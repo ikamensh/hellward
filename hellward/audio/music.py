@@ -27,7 +27,7 @@ Voice = Callable[..., np.ndarray]
 Motif = tuple[tuple[int, float], ...]  # (scale degree relative to the phrase centre, beats)
 Progression = tuple[int, ...]  # chord root degrees, one per bar, cycling
 
-MODES = {"aeolian": (0, 2, 3, 5, 7, 8, 10), "phrygian": (0, 1, 3, 5, 7, 8, 10), "dorian": (0, 2, 3, 5, 7, 9, 10)}
+MODES = {"aeolian": (0, 2, 3, 5, 7, 8, 10), "phrygian": (0, 1, 3, 5, 7, 8, 10)}
 _NOTE_INDEX = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5, "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11}
 SPREAD = (0, 2, 4, 7, 9, 11, 14)  # chord tones stacked in thirds: root, third, fifth, octave, tenth, twelfth, two octaves
 
