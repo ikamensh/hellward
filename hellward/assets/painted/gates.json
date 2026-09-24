@@ -1,0 +1,49 @@
+{
+ "cell": [
+  120,
+  160
+ ],
+ "cols": 3,
+ "rows": 1,
+ "origin": [
+  60,
+  120
+ ],
+ "scale": 2,
+ "pad": [
+  0,
+  0
+ ],
+ "chroma": [
+  255,
+  0,
+  255
+ ],
+ "grid": false,
+ "cells": [
+  {
+   "key": "intact",
+   "col": 0,
+   "row": 0,
+   "tags": {
+    "look": "intact"
+   }
+  },
+  {
+   "key": "damaged",
+   "col": 1,
+   "row": 0,
+   "tags": {
+    "look": "damaged"
+   }
+  },
+  {
+   "key": "broken",
+   "col": 2,
+   "row": 0,
+   "tags": {
+    "look": "broken"
+   }
+  }
+ ]
+}

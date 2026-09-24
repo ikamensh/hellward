@@ -1,0 +1,133 @@
+{
+ "cell": [
+  144,
+  300
+ ],
+ "cols": 4,
+ "rows": 3,
+ "origin": [
+  72,
+  256
+ ],
+ "scale": 2,
+ "pad": [
+  0,
+  0
+ ],
+ "chroma": [
+  255,
+  0,
+  255
+ ],
+ "grid": false,
+ "cells": [
+  {
+   "key": "pyre/0",
+   "col": 0,
+   "row": 0,
+   "tags": {
+    "kind": "pyre",
+    "rank": 0
+   }
+  },
+  {
+   "key": "storm/0",
+   "col": 1,
+   "row": 0,
+   "tags": {
+    "kind": "storm",
+    "rank": 0
+   }
+  },
+  {
+   "key": "frost/0",
+   "col": 2,
+   "row": 0,
+   "tags": {
+    "kind": "frost",
+    "rank": 0
+   }
+  },
+  {
+   "key": "plague/0",
+   "col": 3,
+   "row": 0,
+   "tags": {
+    "kind": "plague",
+    "rank": 0
+   }
+  },
+  {
+   "key": "pyre/1",
+   "col": 0,
+   "row": 1,
+   "tags": {
+    "kind": "pyre",
+    "rank": 1
+   }
+  },
+  {
+   "key": "storm/1",
+   "col": 1,
+   "row": 1,
+   "tags": {
+    "kind": "storm",
+    "rank": 1
+   }
+  },
+  {
+   "key": "frost/1",
+   "col": 2,
+   "row": 1,
+   "tags": {
+    "kind": "frost",
+    "rank": 1
+   }
+  },
+  {
+   "key": "plague/1",
+   "col": 3,
+   "row": 1,
+   "tags": {
+    "kind": "plague",
+    "rank": 1
+   }
+  },
+  {
+   "key": "pyre/2",
+   "col": 0,
+   "row": 2,
+   "tags": {
+    "kind": "pyre",
+    "rank": 2
+   }
+  },
+  {
+   "key": "storm/2",
+   "col": 1,
+   "row": 2,
+   "tags": {
+    "kind": "storm",
+    "rank": 2
+   }
+  },
+  {
+   "key": "frost/2",
+   "col": 2,
+   "row": 2,
+   "tags": {
+    "kind": "frost",
+    "rank": 2
+   }
+  },
+  {
+   "key": "plague/2",
+   "col": 3,
+   "row": 2,
+   "tags": {
+    "kind": "plague",
+    "rank": 2
+   }
+  }
+ ]
+}

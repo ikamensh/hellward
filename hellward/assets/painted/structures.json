@@ -1,0 +1,37 @@
+{
+ "cell": [
+  272,
+  300
+ ],
+ "cols": 2,
+ "rows": 1,
+ "origin": [
+  136,
+  236
+ ],
+ "scale": 2,
+ "pad": [
+  0,
+  0
+ ],
+ "chroma": [
+  255,
+  0,
+  255
+ ],
+ "grid": false,
+ "cells": [
+  {
+   "key": "arch",
+   "col": 0,
+   "row": 0,
+   "tags": {}
+  },
+  {
+   "key": "pillar",
+   "col": 1,
+   "row": 0,
+   "tags": {}
+  }
+ ]
+}

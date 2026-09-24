@@ -15,7 +15,7 @@ from PIL import Image
 from saga2d import RenderLayer, Scene, Sprite, SpriteAnchor
 
 CELL = 6          # logical pixels per light cell
-DARK = 0.56       # opacity of unlit ground
+DARK = 0.5        # opacity of unlit ground
 TINT = 0.16       # how strongly a light colours what it lights
 
 

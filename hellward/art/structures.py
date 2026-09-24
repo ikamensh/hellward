@@ -203,7 +203,7 @@ def _render(mesh: Mesh, canvas: tuple[float, float], origin: tuple[float, float]
 TOWER_CELL = ((72, 150), (36, 128))    # (canvas, origin of the tile centre) in logical px
 GATE_CELL = ((60, 80), (30, 60))
 ARCH_CELL = ((136, 150), (68, 118))
-PILLAR_CELL = ((48, 120), (24, 100))
+PILLAR_CELL = ARCH_CELL                 # the two share a painted sheet, and a sheet has one cell
 
 
 @lru_cache(maxsize=None)

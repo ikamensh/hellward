@@ -138,8 +138,11 @@ def register(game: Game, level: Level, cache_dir: Path) -> Art:
     for look in structures.GATE_LOOKS:
         image = gates.get(look) if gates else None
         assets.image_from_pil(f"gate/{look}", image if image is not None else structures.gate_image(look))
-    assets.image_from_pil("arch", structures.arch_image())
-    assets.image_from_pil("pillar", structures.pillar_image())
+    standing = _painted_cells("structures") or {}
+    assets.image_from_pil("arch", standing.get("arch") or structures.arch_image())
+    assets.image_from_pil("pillar", standing.get("pillar") or structures.pillar_image())
+    if standing:
+        painted.add("structures")
     ground = mapart.ground(level) if not procedural() else mapart.stand_in(level)
     assets.image_from_pil("ground", ground)
     if (PAINTED / "ground.png").exists() and not procedural():

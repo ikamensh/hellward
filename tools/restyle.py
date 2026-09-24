@@ -76,6 +76,7 @@ FRAME_WORDS = {
 FACING_WORDS = {"front": "facing the viewer (walking towards the camera)", "back": "facing away from the viewer",
                 "side": "facing right, in profile (walking to the right)"}
 SPLIT = {"azazel"}   # painted one facing per sheet
+PROVIDERS = ("codex", "openrouter")
 CODEX_MODEL = "gpt-5.5"   # the configured default may be one a ChatGPT account refuses
 
 
@@ -135,33 +136,60 @@ def gate_subject() -> Subject:
     return Subject("gates", sheet, images, prompt, "gates", [k for k, _ in keys])
 
 
+def structure_subject() -> Subject:
+    canvas, origin = structures.ARCH_CELL
+    keys = [("arch", {}), ("pillar", {})]
+    sheet = restyle.Sheet.layout(keys, cols=2, cell=(canvas[0] * DENSITY, canvas[1] * DENSITY),
+                                 origin=(origin[0] * DENSITY, origin[1] * DENSITY), scale=DENSITY)
+    images = {"arch": structures.arch_image(), "pillar": structures.pillar_image()}
+    layout = ("Left: a gothic stone arch standing across a corridor: two square buttressed piers with pinnacles and a pointed arch "
+              "between them, a small gilded ward on the keystone; the opening between the piers stays empty. Right: a gothic stone "
+              "column with a carved base and capital, a three-branched candelabrum with lit candles on top.")
+    prompt = _prompt(sheet, layout, "pieces of a desecrated gothic cathedral: dark grey carved stone, moss and cracks",
+                     "Paint carved gothic stonework in place of the blocks, keeping each outline.")
+    return Subject("structures", sheet, images, prompt, "structures", [k for k, _ in keys])
+
+
 def _prompt(sheet: restyle.Sheet, layout: str, subject: str, fixes: str) -> str:
     w, h = sheet.size
-    return (f"Edit target: the attached sprite sheet. It is a grid of {sheet.rows} rows by {sheet.cols} columns of {sheet.cell[0]}x"
+    return (f"The background of this sprite sheet is a chroma key: it must stay pure flat magenta #FF00FF everywhere outside "
+            f"the figures, as in the attached image. Edit target: the attached sprite sheet. It is a grid of {sheet.rows} rows by {sheet.cols} columns of {sheet.cell[0]}x"
             f"{sheet.cell[1]} px cells on a flat magenta #FF00FF background, inside an empty magenta margin; thin dark grey lines mark "
             f"the cell borders: keep the lines and the margin exactly where they are and keep each figure centred in its own cell. "
             f"{layout}\n\nThe subject: {subject}.\n\n{STYLE}\n\nThe drawings are rough low-poly stand-ins: repaint every cell as the "
             f"finished sprite, drawing the plausible version of whatever the stand-in gets wrong. {fixes}\n\nKeep exactly: each "
             f"figure's position, scale, pose, facing and where it stands. Every cell keeps the flat #FF00FF background with nothing "
-            f"else on it: no ground, no shadow, no glow on the background, no text, no extra objects. Output the same layout.")
+            f"else on it: no ground, no shadow, no glow on the background, no text, no extra objects. Output the same layout.\n\n"
+            f"The magenta is a chroma key that will be cut away: every pixel that is not part of a figure, in the cells and in the "
+            f"margin, must stay pure flat #FF00FF. Do not paint a dark backdrop, a vignette or any lighting on the background.")
 
 
 def subjects(selected: set[str] | None) -> list[Subject]:
-    found = [s for kind in MONSTERS for s in monster_subjects(kind)] + [tower_subject(), gate_subject()]
+    found = [s for kind in MONSTERS for s in monster_subjects(kind)] + [tower_subject(), gate_subject(), structure_subject()]
     if selected:
         found = [s for s in found if s.name in selected or s.install in selected]
     return found
 
 
-def padded(image: Image.Image, aspect: float = 1.5) -> Image.Image:
+def _padded_size(size: tuple[int, int], aspect: float = 1.5) -> tuple[int, int]:
+    w, h = size
+    return (w, round(w / aspect)) if w / h > aspect else (round(h * aspect), h)
+
+
+def padded(image: Image.Image) -> Image.Image:
     w, h = image.size
-    if w / h > aspect:
-        size = (w, round(w / aspect))
-    else:
-        size = (round(h * aspect), h)
+    size = _padded_size(image.size)
     out = Image.new("RGB", size, restyle.MAGENTA)
     out.paste(image.convert("RGB"), ((size[0] - w) // 2, (size[1] - h) // 2))
     return out
+
+
+def unpadded(rendered: Image.Image, sheet_size: tuple[int, int]) -> Image.Image:
+    """The part of the model's output where the sheet was: the padding comes back scaled, never the grid's own frame."""
+    pw, ph = _padded_size(sheet_size)
+    sx, sy = rendered.width / pw, rendered.height / ph
+    x0, y0 = (pw - sheet_size[0]) / 2 * sx, (ph - sheet_size[1]) / 2 * sy
+    return rendered.crop((round(x0), round(y0), round(x0 + sheet_size[0] * sx), round(y0 + sheet_size[1] * sy)))
 
 
 # -- Commands ---------------------------------------------------------------------------------
@@ -176,14 +204,14 @@ def cmd_dump(args: argparse.Namespace) -> None:
         print(f"{s.name}: {s.sheet.size[0]}x{s.sheet.size[1]}, {len(s.sheet.cells)} cells of {s.sheet.cell[0]}x{s.sheet.cell[1]}")
 
 
-def _render(directory: Path, s: Subject, provider: str) -> str:
+def _render(directory: Path, s: Subject, provider: str, effort: str = "low") -> str:
     out = directory / s.name / f"{provider}.png"
     if out.exists():
         return f"{s.name}: kept {out}"
     source = restyle.file(directory / s.name, "input.png")
     prompt = restyle.file(directory / s.name, "prompt.txt").read_text()
     if provider == "codex":
-        restyle.render_with_codex(source, prompt, out, model=CODEX_MODEL, effort="low")
+        restyle.render_with_codex(source, prompt, out, model=CODEX_MODEL, effort=effort)
     else:
         usage = restyle.render_with_openrouter(source, prompt, out, model="google/gemini-3.1-flash-image-preview",
                                                api_key=restyle.openrouter_api_key(), aspect_ratio="3:2", image_size="2K")
@@ -193,7 +221,7 @@ def _render(directory: Path, s: Subject, provider: str) -> str:
 
 def cmd_render(args: argparse.Namespace) -> None:
     with ThreadPoolExecutor(args.jobs) as pool:
-        for line in pool.map(lambda s: _render(args.dir, s, args.provider), subjects(args.subjects)):
+        for line in pool.map(lambda s: _render(args.dir, s, args.provider, args.effort), subjects(args.subjects)):
             print(line, flush=True)
 
 
@@ -206,12 +234,21 @@ def cmd_cut(args: argparse.Namespace) -> None:
         frames: dict[str, Image.Image] = {}
         ok = True
         for s in parts:
-            rendered = args.dir / s.name / f"{args.provider}.png"
-            if not rendered.exists():
-                print(f"{s.name}: not rendered")
+            result = None
+            for provider in (args.provider, *(p for p in PROVIDERS if p != args.provider)):
+                rendered = args.dir / s.name / f"{provider}.png"
+                if not rendered.exists():
+                    continue
+                try:
+                    result = restyle.cut(s.sheet, unpadded(Image.open(rendered), s.sheet.size),
+                                         Image.open(restyle.file(args.dir / s.name, "png")))
+                    break
+                except ValueError as rejected:   # the model broke the sheet (lost the key colour, the grid)
+                    print(f"{s.name} ({provider}): rejected: {rejected}")
+            if result is None:
+                print(f"{s.name}: no render cuts cleanly; render it again")
                 ok = False
                 continue
-            result = restyle.cut(s.sheet, Image.open(rendered), Image.open(restyle.file(args.dir / s.name, "png")))
             print(f"{s.name}: scale {result.registration.scale:.2f}, {len(result.flagged)} of {len(result.report)} cells flagged")
             for r in result.flagged:
                 print(f"   {r.key}: coverage {r.coverage:.3f} vs {r.original_coverage:.3f}, drift {r.drift:.0f}px, edge {r.touches_edge}")
@@ -234,7 +271,7 @@ class _Frames:
 def _whole(install: str) -> restyle.Sheet:
     if install.startswith("mon-"):
         return monster_sheet(install[4:])[0]
-    return {"towers": tower_subject, "gates": gate_subject}[install]().sheet
+    return {"towers": tower_subject, "gates": gate_subject, "structures": structure_subject}[install]().sheet
 
 
 def cmd_preview(args: argparse.Namespace) -> None:
@@ -245,8 +282,8 @@ def cmd_preview(args: argparse.Namespace) -> None:
         if not restyle.file(stem, "json").exists():
             continue
         sheet, painted = restyle.load_frames(stem)
-        original = monster_sheet(install[4:])[1] if install.startswith("mon-") else (
-            tower_subject() if install == "towers" else gate_subject()).images
+        original = monster_sheet(install[4:])[1] if install.startswith("mon-") else {
+            "towers": tower_subject, "gates": gate_subject, "structures": structure_subject}[install]().images
         keys = [c.key for c in sheet.cells]
         per_row = sheet.cols
         rows = []
@@ -307,8 +344,9 @@ def cmd_ground(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--subjects", type=lambda s: set(s.split(",")), default=None)
-    parser.add_argument("--provider", choices=("codex", "openrouter"), default="codex")
+    parser.add_argument("--provider", choices=PROVIDERS, default="codex", help="render with, and cut this one's render first")
     parser.add_argument("--jobs", type=int, default=3)
+    parser.add_argument("--effort", default="low", help="Codex's reasoning effort: raise it when the painter drops instructions")
     parser.add_argument("--tolerance", type=int, default=2, help="flagged cells a sheet may have and still be installed")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("command", choices=("dump", "render", "cut", "preview", "refresh", "ground"))

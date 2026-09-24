@@ -1,0 +1,214 @@
+{
+ "cell": [
+  162,
+  180
+ ],
+ "cols": 7,
+ "rows": 3,
+ "origin": [
+  81.0,
+  140.69883902377123
+ ],
+ "scale": 2,
+ "pad": [
+  0,
+  0
+ ],
+ "chroma": [
+  255,
+  0,
+  255
+ ],
+ "grid": false,
+ "cells": [
+  {
+   "key": "front/walk1",
+   "col": 0,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "front/walk2",
+   "col": 1,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "front/walk3",
+   "col": 2,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "front/walk4",
+   "col": 3,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "front/wind",
+   "col": 4,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "front/strike",
+   "col": 5,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "front/recover",
+   "col": 6,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "recover"
+   }
+  },
+  {
+   "key": "back/walk1",
+   "col": 0,
+   "row": 1,
+   "tags": {
+    "facing": "back",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "back/walk2",
+   "col": 1,
+   "row": 1,
+   "tags": {
+    "facing": "back",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "back/walk3",
+   "col": 2,
+   "row": 1,
+   "tags": {
+    "facing": "back",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "back/walk4",
+   "col": 3,
+   "row": 1,
+   "tags": {
+    "facing": "back",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "back/wind",
+   "col": 4,
+   "row": 1,
+   "tags": {
+    "facing": "back",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "back/strike",
+   "col": 5,
+   "row": 1,
+   "tags": {
+    "facing": "back",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "back/recover",
+   "col": 6,
+   "row": 1,
+   "tags": {
+    "facing": "back",
+    "frame": "recover"
+   }
+  },
+  {
+   "key": "side/walk1",
+   "col": 0,
+   "row": 2,
+   "tags": {
+    "facing": "side",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "side/walk2",
+   "col": 1,
+   "row": 2,
+   "tags": {
+    "facing": "side",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "side/walk3",
+   "col": 2,
+   "row": 2,
+   "tags": {
+    "facing": "side",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "side/walk4",
+   "col": 3,
+   "row": 2,
+   "tags": {
+    "facing": "side",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "side/wind",
+   "col": 4,
+   "row": 2,
+   "tags": {
+    "facing": "side",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "side/strike",
+   "col": 5,
+   "row": 2,
+   "tags": {
+    "facing": "side",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "side/recover",
+   "col": 6,
+   "row": 2,
+   "tags": {
+    "facing": "side",
+    "frame": "recover"
+   }
+  }
+ ]
+}

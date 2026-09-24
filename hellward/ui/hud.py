@@ -239,14 +239,17 @@ class Hud:
 
     def _chronicle(self) -> None:
         scene = self.scene
-        y = 16
-        for stamp, text, color in self.log:
-            age = self.clock - stamp
-            if age > 14:
-                continue
+        lines = [(self.clock - stamp, text, color) for stamp, text, color in self.log if self.clock - stamp <= 14]
+        if not lines:
+            return
+        width = max(scene.game.backend.measure_text(text, 13, style.TEXT_FONT)[0] for _, text, _ in lines) + 20
+        backing = min(1.0, (14 - min(age for age, _, _ in lines)) / 3)
+        scene.draw_rect(46, 6, width, 18 * len(lines) + 8, (10, 6, 8, int(170 * backing)), radius=4)
+        y = 19
+        for age, text, color in lines:
             alpha = int(255 * min(1.0, (14 - age) / 3))
-            scene.draw_text(text, 55, y + 1, font_size=13, color=(0, 0, 0, alpha), anchor_y="center")
-            scene.draw_text(text, 54, y, font_size=13, color=color[:3] + (alpha,), anchor_y="center")
+            scene.draw_text(text, 57, y + 1, font_size=13, color=(0, 0, 0, alpha), anchor_y="center")
+            scene.draw_text(text, 56, y, font_size=13, color=color[:3] + (alpha,), anchor_y="center")
             y += 18
 
     def _banners(self) -> None:
