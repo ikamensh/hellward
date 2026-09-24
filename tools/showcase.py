@@ -121,9 +121,9 @@ def film(out: Path, seed: int, shots: list[float], seconds: float, fps: int, lea
     frames_dir.mkdir(parents=True)
     cache = Path.home() / ".hellward" / "cache"
     cache.mkdir(parents=True, exist_ok=True)
-    SoundBank.prepare(cache, wait=True)
     game = Game("Hellward", resolution=(1280, 800), backend="pyglet", visible=False, asset_path=cache)
     art = build(game, cache)
+    SoundBank.prepare(cache, wait=True)   # the music too, before filming starts
     recorder = Recorder(game.audio)
     bank = SoundBank(game, clock=lambda: recorder.frame / fps)   # the voice budget keeps the film's time, not the wall's
     scene = BattleScene(art, seed=seed, planner=planner.smart, autopilot=Defender(), sound=bank)

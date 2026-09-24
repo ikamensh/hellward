@@ -7,8 +7,12 @@ in the middle and fade to the element's colour at the edge, so layered over the 
 
 from __future__ import annotations
 
+import hashlib
 import math
 import random
+from functools import partial
+from pathlib import Path
+from typing import Callable
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter
@@ -147,28 +151,48 @@ def orb(liquid: tuple[int, int, int], fill: float, size: int = 116) -> Image.Ima
 ORB_LEVELS = 40
 
 
-def register(game: Game) -> None:
-    assets = game.assets
+def textures() -> dict[str, Callable[[], Image.Image]]:
+    """Every texture by name, as a recipe."""
     d = DENSITY
+    out: dict[str, Callable[[], Image.Image]] = {}
     for name, color in ELEMENT_COLORS.items():
-        assets.image_from_pil(f"fx/glow/{name}", glow(color, 64 * d))
-        assets.image_from_pil(f"fx/soft/{name}", glow(color, 64 * d, falloff=1.4, core=0.0))
-        assets.image_from_pil(f"fx/ring/{name}", ring(color, 160 * d))
-        assets.image_from_pil(f"fx/trail/{name}", bolt_trail(color, 48 * d, 14 * d))
-        assets.image_from_pil(f"fx/sigil/{name}", sigil(color, 96 * d))
-    assets.image_from_pil("fx/spark", glow((255, 230, 180), 12 * d, falloff=1.5, core=0.5))
-    assets.image_from_pil("fx/shard", shard((190, 235, 255), 20 * d))
+        out[f"fx/glow/{name}"] = partial(glow, color, 64 * d)
+        out[f"fx/soft/{name}"] = partial(glow, color, 64 * d, falloff=1.4, core=0.0)
+        out[f"fx/ring/{name}"] = partial(ring, color, 160 * d)
+        out[f"fx/trail/{name}"] = partial(bolt_trail, color, 48 * d, 14 * d)
+        out[f"fx/sigil/{name}"] = partial(sigil, color, 96 * d)
+    out["fx/spark"] = partial(glow, (255, 230, 180), 12 * d, falloff=1.5, core=0.5)
+    out["fx/shard"] = partial(shard, (190, 235, 255), 20 * d)
     for i in range(3):
-        assets.image_from_pil(f"fx/smoke/{i}", smoke((70, 64, 64), 48 * d, seed=i))
-        assets.image_from_pil(f"fx/venom/{i}", smoke((90, 170, 40), 48 * d, seed=10 + i))
-        assets.image_from_pil(f"fx/miasma/{i}", smoke((110, 30, 140), 48 * d, seed=20 + i))
-    assets.image_from_pil("fx/shadow", shadow(64 * d, 24 * d))
-    assets.image_from_pil("fx/blood", _splat((110, 8, 12), 40 * d, 1))
-    assets.image_from_pil("fx/ichor", _splat((60, 90, 30), 40 * d, 2))
-    assets.image_from_pil("fx/dust", _splat((150, 144, 130), 40 * d, 3))
+        out[f"fx/smoke/{i}"] = partial(smoke, (70, 64, 64), 48 * d, seed=i)
+        out[f"fx/venom/{i}"] = partial(smoke, (90, 170, 40), 48 * d, seed=10 + i)
+        out[f"fx/miasma/{i}"] = partial(smoke, (110, 30, 140), 48 * d, seed=20 + i)
+    out["fx/shadow"] = partial(shadow, 64 * d, 24 * d)
+    out["fx/blood"] = partial(_splat, (110, 8, 12), 40 * d, 1)
+    out["fx/ichor"] = partial(_splat, (60, 90, 30), 40 * d, 2)
+    out["fx/dust"] = partial(_splat, (150, 144, 130), 40 * d, 3)
     for i in range(ORB_LEVELS + 1):
-        assets.image_from_pil(f"ui/orb/life/{i}", orb((190, 14, 20), i / ORB_LEVELS, 116 * d))
-        assets.image_from_pil(f"ui/orb/mana/{i}", orb((30, 60, 210), i / ORB_LEVELS, 116 * d))
+        out[f"ui/orb/life/{i}"] = partial(orb, (190, 14, 20), i / ORB_LEVELS, 116 * d)
+        out[f"ui/orb/mana/{i}"] = partial(orb, (30, 60, 210), i / ORB_LEVELS, 116 * d)
+    out["ui/panel"] = partial(panel, 1280 * d, 128 * d)
+    out["ui/slot"] = partial(slot, 68 * d, False)
+    out["ui/slot_lit"] = partial(slot, 68 * d, True)
+    return out
+
+
+def register(game: Game, cache_dir: Path) -> None:
+    """Draw every texture once into ``cache_dir/fx-<hash of this file>`` and register them all from there."""
+    folder = cache_dir / f"fx-{hashlib.sha1(Path(__file__).read_bytes()).hexdigest()[:12]}"
+    folder.mkdir(parents=True, exist_ok=True)
+    for name, make in textures().items():
+        path = folder / (name.replace("/", "_") + ".png")
+        if path.exists():
+            image = Image.open(path)
+            image.load()
+        else:
+            image = make()
+            image.save(path)
+        game.assets.image_from_pil(name, image)
 
 
 def _splat(color: tuple[int, int, int], size: int, seed: int) -> Image.Image:
@@ -218,8 +242,3 @@ def slot(size: int, lit: bool) -> Image.Image:
         image = Image.alpha_composite(image, warm)
     return image
 
-
-def register_ui(game: Game) -> None:
-    game.assets.image_from_pil("ui/panel", panel(1280 * DENSITY, 128 * DENSITY))
-    game.assets.image_from_pil("ui/slot", slot(68 * DENSITY, False))
-    game.assets.image_from_pil("ui/slot_lit", slot(68 * DENSITY, True))

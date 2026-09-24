@@ -72,22 +72,28 @@ class _Uncut:
 
 
 def _load_monster(kind: str, cache: Path) -> tuple[restyle.Sheet, dict[str, Image.Image], bool]:
-    wanted = {f"{facing}/{frame}" for frame in figures.frames(kind) for facing in figures.FACINGS}
-    painted = PAINTED / f"mon-{kind}"
-    if not procedural() and restyle.file(painted, "json").exists():
-        sheet, frames = restyle.load_frames(painted)
-        if set(frames) == wanted:
-            return sheet, frames, True
+    if _painted_matches(kind):
+        sheet, frames = restyle.load_frames(PAINTED / f"mon-{kind}")
+        return sheet, frames, True
+    if not procedural() and restyle.file(PAINTED / f"mon-{kind}", "json").exists():
         warnings.warn(f"painted sheet for {kind} no longer matches its frames; drawing the stand-in")
     sheet, frames = restyle.load_frames(cache / f"mon-{kind}")
     return sheet, frames, False
 
 
+def _painted_matches(kind: str) -> bool:
+    stem = PAINTED / f"mon-{kind}"
+    if procedural() or not restyle.file(stem, "json").exists():
+        return False
+    wanted = {f"{facing}/{frame}" for frame in figures.frames(kind) for facing in figures.FACINGS}
+    return {c.key for c in restyle.Sheet.load(stem).cells} == wanted
+
+
 def warm(cache_dir: Path) -> Path:
-    """Render every missing stand-in into the cache, in parallel; returns the cache folder."""
+    """Render every missing stand-in the paintings do not replace into the cache, in parallel; returns the folder."""
     cache = cache_dir / f"art-{art_version()}"
     cache.mkdir(parents=True, exist_ok=True)
-    missing = [k for k in MONSTERS if not restyle.file(cache / f"mon-{k}", "json").exists()]
+    missing = [k for k in MONSTERS if not _painted_matches(k) and not restyle.file(cache / f"mon-{k}", "json").exists()]
     if missing:
         with ProcessPoolExecutor(min(len(missing), os.cpu_count() or 4)) as pool:
             list(pool.map(_render_kind, missing, [cache] * len(missing)))

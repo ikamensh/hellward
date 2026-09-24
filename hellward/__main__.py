@@ -15,7 +15,7 @@ from hellward.sim.model import World
 from hellward.ui import style
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
 from hellward.ui.thinking import Thinker
-from hellward.ui.title import ReckoningScene, TitleScene
+from hellward.ui.title import LoadingScene, ReckoningScene, TitleScene
 
 DATA = Path.home() / ".hellward"
 
@@ -23,9 +23,13 @@ DATA = Path.home() / ".hellward"
 def build(game: Game, cache: Path):
     style.load_fonts(game)
     game.theme = style.theme()
+    loading = LoadingScene()
+    game.push(loading)
+    game.tick(1 / 60)   # the first launch spends a while drawing textures and sounds: show that it is alive
+    SoundBank.prepare(cache)
     art = sprites.register(game, CATHEDRAL, cache)
-    fx.register(game)
-    fx.register_ui(game)
+    fx.register(game, cache)
+    game.pop()
     return art
 
 
@@ -39,7 +43,6 @@ def main(argv: list[str] | None = None) -> None:
     cache.mkdir(parents=True, exist_ok=True)
     game = Game("Hellward", resolution=(WIDTH, HEIGHT), fullscreen=args.fullscreen, asset_path=cache,
                 save_dir=DATA / "saves")
-    SoundBank.prepare(cache)
     art = build(game, cache)
     sound = SoundBank(game)
     thinker = Thinker()
