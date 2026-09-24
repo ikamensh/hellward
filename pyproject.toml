@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hellward"
+version = "0.1.0"
+description = "Hellward — a gothic tower defence where demon leaders curse your towers"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Ilya Kamenshchikov", email = "ilya.kamenshchikov@gmail.com" }]
+dependencies = ["saga2d==0.3.12", "sagaforge"]
+
+[project.optional-dependencies]
+dev = ["pytest>=9.0.2"]
+
+[project.scripts]
+hellward = "hellward.__main__:main"
+
+[tool.uv.sources]
+sagaforge = { path = "../sagaforge", editable = true }
+
+[tool.hatch.build.targets.wheel]
+packages = ["hellward"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

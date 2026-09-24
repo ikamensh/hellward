@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+.pytest_cache/
+.claude/*
+*.png
+*.gif
+*.wav
+!hellward/assets/**/*.png
+!hellward/assets/**/*.wav
