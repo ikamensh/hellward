@@ -350,6 +350,11 @@ class BattleScene(Scene):
         self.fx.draw()
         self.hud.draw(placing=self.placing, selected=self.selected, hovered=hovered, speed=self.speed, paused=self.paused,
                       thoughts=self.fx.show_thoughts, mouse=mouse, costs=self.cost)
+        if mouse is not None and mouse[1] < 672 and self.placing is None and hovered is None:
+            tile = self.tile_at(*self.camera.screen_to_world(*mouse))
+            tower = world.tower_at(tile) if tile is not None else None
+            if tower is not None:
+                self.hud.tower_tip(tower, mouse)
         if self.paused:
             with self.screen_layer(4):
                 self.draw_text("Paused", 640, 330, style="banner", anchor_x="center", anchor_y="center")

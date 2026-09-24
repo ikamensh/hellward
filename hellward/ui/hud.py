@@ -188,6 +188,8 @@ class Hud:
             leaders = world.leaders()
             if leaders:
                 status += f", {len(leaders)} leader{'s' if len(leaders) > 1 else ''} among them"
+        elif world.wave < 0:
+            status = "Towers (1-4) beside the carpet, gates (5) in the arches."
         elif world.break_left is not None:
             status = f"The next wave comes in {world.break_left:.0f}s"
         else:
@@ -263,14 +265,24 @@ class Hud:
             if b.subtitle:
                 scene.draw_text(b.subtitle, 640, 334, font_size=17, color=style.BONE[:3] + (alpha,), anchor_x="center", anchor_y="center")
 
-    def _tooltip(self, tip: str, mouse: tuple[float, float]) -> None:
+    def tower_tip(self, tower: Tower, mouse: tuple[float, float]) -> None:
+        """What a tower on the map is, and what is cursing it."""
+        lines = [f"{tower.kind.name} {'I' * (tower.level + 1)}  ({ELEMENT_NAMES[tower.kind.element]})"]
+        for curse, left in sorted(tower.curses.items(), key=lambda kv: -kv[1]):
+            lines.append(f"{CURSES[curse].name}, {left:.0f}s: {CURSES[curse].blurb}")
+        if not tower.curses:
+            lines.append("Click to upgrade, sell or cleanse it.")
+        with self.scene.screen_layer(5):
+            self._tooltip("\n".join(lines), mouse, above=mouse[1] - 30)
+
+    def _tooltip(self, tip: str, mouse: tuple[float, float], above: float = TOP - 8) -> None:
         scene = self.scene
         lines = tip.split("\n")
         width = 320
         layout = [scene.layout_text(line, width - 20, font_size=13) for line in lines]
         height = sum(l.height for l in layout) + 10 * len(layout) + 8
         x = min(max(mouse[0] - width / 2, 44), 1236 - width)
-        y = TOP - height - 8
+        y = max(4, above - height)
         scene.draw_rect(x, y, width, height, (16, 12, 12, 240), border_color=style.PANEL_EDGE, border_width=1.5, radius=4)
         yy = y + 8
         for i, line in enumerate(lines):
