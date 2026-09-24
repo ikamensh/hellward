@@ -97,6 +97,7 @@ class BattleScene(Scene):
         if world.outcome is not None:
             self.ended += dt
             if self.ended > 3.0 and self.on_end is not None:
+                self.hud.banners.clear()   # the reckoning is drawn over this scene
                 callback, self.on_end = self.on_end, None
                 callback(world)
 
@@ -173,6 +174,8 @@ class BattleScene(Scene):
             sound.play("curse")
         elif kind == "fizzle":
             sound.play("fizzle")
+        elif kind == "ponder":
+            sound.play("ponder", volume=0.6)
         elif kind == "plan":
             decision = e[2]
             leader = world.monster(e[1])

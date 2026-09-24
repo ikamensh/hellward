@@ -66,18 +66,20 @@ class ReckoningScene(Scene):
         self.ui.add(Column(
             Button("Defend again", shortcut="Enter", on_click=self.again, width=280),
             Button("To the title", shortcut="Esc", on_click=self.title, width=280),
-            anchor=Anchor.CENTER, margin=(0, 150), spacing=10))
+            anchor=Anchor.BOTTOM, margin=(0, 190), spacing=10))
 
     def draw(self) -> None:
         world = self.world
         won = world.outcome == "victory"
         self.draw_rect(0, 0, 1280, 800, (0, 0, 0, 185))
         title = "The Sanctuary Holds" if won else "The Sanctuary Has Fallen"
-        self.draw_text(title, 640, 230, style="title", color=style.GOLD if won else style.BLOOD, anchor_x="center", anchor_y="center")
+        self.draw_text(title, 643, 213, style="title", color=(0, 0, 0, 230), anchor_x="center", anchor_y="center")
+        self.draw_text(title, 640, 210, style="title", color=style.GOLD if won else style.BLOOD, anchor_x="center", anchor_y="center")
         lines = [
             f"Waves withstood: {world.wave + (1 if won else 0)} of {len(world.waves)}",
             f"Monsters slain: {world.kills}",
             f"Life kept: {world.lives} of {START_LIVES}",
+            f"Curses the leaders laid on your towers: {world.curses_landed}, and you cleansed {world.cleanses}",
         ]
         for i, line in enumerate(lines):
-            self.draw_text(line, 640, 310 + i * 30, font_size=19, color=style.BONE, anchor_x="center", anchor_y="center")
+            self.draw_text(line, 640, 300 + i * 32, font_size=19, color=style.BONE, anchor_x="center", anchor_y="center")

@@ -200,6 +200,8 @@ class World:
         self.forced: list[ForcedCurse] = []
         self.outcome: str | None = None       # "victory" or "defeat"
         self.kills = 0
+        self.curses_landed = 0
+        self.cleanses = 0
         self._next_id = 1
 
     # -- Copies for the planner ---------------------------------------------------------
@@ -218,6 +220,7 @@ class World:
         w.wave, w.schedule, w.wave_time, w.break_left = self.wave, list(self.schedule), self.wave_time, self.break_left
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
         w.leaked_life, w.forced, w.outcome, w.kills, w._next_id = self.leaked_life, [], self.outcome, self.kills, self._next_id
+        w.curses_landed, w.cleanses = self.curses_landed, self.cleanses
         return w
 
     def _id(self) -> int:
@@ -323,6 +326,7 @@ class World:
         if self.mana < CLEANSE_COST:
             raise Refused(f"Cleansing takes {CLEANSE_COST:.0f} mana.")
         self.mana -= CLEANSE_COST
+        self.cleanses += 1
         lifted = sorted(tower.curses)
         tower.curses.clear()
         self._emit("cleansed", tower.id, lifted)
@@ -418,6 +422,7 @@ class World:
             if m.cooldown <= 0 and self.planner is not None and self.towers:
                 m.asking = _ASK
                 m.ask_left = DECIDE_DELAY
+                self._emit("ponder", m.id)
 
     def _land(self, leader_id: int, curse: Curse, tower_id: int) -> None:
         leader = self.monster(leader_id)
@@ -431,6 +436,7 @@ class World:
             self._emit("fizzle", leader_id, tower_id)
             return
         tower.curses[curse] = CURSES[curse].duration
+        self.curses_landed += 1
         self._emit("cursed", leader_id, tower_id, curse)
 
     def _move(self, dt: float) -> None:
