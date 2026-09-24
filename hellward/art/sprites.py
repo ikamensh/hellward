@@ -49,10 +49,11 @@ class Cell:
 
 
 def monster_sheet(kind: str) -> tuple[restyle.Sheet, dict[str, Image.Image]]:
-    """The stand-in frames of one monster as a restyle sheet: facings across, frames down."""
+    """The stand-in frames of one monster as a restyle sheet: a row per facing, its frames across."""
     (w, h), origin = figures.cell(kind)
-    keys = [(f"{facing}/{frame}", {"facing": facing, "frame": frame}) for frame in figures.frames(kind) for facing in figures.FACINGS]
-    sheet = restyle.Sheet.layout(keys, cols=len(figures.FACINGS), cell=(w * DENSITY, h * DENSITY),
+    frames = figures.frames(kind)
+    keys = [(f"{facing}/{frame}", {"facing": facing, "frame": frame}) for facing in figures.FACINGS for frame in frames]
+    sheet = restyle.Sheet.layout(keys, cols=len(frames), cell=(w * DENSITY, h * DENSITY),
                                  origin=(origin[0] * DENSITY, origin[1] * DENSITY), scale=DENSITY)
     images = {key: figures.render(kind, tags["facing"], tags["frame"]) for key, tags in keys}
     return sheet, images

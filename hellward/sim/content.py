@@ -171,16 +171,16 @@ WAVES: tuple[Wave, ...] = (
     Wave((Group("fallen", 12, 0.9), Group("shaman", 1, 1, start=5.0)), 50, hp=1.1),
     Wave((Group("skeleton", 10, 1.2), Group("fallen", 6, 0.8, start=4.0)), 60, hp=1.25),
     Wave((Group("zombie", 7, 1.8), Group("fallen", 10, 0.8, start=2.0), Group("shaman", 2, 5.0, start=5.0)), 70, hp=1.4),
-    Wave((Group("goatman", 12, 1.0), Group("gargoyle", 5, 1.4, start=6.0), Group("shaman", 1, 1, start=8.0)), 80, hp=1.55),
-    Wave((Group("skeleton", 14, 0.8), Group("overlord", 2, 6.0, start=3.0), Group("priest", 1, 1, start=6.0)), 90, hp=1.75),
+    Wave((Group("goatman", 12, 1.0), Group("gargoyle", 5, 1.4, start=6.0), Group("shaman", 1, 1, start=8.0)), 80, hp=1.53),
+    Wave((Group("skeleton", 14, 0.8), Group("overlord", 2, 6.0, start=3.0), Group("priest", 1, 1, start=6.0)), 90, hp=1.69),
     Wave((Group("zombie", 8, 1.4), Group("goatman", 10, 0.9, start=3.0), Group("witch", 1, 1, start=5.0),
-          Group("shaman", 1, 1, start=9.0)), 100, hp=1.95),
+          Group("shaman", 1, 1, start=9.0)), 100, hp=1.87),
     Wave((Group("gargoyle", 10, 0.9), Group("overlord", 3, 5.0, start=2.0), Group("goatman", 8, 1.0, start=4.0),
-          Group("priest", 1, 1, start=6.0), Group("witch", 1, 1, start=10.0)), 110, hp=2.15),
+          Group("priest", 1, 1, start=6.0), Group("witch", 1, 1, start=10.0)), 110, hp=2.05),
     Wave((Group("skeleton", 16, 0.6), Group("zombie", 8, 1.2, start=2.0), Group("overlord", 3, 4.0, start=5.0),
-          Group("shaman", 1, 1, start=4.0), Group("priest", 1, 1, start=8.0), Group("witch", 1, 1, start=12.0)), 120, hp=2.3),
+          Group("shaman", 1, 1, start=4.0), Group("priest", 1, 1, start=8.0), Group("witch", 1, 1, start=12.0)), 120, hp=2.2),
     Wave((Group("azazel", 1, 1, start=4.0), Group("fallen", 16, 0.7), Group("goatman", 10, 1.0, start=6.0),
-          Group("priest", 1, 1, start=2.0), Group("witch", 1, 1, start=7.0), Group("gargoyle", 6, 1.0, start=12.0)), 0, hp=2.45),
+          Group("priest", 1, 1, start=2.0), Group("witch", 1, 1, start=7.0), Group("gargoyle", 6, 1.0, start=12.0)), 0, hp=2.35),
 )
 
 START_GOLD = 260

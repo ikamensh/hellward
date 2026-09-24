@@ -298,7 +298,7 @@ def azazel(pose: Pose) -> Mesh:
 
 def priest(pose: Pose) -> Mesh:
     bone = (222, 214, 190)
-    robe = (64, 44, 86)
+    robe = (62, 50, 44)   # ash and soot: nothing near the magenta the sheets are keyed on
     b = Build(hip=0.3, leg_w=0.05, torso=(0.22, 0.14, 0.26), head=0.09, arm_len=0.24, arm_w=0.05,
               skin=bone, legs_color=robe, body_color=robe, robe=robe, hunch=6)
     head = r3.sphere((0, 0, 0), b.head, bone, rings=4, sides=7)

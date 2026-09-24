@@ -30,9 +30,10 @@ SHORTLIST = 10         # (curse, tower) pairs that get a rollout
 DELAYS = (2.0, 4.0)    # later moments tried for the best targets
 LATER_TRIED = 3
 LATER_MARGIN = 1.2     # waiting must beat casting now by this factor ...
-MIN_GAIN = 15.0        # ... and by this much life; a curse worth less than this is not cast
+MIN_GAIN = 5.0         # ... and by this much life; a curse is free but for its cooldown, so only noise is not cast
 QUIET_RETRY = 1.5      # when nothing is worth cursing
 SAMPLE = 0.5           # the estimate's time step
+LASTING = 0.5          # the weight of the pack's average life over the look-ahead in a rollout's score
 
 
 @dataclass(frozen=True)
@@ -178,9 +179,11 @@ def horizon(leader: Monster) -> float:
     return max(CURSES[c].duration for c in leader.kind.leader.curses) + HORIZON_PAD
 
 
-def utility(after: World, before: World) -> float:
-    """What the pack has left: standing life, sanctuary life (weighted), and life knocked off doors."""
-    life = sum(m.hp for m in after.monsters) + after.leaked_life - before.leaked_life
+def utility(after: World, before: World, lasting: float = 0.0) -> float:
+    """What the pack has left: standing life, sanctuary life (weighted), life knocked off doors, and
+    *lasting*, its life averaged over the look-ahead: a monster that dies later has walked further and
+    held the towers' fire longer, even when every one of them is dead by the end."""
+    life = sum(m.hp for m in after.monsters) + after.leaked_life - before.leaked_life + LASTING * lasting
     for d0, d1 in zip(before.doors, after.doors):
         if d0.built:
             life += d0.hp - (d1.hp if d1.built else 0.0)
@@ -194,9 +197,11 @@ def rollout(world: World, leader_id: int, option: Option | None, seconds: float,
         at = world.time + DECIDE_DELAY + leader.kind.leader.channel + option.delay
         w.forced.append(ForcedCurse(at, leader_id, option.curse, option.tower))
     end = world.time + seconds - 1e-9
+    lasting = 0.0
     while w.time < end and w.outcome is None:
         w.step(dt)
-    return utility(w, world)
+        lasting += sum(m.hp for m in w.monsters) * dt
+    return utility(w, world, lasting / seconds)
 
 
 def decide(world: World, leader_id: int, *, dt: float = ROLLOUT_DT, shortlist: int = SHORTLIST,
