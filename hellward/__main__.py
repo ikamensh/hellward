@@ -8,6 +8,7 @@ from pathlib import Path
 from saga2d import Game
 
 from hellward.art import fx, sprites
+from hellward.audio.bank import SoundBank
 from hellward.sim.autoplay import Defender
 from hellward.sim.level import CATHEDRAL
 from hellward.sim.model import World
@@ -17,16 +18,6 @@ from hellward.ui.thinking import Thinker
 from hellward.ui.title import ReckoningScene, TitleScene
 
 DATA = Path.home() / ".hellward"
-
-
-def sound_bank(game: Game, cache: Path):
-    """The game's sounds, when the audio module is present; silence otherwise."""
-    try:
-        from hellward.audio.bank import SoundBank
-    except ImportError:
-        return None
-    SoundBank.prepare(cache)
-    return SoundBank(game)
 
 
 def build(game: Game, cache: Path):
@@ -48,14 +39,14 @@ def main(argv: list[str] | None = None) -> None:
     cache.mkdir(parents=True, exist_ok=True)
     game = Game("Hellward", resolution=(WIDTH, HEIGHT), fullscreen=args.fullscreen, asset_path=cache,
                 save_dir=DATA / "saves")
+    SoundBank.prepare(cache)
     art = build(game, cache)
-    sound = sound_bank(game, cache)
+    sound = SoundBank(game)
     thinker = Thinker()
 
     def title() -> None:
         game.replace(TitleScene(begin, game.quit))
-        if sound is not None:
-            sound.music("title")
+        sound.music("title")
 
     def begin(autopilot: bool) -> None:
         game.replace(BattleScene(art, seed=args.seed, planner=thinker, sound=sound,
@@ -68,8 +59,7 @@ def main(argv: list[str] | None = None) -> None:
         if args.demo:
             game.run(BattleScene(art, seed=args.seed, planner=thinker, sound=sound, autopilot=Defender(), on_end=end))
         else:
-            if sound is not None:
-                sound.music("title")
+            sound.music("title")
             game.run(TitleScene(begin, game.quit))
     finally:
         thinker.close()

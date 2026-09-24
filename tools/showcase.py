@@ -45,10 +45,72 @@ def moments(seed: int, limit: float = 900.0) -> list[tuple[float, str]]:
     return found
 
 
+class Recorder:
+    """Stands between the sound bank and the game's audio: remembers what would play, and at which frame."""
+
+    def __init__(self, audio) -> None:
+        self.audio = audio
+        self.frame = -1          # frames are only counted while filming
+        self.sounds: list[tuple[int, str, float, float]] = []
+        self.music: list[tuple[int, str]] = []
+        self._play_sound, self._play_music = audio.play_sound, audio.play_music
+        audio.play_sound, audio.play_music = self.play_sound, self.play_music
+
+    def play_sound(self, name: str, *, volume: float = 1.0, pitch: float = 1.0) -> None:
+        if self.frame >= 0:
+            self.sounds.append((self.frame, name, volume, pitch))
+        self._play_sound(name, volume=volume, pitch=pitch)
+
+    def play_music(self, name: str, *, loop: bool = True, fade: float = 0.0) -> None:
+        self.music.append((max(self.frame, 0), name))
+        self._play_music(name, loop=loop, fade=fade)
+
+
+def soundtrack(recorder: Recorder, cache: Path, frames: int, fps: int, path: Path) -> None:
+    """Mix what the bank played into one stereo track: the music under, every cue at its frame."""
+    import numpy as np
+
+    from sagaforge.foley import read_wav
+    from sagaforge.synth import write_wav
+
+    rate = 44_100
+    length = int(frames / fps * rate) + rate
+    mix = np.zeros((length, 2), dtype=np.float64)
+    tracks = recorder.music or [(0, "battle")]
+    for i, (start, name) in enumerate(tracks):
+        end = tracks[i + 1][0] if i + 1 < len(tracks) else frames
+        clip = _stereo(read_wav(cache / "music" / f"{name}.wav"))
+        a, b = int(start / fps * rate), int(end / fps * rate)
+        reps = np.resize(clip, (b - a, 2)) if b > a else clip[:0]
+        mix[a:b] += reps * 0.45
+    for frame, name, volume, pitch in recorder.sounds:
+        clip = _stereo(read_wav(cache / "sounds" / f"{name}.wav"))
+        if pitch != 1.0:
+            idx = np.arange(0, len(clip) - 1, pitch)
+            clip = np.stack([np.interp(idx, np.arange(len(clip)), clip[:, c]) for c in range(2)], axis=1)
+        a = int(frame / fps * rate)
+        b = min(length, a + len(clip))
+        mix[a:b] += clip[: b - a] * volume * 0.8
+    peak = np.abs(mix).max()
+    if peak > 0.95:
+        mix *= 0.95 / peak
+    write_wav(path, mix[: int(frames / fps * rate)].astype(np.float32))
+
+
+def _stereo(clip):
+    import numpy as np
+
+    return np.stack([clip, clip], axis=1) if clip.ndim == 1 else clip
+
+
 def film(out: Path, seed: int, shots: list[float], seconds: float, fps: int, lead: float) -> None:
+    import os
+
+    os.environ.setdefault("SAGA2D_SILENT", "1")
     from saga2d import Game
 
     from hellward.__main__ import build
+    from hellward.audio.bank import SoundBank
     from hellward.sim import planner
     from hellward.sim.autoplay import Defender
     from hellward.ui.battle import BattleScene
@@ -59,9 +121,12 @@ def film(out: Path, seed: int, shots: list[float], seconds: float, fps: int, lea
     frames_dir.mkdir(parents=True)
     cache = Path.home() / ".hellward" / "cache"
     cache.mkdir(parents=True, exist_ok=True)
+    SoundBank.prepare(cache, wait=True)
     game = Game("Hellward", resolution=(1280, 800), backend="pyglet", visible=False, asset_path=cache)
     art = build(game, cache)
-    scene = BattleScene(art, seed=seed, planner=planner.smart, autopilot=Defender())
+    recorder = Recorder(game.audio)
+    bank = SoundBank(game, clock=lambda: recorder.frame / fps)   # the voice budget keeps the film's time, not the wall's
+    scene = BattleScene(art, seed=seed, planner=planner.smart, autopilot=Defender(), sound=bank)
     game.push(scene)
     index = 0
     dt = 1 / fps
@@ -73,6 +138,7 @@ def film(out: Path, seed: int, shots: list[float], seconds: float, fps: int, lea
         scene.speed = 1.0
         taken = 0
         while taken < seconds * fps:
+            recorder.frame = index
             game.tick(dt)
             image = game.backend.capture_frame().convert("RGB").resize((1280, 800))
             image.save(frames_dir / f"{index:05d}.png")
@@ -80,9 +146,12 @@ def film(out: Path, seed: int, shots: list[float], seconds: float, fps: int, lea
                 image.save(out / f"still-{int(shot):04d}.png")
             index += 1
             taken += 1
+        recorder.frame = -1
     game.close()
+    soundtrack(recorder, cache, index, fps, frames_dir / "sound.wav")
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(fps), "-i", str(frames_dir / "%05d.png"),
-                    "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", str(out / "clip.mp4")], check=True)
+                    "-i", str(frames_dir / "sound.wav"), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20",
+                    "-c:a", "aac", "-b:a", "160k", "-shortest", str(out / "clip.mp4")], check=True)
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(out / "clip.mp4"), "-vf",
                     "fps=15,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=160[p];[b][p]paletteuse=dither=bayer",
                     str(out / "clip.gif")], check=True)

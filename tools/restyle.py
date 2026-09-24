@@ -76,6 +76,9 @@ FRAME_WORDS = {
 FACING_WORDS = {"front": "facing the viewer (walking towards the camera)", "back": "facing away from the viewer",
                 "side": "facing right, in profile (walking to the right)"}
 SPLIT = {"azazel"}   # painted one facing per sheet
+#: Sheets laid out in fewer columns than they have frames: a single row padded to 3:2 leaves an empty field
+#: that both models filled (with a dark backdrop, or with giant figures).
+COLUMNS = {"mon-azazel@side": 4}
 PROVIDERS = ("codex", "openrouter")
 CODEX_MODEL = "gpt-5.5"   # the configured default may be one a ChatGPT account refuses
 
@@ -97,9 +100,13 @@ def monster_subjects(kind: str) -> list[Subject]:
     parts = [(f"mon-{kind}@{facing}", [facing]) for facing in figures.FACINGS] if kind in SPLIT else [(f"mon-{kind}", list(figures.FACINGS))]
     for name, facings in parts:
         keys = [(f"{facing}/{frame}", {"facing": facing, "frame": frame}) for facing in facings for frame in frames]
-        sub = restyle.Sheet.layout(keys, cols=len(frames), cell=sheet.cell, origin=sheet.origin, scale=sheet.scale)
-        rows = "; ".join(f"row {i + 1}: {MONSTER_SUBJECTS[kind].split(':')[0]} {FACING_WORDS[f]}" for i, f in enumerate(facings))
-        cols = "; ".join(f"column {i + 1}: {FRAME_WORDS[f]}" for i, f in enumerate(frames))
+        sub = restyle.Sheet.layout(keys, cols=COLUMNS.get(name, len(frames)), cell=sheet.cell, origin=sheet.origin, scale=sheet.scale)
+        who = MONSTER_SUBJECTS[kind].split(':')[0]
+        rows = (f"every cell: {who} {FACING_WORDS[facings[0]]}" if len(facings) == 1 else
+                "; ".join(f"row {i + 1}: {who} {FACING_WORDS[f]}" for i, f in enumerate(facings)))
+        per_row = COLUMNS.get(name, len(frames))
+        cols = "; ".join(f"row {i // per_row + 1} column {i % per_row + 1}: {FRAME_WORDS[f]}" if per_row < len(frames)
+                         else f"column {i + 1}: {FRAME_WORDS[f]}" for i, f in enumerate(frames))
         prompt = _prompt(sub, f"{rows}. {cols}. The poses differ from column to column on purpose; every row shows the same "
                               f"creature from another side, with the same pose in each column.", MONSTER_SUBJECTS[kind], FIXES.get(kind, ""))
         subjects.append(Subject(name, sub, {k: images[k] for k, _ in keys}, prompt, f"mon-{kind}", [k for k, _ in keys]))
