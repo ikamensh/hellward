@@ -4,6 +4,7 @@
     uv run python tools/restyle.py --subjects mon-skeleton,towers refresh DIR
     uv run python tools/restyle.py dump DIR | render DIR | cut DIR [--force] | preview DIR
     uv run python tools/restyle.py ground DIR                     # the cathedral floor, painted over its stand-in
+    uv run python tools/restyle.py keyart DIR                     # the title screen's painting, from words alone
 
 Subjects: ``mon-<kind>`` (a row per facing, the frames across; Azazel is painted one facing per sheet so the
 boss keeps its detail), ``towers`` (a row per rank, a column per kind) and ``gates`` (intact, damaged, broken).
@@ -348,6 +349,37 @@ def cmd_ground(args: argparse.Namespace) -> None:
     print(f"installed {PAINTED / 'ground.png'}; compare {args.dir / 'ground-overlay.png'}")
 
 
+KEYART_PROMPT = (
+    "Create a new image with the built-in image_gen tool: a wide 3:2 landscape painting for the title screen of a dark gothic "
+    "tower-defence game called Hellward, in the manner of the late-1990s dark action-RPG box art and loading screens. The nave of "
+    "a desecrated gothic cathedral at night, seen from low down: a long torn crimson carpet with gold trim runs from the "
+    "foreground to a radiant golden sanctuary door at the far end; on either side stand magical towers: a stone pillar with an "
+    "iron brazier of roaring fire, a dark obelisk crowned with a floating blue crystal crackling with lightning, a cluster of "
+    "glowing blue ice crystals, a totem of stacked skulls with green glowing eyes. From a swirling hell portal on the left a "
+    "horde pours in: small red imp demons, skeletons, a horned goatman, gargoyles in the air, and at their head a hunched shaman "
+    "with a skull staff whose violet curse snakes towards the fire tower. Candlelight, embers in the air, deep shadows, painterly "
+    "and gritty, rich detail. Keep the upper middle third darker and calmer for the title text. No text, no letters, no logo. "
+    "Save the generated image as {out}; finish by printing the path.")
+
+
+def cmd_keyart(args: argparse.Namespace) -> None:
+    import subprocess
+
+    args.dir.mkdir(parents=True, exist_ok=True)
+    out = args.dir / "keyart" / "codex.png"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if not out.exists():
+        result = subprocess.run(["codex", "exec", "--skip-git-repo-check", "--sandbox", "workspace-write", "-m", CODEX_MODEL,
+                                 "-c", f"model_reasoning_effort={args.effort}", "-C", str(out.parent), "-"],
+                                input=KEYART_PROMPT.format(out=out), capture_output=True, text=True, timeout=900)
+        if not out.exists():
+            raise RuntimeError(f"codex did not write {out}:\n{(result.stdout + result.stderr)[-2000:]}")
+    image = Image.open(out).convert("RGB")
+    PAINTED.mkdir(parents=True, exist_ok=True)
+    image.save(PAINTED / "title.jpg", quality=92)
+    print(f"installed {PAINTED / 'title.jpg'} ({image.width}x{image.height})")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--subjects", type=lambda s: set(s.split(",")), default=None)
@@ -356,7 +388,7 @@ def main() -> None:
     parser.add_argument("--effort", default="low", help="Codex's reasoning effort: raise it when the painter drops instructions")
     parser.add_argument("--tolerance", type=int, default=2, help="flagged cells a sheet may have and still be installed")
     parser.add_argument("--force", action="store_true")
-    parser.add_argument("command", choices=("dump", "render", "cut", "preview", "refresh", "ground"))
+    parser.add_argument("command", choices=("dump", "render", "cut", "preview", "refresh", "ground", "keyart"))
     parser.add_argument("dir", type=Path)
     args = parser.parse_args()
     globals()[f"cmd_{args.command}"](args)

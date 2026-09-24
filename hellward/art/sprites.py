@@ -143,6 +143,14 @@ def register(game: Game, level: Level, cache_dir: Path) -> Art:
     assets.image_from_pil("pillar", standing.get("pillar") or structures.pillar_image())
     if standing:
         painted.add("structures")
+    title = PAINTED / "title.jpg"
+    if title.exists():
+        image = Image.open(title).convert("RGB")
+        width = 1280 * DENSITY
+        height = round(image.height * width / image.width)
+        image = image.resize((width, height), Image.LANCZOS)
+        top = (height - 800 * DENSITY) // 2
+        assets.image_from_pil("title", image.crop((0, top, width, top + 800 * DENSITY)))
     ground = mapart.ground(level) if not procedural() else mapart.stand_in(level)
     assets.image_from_pil("ground", ground)
     if (PAINTED / "ground.png").exists() and not procedural():

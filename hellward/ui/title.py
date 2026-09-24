@@ -21,11 +21,12 @@ class TitleScene(Scene):
         self.clock = 0.0
 
     def on_enter(self) -> None:
-        menu = Column(anchor=Anchor.CENTER, margin=(0, 150), spacing=12, children=[
+        self.art = self.game.assets.has_image("title")
+        menu = Column(
             Button("Descend", shortcut="Enter", on_click=lambda: self.begin(False), width=320),
             Button("Watch the leaders at work", shortcut="D", on_click=lambda: self.begin(True), width=320),
             Button("Leave", shortcut="Esc", on_click=self.quit, width=320),
-        ])
+            anchor=Anchor.BOTTOM, margin=(0, 70), spacing=12)
         self.ui.add(menu)
 
     def update(self, dt: float) -> None:
@@ -33,17 +34,22 @@ class TitleScene(Scene):
 
     def draw(self) -> None:
         pulse = 0.5 + 0.5 * math.sin(self.clock * 1.3)
-        self.draw_image("ground", 0, 0, 1280, 800, opacity=0.35)
-        self.draw_rect(0, 0, 1280, 800, (0, 0, 0, 150))
+        if self.art:
+            self.draw_image("title", 0, 0, 1280, 800)
+        else:
+            self.draw_image("ground", 0, 0, 1280, 800, opacity=0.35)
+        for i in range(10):   # the dark vault the title hangs in, breathing
+            self.draw_rect(0, i * 26, 1280, 26, (0, 0, 0, int((150 + 20 * pulse) * (1 - i / 10))))
         for i in range(8):
-            r = 260 - i * 28
-            self.draw_circle(640, 230, r, (140, 20, 10, int(10 + 6 * pulse)))
-        self.draw_text("HELLWARD", 643, 213, style="title", color=(0, 0, 0, 220), anchor_x="center", anchor_y="center")
-        self.draw_text("HELLWARD", 640, 210, style="title", anchor_x="center", anchor_y="center")
-        self.draw_text("The demons have leaders now. They watch your towers, and they choose.", 640, 290,
+            self.draw_rect(0, 800 - (i + 1) * 30, 1280, 30, (0, 0, 0, int(140 * (1 - i / 8))))
+        self.draw_text("HELLWARD", 643, 103, style="title", color=(0, 0, 0, 230), anchor_x="center", anchor_y="center")
+        self.draw_text("HELLWARD", 640, 100, style="title", color=(230 + int(20 * pulse), 186, 100, 255), anchor_x="center", anchor_y="center")
+        self.draw_text("The demons have leaders now. They watch your towers, and they choose.", 641, 169,
+                       font_size=19, color=(0, 0, 0, 220), anchor_x="center", anchor_y="center")
+        self.draw_text("The demons have leaders now. They watch your towers, and they choose.", 640, 168,
                        font_size=19, color=style.BONE, anchor_x="center", anchor_y="center")
-        self.draw_text("Each curse is picked by playing the fight ahead, again and again, before it is cast.", 640, 320,
-                       font_size=15, color=style.DIM, anchor_x="center", anchor_y="center")
+        self.draw_text("Each curse is picked by playing the fight ahead, again and again, before it is cast.", 640, 198,
+                       font_size=15, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
 
 
 class ReckoningScene(Scene):
@@ -57,10 +63,10 @@ class ReckoningScene(Scene):
         self.curses = 0
 
     def on_enter(self) -> None:
-        self.ui.add(Column(anchor=Anchor.CENTER, margin=(0, 150), spacing=10, children=[
+        self.ui.add(Column(
             Button("Defend again", shortcut="Enter", on_click=self.again, width=280),
             Button("To the title", shortcut="Esc", on_click=self.title, width=280),
-        ]))
+            anchor=Anchor.CENTER, margin=(0, 150), spacing=10))
 
     def draw(self) -> None:
         world = self.world
