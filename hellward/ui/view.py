@@ -26,6 +26,7 @@ from hellward.ui.lighting import Light
 MAP_X, MAP_Y = 40, 0
 T = TILE
 Z = PROJECTION.z_scale        # logical pixels per tile of height
+TOWER_SCALE = 1.3             # towers stand taller than their stand-ins: the painted ones were cut to the stand-ins' height
 ELEMENT_LIGHT = {"pyre": ELEMENT_COLORS["fire"], "storm": ELEMENT_COLORS["lightning"], "frost": ELEMENT_COLORS["cold"],
                  "plague": ELEMENT_COLORS["poison"]}
 CURSE_TINT = {Curse.WEAKEN: (0.9, 0.55, 0.55), Curse.DECREPIFY: (0.8, 0.72, 0.55), Curse.DIM_VISION: (0.55, 0.5, 0.75),
@@ -38,10 +39,11 @@ def px(x: float, y: float) -> tuple[float, float]:
     return MAP_X + x * T, MAP_Y + y * T
 
 
-def placed(image: str, cell: Cell, x: float, y: float, *, layer: RenderLayer = RenderLayer.UNITS) -> Sprite:
+def placed(image: str, cell: Cell, x: float, y: float, *, layer: RenderLayer = RenderLayer.UNITS, scale: float = 1.0) -> Sprite:
     """A sprite whose cell origin (its ground point) stands at world pixel ``(x, y)``, sorted by that line."""
-    return Sprite(image, position=(x - cell.origin[0], y - cell.origin[1]), anchor=SpriteAnchor.TOP_LEFT, size=cell.size,
-                  layer=layer, y_sort=True, ground=cell.size[1] - cell.origin[1])
+    return Sprite(image, position=(x - cell.origin[0] * scale, y - cell.origin[1] * scale), anchor=SpriteAnchor.TOP_LEFT,
+                  size=(cell.size[0] * scale, cell.size[1] * scale), layer=layer, y_sort=True,
+                  ground=(cell.size[1] - cell.origin[1]) * scale)
 
 
 def facing_of(dx: float, dy: float) -> str:
@@ -171,7 +173,8 @@ class WorldView:
 
     def build(self, tower: Tower) -> None:
         cx, cy = px(tower.tile[0] + 0.5, tower.tile[1] + 0.5)
-        sprite = self.scene.add_sprite(placed(f"tower/{tower.kind.key}/{tower.level}", self.art.tower, cx, cy + 0.25 * T))
+        sprite = self.scene.add_sprite(placed(f"tower/{tower.kind.key}/{tower.level}", self.art.tower, cx, cy + 0.25 * T,
+                                              scale=TOWER_SCALE))
         element = {"pyre": "fire", "storm": "lightning", "frost": "cold", "plague": "poison"}[tower.kind.key]
         glow = self.scene.add_sprite(Sprite(f"fx/glow/{element}", position=self.tower_top(tower), size=(30, 30),
                                             layer=RenderLayer.EFFECTS, opacity=200))
@@ -189,7 +192,7 @@ class WorldView:
 
     def tower_top(self, tower: Tower) -> tuple[float, float]:
         cx, cy = px(tower.tile[0] + 0.5, tower.tile[1] + 0.5)
-        return cx, cy + 0.25 * T - tower_top(tower.kind.key, tower.level) * Z
+        return cx, cy + 0.25 * T - tower_top(tower.kind.key, tower.level) * Z * TOWER_SCALE
 
     def monster_point(self, monster: Monster, s: float | None = None) -> tuple[float, float]:
         """Where a monster's feet are drawn, with its place across the corridor."""

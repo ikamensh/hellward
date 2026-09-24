@@ -153,7 +153,7 @@ def film(out: Path, seed: int, shots: list[float], seconds: float, fps: int, lea
                     "-i", str(frames_dir / "sound.wav"), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20",
                     "-c:a", "aac", "-b:a", "160k", "-shortest", str(out / "clip.mp4")], check=True)
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", str(out / "clip.mp4"), "-vf",
-                    "fps=15,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=160[p];[b][p]paletteuse=dither=bayer",
+                    "fps=12,scale=640:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=3",
                     str(out / "clip.gif")], check=True)
     shutil.rmtree(frames_dir)
     print(f"wrote {out / 'clip.mp4'}, {out / 'clip.gif'} and {len(shots)} stills")

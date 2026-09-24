@@ -21,7 +21,7 @@ from hellward.ui import style
 from hellward.ui.effects import ELEMENT_OF, Effects
 from hellward.ui.hud import BUILD, WAVE_NAMES, Hud
 from hellward.ui.lighting import Lighting
-from hellward.ui.view import MAP_X, MAP_Y, T, WorldView, px
+from hellward.ui.view import MAP_X, MAP_Y, T, TOWER_SCALE, WorldView, px
 
 WIDTH, HEIGHT = 1280, 800
 
@@ -169,7 +169,7 @@ class BattleScene(Scene):
             tower = world.towers.get(e[3])
             sound.play("chant")
             if leader is not None and tower is not None:
-                self.hud.note(f"{leader.kind.name} begins to curse the {tower.kind.name} with {CURSES[e[2]].name}.", style.CURSE)
+                self.hud.note(f"{leader.kind.name} chants {CURSES[e[2]].name} at the {tower.kind.name}.", style.CURSE)
         elif kind == "cursed":
             sound.play("curse")
         elif kind == "fizzle":
@@ -182,11 +182,11 @@ class BattleScene(Scene):
             if decision.cast is not None:
                 tower = world.towers.get(decision.cast.tower)
                 if tower is not None:
-                    self.hud.note(f"{leader.kind.name} weighed {decision.considered} curses: {CURSES[decision.cast.curse].name} "
-                                  f"on the {tower.kind.name} spares its pack {decision.cast.gain:.0f} life.", style.UNIQUE)
+                    self.hud.note(f"{leader.kind.name} weighed {decision.considered}: {CURSES[decision.cast.curse].name} "
+                                  f"on the {tower.kind.name}, +{decision.cast.gain:.0f} life", style.UNIQUE)
             elif decision.later is not None and self.hud.clock - self.last_hold_note > 6:
                 self.last_hold_note = self.hud.clock
-                self.hud.note(f"{leader.kind.name} holds its curse: in {decision.later.delay:.0f}s it will be worth more.", style.DIM)
+                self.hud.note(f"{leader.kind.name} waits: in {decision.later.delay:.0f}s its curse is worth more", style.DIM)
         elif kind == "victory":
             sound.play("victory")
             sound.music("title")
@@ -374,9 +374,9 @@ class BattleScene(Scene):
         level = self.world.level
         ok = level.buildable(*tile) and self.world.tower_at(tile) is None and self.world.gold >= self.cost(key)
         cx, cy = px(tile[0] + 0.5, tile[1] + 0.5)
-        cell = self.art.tower
-        self.draw_image(f"tower/{key}/0", cx - cell.origin[0], cy + 0.25 * T - cell.origin[1], cell.size[0], cell.size[1], opacity=0.6,
-                        space="world", layer=RenderLayer.EFFECTS)
+        cell, k = self.art.tower, TOWER_SCALE
+        self.draw_image(f"tower/{key}/0", cx - cell.origin[0] * k, cy + 0.25 * T - cell.origin[1] * k, cell.size[0] * k,
+                        cell.size[1] * k, opacity=0.6, space="world", layer=RenderLayer.EFFECTS)
         self.draw_rect(MAP_X + tile[0] * T + 2, MAP_Y + tile[1] * T + 2, T - 4, T - 4, (0, 0, 0, 0),
                        border_color=(120, 220, 120, 200) if ok else (230, 60, 60, 220), border_width=2, space="world",
                        layer=RenderLayer.EFFECTS)
@@ -400,7 +400,7 @@ class BattleScene(Scene):
             top = y - m.kind.size * T * 0.75 - 8
             if m.hp < max_hp or m.kind.leader is not None:
                 w = 18 + 16 * m.kind.size
-                self.draw_rect(x - w / 2 - 1, top - 1, w + 2, 5, (0, 0, 0, 200), space="world", layer=RenderLayer.UI_WORLD)
+                self.draw_rect(x - w / 2 - 1, top - 1, w + 2, 5, (0, 0, 0, 200), space="world", layer=RenderLayer.EFFECTS)
                 color = (200, 170, 70, 255) if m.kind.leader is not None else (200, 28, 28, 255)
                 self.draw_rect(x - w / 2, top, w * max(0.0, m.hp / max_hp), 3, color, space="world", layer=RenderLayer.UI_WORLD)
             if m.asking is not None:
@@ -411,5 +411,5 @@ class BattleScene(Scene):
             if door.built and door.hp < DOOR.hp:
                 x, y = world.level.doors[door.index]
                 cx, cy = px(x + 0.5, y + 0.5)
-                self.draw_rect(cx - 20, cy - 52, 40, 5, (0, 0, 0, 200), space="world", layer=RenderLayer.UI_WORLD)
+                self.draw_rect(cx - 20, cy - 52, 40, 5, (0, 0, 0, 200), space="world", layer=RenderLayer.EFFECTS)
                 self.draw_rect(cx - 19, cy - 51, 38 * door.hp / DOOR.hp, 3, (230, 190, 90, 255), space="world", layer=RenderLayer.UI_WORLD)

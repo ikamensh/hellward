@@ -285,8 +285,7 @@ class Effects:
 
     def on_plan(self, leader_id: int, decision: Decision) -> None:
         if decision.options:
-            self.thoughts = [t for t in self.thoughts if t.leader != leader_id]
-            self.thoughts.append(Thought(decision, leader_id))
+            self.thoughts = [Thought(decision, leader_id)]   # one leader's reckoning at a time: two over one tower is noise
 
     def on_chant(self, leader_id: int, curse, tower_id: int) -> None:
         m = self.world.monster(leader_id)
@@ -443,7 +442,8 @@ class Effects:
             color = (255, 120, 255, int(255 * fade)) if picked else (200, 170, 200, int(170 * fade))
             size = 15 if picked else 12
             w = len(text) * size * 0.52 + 10
-            scene.draw_rect(x - w / 2, y - 44, w, size + 8, (20, 6, 24, int(170 * fade)), radius=4, space="world", layer=RenderLayer.UI_WORLD)
+            # the box goes a layer below its words: in world space an order is taken from a shape's bottom edge
+            scene.draw_rect(x - w / 2, y - 44, w, size + 8, (20, 6, 24, int(170 * fade)), radius=4, space="world", layer=RenderLayer.EFFECTS)
             scene.draw_text(text, x, y - 44 + 4, font_size=size, color=color, font=style.TEXT_FONT, anchor_x="center",
                             anchor_y="top", space="world", layer=RenderLayer.UI_WORLD)
         leader = self.world.monster(thought.leader)

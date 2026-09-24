@@ -176,10 +176,7 @@ class Hud:
             self._button("cleanse", x0 + 224, by, 116, 28, f"Cleanse {CLEANSE_COST:.0f}", enabled=bool(selected.curses) and world.mana >= CLEANSE_COST,
                          tip="[C] Burn every curse off this tower with holy light. Costs mana.", accent=style.HOLY)
             return
-        if world.wave < 0:
-            title = "The cathedral waits"
-        else:
-            title = f"Wave {world.wave + 1} of {len(world.waves)}: {WAVE_NAMES[min(world.wave, len(WAVE_NAMES) - 1)]}"
+        title = "The cathedral waits" if world.wave < 0 else WAVE_NAMES[min(world.wave, len(WAVE_NAMES) - 1)]
         scene.draw_text(scene.fit_text(title, 340, style="heading"), x0, y0 + 14, style="heading", anchor_y="center")
         if world.outcome is not None:
             status = "Victory." if world.outcome == "victory" else "The sanctuary has fallen."
@@ -187,14 +184,16 @@ class Hud:
             status = f"{len(world.monsters) + len(world.schedule)} monsters abroad"
             leaders = world.leaders()
             if leaders:
-                status += f", {len(leaders)} leader{'s' if len(leaders) > 1 else ''} among them"
+                status += f", {len(leaders)} leading"
         elif world.wave < 0:
             status = "Towers (1-4) beside the carpet, gates (5) in the arches."
         elif world.break_left is not None:
-            status = f"The next wave comes in {world.break_left:.0f}s"
+            status = f"the next comes in {world.break_left:.0f}s"
         else:
             status = ""
-        scene.draw_text(status, x0, y0 + 40, font_size=14, color=style.BONE, anchor_y="center")
+        if world.wave >= 0 and world.outcome is None:
+            status = f"Wave {world.wave + 1} of {len(world.waves)}" + (f": {status}" if status else "")
+        scene.draw_text(scene.fit_text(status, 340, font_size=14), x0, y0 + 40, font_size=14, color=style.BONE, anchor_y="center")
         if world.can_call_wave:
             bonus = int(world.break_left) if world.break_left is not None and world.wave >= 0 else 0
             label = "Summon the next wave" + (f"  +{bonus}" if bonus else "")
@@ -240,18 +239,20 @@ class Hud:
             scene.draw_text(", ".join(notes), 640, y + 38, font_size=13, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
 
     def _chronicle(self) -> None:
+        """The last few things the leaders did, top right, over the bare floor by the north wall."""
         scene = self.scene
         lines = [(self.clock - stamp, text, color) for stamp, text, color in self.log if self.clock - stamp <= 14]
         if not lines:
             return
-        width = max(scene.game.backend.measure_text(text, 13, style.TEXT_FONT)[0] for _, text, _ in lines) + 20
+        width, right = 470, 1232
         backing = min(1.0, (14 - min(age for age, _, _ in lines)) / 3)
-        scene.draw_rect(46, 6, width, 18 * len(lines) + 8, (10, 6, 8, int(170 * backing)), radius=4)
-        y = 19
+        scene.draw_rect(right - width, 64, width, 18 * len(lines) + 8, (10, 6, 8, int(175 * backing)), radius=4)
+        y = 77
         for age, text, color in lines:
             alpha = int(255 * min(1.0, (14 - age) / 3))
-            scene.draw_text(text, 57, y + 1, font_size=13, color=(0, 0, 0, alpha), anchor_y="center")
-            scene.draw_text(text, 56, y, font_size=13, color=color[:3] + (alpha,), anchor_y="center")
+            text = scene.fit_text(text, width - 16, font_size=12)
+            scene.draw_text(text, right - width + 9, y + 1, font_size=12, color=(0, 0, 0, alpha), anchor_y="center")
+            scene.draw_text(text, right - width + 8, y, font_size=12, color=color[:3] + (alpha,), anchor_y="center")
             y += 18
 
     def _banners(self) -> None:

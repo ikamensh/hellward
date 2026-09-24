@@ -15,7 +15,7 @@ from PIL import Image
 from saga2d import RenderLayer, Scene, Sprite, SpriteAnchor
 
 CELL = 6          # logical pixels per light cell
-DARK = 0.5        # opacity of unlit ground
+DARK = 0.42       # opacity of unlit ground
 TINT = 0.16       # how strongly a light colours what it lights
 
 
@@ -56,7 +56,7 @@ class Lighting:
             dx = self.xs[r0:r1, c0:c1] - light.x
             dy = self.ys[r0:r1, c0:c1] - light.y
             f = np.clip(1.0 - (dx * dx + dy * dy) / (r * r), 0.0, 1.0)
-            f = f * f * light.intensity
+            f = f ** 1.5 * light.intensity   # softer than squared: pools melt into each other instead of blotting
             total[r0:r1, c0:c1] += f
             color[r0:r1, c0:c1] += f[..., None] * np.array(light.color, dtype=np.float32)
         lit = np.clip(total + self.ambient, 0.0, 1.0)
