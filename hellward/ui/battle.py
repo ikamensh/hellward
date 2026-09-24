@@ -15,10 +15,9 @@ from saga2d import Camera, RenderLayer, Scene
 from hellward.art.sprites import Art
 from hellward.sim.autoplay import Defender
 from hellward.sim.content import CURSES, DOOR, MONSTERS, TOWERS
-from hellward.sim.level import Tile
 from hellward.sim.model import SIM_DT, Monster, Refused, Tower, World
 from hellward.ui import style
-from hellward.ui.effects import ELEMENT_OF, Effects
+from hellward.ui.effects import Effects
 from hellward.ui.hud import BUILD, WAVE_NAMES, Hud
 from hellward.ui.lighting import Lighting
 from hellward.ui.view import MAP_X, MAP_Y, T, TOWER_SCALE, WorldView, px

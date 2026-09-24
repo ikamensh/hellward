@@ -248,7 +248,6 @@ class WorldView:
                 figure.flash -= dt
                 tint = figure.flash_tint
             sprite.tint = tint
-            size = m.kind.size
             figure.shadow.position = (x, y + 2)
             figure.shadow.opacity = 150 if not m.kind.flying else 90
             if figure.aura is not None:
@@ -257,7 +256,6 @@ class WorldView:
                 figure.aura.opacity = int(90 + 110 * pulse) if m.chant_curse is None else 255
                 w = T * (0.8 + 0.15 * pulse) * (1.3 if m.chant_curse is not None else 1.0)
                 figure.aura.size = (w, w * 0.5)
-            del size
         for figure in list(self.dying):
             figure.dying += dt
             t = min(1.0, figure.dying / 0.45)

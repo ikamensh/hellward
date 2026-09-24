@@ -19,7 +19,7 @@ from PIL import Image
 from sagaforge import render3d as r3
 from sagaforge.render3d import Mesh
 
-from hellward.art.rig import DENSITY, PROJECTION, Vec, blade, move, pitch, rod, roll, wing, yaw
+from hellward.art.rig import DENSITY, PROJECTION, blade, move, pitch, rod, roll, wing, yaw
 from hellward.sim.content import MONSTERS
 
 FACINGS = ("front", "back", "side")

@@ -11,7 +11,7 @@ import math
 import random
 from dataclasses import dataclass, field
 
-from saga2d import ParticleEmitter, RenderLayer, Scene, Sprite, SpriteAnchor
+from saga2d import ParticleEmitter, RenderLayer, Scene, Sprite
 
 from hellward.sim.content import CURSES, MONSTERS
 from hellward.sim.model import Bolt, World
@@ -219,7 +219,6 @@ class Effects:
         self.view.hit(monster_id, element.value)
 
     def on_death(self, monster_id: int, key: str, element, where: tuple[float, float], bounty: int) -> None:
-        m = self.world.monster(monster_id)
         figure = self.view.kill(monster_id)
         x, y = (figure.x, figure.y) if figure is not None else px(*where)
         size = MONSTERS[key].size
@@ -235,7 +234,6 @@ class Effects:
             self.scene.camera.shake(9, 1.2)
             self.bloom("fx/glow/fire", x, y - 30, 40, 260, 1.2)
             self.light(x, y, 300, (255, 120, 40), 1.6, 1.4)
-        del m
 
     def on_leak(self, monster_id: int, key: str, lives: int) -> None:
         figure = self.view.figures.get(monster_id)

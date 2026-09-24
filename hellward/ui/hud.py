@@ -12,7 +12,7 @@ from typing import Callable
 from saga2d import Scene
 
 from hellward.art.fx import ORB_LEVELS
-from hellward.sim.content import CLEANSE_COST, CURSES, DOOR, MANA_MAX, MONSTERS, SELL_REFUND, START_LIVES, TOWERS, Element
+from hellward.sim.content import CLEANSE_COST, CURSES, DOOR, MANA_MAX, SELL_REFUND, START_LIVES, TOWERS, Element
 from hellward.sim.model import Monster, Tower, World
 from hellward.ui import style
 
@@ -77,7 +77,6 @@ class Hud:
     def draw(self, *, placing: str | None, selected: Tower | None, hovered: Monster | None, speed: float, paused: bool,
              thoughts: bool, mouse: tuple[float, float] | None, costs: Callable[[str], int]) -> None:
         scene = self.scene
-        world = self.world
         self.controls = []
         scene.draw_image("ui/panel", 0, TOP, 1280, 128)
         with scene.screen_layer(1):
@@ -289,6 +288,3 @@ class Hud:
         for i, line in enumerate(lines):
             yy += scene.draw_paragraph(line, x + 10, yy, width - 20, font_size=13, color=style.GOLD if i == 0 else style.BONE) + 8
 
-
-def monster_title(m: Monster) -> str:
-    return MONSTERS[m.kind.key].name
