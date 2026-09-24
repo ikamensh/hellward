@@ -91,7 +91,7 @@ the leaders' minds does better.
 
 - A leader pondering shows dots over its head.
 - A chant draws a violet beam growing from the leader's staff to the tower, and the tower glows.
-- The chronicle (top left) says what the leader weighed, its choice and the life it expects to
+- The chronicle (top right) says what the leader weighed, its choice and the life it expects to
   spare its pack, or that it holds its curse because waiting is worth more.
 - **Leaders' minds** (Tab, on by default) writes each weighed tower's gain over it for three
   seconds, with the chosen curse named.
