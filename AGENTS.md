@@ -17,6 +17,7 @@ uv run python tools/sampler.py DIR --music   # every sound cue back to back, and
 uv run python tools/pieces.py refresh        # regenerate changed foley pieces (Stable Audio 3, docs/audio.md)
 uv run python tools/restyle.py refresh DIR   # repaint the stand-ins (Codex; --provider openrouter), install the cut
 uv run python tools/showcase.py OUT          # a clip with its soundtrack through the real renderer (caffeinate -u)
+uv run python tools/intro.py STEP OUT        # the story intro as film and as comic (docs/intro.md)
 ```
 
 ## Layout
