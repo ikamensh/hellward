@@ -12,7 +12,7 @@ from hellward.audio.bank import SoundBank
 from hellward.sim.autoplay import Defender
 from hellward.sim.level import CATHEDRAL
 from hellward.sim.model import World
-from hellward.ui import style
+from hellward.ui import menus, style
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
 from hellward.ui.thinking import Thinker
 from hellward.ui.title import LoadingScene, ReckoningScene, TitleScene
@@ -44,26 +44,35 @@ def main(argv: list[str] | None = None) -> None:
     game = Game("Hellward", resolution=(WIDTH, HEIGHT), fullscreen=args.fullscreen, asset_path=cache,
                 save_dir=DATA / "saves")
     art = build(game, cache)
+    values = menus.settings(game)
+    if args.fullscreen:
+        values["fullscreen"] = True
+    menus.apply(game, values)
     sound = SoundBank(game)
     thinker = Thinker()
 
     def title() -> None:
-        game.replace(TitleScene(begin, game.quit))
+        game.clear_and_push(TitleScene(begin, game.quit))   # from under a menu or the reckoning too
         sound.music("title")
 
+    def battle(autopilot: bool) -> BattleScene:
+        return BattleScene(art, seed=args.seed, planner=thinker, sound=sound, autopilot=Defender() if autopilot else None,
+                           on_end=end, settings=values, restart=lambda: begin(autopilot), to_title=title)
+
     def begin(autopilot: bool) -> None:
-        game.replace(BattleScene(art, seed=args.seed, planner=thinker, sound=sound,
-                                 autopilot=Defender() if autopilot else None, on_end=end))
+        game.clear_and_push(battle(autopilot))
 
     def end(world: World) -> None:
         game.push(ReckoningScene(world, again=lambda: begin(False), title=title))
 
     try:
         if args.demo:
-            game.run(BattleScene(art, seed=args.seed, planner=thinker, sound=sound, autopilot=Defender(), on_end=end))
+            game.run(battle(True))
         else:
             sound.music("title")
             game.run(TitleScene(begin, game.quit))
+    except KeyboardInterrupt:
+        pass   # Ctrl-C in the terminal: the player's way out, not an error
     finally:
         thinker.close()
 

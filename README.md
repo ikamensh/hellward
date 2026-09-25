@@ -27,6 +27,7 @@ The first launch renders the stand-in art and the sounds into `~/.hellward/cache
 | **F** / **P** | double the pace / pause |
 | **Tab** | show or hide the leaders' minds: the life each curse would save its pack |
 | right click / **Esc** | let go of what you hold |
+| **Esc** with nothing held, or **Menu** | pause: settings (music and effects volume, fullscreen), start again, the title, leave |
 
 Hover a monster to read its resistances in the bar at the top. Leaders wear a violet ring. When
 one ponders, dots rise over its head; when it chants, a violet beam reaches for a tower. Kill it

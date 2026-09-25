@@ -1,8 +1,9 @@
 """The defence itself: the map, the fight and the panel, stepped at the rules' fixed rate.
 
 Input: a build slot (or 1–5) picks a tower or a gate to place, a click on the floor or on an arch places
-it, a click on a tower selects it (U upgrades, S sells, C cleanses), right click or Esc lets go. Space
-calls the next wave, F doubles the pace, P pauses, Tab shows or hides what the leaders were thinking.
+it, a click on a tower selects it (U upgrades, S sells, C cleanses), right click or Esc lets go; Esc with
+nothing to let go of opens the menu. Space calls the next wave, F doubles the pace, P pauses, Tab shows or
+hides what the leaders were thinking.
 """
 
 from __future__ import annotations
@@ -20,6 +21,7 @@ from hellward.ui import style
 from hellward.ui.effects import Effects
 from hellward.ui.hud import BUILD, WAVE_NAMES, Hud
 from hellward.ui.lighting import Lighting
+from hellward.ui.menus import PauseScene
 from hellward.ui.view import MAP_X, MAP_Y, T, TOWER_SCALE, WorldView, px
 
 WIDTH, HEIGHT = 1280, 800
@@ -42,8 +44,13 @@ class BattleScene(Scene):
     }
 
     def __init__(self, art: Art, *, seed: int = 0, planner: Callable | None = None, sound: Any = None,
-                 autopilot: Defender | None = None, on_end: Callable[[World], None] | None = None) -> None:
+                 autopilot: Defender | None = None, on_end: Callable[[World], None] | None = None,
+                 settings: Any = None, restart: Callable[[], None] | None = None,
+                 to_title: Callable[[], None] | None = None) -> None:
         self.art = art
+        self.settings = settings
+        self.restart = restart
+        self.to_title = to_title
         self.seed = seed
         self.planner = planner
         self.sound = sound or Silent()
@@ -65,6 +72,8 @@ class BattleScene(Scene):
         self.fx = Effects(self, self.view, self.world)
         self.hud = Hud(self, self.world)
         self.lighting = Lighting(self, (MAP_X, MAP_Y), (self.world.level.width * T, self.world.level.height * T))
+        if self.settings is not None:
+            self.fx.show_thoughts = self.settings["minds"]
         self.hud.banner(self.world.level.name, "Hold the sanctuary gate. The first wave comes soon.", life=4.5)
         self.sound.music("battle")
 
@@ -241,6 +250,9 @@ class BattleScene(Scene):
 
     def toggle_thoughts(self) -> None:
         self.fx.show_thoughts = not self.fx.show_thoughts
+        if self.settings is not None:
+            self.settings["minds"] = self.fx.show_thoughts
+            self.settings.save()
 
     def upgrade(self) -> None:
         if self.selected is not None:
@@ -256,8 +268,21 @@ class BattleScene(Scene):
             self._try(lambda: self.world.cleanse(self.selected.id))
 
     def cancel(self) -> None:
-        self.placing = None
-        self.selected = None
+        """Escape lets go of what is held or selected; with nothing to let go of, it opens the menu."""
+        if self.placing is not None or self.selected is not None:
+            self.placing = None
+            self.selected = None
+        else:
+            self.open_menu()
+
+    def open_menu(self) -> None:
+        if self.restart is None or self.to_title is None:
+            self.paused = not self.paused   # a scene without a game around it (tests, clips) can only pause
+            return
+        self.game.push(PauseScene(restart=self.restart, to_title=self.to_title, on_settings=self.settings_changed))
+
+    def settings_changed(self) -> None:
+        self.fx.show_thoughts = self.settings["minds"]
 
     # -- Pointer ---------------------------------------------------------------------------------
 
@@ -289,7 +314,8 @@ class BattleScene(Scene):
     def handle_input(self, event) -> bool:
         if event.type == "click":
             if event.button == "right":
-                self.cancel()
+                self.placing = None
+                self.selected = None
                 return True
             control = self.hud.hit(event.x, event.y)
             if control is not None:
@@ -325,8 +351,8 @@ class BattleScene(Scene):
             self.call_wave()
         elif name == "speed":
             self.toggle_speed()
-        elif name == "pause":
-            self.toggle_pause()
+        elif name == "menu":
+            self.open_menu()
         elif name == "thoughts":
             self.toggle_thoughts()
         elif name in ("upgrade", "sell", "cleanse"):

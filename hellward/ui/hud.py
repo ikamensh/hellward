@@ -206,7 +206,7 @@ class Hud:
         scene.draw_circle(x0 + 10, TOP + 30, 6, (240, 204, 110, 255))
         scene.draw_text(f"{world.gold}", x0 + 26, TOP + 30, font_size=22, color=style.GOLD, font=style.TITLE_FONT, anchor_y="center")
         self._button("speed", x0, TOP + 52, 108, 26, f"Pace {speed:.0f}x", tip="[F] Double the pace of the fight, or restore it.")
-        self._button("pause", x0 + 114, TOP + 52, 108, 26, "Resume" if paused else "Pause", tip="[P] Stop time while you think.")
+        self._button("menu", x0 + 114, TOP + 52, 108, 26, "Menu", tip="[Esc] Pause, settings and volume, start again or leave.")
         self._button("thoughts", x0, TOP + 86, 222, 28, "Leaders' minds: " + ("shown" if thoughts else "hidden"),
                      tip="[Tab] Show what each leader weighed before it cursed: the life each curse would save its pack.",
                      accent=style.CURSE)

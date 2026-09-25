@@ -7,6 +7,7 @@ The world asks for a decision at a step boundary and reads it half a second of g
 
 from __future__ import annotations
 
+import signal
 from concurrent.futures import Future, ProcessPoolExecutor
 
 from hellward.sim import planner
@@ -17,13 +18,17 @@ def _decide(world: World, leader_id: int) -> planner.Decision:
     return planner.decide(world, leader_id)
 
 
+def _ignore_interrupts() -> None:
+    signal.signal(signal.SIGINT, signal.SIG_IGN)   # Ctrl-C in the terminal is for the game, which closes the pool
+
+
 class Thinker:
     def __init__(self, workers: int = 2) -> None:
-        self.pool = ProcessPoolExecutor(workers)
+        self.pool = ProcessPoolExecutor(workers, initializer=_ignore_interrupts)
         self.pool.submit(int, 0).result()   # start the workers now, not in the first fight
 
     def __call__(self, world: World, leader_id: int) -> Future:
         return self.pool.submit(_decide, world.clone(), leader_id)
 
     def close(self) -> None:
-        self.pool.shutdown(wait=False, cancel_futures=True)
+        self.pool.shutdown(wait=True, cancel_futures=True)   # waiting releases the pool's semaphores

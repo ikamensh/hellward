@@ -10,6 +10,7 @@ from saga2d import Anchor, Button, Column, Scene
 from hellward.sim.content import START_LIVES
 from hellward.sim.model import World
 from hellward.ui import style
+from hellward.ui.menus import SettingsScene, settings
 
 
 class LoadingScene(Scene):
@@ -25,17 +26,23 @@ class LoadingScene(Scene):
 class TitleScene(Scene):
     background_color = (6, 4, 6, 255)
 
+    controls = {"s": "open_settings"}
+
     def __init__(self, begin: Callable[[bool], None], quit: Callable[[], None]) -> None:
         self.begin = begin
         self.quit = quit
         self.clock = 0.0
+
+    def open_settings(self) -> None:
+        self.game.push(SettingsScene(settings(self.game)))
 
     def on_enter(self) -> None:
         self.art = self.game.assets.has_image("title")
         menu = Column(
             Button("Descend", shortcut="Enter", on_click=lambda: self.begin(False), width=320),
             Button("Watch the leaders at work", shortcut="D", on_click=lambda: self.begin(True), width=320),
-            Button("Leave", shortcut="Esc", on_click=self.quit, width=320),
+            Button("Settings", hotkey="S", on_click=self.open_settings, width=320),
+            Button("Leave", shortcut="Q", on_click=self.quit, width=320),
             anchor=Anchor.BOTTOM, margin=(0, 70), spacing=12)
         self.ui.add(menu)
 

@@ -22,8 +22,8 @@ def cache(tmp_path_factory) -> Path:
 
 
 @pytest.fixture
-def game(cache):
-    g = Game("Hellward", backend="mock", resolution=(WIDTH, HEIGHT), asset_path=cache)
+def game(cache, tmp_path):
+    g = Game("Hellward", backend="mock", resolution=(WIDTH, HEIGHT), asset_path=cache, save_dir=tmp_path / "saves")
     yield g, build(g, cache)
     g.close()
 
