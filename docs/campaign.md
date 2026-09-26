@@ -275,6 +275,49 @@ set the ceiling, and a human-like one that sets how Normal feels.
   the build and hand it to their worker processes. The heavy runs go through
   `~/saga/tools/slot.py`.
 
+## The tuning record (2026-09-26)
+
+Measured on the compiled simulation, evaluation seeds 1000–1007 for the margins and 1000–1019 for the
+wins, against the smart leaders. Commands: `tools/margin.py PLAYER [--difficulty hell] [--leaders random]`,
+`tools/campaign_balance.py --margin --leaders`, `tools/curse_quality.py --location L`. The tables and runs are in
+`~/saga/evidence/hellward/campaign-tuning/`.
+
+**Normal**, the apprentice with two sigils per earlier location. It wins every location on all 20 seeds; its
+margins fall down the descent as designed:
+
+| | Tristram | Graveyard | Cathedral | Catacombs | Caves | Hell's Gate |
+|---|---|---|---|---|---|---|
+| life factor | 1.0 | 1.15 | 0.8 | 1.5 | 1.9 | 1.2 |
+| apprentice's margin | 1.82 | 1.68 | 1.32 | 1.30 | 1.26 | 1.09 |
+| against random curses | | | 1.50 | 1.40 | 1.41 | 1.14 |
+
+The Cathedral's factor is below one because the apprentice's fixed build puts lightning against goatmen who
+shrug it off: its lesson bites. The strong players win Normal everywhere with every life; the ordinary
+defender (no skills, no spells) loses every location from the Cathedral on.
+
+**Hell**, the whole tree, each location's own factor on top of Hell's 2.2:
+
+| | Tristram | Graveyard | Cathedral | Catacombs | Caves | Hell's Gate |
+|---|---|---|---|---|---|---|
+| Hell's factor | 3.5 | 3.85 | 6.9 | 2.75 | 1.5 | 2.5 |
+| best player | planned | warden | adaptive | planned | adaptive | warden |
+| its margin | 1.24 | 1.06 | 1.42 | 1.38 | 1.19 | 1.00 |
+| its wins of 20 | 20 | 20 | 20 | 20 | 20 | **8** |
+
+Even the strongest player, the warden with its Hell's Gate build searched again under the final numbers three
+times, wins Hell's Gate on Hell on 8 seeds of 20. The others hold there at margins of 0.67 and 0.69.
+
+**The leaders.** Their choices are worth 5–14% of the monsters' life to the apprentice (its margins against
+random curses above), and 0–7% to the strong players, who break a third to half of all chants and cleanse
+most of the rest. Where the fight is contested, Hell's Gate on Hell, the smart leaders cost the warden 6.5
+lives more than random curses (32% of what it lost). The planner keeps 0.93 of the best curse's value at the
+Cathedral and 0.97 at Hell's Gate, at 2 ms a decision.
+
+**What remains open.** Lives kept is a cliff, not a slope: a defence holds whole until the monsters outgrow
+it, so the apprentice keeps every life on Normal and the margins carry the difficulty. The strong players
+answer most curses before they land; stronger leaders against them (more of them late, or curses a Smite
+cannot break) would make the leaders matter more at the top. None of this has met a person yet.
+
 ## Screens
 
 Title → **Descend** → world map ↔ skill tree; world map → (the lantern travels) → intro →
