@@ -5,9 +5,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from hellward.sim.players.adaptive import Adaptive
 from hellward.sim.players.hands import Player
 from hellward.sim.players.ordinary import Ordinary
 
 PLAYERS: dict[str, Callable[[int], Player]] = {
     "ordinary": lambda seed: Ordinary(),
+    "adaptive": lambda seed: Adaptive(),
 }

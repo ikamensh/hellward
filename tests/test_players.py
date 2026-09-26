@@ -57,3 +57,9 @@ def test_a_player_reads_no_leaders_mind_and_no_future(path):
         return   # the harness itself reads the events a person would see
     source = path.read_text()
     assert not [word for word in FORBIDDEN if word in source]
+
+
+def test_the_adaptive_player_holds_tristram():
+    world, record = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["adaptive"](1), seed=1, sigils=0, planner=planner.smart)
+    assert world.outcome == "victory"
+    assert world.lives >= 18
