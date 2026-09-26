@@ -115,12 +115,12 @@ def test_bone_prison_silences_and_cleanse_lifts_it():
     started(world)
     run(world, 6)   # well inside the pyre's reach by now
     zombie = world.monsters[0]
-    assert zombie.hp == pytest.approx(MONSTERS["zombie"].hp)
+    assert zombie.hp == pytest.approx(zombie.max_hp)
     world.mana = SPELLS["cleanse"].mana
     world.cleanse(tower.id)
     assert world.mana == 0 and not tower.curses
     run(world, 3)
-    assert zombie.hp < MONSTERS["zombie"].hp
+    assert zombie.hp < zombie.max_hp
     with pytest.raises(Refused):
         world.cleanse(tower.id)
 

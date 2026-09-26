@@ -255,6 +255,7 @@ class World:
         self.difficulty = difficulty
         self.perks = perks
         self.tower_levels = baked(perks)
+        self.hardness = difficulty.factor(location.key)   # the difficulty's factor on every monster's life here
         self.rng = random.Random(seed)
         self.planner = planner
         self.record = record
@@ -363,7 +364,7 @@ class World:
 
     def power(self) -> float:
         """How hard a spell strikes: with the monsters' life now, and with Spell Mastery."""
-        return self.waves[max(self.wave, 0)].hp * self.location.life * self.difficulty.hp * self.perks.spell_power
+        return self.waves[max(self.wave, 0)].hp * self.location.life * self.perks.spell_power
 
     def cost(self, kind: str) -> int:
         return self.tower_levels[kind][0].cost
@@ -568,7 +569,7 @@ class World:
             kind = MONSTERS[key]
             cooldown = kind.leader.first_cast * self.difficulty.leader_pace if kind.leader is not None else 0.0
             m = Monster(self._id(), kind, self.wave, self.rng.uniform(-0.28, 0.28), self.rng.uniform(0.0, JOSTLE),
-                        kind.hp * self.waves[self.wave].hp * self.location.life * self.difficulty.hp, cooldown)
+                        kind.hp * self.waves[self.wave].hp * self.location.life * self.hardness, cooldown)
             self.monsters.append(m)
             self._emit("spawn", m.id)
 

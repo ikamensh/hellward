@@ -64,9 +64,17 @@ class Location:
 class Difficulty:
     key: str
     name: str
-    hp: float              # every monster's life is multiplied by this
+    hp: float              # every monster's life is multiplied by this (the spells' strength is not)
     leader_pace: float     # and every leader's cooldown by this
     requires: str | None   # the difficulty whose last location must fall first
+    life: tuple[tuple[str, float], ...] = ()   # a location's own factor on top of hp, tuned by simulation
+
+    def factor(self, location: str) -> float:
+        """Every monster's life at a location, as a multiple of what Normal gives it."""
+        for key, value in self.life:
+            if key == location:
+                return self.hp * value
+        return self.hp
 
 
 NORMAL = Difficulty("normal", "Normal", 1.0, 1.0, None)
@@ -149,6 +157,7 @@ GRAVEYARD = Location(
     taunt="I buried every one of them, and they still come when I call. Build your gates. I will cage the fire "
           "behind them.",
     requires=("tristram",),
+    life=1.15,
 )
 
 CATHEDRAL = Location(
@@ -180,6 +189,7 @@ CATHEDRAL = Location(
     taunt="This was my house before it was yours. The witch will make your towers old, and the goatmen do not "
           "fear your thunder.",
     requires=("graveyard",),
+    life=0.8,
 )
 
 CATACOMBS = Location(
@@ -211,6 +221,7 @@ CATACOMBS = Location(
     taunt="Four doors between you and the dark. An Overlord needs a few breaths for each, and my priest will "
           "blind whatever watches them.",
     requires=("cathedral",),
+    life=1.5,
 )
 
 CAVES = Location(
@@ -241,6 +252,7 @@ CAVES = Location(
     blurb="Below the catacombs the caves open onto lava. Gargoyles nest in the vault and fly where they please.",
     taunt="Walls mean nothing to wings. Look up.",
     requires=("catacombs",),
+    life=1.9,
 )
 
 HELLS_GATE = Location(
@@ -274,6 +286,7 @@ HELLS_GATE = Location(
     blurb="The door your saints built the cathedral on. Azazel the Flayer waits behind it with the council of curses.",
     taunt="I have watched this fight more times than you have drawn breath. In every one of them, the lamp goes out.",
     requires=("caves",),
+    life=1.2,
 )
 
 LOCATIONS: dict[str, Location] = {loc.key: loc for loc in (TRISTRAM, GRAVEYARD, CATHEDRAL, CATACOMBS, CAVES, HELLS_GATE)}
