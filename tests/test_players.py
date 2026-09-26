@@ -149,7 +149,7 @@ def assert_fits(plan, location):
             assert location.arsenal.gates and 0 <= step[1] < len(location.level.doors)
 
 
-@pytest.mark.parametrize("path", sorted(PLANS.glob("*.json")), ids=lambda p: p.stem)
+@pytest.mark.parametrize("path", sorted(PLANS.glob("*-*.json")), ids=lambda p: p.stem)   # the planned player's own
 def test_every_stored_plan_fits_its_location(path):
     """A plan found for an older map or arsenal would build nowhere; the player would stand idle."""
     key, difficulty = path.stem.split("-")
