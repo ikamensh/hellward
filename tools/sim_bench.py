@@ -6,7 +6,8 @@
 Every location is defended once by the ordinary player (``hands.defend``) against smart leaders, on seed 1.
 Each run is a fresh process: source (``HELLWARD_INTERPRETED=1``) and compiled (:mod:`hellward.sim.fastsim`)
 alternate, so that both meet the same load on a shared machine, and each is timed by the processor time of the
-defence alone. The fastest of ``--repeat`` runs counts.
+defence alone (its events are kept, and written out after the clock stops). The fastest of ``--repeat`` runs
+counts.
 
 A run also prints a digest of every event with its time and of the world at the end (:func:`digest`); the source
 and the compiled digests must agree, so a speed change that is only a speed change prints the same digests.
@@ -86,25 +87,41 @@ def state(world: World) -> str:
     return "\n".join(parts)
 
 
-def defence(key: str, seed: int = SEED) -> tuple[World, str]:
-    """One defence of a location by the ordinary player against smart leaders, and the digest of every event with
-    its time and of the world at its end."""
-    digest = hashlib.sha256()
+def play(key: str, seed: int = SEED) -> tuple[World, list[tuple[float, list[tuple]]]]:
+    """One defence of a location by the ordinary player against smart leaders, and every step's events with its
+    time. Events are kept as they are: nothing the world emits is changed after (a bolt moves as a new bolt)."""
+    events: list[tuple[float, list[tuple]]] = []
 
     def watch(world: World) -> None:
-        for event in world.events:
-            digest.update(f"{world.time.hex()} {canon(event)}\n".encode())
+        if world.events:
+            events.append((world.time, list(world.events)))
 
     world, _ = defend(LOCATIONS[key], NORMAL, PLAYERS["ordinary"](seed), seed=seed, sigils=0, planner=planner.smart,
                       watch=watch)
-    digest.update(state(world).encode())
-    return world, digest.hexdigest()[:16]
+    return world, events
+
+
+def digest(world: World, events: list[tuple[float, list[tuple]]]) -> str:
+    """Every event with its time, and the world at the end."""
+    written = hashlib.sha256()
+    for at, happened in events:
+        for event in happened:
+            written.update(f"{at.hex()} {canon(event)}\n".encode())
+    written.update(state(world).encode())
+    return written.hexdigest()[:16]
+
+
+def defence(key: str, seed: int = SEED) -> tuple[World, str]:
+    """One defence of a location, and its digest."""
+    world, events = play(key, seed)
+    return world, digest(world, events)
 
 
 def timed(key: str) -> dict[str, Any]:
     started = time.process_time()
-    world, digest = defence(key)
-    return {"cpu": time.process_time() - started, "digest": digest, "outcome": world.outcome, "lives": world.lives,
+    world, events = play(key)
+    cpu = time.process_time() - started
+    return {"cpu": cpu, "digest": digest(world, events), "outcome": world.outcome, "lives": world.lives,
             "compiled": fastsim.compiled()}
 
 
