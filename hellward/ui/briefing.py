@@ -62,11 +62,11 @@ class BriefingScene(Scene):
             self.draw_text(f"The descent, {index + 1} of {len(ORDER)}  ·  {difficulty.name}  ·  {len(location.waves)} waves", 640, 94,
                            font_size=15, color=style.DIM, anchor_x="center", anchor_y="center")
             widgets.centred(self, location.blurb, 640, 108, 1040, font_size=17, color=style.BONE)
-            self._taunt(164)
-            self._host(228)
-            self._curses(486)
-            self._arsenal(622)
-            self._sigils(622)
+            self._taunt(160)
+            self._host(242)
+            self._curses(496)
+            self._arsenal(636)
+            self._sigils(636)
         mouse = self.game.mouse_position
         if mouse is not None:
             spot = widgets.hit(self.spots, *mouse)
@@ -83,10 +83,11 @@ class BriefingScene(Scene):
         h = 58
         w = h * cell.size[0] / cell.size[1]
         self.draw_image("mon/priest/front/chant", 150 - w / 2, y - 8, w, h)
-        self.draw_text("the Bone Priest", 150, y + h + 2, font_size=11, color=style.DIM, anchor_x="center", anchor_y="center")
         glow = 0.75 + 0.25 * math.sin(self.clock * 2)
-        self.draw_paragraph(f"“{self.location.taunt}”", 200, y + 4, 960, font_size=16, color=style.CURSE[:3] + (int(255 * glow),),
-                            max_lines=2)
+        height = self.draw_paragraph(f"“{self.location.taunt}”", 200, y + 4, 960, font_size=16,
+                                     color=style.CURSE[:3] + (int(255 * glow),), max_lines=2)
+        self.draw_text("— the Bone Priest", 1160, y + 4 + height + 10, font_size=12, color=style.DIM, anchor_x="right",
+                       anchor_y="center")
 
     def _host(self, y: float) -> None:
         """A card per monster kind: its figure, life on this difficulty, pace, and what it resists."""
@@ -101,7 +102,7 @@ class BriefingScene(Scene):
             life = kind.hp * first.hp * self.location.life * difficulty.factor(self.location.key)
             top = y + 26
             leader = kind.leader is not None
-            self.draw_rect(x, top, width, 222, (18, 12, 14, 230), border_color=style.CURSE if leader else style.PANEL_EDGE,
+            self.draw_rect(x, top, width, 214, (18, 12, 14, 230), border_color=style.CURSE if leader else style.PANEL_EDGE,
                            border_width=1.5, radius=6)
             cell = self.flow.art.monster[key]
             h = min(96, 60 + 40 * kind.size)
@@ -114,8 +115,8 @@ class BriefingScene(Scene):
                            font=style.TITLE_FONT, anchor_x="center", anchor_y="center")
             pace = "fast" if kind.speed >= 1.3 else "steady" if kind.speed >= 0.9 else "slow"
             cost = f", {kind.lives} lives" if kind.lives > 1 else ""
-            self.draw_text(f"{life:.0f} life, {pace}{cost}", x + width / 2, top + 136, font_size=12, color=style.BONE,
-                           anchor_x="center", anchor_y="center")
+            line = self.fit_text(f"{life:.0f} life, {pace}{cost}", width - 8, font_size=12)
+            self.draw_text(line, x + width / 2, top + 136, font_size=12, color=style.BONE, anchor_x="center", anchor_y="center")
             notes = monster_notes(kind)
             if leader:
                 notes.append("Curses: " + ", ".join(CURSES[c].name for c in kind.leader.curses))
@@ -142,13 +143,13 @@ class BriefingScene(Scene):
         x = 640 - (len(curses) * width + (len(curses) - 1) * 12) / 2
         for curse in curses:
             spec = CURSES[curse]
-            self.draw_rect(x, y + 24, width, 70, (26, 10, 30, 230), border_color=(150, 70, 190, 255), border_width=1.5, radius=6)
+            self.draw_rect(x, y + 24, width, 84, (26, 10, 30, 230), border_color=(150, 70, 190, 255), border_width=1.5, radius=6)
             self.draw_text(f"{spec.name}, {spec.duration:g} s", x + 12, y + 42, font_size=17, color=style.CURSE,
                            font=style.TITLE_FONT, anchor_y="center")
-            self.draw_paragraph(f"The tower {spec.blurb}.", x + 12, y + 58, width - 24, font_size=13, color=style.BONE, max_lines=2)
-            self.spots.append(widgets.Hotspot(f"curse:{curse.value}", (x, y + 24, width, 70), True, f"{spec.name}\n{answer}"))
+            self.draw_paragraph(f"The tower {spec.blurb}.", x + 12, y + 58, width - 24, font_size=12, color=style.BONE, max_lines=2)
+            self.spots.append(widgets.Hotspot(f"curse:{curse.value}", (x, y + 24, width, 84), True, f"{spec.name}\n{answer}"))
             x += width + 12
-        widgets.centred(self, f"The answer: {answer}", 640, y + 100, 1100, font_size=13, color=style.HOLY)
+        widgets.centred(self, f"The answer: {answer}", 640, y + 112, 1100, font_size=13, color=style.HOLY)
 
     def _arsenal(self, y: float) -> None:
         """What the player may use here, with what is new since the last location marked."""
@@ -185,8 +186,9 @@ class BriefingScene(Scene):
         if won < 3:
             need = SIGIL_LIVES[won]
             text = "Hold the sanctuary to win the first." if won == 0 else f"The next: keep {need} of {START_LIVES} lives."
-            self.draw_text(text, x, y + 92, font_size=12, color=style.DIM, anchor_x="center", anchor_y="center")
+            self.draw_text(text, x, y + 86, font_size=12, color=style.DIM, anchor_x="center", anchor_y="center")
         wasted = sum(SKILLS[key].cost for key in progress.learned if idle(self.location, SKILLS[key].needs))
         if wasted:
-            self.draw_text(f"{wasted} sigils sit in skills that do nothing here.", x, y + 110, font_size=12, color=style.BLOOD,
-                           anchor_x="center", anchor_y="center")
+            what = "1 sigil sits in a skill that does" if wasted == 1 else f"{wasted} sigils sit in skills that do"
+            self.draw_text(f"{what} nothing here.", x, y + 20, font_size=12, color=style.BLOOD, anchor_x="center",
+                           anchor_y="center")

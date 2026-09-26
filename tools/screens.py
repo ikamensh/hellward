@@ -81,6 +81,7 @@ def main() -> None:
 
     def make_battle(key: str):
         def battle() -> None:
+            progress.won["normal"] = {k: 1 for k in LOCATIONS}   # the whole descent open, whatever the map frame showed
             flow.defend(LOCATIONS[key])
             scene = game.scenes[-1]
             scene.autopilot = Ordinary()
