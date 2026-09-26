@@ -61,6 +61,7 @@ class Record:
     mana_capped: float = 0.0      # seconds the mana orb sat full
     spells: Counter = field(default_factory=Counter)
     leaks: Counter = field(default_factory=Counter)   # lives lost by wave
+    skills: frozenset[str] = frozenset()              # what the player learned for it
 
 
 def react_for(seed: int) -> float:
@@ -153,15 +154,20 @@ class Hands:
 
 
 def defend(location: Location, difficulty: Difficulty, player: Player, *, seed: int, sigils: int,
-           planner: Planner | None, hp: float = 1.0, limit: float = 3000.0) -> tuple[World, Record]:
-    """One defence played to its end by a player; ``hp`` scales every monster's life (the balance tools' margin)."""
+           planner: Planner | None, hp: float = 1.0, lives: int | None = None,
+           limit: float = 3000.0) -> tuple[World, Record]:
+    """One defence played to its end by a player; ``hp`` scales every monster's life (the balance tools' margin), and
+    ``lives`` replaces the sanctuary's (the balance tools set it huge to count every life lost)."""
     learned = player.skills(location, difficulty, sigils)
     if cost(learned) > sigils:
         raise ValueError(f"{player.name} learned {cost(learned)} sigils' worth of skills with {sigils}")
     world = World(location, difficulty=replace(difficulty, hp=difficulty.hp * hp), perks=perks(learned), seed=seed,
                   planner=planner)
     world.record = True
+    if lives is not None:
+        world.lives = lives
     hands = Hands(world, react_for(seed))
+    hands.record.skills = learned
     while world.outcome is None and world.time < limit:
         player.act(hands)
         world.step(SIM_DT)
