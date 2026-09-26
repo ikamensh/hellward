@@ -280,7 +280,7 @@ class Warden:
             self.work[t.id] = self.work.get(t.id, 0.0) + busy * THINK
 
     def _gates(self, world: World) -> None:
-        """Set a broken gate again once the arch is clear: those it has set before, while monsters still come."""
+        """Set a broken gate again once no walker stands in its arch, if the build has set it before."""
         steps = self.chosen.steps
         for door in world.doors:
             if door.built or world.gold < DOOR.cost or Step("gate", door=door.index) not in steps[:self.done]:
@@ -335,7 +335,7 @@ class Warden:
             world.build(kind, max(free, key=lambda t: (tile_value(location, kind, t, reach), -t[1], -t[0])))
 
     def _call(self, world: World) -> None:
-        """Call the next wave early for its gold once the build is caught up and the mana orb is nearly full."""
+        """Call the next wave early for its gold, a second into the break, once the mana orb is full enough."""
         if not world.can_call_wave or world.break_left is None or world.wave < 0:
             return
         if world.break_left > WAVE_BREAK - 1.0:
