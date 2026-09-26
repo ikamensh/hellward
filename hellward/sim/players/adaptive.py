@@ -6,7 +6,9 @@ crowded the bin is (a fireball or a leap of lightning is worth more in a crowd),
 to the sanctuary. A monster's trail joins the picture when it dies or leaks, so the picture shows where
 monsters really get to under the towers already standing. Before the first monster it is a guess from the map
 and the location's roster, as a person has it from the intro; while a wave runs, the monsters on the map and
-still to come weigh in with the trails their kinds usually walk.
+still to come weigh in with the trails their kinds usually walk. Which kinds are still to come is what a person who
+has replayed the location knows: the panel counts the monsters abroad, and each wave's host comes in the same order
+every time.
 
 From that picture every build and upgrade is priced as the damage it would deal per wave, weighted towards the
 kinds that leak and the leaders, per gold; the best is bought, or saved for. A frost shrine is also priced by
@@ -17,12 +19,13 @@ the monsters left are priced, and the towers that will never see a monster again
 past, are sold to stand where the monsters are going: Azazel dies that way on Hell's Gate.
 
 It also keeps, per kind, the damage a monster takes from anywhere on the path to the sanctuary, so it can tell
-which monster is about to get through. Mana is kept for Smite while leaders walk: a chant at a tower that
-matters is broken (two at once with a Frozen Orb), a leader Smite can finish is finished, and a monster Smite
-can stop is stopped. What mana is left goes to the damage that saves most lives: Meteor on a thick crowd, a
-Frozen Orb on a gate about to break or a clump getting through, a Smite on whatever costs many lives, and never
-a full orb wasting its flow. Cleanse lifts the curse costing the most. A break is cut short for its gold when
-the last wave cost nothing and the mana is in hand.
+which monster is about to get through. Mana is kept for Smite while leaders walk: a chant at a tower that matters
+is broken (two at once with a Frozen Orb, aimed between where the two stood when their beams appeared), a leader
+Smite can finish is finished, and a monster Smite can stop is stopped. What mana is left goes to the damage that
+saves most lives: Meteor on a thick crowd, a Frozen Orb on a gate about to break (its health bar falling fast) or a
+clump getting through, a Smite on whatever costs many lives, and never a full orb wasting its flow. Cleanse lifts
+the curse costing the most. A break is cut short for its gold when the last wave cost nothing and the mana is in
+hand.
 
 Its skills come from a themed order of the tree (:data:`ORDERS`), cut to the sigils in hand and to what the
 location offers. Which order suits a location was found by playing each on training seeds
@@ -205,6 +208,9 @@ class Adaptive:
         self.watched: dict[int, float] = {}   # per tower: seconds it stood while monsters walked
         self.aimed_at = -1e9
         self.endgame = False                  # the last wave has sent every monster it has
+        self.host: list[str] = []             # this wave's monsters in the order they come
+        self.gate_hp: dict[int, float] = {}   # per gate: its life at the last look
+        self.battered: dict[int, float] = {}  # per gate: life it lost a second since the look before
 
     # -- Skills --------------------------------------------------------------------------------------
 
@@ -228,7 +234,7 @@ class Adaptive:
             self._watch(world)
         if world.wave != self.wave:
             self._new_wave(world)
-        if not self.endgame and world.wave == len(world.location.waves) - 1 and not world.schedule:
+        if not self.endgame and world.wave == len(world.location.waves) - 1 and not self._to_come(world):
             self.endgame = True
             self.view = None
         if self.view is None or world.time >= self.refresh_at:
@@ -276,6 +282,9 @@ class Adaptive:
         for key in [k for k in self.trails if k not in alive]:
             trail = self.trails.pop(key)
             self.picture.fold(trail, leaked=trail.s + trail.kind.speed * SAMPLE * 2 >= study.length)
+        for d in world.doors:
+            self.battered[d.index] = max(0.0, self.gate_hp.get(d.index, d.hp) - d.hp) / SAMPLE
+            self.gate_hp[d.index] = d.hp
 
     def _new_wave(self, world: World) -> None:
         self.lost_last = self.lives_at_wave - world.lives
@@ -283,6 +292,15 @@ class Adaptive:
         self.wave = world.wave
         self.picture.fade(FADE)
         self.view = None
+        groups = world.location.waves[world.wave].groups
+        self.host = [kind for _, kind in sorted((group.start + i * group.interval, group.kind)
+                                                 for group in groups for i in range(group.count))]
+
+    def _to_come(self, world: World) -> list[str]:
+        """The kinds this wave has still to send: the last of its host, as many as the panel's count of monsters
+        abroad has beyond those on the map."""
+        left = len(world.schedule)   # what the panel adds to the monsters on the map
+        return self.host[len(self.host) - left:] if left else []
 
     def _reread(self, world: World) -> None:
         """Blend the picture with the guess from the map and the roster, and with the monsters of this wave (on the
@@ -292,7 +310,7 @@ class Adaptive:
         coming: dict[str, list[float]] = {}
         for m in world.monsters:
             coming.setdefault(m.kind.key, [0.0] * bins)[study.bin(m.s)] += 1.0
-        for _, key in world.schedule:
+        for key in self._to_come(world):
             coming.setdefault(key, [0.0] * bins)[0] += 1.0
         seconds = [0.0] * bins
         worth = {e: [0.0] * bins for e in ELEMENTS}
@@ -580,7 +598,7 @@ class Adaptive:
         """Mana kept for Smite while a leader walks or is still to come in this wave."""
         if "smite" not in world.location.arsenal.spells:
             return 0.0
-        coming = any(MONSTERS[key].leader is not None for _, key in world.schedule)
+        coming = any(MONSTERS[key].leader is not None for key in self._to_come(world))
         walking = any(m.kind.leader is not None for m in world.monsters)
         return world.spell_cost("smite") if coming or walking else 0.0
 
@@ -599,11 +617,11 @@ class Adaptive:
         chants = [(sign, m) for sign, m in chants if m is not None]
         if len(chants) >= 2 and self._can(world, "orb"):
             radius = SPELLS["orb"].radius
-            for _, m in chants:
-                at = world.position(m)
-                if sum(1 for _, o in chants if _dist(world.position(o), at) <= radius) >= 2:
-                    hands.orb(*at)
-                    return True
+            for i, (a, _) in enumerate(chants):
+                for b, _ in chants[i + 1:]:
+                    if _dist(a.at, b.at) <= radius:
+                        hands.orb((a.at[0] + b.at[0]) / 2, (a.at[1] + b.at[1]) / 2)
+                        return True
         if not self._can(world, "smite"):
             return False
         full = world.mana >= world.mana_max - 5
@@ -692,15 +710,12 @@ class Adaptive:
                    key=lambda s: (level.point(s)[0] - at[0]) ** 2 + (level.point(s)[1] - at[1]) ** 2)
 
     def _failing_gate(self, world: World) -> tuple[float, float] | None:
-        """The queue at a gate that will break within two seconds, when enough monsters batter it."""
+        """The queue at a gate whose health bar, falling as fast as it did since the last look, empties within two
+        seconds, when enough monsters batter it."""
         for d in world.doors:
-            if not d.built:
+            if not d.built or d.hp >= self.battered[d.index] * 2.0:
                 continue
-            queue = [m for m in world.monsters if m.door == d.index]
-            if len(queue) < ORB_CROWD:
-                continue
-            blows = sum(m.kind.door_dps * (1.0 - m.chill if m.chill_left > 0 else 1.0) for m in queue)
-            if d.hp < blows * 2.0:
+            if sum(1 for m in world.monsters if m.door == d.index) >= ORB_CROWD:
                 return world.level.point(d.s - DOOR_STOP - JOSTLE / 2)
         return None
 
