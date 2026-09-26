@@ -33,6 +33,7 @@ class Flow:
         self.progress = progress
         self.demo_player = demo_player
         self.seed = seed
+        self.gained = 0   # the sigils the last defence added
 
     def title(self) -> None:
         self.game.clear_and_push(TitleScene(self))
@@ -40,6 +41,11 @@ class Flow:
 
     def world_map(self) -> None:
         self.game.clear_and_push(MapScene(self))
+        self.sound.music("title")
+
+    def descend(self) -> None:
+        """The title's Descend: the map, and on a new campaign the lantern walks straight on to Tristram."""
+        self.game.clear_and_push(MapScene(self, first=self.progress.sigils == 0))
         self.sound.music("title")
 
     def intro(self, location: Location) -> None:
@@ -50,10 +56,13 @@ class Flow:
         self.game.push(SkillTreeScene(self, location))
 
     def defend(self, location: Location) -> None:
+        if not self.progress.opened(location):
+            self.world_map()   # the way there is not open on this difficulty
+            return
         self.game.clear_and_push(BattleScene(
             self.art, location, difficulty=DIFFICULTIES[self.progress.difficulty], perks=perks(self.progress.learned),
-            seed=self.seed, planner=self.planner, sound=self.sound, on_end=self.reckon, settings=self.settings,
-            restart=lambda: self.defend(location), to_title=self.title, to_map=self.world_map))
+            seed=self.seed, planner=self.planner, sound=self.sound, on_outcome=self.keep, on_end=self.reckon,
+            settings=self.settings, restart=lambda: self.defend(location), to_title=self.title, to_map=self.world_map))
 
     def demo(self) -> None:
         self.game.clear_and_push(self.demo_scene())
@@ -64,6 +73,9 @@ class Flow:
                            on_end=lambda world: self.title(), settings=self.settings, restart=self.demo, to_title=self.title,
                            to_map=self.world_map)
 
+    def keep(self, world: World) -> None:
+        """The moment a defence is decided: its sigils are won, even if the player leaves before the reckoning."""
+        self.gained = self.progress.record(world.location.key, world.outcome, world.lives)
+
     def reckon(self, world: World) -> None:
-        gained = self.progress.record(world.location.key, world.outcome, world.lives)
-        self.game.push(ReckoningScene(self, world, gained))
+        self.game.push(ReckoningScene(self, world, self.gained))

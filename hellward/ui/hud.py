@@ -128,7 +128,7 @@ class Hud:
             y = TOP + 16
             if key == "gate":
                 name, tip = "Warded Gate", (f"Bar an arch on the path. Walkers must break it ({world.gate_life:.0f} life); flyers pass "
-                                            "over. A broken gate lies in rubble until the wave is cleared.")
+                                            "over. A broken gate lies in rubble until the fight dies down between waves.")
             else:
                 kind = TOWERS[key]
                 name, tip = kind.name, f"{ELEMENT_NAMES[kind.element]}. {kind.blurb}"
@@ -271,7 +271,7 @@ class Hud:
             if leaders:
                 status += f", {len(leaders)} leading"
         elif world.wave < 0:
-            status = "Towers (1-4) beside the carpet, gates (5) in the arches."
+            status = "Towers beside the way, gates (5) in the arches." if world.doors else "Towers beside the way before the first wave."
         elif world.break_left is not None:
             status = f"the next comes in {world.break_left:.0f}s"
         else:

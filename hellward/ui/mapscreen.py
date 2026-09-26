@@ -27,7 +27,7 @@ class MapScene(Scene):
     background_color = (6, 4, 6, 255)
     controls = {"k": "open_skills", "escape": "to_title"}
 
-    def __init__(self, flow: Flow) -> None:
+    def __init__(self, flow: Flow, *, first: bool = False) -> None:
         self.flow = flow
         self.progress = flow.progress
         self.spots: list[widgets.Hotspot] = []
@@ -36,7 +36,7 @@ class MapScene(Scene):
         self.going: str | None = None
         here = worldmap.ANCHORS[self.progress.at]
         self.lantern = here
-        self.first = self.progress.sigils == 0 and not any(self.progress.won[d] for d in DIFFICULTIES)
+        self.first = first   # a first Descend from the title walks on to Tristram by itself
 
     def on_enter(self) -> None:
         bar = Row(Button("Skills", shortcut="K", on_click=self.open_skills, width=200),
@@ -62,7 +62,7 @@ class MapScene(Scene):
 
     def choose(self, key: str) -> None:
         difficulty = DIFFICULTIES[key]
-        if not self.progress.difficulty_opened(difficulty):
+        if self.going is not None or not self.progress.difficulty_opened(difficulty):
             self.flow.sound.play("refuse")
             return
         self.progress.choose(key)
@@ -127,7 +127,8 @@ class MapScene(Scene):
     def _arrive(self) -> None:
         key, self.going, self.walk = self.going, None, []
         self.lantern = worldmap.ANCHORS[key]
-        self.flow.intro(LOCATIONS[key])
+        if self.progress.opened(LOCATIONS[key]):
+            self.flow.intro(LOCATIONS[key])
 
     # -- Drawing ----------------------------------------------------------------------------------
 

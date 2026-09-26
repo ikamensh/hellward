@@ -191,8 +191,9 @@ def test_each_cleared_wave_pays_its_bonus_once_even_when_called_early():
     assert world.outcome == "victory"
 
 
-def test_a_broken_gate_lies_in_rubble_until_its_wave_is_cleared():
-    world = World(wave_of("zombie", count=2, interval=0.3))
+def test_a_broken_gate_lies_in_rubble_until_the_fight_dies_down_between_waves():
+    zombies = Wave((Group("zombie", 2, 0.3),), 10)
+    world = World(with_waves(zombies, zombies))
     world.gold = 1000
     world.build_door(0)
     started(world)
@@ -202,8 +203,21 @@ def test_a_broken_gate_lies_in_rubble_until_its_wave_is_cleared():
     run(world, 2)   # the zombies have walked on out of the arch
     with pytest.raises(Refused, match="rubble"):
         world.build_door(0)
-    while world.unpaid:   # the wave's last monster falls or gets through
+    while world.break_left is None:   # the wave's last monster falls or gets through, and the break begins
         run(world, 1)
         assert world.time < 600
     world.build_door(0)
     assert world.doors[0].built
+
+
+def test_a_monster_a_spell_kills_between_steps_walks_no_further():
+    world = World(wave_of("fallen"))
+    started(world)
+    run(world, 2)
+    fallen = world.monsters[0]
+    world.mana = 100
+    world.smite(fallen.id)
+    assert not world.monsters
+    lives = world.lives
+    run(world, 1)
+    assert world.lives == lives and world.kills == 1

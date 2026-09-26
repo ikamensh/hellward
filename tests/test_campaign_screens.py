@@ -58,7 +58,7 @@ def test_a_first_descent_walks_the_lantern_to_tristram_and_its_intro_names_its_h
     tick(g)
     press(g, "return")
     assert isinstance(g.scenes[-1], MapScene)
-    tick(g, 4)
+    tick(g, 4)   # the lantern walks on by itself
     intro = g.scenes[-1]
     assert isinstance(intro, BriefingScene) and intro.location.key == "tristram"
     assert_text_fits(g)
@@ -144,6 +144,7 @@ def test_the_learned_skills_go_into_the_defence(game):
 
 def test_q_smites_the_leader_closest_to_cursing_and_no_spell_is_cast_while_paused(game):
     g, flow = game
+    flow.progress.won["normal"] = {"tristram": 1}
     flow.defend(LOCATIONS["graveyard"])
     tick(g)
     battle = g.scenes[-1]
@@ -179,6 +180,33 @@ def test_what_a_location_does_not_offer_is_refused_with_where_it_arrives(game):
     assert battle.placing is None
     assert any("Cathedral" in text for _, text, _ in battle.hud.log)
     assert_text_fits(g)
+
+
+def test_a_location_the_way_has_not_reached_sends_the_player_back_to_the_map(game):
+    g, flow = game
+    flow.defend(LOCATIONS["caves"])
+    tick(g)
+    assert isinstance(g.scenes[-1], MapScene)
+
+
+def test_the_first_descent_walks_on_by_itself_only_from_the_title(game):
+    g, flow = game
+    flow.world_map()   # back to the map from Tristram's intro, say: the lantern waits
+    tick(g, 3)
+    assert isinstance(g.scenes[-1], MapScene)
+
+
+def test_a_won_defence_is_kept_even_when_the_player_leaves_before_the_reckoning(game):
+    g, flow = game
+    flow.defend(LOCATIONS["tristram"])
+    tick(g)
+    battle = g.scenes[-1]
+    battle.world.lives = 20
+    battle.world.outcome = "victory"
+    tick(g)
+    battle.to_map()   # the pause menu's To the map, before the reckoning comes
+    tick(g)
+    assert flow.progress.best("tristram") == 3
 
 
 def test_hell_opens_only_when_hells_gate_holds_on_normal(game):

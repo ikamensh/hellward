@@ -51,6 +51,7 @@ class BattleScene(Scene):
     def __init__(self, art: Art, location: Location = CATHEDRAL, *, difficulty: Difficulty = NORMAL, perks: Perks = NO_PERKS,
                  seed: int = 0, planner: Callable | None = None, sound: Any = None,
                  autopilot: Player | None = None, on_end: Callable[[World], None] | None = None,
+                 on_outcome: Callable[[World], None] | None = None,
                  settings: Any = None, restart: Callable[[], None] | None = None,
                  to_title: Callable[[], None] | None = None, to_map: Callable[[], None] | None = None) -> None:
         self.art = art
@@ -65,7 +66,8 @@ class BattleScene(Scene):
         self.planner = planner
         self.sound = sound or Silent()
         self.autopilot = autopilot
-        self.on_end = on_end
+        self.on_end = on_end            # three seconds after the fight is decided: the reckoning
+        self.on_outcome = on_outcome    # the moment it is decided: the result is kept, whatever the player does next
         self.placing: str | None = None
         self.selected: Tower | None = None
         self.speed = 1.0
@@ -109,9 +111,7 @@ class BattleScene(Scene):
                 self.view.before_step()
                 world.step(SIM_DT)
                 self.hands.observe(world.events)
-                for event in world.events:
-                    self._event(event)
-                world.events.clear()
+                self._route()
         if self.selected is not None and self.selected.id not in world.towers:
             self.selected = None
         self.fx.selected = self.selected.id if self.selected is not None else -1
@@ -121,6 +121,9 @@ class BattleScene(Scene):
         self._door_blows(dt)
         self.lighting.render(self.view.lights() + self.fx.lights())
         if world.outcome is not None:
+            if self.on_outcome is not None:
+                callback, self.on_outcome = self.on_outcome, None
+                callback(world)
             self.ended += dt
             if self.ended > 3.0 and self.on_end is not None:
                 self.hud.banners.clear()   # the reckoning is drawn over this scene
@@ -245,14 +248,22 @@ class BattleScene(Scene):
     def cost(self, key: str) -> int:
         return DOOR.cost if key == "gate" else self.world.cost(key)
 
+    def _route(self) -> None:
+        """Hand the world's events to the effects and the sound, and clear them."""
+        for event in self.world.events:
+            self._event(event)
+        self.world.events.clear()
+
     def _try(self, action: Callable[[], Any]) -> bool:
         try:
             action()
-            return True
         except Refused as refusal:
             self.hud.note(str(refusal), style.DIM)
             self.sound.play("refuse")
             return False
+        self.hands.observe(self.world.events, dt=0.0)   # a command's events now, not after a step that may be paused away
+        self._route()
+        return True
 
     def pick(self, key: str) -> None:
         if not offers(self.location, key):

@@ -168,7 +168,7 @@ class Door:
         self.s = s
         self.hp = 0.0
         self.built = False
-        self.rubble = False    # broken this wave: it cannot be warded again until a wave is cleared
+        self.rubble = False    # broken: it cannot be warded again until the fight dies down between waves
 
     def copy(self) -> Door:
         d = Door(self.index, self.tile, self.s)
@@ -420,7 +420,7 @@ class World:
         if door.built:
             raise Refused("The gate already stands.")
         if door.rubble:
-            raise Refused("The arch lies in rubble until this wave is broken.")
+            raise Refused("The arch lies in rubble until the fight dies down between waves.")
         if self.gold < DOOR.cost:
             raise Refused(f"A warded gate costs {DOOR.cost} gold.")
         for m in self.monsters:
@@ -465,6 +465,7 @@ class World:
         if m.chant_curse is not None or m.asking is not None:
             self._break(m)
         self._hurt(m, SPELLS["smite"].damage * self.power(), None)
+        self._bury()   # cast between steps: what it killed must not walk on into the next one
 
     def meteor(self, x: float, y: float) -> None:
         self._inside_map(x, y)
@@ -488,6 +489,7 @@ class World:
                 self._break(m)
         for m in struck:
             self._hurt(m, damage, Element.COLD)
+        self._bury()
 
     def _inside_map(self, x: float, y: float) -> None:
         if not (0 <= x <= self.level.width and 0 <= y <= self.level.height):
@@ -972,7 +974,6 @@ class World:
                 bonus = self.waves[w].bonus
                 self.gold += bonus
                 for d in self.doors:
-                    d.rubble = False
                     if d.built:
                         d.hp += (self.gate_life - d.hp) * self.perks.gate_mend
                 self._emit("cleared", w, bonus)
@@ -983,6 +984,8 @@ class World:
             self._emit("victory")
         else:
             self.break_left = WAVE_BREAK
+            for d in self.doors:   # the fight has died down: a broken arch can take a gate again
+                d.rubble = False
 
 
 _ASK: Final = object()   # a leader that has decided to ask, for the end of this step

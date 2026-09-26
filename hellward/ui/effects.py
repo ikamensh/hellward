@@ -103,14 +103,15 @@ class Pillar:
 
 @dataclass
 class Falling:
-    """A meteor on its way down: a burning rock from the sky and a shadow on the floor growing under it."""
+    """A meteor on its way down: a burning rock from the sky and a shadow on the floor growing under it, on the
+    fight's own clock, so it lands with the rules at any pace and hangs in the air while the fight is paused."""
 
     x: float
     y: float
-    life: float
+    delay: float
+    lands: float          # the world's time it lands at
     head: Sprite
     trail: Sprite
-    age: float = 0.0
 
 
 @dataclass
@@ -180,6 +181,8 @@ class Effects:
 
     def on_spawn(self, monster_id: int) -> None:
         m = self.world.monster(monster_id)
+        if m is None:
+            return   # it fell in the step it came out of the portal; its death has nothing to show either
         self.view.spawn(m)
         x, y = self.view.monster_point(m)
         self.bloom("fx/soft/ember", x, y - 10, 10, 50, 0.4, opacity=200)
@@ -406,7 +409,7 @@ class Effects:
         head = self.scene.add_sprite(Sprite("fx/glow/fire", position=(tx + 260, ty - 520), size=(46, 46), layer=RenderLayer.EFFECTS))
         trail = self.scene.add_sprite(Sprite("fx/trail/fire", position=(tx + 260, ty - 520), size=(140, 40), layer=RenderLayer.EFFECTS,
                                              opacity=230))
-        self.falling.append(Falling(tx, ty, delay, head, trail))
+        self.falling.append(Falling(tx, ty, delay, self.world.time + delay, head, trail))
 
     def on_meteor(self, x: float, y: float, struck: list[int]) -> None:
         cx, cy = px(x, y)
@@ -535,8 +538,7 @@ class Effects:
             if pillar.age >= pillar.life:
                 self.pillars.remove(pillar)
         for rock in list(self.falling):
-            rock.age += dt
-            t = min(1.0, rock.age / rock.life)
+            t = min(1.0, 1.0 - (rock.lands - self.world.time) / rock.delay)
             ease = t * t
             x, y = rock.x + 260 * (1 - ease), rock.y - 520 * (1 - ease)
             rock.head.position = (x, y)
@@ -544,7 +546,7 @@ class Effects:
             angle = math.degrees(math.atan2(520, -260))
             rock.trail.rotation = angle
             rock.trail.position = (x + 60, y - 110)
-            if rock.age >= rock.life:
+            if self.world.time >= rock.lands - 1e-9:
                 rock.head.remove()
                 rock.trail.remove()
                 self.falling.remove(rock)
@@ -634,7 +636,7 @@ class Effects:
                 for (a, b), (c, d) in zip(path, path[1:]):
                     scene.draw_line(a, b, c, d, color, width, space="world", layer=RenderLayer.EFFECTS)
         for rock in self.falling:   # the meteor's shadow on the floor, growing as it comes down
-            t = min(1.0, rock.age / rock.life)
+            t = min(1.0, 1.0 - (rock.lands - self.world.time) / rock.delay)
             r = SPELLS["meteor"].radius * T * (0.3 + 0.7 * t)
             scene.draw_image("fx/soft/ember", rock.x - r, rock.y - r * 0.55, 2 * r, 1.1 * r, opacity=0.25 + 0.5 * t,
                              space="world", layer=RenderLayer.OBJECTS)

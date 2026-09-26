@@ -42,7 +42,7 @@ class TitleScene(Scene):
     def on_enter(self) -> None:
         self.art = self.game.assets.has_image("title")
         menu = Column(
-            Button("Descend", shortcut="Enter", on_click=self.flow.world_map, width=320),
+            Button("Descend", shortcut="Enter", on_click=self.flow.descend, width=320),
             Button("Watch the leaders at work", shortcut="D", on_click=self.flow.demo, width=320),
             Button("Settings", hotkey="S", on_click=self.open_settings, width=320),
             Button("Leave", shortcut="Q", on_click=self.game.quit, width=320),

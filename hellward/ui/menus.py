@@ -60,7 +60,7 @@ class _Overlay(Scene):
 
 
 class PauseScene(_Overlay):
-    controls = {"s": "open_settings", "r": "restart", "m": "to_map", "t": "to_title", "q": "quit"}
+    controls = {"s": "open_settings", "r": "restart", "m": "to_map", "t": "to_title"}   # no key leaves: Q is Smite in the fight
 
     def __init__(self, *, restart: Callable[[], None], to_map: Callable[[], None], to_title: Callable[[], None],
                  on_settings: Callable[[], None]) -> None:
@@ -70,7 +70,7 @@ class PauseScene(_Overlay):
         panel = self.panel("Paused")
         for text, key, action in (("Resume", "Esc", self.game.pop), ("Settings", "S", self.open_settings),
                                   ("Start this defence again", "R", self.restart), ("To the map", "M", self.to_map),
-                                  ("Back to the title", "T", self.to_title), ("Leave the game", "Q", self.quit)):
+                                  ("Back to the title", "T", self.to_title), ("Leave the game", None, self.quit)):
             panel.add(Button(text, hotkey=key, on_click=action, width=340, style=None if text == "Resume" else QUIET_BUTTON))
 
     def open_settings(self) -> None:

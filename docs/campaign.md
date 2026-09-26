@@ -239,8 +239,8 @@ set the ceiling, and a human-like one that sets how Normal feels.
   every life, at margins of 3 to 18 times the monsters' life (the ordinary player: 0.5 to 1.8). The
   warden found why: a gate queue under a frost shrine and three or four fireball pyres was a kill zone,
   and the gate was warded again the moment it broke. And every strong player broke seven chants in ten with
-  Smite, so the leaders barely mattered. Two rules answer it: **a broken gate lies in rubble until its wave
-  is cleared**, and **each spell gathers itself** after a cast (the table above).
+  Smite, so the leaders barely mattered. Two rules answer it: **a broken gate lies in rubble until the fight
+  dies down between waves**, and **each spell gathers itself** after a cast (the table above).
 - **Targets.** The strong players plan with thousands of simulated defences and react within a person's
   reaction time every time; no person plays like that. Tuned to their ceiling, Normal would be unwinnable
   for people, so each difficulty has its own yardstick:
