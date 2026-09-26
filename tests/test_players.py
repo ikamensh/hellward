@@ -34,15 +34,18 @@ def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():
     world.call_wave()
     seen_at = {}
     signed_at = {}
+    stood = {}
     while world.outcome is None and world.time < 60 and len(seen_at) < 3:
         world.step(SIM_DT)
         for e in world.events:
             if e[0] in ("ponder", "chant"):
                 signed_at.setdefault((e[1], e[0]), world.time)
+                stood[(e[1], e[0])] = world.position(world.monster(e[1]))
         hands.observe(world.events)
         world.events.clear()
         for sign in hands.threats():
             seen_at.setdefault((sign.leader, sign.kind), world.time)
+            assert sign.at == stood[(sign.leader, sign.kind)]   # aimed where it stood, not where it walks now
     assert seen_at
     for key, seen in seen_at.items():
         assert seen >= signed_at[key] + 0.6 - 1e-6
