@@ -43,7 +43,7 @@ def score(job: tuple[str, str, str, int, int, float]) -> float:
 
 def edge(pool: ProcessPoolExecutor, location: str, difficulty: str, sigils: int, seeds: list[int]) -> float:
     """The life factor at which the default order starts to lose, bisected on the median of a few seeds."""
-    low, high = 0.5, 8.0
+    low, high = 0.5, 16.0
     while high / low > 1.08:
         mid = (low * high) ** 0.5
         scores = list(pool.map(score, [(location, difficulty, "", sigils, s, mid) for s in seeds]))
