@@ -12,7 +12,9 @@ From that picture every build and upgrade is priced as the damage it would deal 
 kinds that leak and the leaders, per gold; the best is bought, or saved for. A frost shrine is also priced by
 the damage its chill lets the other towers deal, a plague totem only by the venom that finds room, and an
 upgrade loses what the leaders' curses have been taking from its tower. Gates go into arches the towers watch
-and back up as soon as the arch is clear. A tower that stopped seeing monsters is sold between waves.
+and back up as soon as the arch is clear. A tower that stopped seeing monsters is sold between waves. In the
+last stretch, once the last wave has sent everything, only the monsters left are priced, and the towers they
+have all walked past are sold to stand where they are going: Azazel dies that way on Hell's Gate.
 
 It also keeps, per kind, the damage a monster takes from anywhere on the path to the sanctuary, so it can tell
 which monster is about to get through. Mana is kept for Smite while leaders walk: a chant at a tower that
@@ -200,6 +202,7 @@ class Adaptive:
         self.watched: dict[int, float] = {}   # per tower: seconds it stood while monsters walked
         self.aimed_at = -1e9
         self.sold = -2
+        self.endgame = False                  # the last wave has sent every monster it has
 
     # -- Skills --------------------------------------------------------------------------------------
 
@@ -223,6 +226,9 @@ class Adaptive:
             self._watch(world)
         if world.wave != self.wave:
             self._new_wave(world)
+        if not self.endgame and world.wave == len(world.location.waves) - 1 and not world.schedule:
+            self.endgame = True
+            self.view = None
         if self.view is None or world.time >= self.refresh_at:
             self.refresh_at = world.time + REFRESH
             self._reread(world)
@@ -231,6 +237,7 @@ class Adaptive:
         if world.time >= self.think_at - 1e-9:
             self.think_at = world.time + THINK
             self._sell(world)
+            self._salvage(world)
             self._spend(world)
             self._call(world)
 
@@ -296,7 +303,10 @@ class Adaptive:
             came = picture.came.get(key, 0.0)
             seen = picture.seconds.get(key)
             usual = [t / came for t in seen] if seen is not None and came >= 1.0 else study.guess[key]
-            here = [study.guess[key][b] * GUESS + (seen[b] if seen is not None else 0.0) for b in range(bins)]
+            past = 0.0 if self.endgame else 1.0   # in the last stretch only the monsters left matter
+            here = [past * study.guess[key][b] * GUESS for b in range(bins)]
+            if seen is not None:
+                here = [h + past * t for h, t in zip(here, seen)]
             starts = coming.get(key)
             if starts is not None:
                 walking = 0.0
@@ -518,6 +528,19 @@ class Adaptive:
         if idle:
             world.sell(min(idle, key=lambda t: self.tower_worth[t.id] / t.spent).id)
             self.sold = world.wave
+            self._price(world)
+
+    def _salvage(self, world: World) -> None:
+        """In the last wave, once every monster has come, sell the towers all of them have walked past: those will
+        never fire again, and their gold can still stand where the monsters are going."""
+        if not self.endgame or not world.monsters:
+            return
+        rear = min(m.s for m in world.monsters)
+        behind = [t for t in world.towers.values()
+                  if max(b for b, _ in self.study.cover(t.tile, t.stats.range)) + 1 < rear]
+        for t in behind:
+            world.sell(t.id)
+        if behind:
             self._price(world)
 
     def _cost(self, world: World, choice: tuple) -> int:
