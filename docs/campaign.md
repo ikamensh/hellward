@@ -288,8 +288,8 @@ margins fall down the descent as designed:
 | | Tristram | Graveyard | Cathedral | Catacombs | Caves | Hell's Gate |
 |---|---|---|---|---|---|---|
 | life factor | 1.0 | 1.15 | 0.8 | 1.5 | 1.9 | 1.2 |
-| apprentice's margin | 1.82 | 1.68 | 1.32 | 1.30 | 1.26 | 1.09 |
-| against random curses | | | 1.50 | 1.40 | 1.41 | 1.14 |
+| apprentice's margin | 1.82 | 1.68 | 1.25 | 1.31 | 1.28 | 1.04 |
+| against random curses | | | 1.49 | 1.43 | 1.39 | 1.15 |
 
 The Cathedral's factor is below one because the apprentice's fixed build puts lightning against goatmen who
 shrug it off: its lesson bites. The strong players win Normal everywhere with every life; the ordinary
@@ -307,7 +307,7 @@ defender (no skills, no spells) loses every location from the Cathedral on.
 Even the strongest player, the warden with its Hell's Gate build searched again under the final numbers three
 times, wins Hell's Gate on Hell on 8 seeds of 20. The others hold there at margins of 0.67 and 0.69.
 
-**The leaders.** Their choices are worth 5–14% of the monsters' life to the apprentice (its margins against
+**The leaders.** Their choices are worth 8–16% of the monsters' life to the apprentice (its margins against
 random curses above), and 0–7% to the strong players, who break a third to half of all chants and cleanse
 most of the rest. Where the fight is contested, Hell's Gate on Hell, the smart leaders cost the warden 6.5
 lives more than random curses (32% of what it lost). The planner keeps 0.93 of the best curse's value at the
