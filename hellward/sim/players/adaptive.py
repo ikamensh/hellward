@@ -12,9 +12,9 @@ From that picture every build and upgrade is priced as the damage it would deal 
 kinds that leak and the leaders, per gold; the best is bought, or saved for. A frost shrine is also priced by
 the damage its chill lets the other towers deal, a plague totem only by the venom that finds room, and an
 upgrade loses what the leaders' curses have been taking from its tower. Gates go into arches the towers watch
-and back up as soon as the arch is clear. A tower that stopped seeing monsters is sold between waves. In the
-last stretch, once the last wave has sent everything, only the monsters left are priced, and the towers they
-have all walked past are sold to stand where they are going: Azazel dies that way on Hell's Gate.
+and back up as soon as the arch is clear. In the last stretch, once the last wave has sent everything, only
+the monsters left are priced, and the towers that will never see a monster again, all of them having walked
+past, are sold to stand where the monsters are going: Azazel dies that way on Hell's Gate.
 
 It also keeps, per kind, the damage a monster takes from anywhere on the path to the sanctuary, so it can tell
 which monster is about to get through. Mana is kept for Smite while leaders walk: a chant at a tower that
@@ -38,7 +38,7 @@ from pathlib import Path
 
 from hellward.sim.campaign import Difficulty, Location
 from hellward.sim.content import (
-    CURSES, DOOR, MONSTERS, SELL_REFUND, SPELLS, TOWERS, Curse, Element, MonsterKind, TowerLevel,
+    CURSES, DOOR, MONSTERS, SPELLS, TOWERS, Curse, Element, MonsterKind, TowerLevel,
 )
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Refused, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands
@@ -50,8 +50,7 @@ REFRESH = 4.0          # seconds between two re-readings of the picture while a 
 GUESS = 3.0            # monsters of each kind the first guess is worth against what is seen
 NOW = 2.0              # what a monster of this wave, on the map or still to come, weighs against one seen before
 FADE = 0.75            # what an older wave's monsters still weigh when a new wave starts
-QUEUE_GUESS = 4.0      # seconds a monster is guessed to wait at a standing gate, before any is seen
-QUEUE_WAIT = 4.0       # seconds a monster is reckoned to wait at each standing gate ahead, asking who gets through
+QUEUE_GUESS = 4.0      # seconds a monster is reckoned to wait at a standing gate, before any is seen
 URGENCY = 1.2          # how much more a bin by the sanctuary is worth than one at the portal (found on training seeds)
 LEAKY = 4.0            # how much more damage to a kind is worth when all of it leaks
 LEADER = 1.5           # how much more damage to a leader is worth
@@ -60,7 +59,6 @@ VENOM_ROOM = 1.0       # venom darts a second one monster can take: four stacks 
 VENOM_TRUST = 0.6      # how far the estimate of a plague totem is trusted, and a frost nova's: both found by
 NOVA_TRUST = 1.45      # playing training seeds, where totems proved worth less and novas more than estimated
 SETTLE = 0.8           # an affordable buy this close to the best is taken instead of saving for the best
-IDLE = 5.0             # a tower is sold when its gold would buy this many times what it does
 CALL_MANA = 0.92       # share of a full orb an early call needs in hand
 ELEMENTS = tuple(Element)
 SEVERITY = {Curse.WEAKEN: 1.0 - CURSES[Curse.WEAKEN].damage, Curse.DECREPIFY: 1.0 - CURSES[Curse.DECREPIFY].rate,
@@ -206,7 +204,6 @@ class Adaptive:
         self.cursed: dict[int, float] = {}    # per tower: seconds cursed, weighted by how badly, while monsters walked
         self.watched: dict[int, float] = {}   # per tower: seconds it stood while monsters walked
         self.aimed_at = -1e9
-        self.sold = -2
         self.endgame = False                  # the last wave has sent every monster it has
 
     # -- Skills --------------------------------------------------------------------------------------
@@ -241,7 +238,6 @@ class Adaptive:
         self._gates(world)
         if world.time >= self.think_at - 1e-9:
             self.think_at = world.time + THINK
-            self._sell(world)
             self._salvage(world)
             self._spend(world)
             self._call(world)
@@ -480,7 +476,7 @@ class Adaptive:
             dwell = [1.0 / kind.speed] * bins
             if not kind.flying:
                 for d in gates:
-                    dwell[study.queue_bins[d.index]] += QUEUE_WAIT
+                    dwell[study.queue_bins[d.index]] += QUEUE_GUESS
             total = 0.0
             ahead = [0.0] * bins
             for b in range(bins - 1, -1, -1):
@@ -522,17 +518,6 @@ class Adaptive:
                 world.build(choice[1], choice[2])
             else:
                 world.upgrade(choice[1])
-            self._price(world)
-
-    def _sell(self, world: World) -> None:
-        """Between waves, sell one tower that no longer sees monsters when its gold would buy far more elsewhere."""
-        if world.monsters or world.schedule or self.sold == world.wave or not self.prices:
-            return
-        best = max(self.prices.values())
-        idle = [t for t in world.towers.values() if self.tower_worth[t.id] * IDLE < best * t.spent * SELL_REFUND]
-        if idle:
-            world.sell(min(idle, key=lambda t: self.tower_worth[t.id] / t.spent).id)
-            self.sold = world.wave
             self._price(world)
 
     def _salvage(self, world: World) -> None:
