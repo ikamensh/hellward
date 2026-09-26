@@ -17,7 +17,7 @@ plan, found by the same search.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field, fields
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from hellward.sim.campaign import Difficulty, Location
@@ -54,7 +54,7 @@ class Plan:
     trained: dict = field(default_factory=dict)   # how the search found it, for the record
 
     def to_json(self) -> dict:
-        data = {f.name: getattr(self, f.name) for f in fields(self)}
+        data = asdict(self)
         data["steps"] = [list(step) for step in self.steps]
         return data
 
