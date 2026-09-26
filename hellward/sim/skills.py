@@ -86,6 +86,18 @@ def can_learn(learned: frozenset[str], key: str, sigils: int) -> bool:
     return key not in learned and (needed is None or needed.key in learned) and cost(learned) + skill.cost <= sigils
 
 
+def kept(learned: Iterable[str]) -> frozenset[str]:
+    """The learned skills a save from an older tree keeps: those the tree still has, each with every skill above it
+    in its column learned too (a skill the tree lost, or moved above one learned, takes those below it along)."""
+    have = {key for key in learned if key in SKILLS}
+    out: set[str] = set()
+    for skill in sorted((SKILLS[key] for key in have), key=lambda s: s.tier):
+        needed = above(skill)
+        if needed is None or needed.key in out:
+            out.add(skill.key)
+    return frozenset(out)
+
+
 def check(learned: frozenset[str]) -> None:
     """Raise ValueError unless every learned skill has the one above it."""
     for key in learned:

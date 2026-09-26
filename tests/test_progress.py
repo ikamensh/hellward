@@ -73,6 +73,20 @@ def test_a_save_listing_a_removed_mastery_loads_with_it_forgotten(game):
     assert progress.free == 2
 
 
+def test_the_save_ilya_played_before_the_new_tree_loads(game):
+    """His 2026-09-26 save: Blaze stays learned in the file, but the new tree puts Master of Fire above it, which
+    the save does not have. Every skill that lost a step above it goes; the save loads and its sigils are free."""
+    game.save_manager.save("campaign", {
+        "won": {"normal": {k: 3 for k in ("tristram", "graveyard", "cathedral", "catacombs", "caves", "hells_gate")},
+                "hell": {}},
+        "learned": ["blaze", "chain_lightning", "cold_mastery", "fire_ball", "fire_mastery", "glacial_spike",
+                    "lightning_mastery", "poison_mastery", "warmth"],
+        "at": "hells_gate", "difficulty": "hell"}, "Progress", summary={})
+    progress = Progress.load(game)
+    assert progress.learned == frozenset({"warmth"})
+    assert progress.free == 17
+
+
 def test_an_old_save_with_a_difficulty_loads_its_normal_sigils(game):
     game.save_manager.save("campaign", {"won": {"normal": {"tristram": 3}, "hell": {}},
                                         "learned": [], "at": "tristram", "difficulty": "hell"},
