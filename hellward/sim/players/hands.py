@@ -3,7 +3,8 @@
 A player reads the world as a person reads the screen: where every monster walks, its life, the towers and
 the curses on them, the gates, the gold and the mana. Leaders are the exception. A person sees a leader ponder
 (the dots over its head) and chant (the beam to a tower) and answers a moment later, so :meth:`Hands.threats`
-shows each sign only :attr:`Hands.react` seconds of game time after it appears. A player never reads a leader's
+shows each sign only :attr:`Hands.react` seconds of game time after it appears, with where the leader stood when
+it appeared: a person aims there, not where the leader has walked since. A player never reads a leader's
 mind: not its planner, its cooldown or its chant's clock; it does not clone the live world to see the future, and
 it never pauses (``tests/test_players.py`` holds every player's source to this). Its aimed spells (Smite, Meteor,
 Frozen Orb) come at most one each :data:`AIM_GAP` seconds. Everything else it does through the world's own
@@ -46,6 +47,7 @@ class Sign:
     leader: int
     kind: str                     # "ponder" (the dots) or "chant" (the beam)
     since: float                  # when it appeared
+    at: tuple[float, float]       # where the leader stood then: where a person's aim goes
     tower: int = -1               # a chant's tower: the beam points at it
     curse: Curse | None = None    # a chant's curse: its colour and sigil show which
 
@@ -86,11 +88,11 @@ class Hands:
         for e in events:
             kind = e[0]
             if kind == "ponder":
-                self._signs[e[1]] = Sign(e[1], "ponder", world.time)
+                self._sign(e[1], "ponder")
             elif kind == "plan":
                 self._signs.pop(e[1], None)
             elif kind == "chant":
-                self._signs[e[1]] = Sign(e[1], "chant", world.time, e[3], e[2])
+                self._sign(e[1], "chant", e[3], e[2])
                 record.chants += 1
             elif kind == "broken":
                 self._signs.pop(e[1], None)
@@ -113,6 +115,11 @@ class Hands:
         record.curse_seconds += int_sum(len(t.curses) for t in world.towers.values()) * dt
         if world.mana >= world.mana_max - 1e-9:
             record.mana_capped += dt
+
+    def _sign(self, leader: int, kind: str, tower: int = -1, curse: Curse | None = None) -> None:
+        m = self.world.monster(leader)
+        if m is not None:   # a leader killed in the step it spoke leaves no sign
+            self._signs[leader] = Sign(leader, kind, self.world.time, self.world.position(m), tower, curse)
 
     def threats(self) -> list[Sign]:
         """The leaders' signs a person has taken in by now, the oldest first: those most about to curse."""

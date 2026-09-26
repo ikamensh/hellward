@@ -12,10 +12,11 @@ from hellward.sim.campaign import DIFFICULTIES, LOCATIONS, NORMAL, g
 from hellward.sim.content import Wave
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.players import PLAYERS
+from hellward.sim.players.adaptive import ORDERS, Adaptive
 from hellward.sim.players.hands import Hands, defend
 from hellward.sim.players.planned import PLANS, load
 from hellward.sim.players.warden import fingerprint, load_plans
-from hellward.sim.skills import SKILLS, cost
+from hellward.sim.skills import SKILLS, can_learn, check, cost
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import plan_player  # noqa: E402
@@ -57,15 +58,18 @@ def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():
     world.call_wave()
     seen_at = {}
     signed_at = {}
+    stood = {}
     while world.outcome is None and world.time < 60 and len(seen_at) < 3:
         world.step(SIM_DT)
         for e in world.events:
             if e[0] in ("ponder", "chant"):
                 signed_at.setdefault((e[1], e[0]), world.time)
+                stood[(e[1], e[0])] = world.position(world.monster(e[1]))
         hands.observe(world.events)
         world.events.clear()
         for sign in hands.threats():
             seen_at.setdefault((sign.leader, sign.kind), world.time)
+            assert sign.at == stood[(sign.leader, sign.kind)]   # aimed where it stood, not where it walks now
     assert seen_at
     for key, seen in seen_at.items():
         assert seen >= signed_at[key] + 0.6 - 1e-6
@@ -121,6 +125,12 @@ def test_the_planned_player_holds_tristram_with_its_searched_build():
     assert world.lives >= 18
 
 
+def test_the_adaptive_player_holds_tristram():
+    world, record = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["adaptive"](1), seed=1, sigils=0, planner=planner.smart)
+    assert world.outcome == "victory"
+    assert world.lives >= 18
+
+
 def assert_fits(plan, location):
     assert set(plan.skills) <= set(SKILLS)
     assert len(plan.calls) == len(location.waves)
@@ -156,3 +166,16 @@ def test_the_plan_search_only_ever_makes_plans_that_fit(key):
         for _ in range(60):
             plan = plan_player.mutate(plan, location, rng, tiles)
             assert_fits(plan, location)
+
+
+@pytest.mark.parametrize("order", ["", *ORDERS])
+def test_the_adaptive_player_learns_within_its_sigils_and_the_tree(order):
+    """Every themed order, and the planned one (empty), buys a set the tree allows, and leaves no sigil it could
+    still spend, at every budget and place."""
+    for location in LOCATIONS.values():
+        for difficulty in DIFFICULTIES.values():
+            for sigils in range(0, 37):
+                learned = Adaptive(order).skills(location, difficulty, sigils)
+                check(learned)
+                assert cost(learned) <= sigils
+                assert not [key for key in SKILLS if can_learn(learned, key, sigils)]   # nothing left it could buy
