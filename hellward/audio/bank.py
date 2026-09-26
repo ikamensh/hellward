@@ -6,7 +6,7 @@
     game = Game("Hellward", asset_path=cache_dir)
     bank = SoundBank(game)
     bank.play("door_hit")                        # a take, never the last one, a touch of pitch; within the voice budget
-    bank.music("battle_cathedral")               # crossfades as soon as the track is composed
+    bank.music("battle_cathedral")               # crossfades as soon as the score is composed
 
 Every cue name is in :data:`hellward.audio.cues.CUES`, every track in :data:`hellward.audio.music.PIECES`.
 A location's battle track is :func:`hellward.audio.music.track_for` of its key.
@@ -30,7 +30,7 @@ from hellward.audio.music import BATTLE_FOR, PIECES
 from saga2d import Game
 from sagaforge.synth import write_wav
 
-VERSION = "3"
+VERSION = "4"
 SOUNDS, MUSIC = "sounds", "music"
 #: The composer's order: the title plays first, then the dungeons in the campaign's order, the boss last.
 COMPOSE_ORDER = ("title",) + tuple(BATTLE_FOR.values()) + ("boss",)
@@ -169,7 +169,8 @@ class SoundBank:
             if not self.ready(self._wanted):  # the composer may have finished it since the first look
                 raise RuntimeError(f"Track {self._wanted!r} is not under {self.cache_dir} and nothing is composing it: call SoundBank.prepare")
         mood, self._wanted = self._wanted, None
-        self._audio.play_music(mood, fade=FADE_IN[mood] if self._audio.music_name else 1.0)
+        self._audio.play_music(mood, loop=mood == "title",
+                               fade=FADE_IN[mood] if self._audio.music_name else 1.0)
 
 
 def _track(cache_dir: Path, name: str) -> Path:

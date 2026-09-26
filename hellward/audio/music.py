@@ -1,4 +1,4 @@
-"""Hellward's music: a loop for the town and one for each dungeon on the way down, composed with
+"""Hellward's music: a loop for the town and a five-minute score for each dungeon, composed with
 :mod:`hellward.audio.instruments` on :mod:`sagaforge.synth`.
 
 The mood is the old Tristram and Cathedral one: slow, dark and sparse, a detuned twelve-string
@@ -7,22 +7,23 @@ of room and now and then a bell.  ``title`` is the night over the town; each ``b
 is the same world heard from one dungeon down the descent, with its own key, pulse and consort;
 ``boss`` is Azazel's last wave, with drums.
 
-A piece is a :class:`Score` of 4/4 bars filled by layer functions (pedal, pad, arpeggio, line, ostinato,
-drums, bells).  Everything that runs past the end wraps round to the start, the room's tail too,
-so every loop is seamless.  The pattern follows Warband's ``music.py``, adapted here.
+A dungeon is a sequence of eight-bar chapters with a distinct harmonic route and changing
+orchestration.  Chapters overlap in the room; the complete score fades to silence and is played once.
+The town cue remains a short loop; the boss has its own one-shot suite. The instruments follow
+Warband's ``music.py``.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import math
 import random
 
 import numpy as np
 
 from hellward.audio import instruments as inst
-from sagaforge.synth import SAMPLE_RATE, highpass, loop_add, pan, reverb, soft_clip
+from sagaforge.synth import SAMPLE_RATE, highpass, loop_add, noise, pan, reverb, soft_clip
 
 Voice = Callable[..., np.ndarray]
 Motif = tuple[tuple[int, float], ...]  # (scale degree relative to the phrase centre, beats)
@@ -191,8 +192,6 @@ def bells(score: Score, key: Key, strikes: tuple[tuple[float, int], ...], *, gai
 
 TRISTRAM: Motif = ((4, 1.5), (3, 0.5), (2, 1.0), (1, 1.0), (0, 3.0), (-1, 1.0))
 DESCENT: Motif = ((7, 1.0), (6, 0.5), (4, 0.5), (5, 2.0), (4, 1.0), (1, 1.0), (0, 2.0))
-LAMENT: Motif = ((7, 2.0), (5, 1.0), (4, 2.0), (3, 1.0), (2, 3.0), (0, 2.0))
-EMBER: Motif = ((0, 0.5), (1, 0.5), (4, 0.5), (5, 1.0), (4, 0.5), (1, 0.5), (0, 2.0))
 HEART_KIT = {"heart": (inst.heartbeat, 0.32, 0.0), "frame": (inst.frame_drum, 0.16, -0.3), "rattle": (inst.rattle, 0.06, 0.45)}
 BONE_KIT = {"heart": (inst.heartbeat, 0.22, 0.0), "frame": (inst.frame_drum, 0.12, -0.3), "rattle": (inst.rattle, 0.12, 0.45)}
 LAVA_KIT = {"war": (inst.war_drum, 0.22, -0.1), "taiko": (inst.taiko, 0.22, 0.25), "tom": (inst.tom, 0.16, -0.35),
@@ -215,148 +214,190 @@ def title(s: Score) -> np.ndarray:
     return s.master(room=4.5, wet=0.45, damping=3800, rms=0.085, seed=11)
 
 
-def battle_tristram(s: Score) -> np.ndarray:
-    """The burning village: the familiar night, sad and open, embers in the air. A lone twelve-string
-    over a D-A drone, the heart under it, a low bow and far voices joining for the second half."""
-    key, prog = Key("D2", "aeolian"), (0, 0, 5, 5, 6, 6, 3, 4)
-    pedal(s, (key.hz(0, 0), key.hz(4, 0)), inst.drone, gain=0.16, span=8, seed=1)
-    drums(s, HEART_KIT, {"heart": "x.......x......."}, bars=16, seed=2)
-    drums(s, HEART_KIT, {"frame": "......o.......o.", "rattle": "....o.......o..."}, bars=8, start=8, seed=3)
-    arpeggio(s, key, prog, inst.twelve_string, bars=16, gain=0.2, at=-0.2, pattern=(0, 2, 3, 4, 3, 2, 1, 2), octave=1, ring=3.0,
-             rest=(7,), seed=4)
-    arpeggio(s, key, prog, inst.twelve_string, bars=8, start=8, gain=0.11, at=-0.25, pattern=(0, 2, 3, 4, 3, 2), step=0.25,
-             octave=1, ring=2.2, seed=5)
-    ostinato(s, key, prog, inst.cello, bars=8, start=8, gain=0.07, figure=(0, None, 0, None, 0, None, 4, None), step=0.5, octave=0,
-             ring=0.95, at=0.15, seed=6)
-    pad(s, key, prog, inst.hollow_choir, bars=8, start=8, gain=0.06, octave=1, voicing=(0, 4, 7), seed=7)
-    line(s, key, prog, TRISTRAM, inst.twelve_string, bars=4, start=4, gain=0.13, at=0.3, octave=2, shapes=("A", "A_end"), seed=8)
-    line(s, key, prog, TRISTRAM, inst.twelve_string, bars=4, start=12, gain=0.11, at=0.35, octave=2, shapes=("B", "A_end"), seed=9)
-    bells(s, key, ((0.0, 0), (32.0, 4)), gain=0.1)
-    s.add(inst.timpani(key.hz(0, -1), 1.6, seed=3), 32, gain=0.1)
-    return s.master(room=4.5, wet=0.45, damping=3800, rms=0.09, seed=21)
+# -- The dungeon suites --------------------------------------------------------------------
+
+CHAPTER_BARS = 8
+OVERLAP = 2.0
 
 
-def battle_graveyard(s: Score) -> np.ndarray:
-    """Moon over open graves: cold mist, wet turf, bones in the earth. An E dorian lament on high strings
-    and far voices over an organ, dry bones for drums, funeral bells through the biggest room of the descent."""
-    key, prog = Key("E2", "dorian"), (0, 0, 3, 3, 4, 4, 3, 2)
-    pedal(s, (key.hz(0, 0), key.hz(4, 0)), inst.drone, gain=0.15, span=6, seed=1)
-    drums(s, BONE_KIT, {"heart": "x..............."}, bars=12, seed=2)
-    drums(s, BONE_KIT, {"frame": "......o.........", "rattle": "..o...o...o...o."}, bars=6, start=6, seed=3)
-    arpeggio(s, key, prog, inst.twelve_string, bars=12, gain=0.13, at=-0.2, pattern=(0, 3, 4, 3, 2, 1, 0, 2), octave=2, ring=3.2,
-             rest=(1, 3, 5, 6, 7), seed=4)
-    pad(s, key, prog, inst.organ, bars=12, gain=0.05, octave=1, voicing=(0, 2, 4, 7), seed=5)
-    pad(s, key, prog, inst.hollow_choir, bars=6, start=6, gain=0.05, octave=2, voicing=(0, 4), seed=6)
-    line(s, key, prog, LAMENT, inst.hollow_choir, bars=6, start=4, gain=0.06, at=0.2, octave=2, legato=1.2, phrase_bars=3,
-         shapes=("A", "A_end"), seed=7)
-    bells(s, key, ((0.0, 0), (16.0, 2), (32.0, 0)), gain=0.1, length=7.0)
-    return s.master(room=5.0, wet=0.5, damping=3200, rms=0.08, seed=22)
+@dataclass(frozen=True)
+class Dungeon:
+    """The themes and acoustic space of one descent. Progressions are alternate eight-bar journeys."""
+
+    root: str
+    mode: str
+    bpm: float
+    progressions: tuple[Progression, ...]
+    motif: Motif
+    lead: Voice
+    harmony: Voice
+    pulse: dict[str, tuple[Callable[[int], np.ndarray], float, float]]
+    pattern: dict[str, str]
+    arpeggio_pattern: tuple[int, ...]
+    atmosphere: str
+    arc: tuple[int, ...]
+    room: float
+    wet: float
+    rms: float
 
 
-def battle_cathedral(s: Score) -> np.ndarray:
-    """The desecrated nave: a liturgical procession under torchlight. D phrygian, the heart on every half
-    bar, the guitar quickening to sixteenths in the second half with frame drum, rattles and a low bow;
-    monks and far voices; bells every eight bars."""
-    key, prog = Key("D2", "phrygian"), (0, 0, 5, 6, 0, 0, 1, 0)
-    pedal(s, (key.hz(0, 0), key.hz(4, 0)), inst.drone, gain=0.15, span=8, seed=1)
-    drums(s, HEART_KIT, {"heart": "x.......x......."}, bars=8, seed=2)
-    drums(s, HEART_KIT, {"heart": "x.......x.......", "frame": "......o.......o.", "rattle": "....o.......o..."}, bars=8, start=8,
-          fill={"frame": "......o...o.o.o.", "heart": "x.......x......."}, every=8, seed=3)
-    arpeggio(s, key, prog, inst.twelve_string, bars=8, gain=0.2, at=-0.2, pattern=(0, 2, 3, 2, 4, 2, 3, 1), octave=1, ring=2.6, seed=4)
-    arpeggio(s, key, prog, inst.twelve_string, bars=8, start=8, gain=0.15, at=-0.25, pattern=(0, 2, 3, 4, 3, 2), step=0.25, octave=1,
-             ring=2.2, seed=5)
-    ostinato(s, key, prog, inst.cello, bars=8, start=8, gain=0.09, figure=(0, None, 0, None, 0, None, 1, None), step=0.5, octave=0,
-             ring=0.95, at=0.15, seed=6)
-    pad(s, key, prog, inst.monks, bars=8, start=8, gain=0.06, octave=1, voicing=(0, 4), seed=7)
-    pad(s, key, prog, inst.hollow_choir, bars=4, start=12, gain=0.05, octave=2, voicing=(0, 2, 4), seed=8)
-    line(s, key, prog, DESCENT, inst.twelve_string, bars=4, start=4, gain=0.12, at=0.3, octave=2, seed=9)
-    line(s, key, prog, TRISTRAM, inst.twelve_string, bars=4, start=12, gain=0.11, at=0.35, octave=2, shapes=("B", "A_end"), seed=10)
-    bells(s, key, ((0.0, 0), (32.0, 4)), gain=0.09)
-    s.add(inst.timpani(key.hz(0, -1), 1.6, seed=3), 32, gain=0.12)
-    return s.master(room=4.0, wet=0.4, damping=4000, rms=0.095, seed=23)
+DUNGEONS: dict[str, Dungeon] = {
+    "tristram": Dungeon("D2", "aeolian", 68,
+        ((0, 0, 5, 5, 6, 6, 3, 4), (0, 3, 5, 4, 6, 5, 3, 0), (0, 0, 6, 5, 3, 3, 4, 0)),
+        TRISTRAM, inst.twelve_string, inst.hollow_choir, HEART_KIT,
+        {"heart": "x.......x.......", "frame": "......o.......o."},
+        (0, 2, 3, 4, 3, 2, 1, 2), "embers",
+        (0, 1, 1, 2, 2, 1, 2, 3, 2, 3, 4, 3, 2, 0), 4.5, 0.43, 0.08),
+    "graveyard": Dungeon("E2", "dorian", 60,
+        ((0, 0, 3, 3, 4, 4, 3, 2), (0, 5, 4, 3, 2, 3, 0, 0), (0, 0, 2, 3, 5, 4, 2, 0)),
+        ((7, 2), (5, 1), (4, 1), (3, 1), (2, 1), (0, 2)),
+        inst.hollow_choir, inst.organ, BONE_KIT,
+        {"heart": "x...............", "rattle": "..o...o...o...o."},
+        (0, 3, 4, 3, 2, 1, 0, 2), "wind_drips",
+        (0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 3, 0), 5.0, 0.5, 0.075),
+    "cathedral": Dungeon("D2", "phrygian", 72,
+        ((0, 0, 5, 6, 0, 0, 1, 0), (0, 3, 5, 6, 1, 0, 6, 0), (0, 0, 1, 5, 3, 3, 1, 0)),
+        DESCENT, inst.twelve_string, inst.monks, HEART_KIT,
+        {"heart": "x.......x.......", "frame": "......o.......o.", "rattle": "....o.......o..."},
+        (0, 2, 3, 2, 4, 2, 3, 1), "nave_drips",
+        (0, 1, 2, 2, 3, 1, 2, 3, 3, 4, 2, 3, 2, 0), 4.0, 0.43, 0.085),
+    "catacombs": Dungeon("C2", "phrygian", 66,
+        ((0, 0, 1, 1, 0, 6, 1, 1), (0, 1, 0, 6, 1, 3, 1, 0), (0, 0, 6, 1, 3, 1, 6, 0)),
+        ((0, 1), (1, 0.5), (0, 0.5), (-1, 1), (0, 1), (4, 1), (1, 1), (0, 2)),
+        inst.cello, inst.organ, {"heart": HEART_KIT["heart"], "tom": (inst.tom, 0.13, -0.3)},
+        {"heart": "x...............", "tom": "....x.......x..."},
+        (0, 1, 2, 1, 0, 1, 3, 1), "crypt_drips",
+        (0, 1, 2, 2, 1, 2, 3, 2, 3, 4, 3, 2, 0), 2.7, 0.3, 0.08),
+    "caves": Dungeon("F2", "phrygian_dominant", 92,
+        ((0, 0, 5, 4, 0, 6, 5, 4), (0, 1, 5, 6, 4, 5, 1, 0), (0, 0, 4, 5, 6, 5, 4, 0)),
+        ((0, 0.5), (1, 0.5), (4, 0.5), (5, 1), (7, 0.5), (5, 1), (4, 1), (1, 1), (0, 2)),
+        inst.twelve_string, inst.cello, LAVA_KIT,
+        {"war": "x.....x...x.....", "taiko": "....x.......x..x", "rattle": "..o...o...o...o."},
+        (0, 3, 2, 3, 4, 3, 2, 3), "lava",
+        (0, 1, 2, 2, 3, 2, 3, 4, 3, 2, 4, 3, 4, 4, 3, 1, 0), 3.5, 0.36, 0.085),
+    "hells_gate": Dungeon("D2", "phrygian", 84,
+        ((0, 0, 1, 1, 0, 0, 6, 5), (0, 1, 3, 1, 6, 5, 1, 0), (0, 0, 6, 1, 3, 1, 6, 0)),
+        ((7, 1), (6, 0.5), (4, 0.5), (1, 1), (0, 1), (-1, 1), (1, 1), (0, 2)),
+        inst.hollow_choir, inst.monks, DOOM_KIT,
+        {"war": "x.....x...x.....", "taiko": "....x.......x..x", "heart": "........x......."},
+        (0, 3, 2, 3, 4, 3, 2, 3), "abyss",
+        (0, 1, 2, 3, 2, 3, 4, 3, 2, 4, 3, 4, 4, 3, 2, 0), 3.2, 0.37, 0.09),
+}
+
+BOSS = replace(DUNGEONS["hells_gate"], bpm=88, motif=DESCENT,
+               progressions=((0, 0, 1, 1, 0, 0, 6, 1), (0, 1, 6, 1, 3, 1, 6, 0)),
+               arc=(2, 3, 4, 3, 4, 4, 3, 4, 4, 2, 0), rms=0.095)
 
 
-def battle_catacombs(s: Score) -> np.ndarray:
-    """The bone halls: narrow, low and close, torchlight on stacked skulls. A C-Db drone under a cello
-    hammering the flat second, toms and a heart in the walls, low monks and organ, one deep bell. No
-    high strings: nothing sparkles down here. The driest room of the descent."""
-    key, prog = Key("C2", "phrygian"), (0, 0, 1, 1, 0, 6, 1, 1)
-    pedal(s, (key.hz(0, 0), key.hz(1, 0)), inst.drone, gain=0.08, span=6, seed=1)
-    drums(s, HEART_KIT, {"heart": "x...............", "tom": "....x.......x..."}, bars=12, seed=2)
-    drums(s, HEART_KIT, {"frame": "......o.......o."}, bars=6, start=6, seed=3)
-    ostinato(s, key, prog, inst.cello, bars=12, gain=0.1, figure=(0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0, 1, 0), step=0.25, octave=0,
-             ring=0.9, at=0.1, seed=4)
-    pad(s, key, prog, inst.organ, bars=12, gain=0.05, octave=1, voicing=(0, 1), seed=5)
-    pad(s, key, prog, inst.monks, bars=6, start=6, gain=0.07, octave=0, voicing=(0, 1, 4), seed=6)
-    line(s, key, prog, DESCENT, inst.cello, bars=4, start=4, gain=0.1, at=0.15, octave=0, shapes=("A", "B"), seed=7)
-    for bar in range(0, 12, 4):
-        s.add(inst.timpani(key.hz(chord_at(prog, bar), -1), 1.4, seed=bar), bar * 4, gain=0.12)
-    bells(s, key, ((0.0, 0),), gain=0.06, length=7.0)
-    return s.master(room=2.8, wet=0.3, damping=4600, rms=0.09, seed=24)
+def _atmosphere(s: Score, kind: str, chapter: int) -> None:
+    """Place distinct, quiet environmental sounds throughout a chapter, behind the score."""
+    rng = random.Random(7919 * chapter + sum(map(ord, kind)))
+    bands = {
+        "embers": (180, 1300), "wind_drips": (80, 700), "nave_drips": (100, 750), "crypt_drips": (65, 480),
+        "lava": (45, 450), "abyss": (35, 350),
+    }
+    low, high = bands[kind]
+    for i in range(4):
+        length = rng.uniform(5.0, 8.0)
+        breath = noise(length, low, high, attack=1.3, tau=length * 2, seed=chapter * 100 + i)
+        breath[-int(1.2 * SAMPLE_RATE):] *= np.linspace(1, 0, int(1.2 * SAMPLE_RATE))
+        s.add(breath, (i * s.length / 4 + rng.uniform(-0.7, 0.7)) / s.beat,
+              at=rng.uniform(-0.7, 0.7), gain=0.025 if kind != "lava" else 0.04)
+    for i in range(7):
+        beat = rng.uniform(0.5, CHAPTER_BARS * 4 - 1)
+        if kind in ("wind_drips", "nave_drips", "crypt_drips"):
+            clip = inst.drip(rng.uniform(520, 1050), seed=chapter * 100 + i)
+            gain = 0.035 if kind == "wind_drips" else 0.045
+        elif kind == "embers":
+            clip = noise(0.16, 1200, 5800, tau=0.045, seed=chapter * 100 + i)
+            gain = 0.012
+        else:
+            clip = noise(0.8, 55, 1100, attack=0.15, tau=0.24, seed=chapter * 100 + i)
+            gain = 0.035 if kind == "lava" else 0.05
+        s.add(clip, beat, at=rng.uniform(-0.8, 0.8), gain=gain)
 
 
-def battle_caves(s: Score) -> np.ndarray:
-    """Lava light: a primal vault of rock and fire, wings overhead. F phrygian-dominant, restless taiko
-    and war drums under a bright sixteenth-note guitar and a driving bow, a rising ember of a melody.
-    No church bells this deep: only timpani and stone."""
-    key, prog = Key("F2", "phrygian_dominant"), (0, 0, 5, 4, 0, 6, 5, 4)
-    pedal(s, (key.hz(0, 0), key.hz(4, 0)), inst.drone, gain=0.12, span=8, seed=1)
-    drums(s, LAVA_KIT, {"taiko": "....x.......x...", "heart": "........x......."}, bars=4, seed=2)
-    drums(s, LAVA_KIT, {"war": "x.....x...x.....", "taiko": "....x.......x..x", "heart": "........x.......", "rattle": "..o...o...o...o."},
-          bars=12, start=4, fill={"tom": "x.x.x.x.x.xxx.xx", "war": "x.....x...x....."}, seed=3)
-    arpeggio(s, key, prog, inst.twelve_string, bars=12, start=4, gain=0.14, at=-0.3, pattern=(0, 3, 2, 3, 4, 3, 2, 3), step=0.25, octave=1,
-             ring=1.6, seed=4)
-    ostinato(s, key, prog, inst.cello, bars=12, start=4, gain=0.09, figure=(0, None, 4, None, 5, None, 4, None), step=0.5, octave=0,
-             ring=0.9, at=0.1, seed=5)
-    pad(s, key, prog, inst.hollow_choir, bars=8, start=8, gain=0.045, octave=2, voicing=(0, 2, 4), seed=6)
-    line(s, key, prog, EMBER, inst.twelve_string, bars=4, start=8, gain=0.11, at=0.3, octave=2, seed=7)
-    for bar in (0, 8):
-        s.add(inst.timpani(key.hz(chord_at(prog, bar), -1), 1.4, seed=bar), bar * 4, gain=0.1)
-    return s.master(room=3.5, wet=0.35, damping=5000, rms=0.095, seed=25)
+def _chapter(spec: Dungeon, index: int, total: int) -> np.ndarray:
+    s = Score(spec.bpm, CHAPTER_BARS)
+    key = Key(spec.root, spec.mode)
+    progression = spec.progressions[index % len(spec.progressions)]
+    strength = spec.arc[round(index * (len(spec.arc) - 1) / (total - 1))]
+    root = progression[0]
+    low = (key.hz(root), key.hz(root + (1 if spec.mode == "phrygian" else 4)))
+    pedal(s, low, inst.drone, gain=0.09 + strength * 0.008, span=4, seed=1000 + index)
+    _atmosphere(s, spec.atmosphere, index)
+
+    if strength >= 1:
+        pad(s, key, progression, spec.harmony, bars=8, gain=0.022 + 0.008 * strength,
+            octave=1 if spec.atmosphere != "crypt_drips" else 0,
+            voicing=(0, 4) if strength < 3 else (0, 2, 4), seed=2000 + index)
+        arpeggio(s, key, progression, inst.twelve_string if spec.atmosphere != "crypt_drips" else inst.cello,
+                 bars=8, gain=0.09 + 0.012 * strength, at=-0.28, pattern=spec.arpeggio_pattern,
+                 step=0.5 if strength < 3 else 0.25, octave=1, ring=2.1,
+                 rest=(1, 3, 5, 7) if strength == 1 else (), seed=3000 + index)
+    motif = TRISTRAM if spec.atmosphere == "abyss" and index >= total // 2 and index % 3 == 1 else spec.motif
+    if strength == 0:
+        line(s, key, progression, motif, spec.lead, bars=2, start=2 if index == 0 else 0,
+             gain=0.045, at=0.3, octave=0 if spec.atmosphere == "crypt_drips" else 2,
+             shapes=("A_end",), seed=4000 + index)
+    elif strength == 1:
+        line(s, key, progression, motif, spec.lead, bars=2, start=4 if index % 2 else 0,
+             gain=0.06, at=0.3, octave=0 if spec.atmosphere == "crypt_drips" else 2,
+             shapes=("A",), seed=4000 + index)
+    else:
+        line(s, key, progression, motif, spec.lead, bars=4, start=4 if index % 3 == 0 else 0,
+             gain=0.07 + strength * 0.01, at=0.3, octave=0 if spec.atmosphere == "crypt_drips" else 2,
+             shapes=("A", "A_end") if index % 2 else ("B", "A2"), seed=4000 + index)
+    if strength >= 3:
+        drums(s, spec.pulse, spec.pattern, bars=8, fill={name: value.replace(".", "o", 1) for name, value in spec.pattern.items()},
+              every=4, seed=5000 + index)
+        ostinato(s, key, progression, inst.cello, bars=8, gain=0.045 + 0.01 * strength,
+                 figure=(0, None, 4, None, 0, None, 1, None), step=0.5, octave=0, at=0.12,
+                 seed=6000 + index)
+    elif strength == 2:
+        drums(s, spec.pulse, {name: pattern if name in ("heart", "war") else "." * 16
+                              for name, pattern in spec.pattern.items()}, bars=8, seed=5000 + index)
+    if index % 4 == 0 and spec.atmosphere not in ("lava", "crypt_drips"):
+        bells(s, key, ((2.0, root),), gain=0.04 + 0.008 * strength, length=7)
+    if strength == 4:
+        s.add(inst.timpani(key.hz(root, -1), 1.7, seed=index), 0, gain=0.09)
+    return s.master(room=spec.room, wet=spec.wet, damping=3500, rms=spec.rms * (0.35 + strength * 0.17),
+                    seed=7000 + index).astype(np.float32)
 
 
-def battle_hells_gate(s: Score) -> np.ndarray:
-    """The gate opens: everything at once, an apocalyptic march on brimstone. D phrygian over a D-Eb
-    drone: war drums and taiko, a low bow on the flat second, organ clusters and monks, a falling choir
-    line, and the village's own melody returning corrupted on the guitar. The boss takes it from here."""
-    key, prog = Key("D2", "phrygian"), (0, 0, 1, 1, 0, 0, 6, 5)
-    pedal(s, (key.hz(0, 0), key.hz(1, 0)), inst.drone, gain=0.07, span=4, seed=1)
-    drums(s, DOOM_KIT, {"war": "x.....x...x.....", "heart": "........x......."}, bars=4, seed=2)
-    drums(s, DOOM_KIT, {"war": "x.....x...x.....", "taiko": "....x.......x..x", "heart": "........x.......", "rattle": "..o...o...o...o."},
-          bars=12, start=4, fill={"tom": "x.x.x.x.x.xxx.xx", "war": "x.....x...x....."}, seed=3)
-    ostinato(s, key, prog, inst.cello, bars=16, gain=0.09, figure=(0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0, 1, 0), step=0.25, octave=0,
-             ring=0.9, at=0.1, seed=4)
-    arpeggio(s, key, prog, inst.twelve_string, bars=12, start=4, gain=0.13, at=-0.3, pattern=(0, 3, 2, 3, 4, 3, 2, 3), step=0.25, octave=1,
-             ring=1.6, seed=5)
-    pad(s, key, prog, inst.organ, bars=8, start=8, gain=0.06, octave=1, voicing=(0, 1, 4, 7), seed=6)
-    pad(s, key, prog, inst.monks, bars=12, start=4, gain=0.07, octave=1, voicing=(0, 4), seed=7)
-    line(s, key, prog, DESCENT, inst.hollow_choir, bars=8, start=8, gain=0.07, at=0.2, octave=2, phrase_bars=4, shapes=("A", "B"), seed=8)
-    line(s, key, prog, TRISTRAM, inst.twelve_string, bars=4, start=12, gain=0.1, at=0.3, octave=2, shapes=("B", "A_end"), seed=9)
-    for bar in range(0, 16, 4):
-        s.add(inst.timpani(key.hz(chord_at(prog, bar), -1), 1.4, seed=bar), bar * 4, gain=0.12)
-    bells(s, key, ((0.0, 0), (32.0, 1)), gain=0.08, length=5.0)
-    return s.master(room=3.2, wet=0.32, damping=4200, rms=0.1, seed=26)
+@dataclass(frozen=True)
+class DungeonPiece:
+    """A through-composed dungeon score. The soundtrack never repeats or wraps at playback."""
 
+    spec: Dungeon
+    target: float = 300.0
 
-def boss(s: Score) -> np.ndarray:
-    """Azazel the Flayer: the last wave of Hell's Gate. War drums, a low bow hammering the flat second,
-    an organ and monks in clusters, bells."""
-    key, prog = Key("D2", "phrygian"), (0, 0, 1, 1, 0, 0, 6, 1)
-    pedal(s, (key.hz(0, 0), key.hz(1, 0)), inst.drone, gain=0.07, span=4, seed=1)
-    drums(s, DOOM_KIT, {"war": "x.....x...x.....", "heart": "........x......."}, bars=4, seed=2)
-    drums(s, DOOM_KIT, {"war": "x.....x...x.....", "taiko": "....x.......x..x", "heart": "........x.......", "rattle": "..o...o...o...o."},
-          bars=16, start=4, fill={"tom": "x.x.x.x.x.xxx.xx", "war": "x.....x...x....."}, seed=3)
-    ostinato(s, key, prog, inst.cello, bars=20, gain=0.09, figure=(0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0, 1, 0), step=0.25, octave=1,
-             ring=0.9, at=0.1, seed=4)
-    arpeggio(s, key, prog, inst.twelve_string, bars=16, start=4, gain=0.14, at=-0.3, pattern=(0, 3, 2, 3, 4, 3, 2, 3), step=0.25, octave=1,
-             ring=1.6, seed=5)
-    pad(s, key, prog, inst.organ, bars=12, start=8, gain=0.06, octave=1, voicing=(0, 1, 4, 7), seed=6)
-    pad(s, key, prog, inst.monks, bars=16, start=4, gain=0.07, octave=1, voicing=(0, 4), seed=7)
-    line(s, key, prog, DESCENT, inst.hollow_choir, bars=8, start=12, gain=0.07, at=0.2, octave=2, phrase_bars=4, shapes=("A", "B"), seed=8)
-    for bar in range(0, 20, 4):
-        s.add(inst.timpani(key.hz(chord_at(prog, bar), -1), 1.4, seed=bar), bar * 4, gain=0.12)
-    bells(s, key, tuple((bar * 4.0, (0, 1)[bar // 8 % 2]) for bar in range(0, 20, 8)), gain=0.08, length=5.0)
-    return s.master(room=3.2, wet=0.32, damping=4200, rms=0.11, seed=13)
+    @property
+    def chapters(self) -> int:
+        chapter_seconds = CHAPTER_BARS * 4 * 60 / self.spec.bpm
+        return math.ceil((self.target - OVERLAP) / (chapter_seconds - OVERLAP))
+
+    @property
+    def seconds(self) -> float:
+        return self.chapters * CHAPTER_BARS * 4 * 60 / self.spec.bpm - (self.chapters - 1) * OVERLAP
+
+    def render(self) -> np.ndarray:
+        length = int(round(self.seconds * SAMPLE_RATE))
+        out = np.zeros((length, 2), dtype=np.float32)
+        overlap = int(OVERLAP * SAMPLE_RATE)
+        cursor = 0
+        for index in range(self.chapters):
+            chapter = _chapter(self.spec, index, self.chapters)
+            if index:
+                chapter[:overlap] *= np.linspace(0, 1, overlap, dtype=np.float32)[:, None]
+            if index < self.chapters - 1:
+                chapter[-overlap:] *= np.linspace(1, 0, overlap, dtype=np.float32)[:, None]
+            end = min(length, cursor + len(chapter))
+            out[cursor:end] += chapter[:end - cursor]
+            cursor += len(chapter) - overlap
+        out[:SAMPLE_RATE // 2] *= np.linspace(0, 1, SAMPLE_RATE // 2, dtype=np.float32)[:, None]
+        out[-3 * SAMPLE_RATE:] *= np.linspace(1, 0, 3 * SAMPLE_RATE, dtype=np.float32)[:, None]
+        return out
 
 
 @dataclass(frozen=True)
@@ -375,26 +416,14 @@ class Piece:
         return self.compose(Score(self.bpm, self.bars))
 
 
-PIECES: dict[str, Piece] = {
+PIECES: dict[str, Piece | DungeonPiece] = {
     "title": Piece(title, 64, 12),
-    "battle_tristram": Piece(battle_tristram, 68, 16),
-    "battle_graveyard": Piece(battle_graveyard, 60, 12),
-    "battle_cathedral": Piece(battle_cathedral, 72, 16),
-    "battle_catacombs": Piece(battle_catacombs, 66, 12),
-    "battle_caves": Piece(battle_caves, 92, 16),
-    "battle_hells_gate": Piece(battle_hells_gate, 84, 16),
-    "boss": Piece(boss, 88, 20),
+    **{f"battle_{name}": DungeonPiece(spec) for name, spec in DUNGEONS.items()},
+    "boss": DungeonPiece(BOSS, 240),
 }
 
 #: Every location's battle track, in the campaign's order.
-BATTLE_FOR: dict[str, str] = {
-    "tristram": "battle_tristram",
-    "graveyard": "battle_graveyard",
-    "cathedral": "battle_cathedral",
-    "catacombs": "battle_catacombs",
-    "caves": "battle_caves",
-    "hells_gate": "battle_hells_gate",
-}
+BATTLE_FOR: dict[str, str] = {name: f"battle_{name}" for name in DUNGEONS}
 
 
 def track_for(location_key: str) -> str:
