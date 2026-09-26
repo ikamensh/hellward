@@ -11,6 +11,8 @@ from hellward.sim.content import Wave
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.hands import Hands, defend
+from hellward.sim.players.warden import fingerprint, load_plans
+from hellward.sim.skills import cost
 
 
 @pytest.mark.parametrize("key", list(LOCATIONS))
@@ -21,6 +23,23 @@ def test_the_ordinary_player_defends_every_location_to_its_end_against_smart_lea
     assert world.outcome == "defeat" or world.wave == len(location.waves) - 1
     assert world.kills > 30
     assert record.chants >= record.landed > 0
+
+
+def test_the_warden_holds_tristram_with_every_life():
+    world, record = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["warden"](1), seed=1, sigils=0, planner=planner.smart)
+    assert world.outcome == "victory"
+    assert world.lives == 20
+    assert record.landed > 0
+
+
+def test_every_stored_warden_plan_is_for_todays_map_and_its_sigils():
+    """A plan searched on a map that has changed since is not played: search it again (tools/warden_plans.py)."""
+    for key, plan in load_plans().items():
+        name, _, sigils = key.split("/")
+        location = LOCATIONS[name]
+        assert plan.map == fingerprint(location), key
+        assert cost(plan.skills) <= int(sigils), key
+        assert all(s.kind in location.arsenal.towers for s in plan.steps if s.what == "build"), key
 
 
 def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():

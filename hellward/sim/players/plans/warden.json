@@ -1,16 +1,17 @@
 {
- "cathedral/normal/4": {
+ "catacombs/normal/6": {
   "early": 0.9,
-  "map": "9a49011c656f",
+  "map": "95b4012365af",
   "searched": {
    "leaders": "greedy",
-   "life": 10.966,
-   "lost": 30,
-   "plans": 200,
+   "life": 6.922,
+   "lost": 18,
+   "plans": 400,
    "seeds": "0-3"
   },
   "skills": [
    "cold_mastery",
+   "fire_ball",
    "fire_mastery",
    "holy_shield",
    "warmth"
@@ -23,25 +24,185 @@
    [
     "build",
     "pyre",
-    1,
-    9
+    3,
+    5
    ],
    [
     "build",
-    "plague",
-    4,
-    10
+    "frost",
+    5,
+    5
    ],
    [
     "build",
     "pyre",
-    4,
-    8
+    6,
+    5
+   ],
+   [
+    "build",
+    "pyre",
+    3,
+    6
+   ],
+   [
+    "build",
+    "frost",
+    3,
+    2
+   ],
+   [
+    "gate",
+    3
+   ],
+   [
+    "build",
+    "pyre",
+    2,
+    5
+   ],
+   [
+    "build",
+    "pyre",
+    5,
+    6
+   ],
+   [
+    "up",
+    3,
+    5
+   ],
+   [
+    "up",
+    3,
+    6
+   ],
+   [
+    "up",
+    2,
+    5
+   ],
+   [
+    "up",
+    5,
+    5
+   ],
+   [
+    "build",
+    "frost",
+    5,
+    10
+   ],
+   [
+    "up",
+    3,
+    6
+   ],
+   [
+    "gate",
+    2
+   ],
+   [
+    "build",
+    "pyre",
+    6,
+    9
+   ],
+   [
+    "up",
+    5,
+    6
+   ],
+   [
+    "gate",
+    1
+   ],
+   [
+    "build",
+    "frost",
+    3,
+    7
+   ],
+   [
+    "up",
+    5,
+    6
+   ],
+   [
+    "build",
+    "pyre",
+    7,
+    4
+   ],
+   [
+    "up",
+    2,
+    5
+   ],
+   [
+    "build",
+    "storm",
+    1,
+    4
    ],
    [
     "up",
     1,
-    9
+    4
+   ],
+   [
+    "up",
+    3,
+    7
+   ],
+   [
+    "up",
+    1,
+    4
+   ]
+  ]
+ },
+ "cathedral/normal/4": {
+  "early": 0.7,
+  "map": "9a49011c656f",
+  "searched": {
+   "leaders": "greedy",
+   "life": 12.273,
+   "lost": 96,
+   "plans": 400,
+   "seeds": "0-3"
+  },
+  "skills": [
+   "cold_mastery",
+   "fire_mastery",
+   "holy_shield",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "build",
+    "plague",
+    10,
+    5
+   ],
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "pyre",
+    1,
+    8
+   ],
+   [
+    "gate",
+    1
+   ],
+   [
+    "up",
+    1,
+    8
    ],
    [
     "build",
@@ -50,11 +211,6 @@
     7
    ],
    [
-    "up",
-    1,
-    9
-   ],
-   [
     "build",
     "pyre",
     6,
@@ -62,12 +218,17 @@
    ],
    [
     "up",
+    1,
+    8
+   ],
+   [
+    "up",
     6,
     8
    ],
    [
     "build",
-    "storm",
+    "pyre",
     9,
     7
    ],
@@ -83,11 +244,6 @@
     9
    ],
    [
-    "up",
-    4,
-    8
-   ],
-   [
     "build",
     "plague",
     2,
@@ -101,7 +257,13 @@
    [
     "up",
     4,
-    8
+    7
+   ],
+   [
+    "build",
+    "storm",
+    2,
+    10
    ],
    [
     "build",
@@ -111,9 +273,14 @@
    ],
    [
     "build",
-    "frost",
+    "pyre",
+    11,
+    5
+   ],
+   [
+    "up",
     6,
-    10
+    9
    ],
    [
     "build",
@@ -122,9 +289,266 @@
     6
    ],
    [
+    "build",
+    "plague",
+    4,
+    10
+   ],
+   [
+    "build",
+    "frost",
+    13,
+    9
+   ],
+   [
+    "gate",
+    2
+   ]
+  ]
+ },
+ "caves/hell/36": {
+  "early": 0.5,
+  "map": "c48a642ddee2",
+  "searched": {
+   "leaders": "greedy",
+   "life": 6.079,
+   "lost": 17,
+   "plans": 400,
+   "seeds": "0-3"
+  },
+  "skills": [
+   "blaze",
+   "chain_lightning",
+   "cold_mastery",
+   "contagion",
+   "fire_ball",
+   "fire_mastery",
+   "glacial_spike",
+   "holy_shield",
+   "lightning_mastery",
+   "lower_resist",
+   "poison_mastery",
+   "salvation",
+   "shatter",
+   "soul_harvest",
+   "spell_mastery",
+   "static_field",
+   "thorns",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "build",
+    "frost",
+    5,
+    5
+   ],
+   [
+    "build",
+    "frost",
+    4,
+    8
+   ],
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "storm",
+    1,
+    8
+   ],
+   [
+    "up",
+    4,
+    8
+   ],
+   [
+    "build",
+    "storm",
+    5,
+    9
+   ],
+   [
+    "up",
+    5,
+    5
+   ],
+   [
+    "build",
+    "pyre",
+    4,
+    9
+   ],
+   [
+    "up",
+    4,
+    8
+   ],
+   [
+    "build",
+    "pyre",
+    6,
+    6
+   ],
+   [
+    "up",
+    1,
+    8
+   ],
+   [
+    "build",
+    "plague",
+    19,
+    8
+   ],
+   [
+    "up",
+    4,
+    9
+   ],
+   [
+    "build",
+    "pyre",
+    2,
+    8
+   ],
+   [
+    "build",
+    "pyre",
+    5,
+    6
+   ],
+   [
+    "build",
+    "pyre",
+    2,
+    5
+   ],
+   [
+    "build",
+    "plague",
+    5,
+    7
+   ],
+   [
+    "build",
+    "frost",
+    2,
+    4
+   ]
+  ]
+ },
+ "caves/normal/8": {
+  "early": 0.9,
+  "map": "c48a642ddee2",
+  "searched": {
+   "leaders": "greedy",
+   "life": 7.624,
+   "lost": 17,
+   "plans": 400,
+   "seeds": "0-3"
+  },
+  "skills": [
+   "chain_lightning",
+   "cold_mastery",
+   "fire_mastery",
+   "holy_shield",
+   "lightning_mastery",
+   "poison_mastery",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "frost",
+    4,
+    5
+   ],
+   [
+    "build",
+    "pyre",
+    5,
+    5
+   ],
+   [
+    "build",
+    "storm",
+    4,
+    6
+   ],
+   [
+    "build",
+    "storm",
+    2,
+    8
+   ],
+   [
+    "up",
+    4,
+    5
+   ],
+   [
+    "up",
+    5,
+    5
+   ],
+   [
+    "up",
+    4,
+    5
+   ],
+   [
+    "build",
+    "storm",
+    1,
+    7
+   ],
+   [
+    "build",
+    "storm",
+    2,
+    6
+   ],
+   [
+    "build",
+    "plague",
+    19,
+    11
+   ],
+   [
+    "build",
+    "pyre",
+    6,
+    6
+   ],
+   [
     "up",
     6,
+    6
+   ],
+   [
+    "build",
+    "plague",
+    22,
     9
+   ],
+   [
+    "build",
+    "storm",
+    5,
+    9
+   ],
+   [
+    "build",
+    "storm",
+    2,
+    5
    ],
    [
     "gate",
@@ -132,8 +556,387 @@
    ],
    [
     "up",
-    2,
+    6,
+    6
+   ],
+   [
+    "build",
+    "pyre",
+    1,
+    8
+   ]
+  ]
+ },
+ "graveyard/normal/2": {
+  "early": 0.7,
+  "map": "29a0cf6ef4b1",
+  "searched": {
+   "leaders": "greedy",
+   "life": 9.038,
+   "lost": 7,
+   "plans": 400,
+   "seeds": "0-3"
+  },
+  "skills": [
+   "fire_mastery",
+   "holy_shield"
+  ],
+  "steps": [
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "pyre",
+    10,
+    5
+   ],
+   [
+    "build",
+    "frost",
+    11,
+    4
+   ],
+   [
+    "up",
+    10,
+    5
+   ],
+   [
+    "up",
+    11,
+    4
+   ],
+   [
+    "up",
+    10,
+    5
+   ],
+   [
+    "build",
+    "pyre",
+    11,
+    8
+   ],
+   [
+    "build",
+    "pyre",
+    10,
+    4
+   ],
+   [
+    "up",
+    10,
+    4
+   ],
+   [
+    "up",
+    11,
+    4
+   ],
+   [
+    "build",
+    "pyre",
+    17,
+    4
+   ],
+   [
+    "up",
+    11,
+    8
+   ],
+   [
+    "build",
+    "frost",
+    14,
+    6
+   ],
+   [
+    "build",
+    "storm",
+    10,
+    10
+   ],
+   [
+    "up",
+    14,
+    6
+   ]
+  ]
+ },
+ "hells_gate/hell/36": {
+  "early": 1.01,
+  "map": "7681ed02cf96",
+  "searched": {
+   "leaders": "greedy",
+   "life": 4.919,
+   "lost": 8,
+   "plans": 400,
+   "seeds": "0-3"
+  },
+  "skills": [
+   "blaze",
+   "chain_lightning",
+   "cold_mastery",
+   "contagion",
+   "fire_ball",
+   "fire_mastery",
+   "glacial_spike",
+   "holy_shield",
+   "lightning_mastery",
+   "lower_resist",
+   "poison_mastery",
+   "salvation",
+   "shatter",
+   "soul_harvest",
+   "spell_mastery",
+   "static_field",
+   "thorns",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "plague",
+    7,
+    8
+   ],
+   [
+    "build",
+    "frost",
+    5,
+    4
+   ],
+   [
+    "build",
+    "plague",
+    7,
+    9
+   ],
+   [
+    "build",
+    "storm",
+    7,
+    4
+   ],
+   [
+    "up",
+    5,
+    4
+   ],
+   [
+    "build",
+    "pyre",
+    7,
+    5
+   ],
+   [
+    "up",
+    5,
+    4
+   ],
+   [
+    "up",
+    7,
+    4
+   ],
+   [
+    "up",
+    7,
+    4
+   ],
+   [
+    "build",
+    "frost",
+    8,
+    8
+   ],
+   [
+    "build",
+    "pyre",
+    5,
+    5
+   ],
+   [
+    "build",
+    "storm",
+    8,
+    10
+   ],
+   [
+    "up",
+    7,
+    9
+   ],
+   [
+    "up",
+    5,
+    5
+   ],
+   [
+    "up",
+    7,
+    8
+   ]
+  ]
+ },
+ "hells_gate/normal/10": {
+  "early": 1.01,
+  "map": "7681ed02cf96",
+  "searched": {
+   "leaders": "greedy",
+   "life": 3.649,
+   "lost": 2,
+   "plans": 400,
+   "seeds": "0-3"
+  },
+  "skills": [
+   "chain_lightning",
+   "cold_mastery",
+   "fire_ball",
+   "fire_mastery",
+   "holy_shield",
+   "lightning_mastery",
+   "poison_mastery",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "pyre",
+    5,
+    5
+   ],
+   [
+    "build",
+    "storm",
+    5,
+    4
+   ],
+   [
+    "build",
+    "storm",
+    7,
+    9
+   ],
+   [
+    "up",
+    5,
+    4
+   ],
+   [
+    "build",
+    "pyre",
+    7,
+    4
+   ],
+   [
+    "build",
+    "frost",
+    7,
+    5
+   ],
+   [
+    "up",
+    7,
+    9
+   ],
+   [
+    "build",
+    "plague",
+    7,
+    8
+   ],
+   [
+    "up",
+    7,
+    4
+   ],
+   [
+    "build",
+    "pyre",
+    13,
+    8
+   ],
+   [
+    "up",
+    5,
+    5
+   ],
+   [
+    "build",
+    "plague",
+    7,
+    6
+   ],
+   [
+    "up",
+    7,
+    4
+   ],
+   [
+    "build",
+    "storm",
+    5,
+    9
+   ],
+   [
+    "up",
+    7,
+    5
+   ],
+   [
+    "up",
+    5,
+    5
+   ],
+   [
+    "build",
+    "pyre",
+    4,
+    5
+   ],
+   [
+    "up",
+    7,
+    9
+   ],
+   [
+    "build",
+    "pyre",
+    10,
+    9
+   ],
+   [
+    "up",
+    5,
+    9
+   ],
+   [
+    "build",
+    "pyre",
+    4,
     7
+   ],
+   [
+    "build",
+    "plague",
+    11,
+    2
+   ],
+   [
+    "up",
+    7,
+    5
    ],
    [
     "gate",
@@ -141,8 +944,135 @@
    ],
    [
     "build",
+    "frost",
+    9,
+    10
+   ],
+   [
+    "up",
+    9,
+    10
+   ]
+  ]
+ },
+ "tristram/normal/0": {
+  "early": 0.5,
+  "map": "00c8bbaff889",
+  "searched": {
+   "leaders": "greedy",
+   "life": 2.622,
+   "lost": 24,
+   "plans": 400,
+   "seeds": "0-3"
+  },
+  "skills": [],
+  "steps": [
+   [
+    "build",
     "pyre",
+    11,
+    8
+   ],
+   [
+    "build",
+    "frost",
     10,
+    9
+   ],
+   [
+    "build",
+    "pyre",
+    15,
+    8
+   ],
+   [
+    "build",
+    "pyre",
+    19,
+    7
+   ],
+   [
+    "up",
+    11,
+    8
+   ],
+   [
+    "build",
+    "pyre",
+    16,
+    8
+   ],
+   [
+    "up",
+    10,
+    9
+   ],
+   [
+    "build",
+    "frost",
+    18,
+    6
+   ],
+   [
+    "up",
+    15,
+    8
+   ],
+   [
+    "build",
+    "pyre",
+    19,
+    6
+   ],
+   [
+    "up",
+    18,
+    6
+   ],
+   [
+    "build",
+    "pyre",
+    8,
+    6
+   ],
+   [
+    "build",
+    "pyre",
+    16,
+    7
+   ],
+   [
+    "build",
+    "pyre",
+    5,
+    5
+   ],
+   [
+    "up",
+    18,
+    6
+   ],
+   [
+    "build",
+    "pyre",
+    4,
+    5
+   ],
+   [
+    "build",
+    "frost",
+    7,
+    3
+   ],
+   [
+    "build",
+    "pyre",
+    18,
+    7
+   ],
+   [
+    "up",
+    11,
     8
    ]
   ]
