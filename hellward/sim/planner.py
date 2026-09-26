@@ -23,7 +23,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Final
 
-from hellward.sim.content import CURSES, Curse, LeaderSpec
+from hellward.sim.content import CURSES, Curse, CurseSpec, LeaderSpec
 from hellward.sim.model import (
     CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, ForcedCurse, Monster, Tower, World, curse_radius,
 )
@@ -128,13 +128,17 @@ def _trajectory(world: World, m: Monster, times: list[float]) -> list[float]:
     return out
 
 
-def _damage_in(tower: Tower, reach: float, world: World, tracks: list[tuple[Monster, list[float]]], index: int) -> float:
-    """Damage per second a tower would deal, at one sample, to the monsters within ``reach``."""
+def _damage_in(tower: Tower, reach: float, world: World, tracks: list[tuple[Monster, list[float]]], index: int,
+               allowed: tuple[tuple[float, float], ...] | None = None) -> float:
+    """Damage per second a tower would deal, at one sample, to the monsters within ``reach``; with ``allowed``, only
+    to those also on those stretches of the path (an altar's reach, whose amplification it lends to)."""
     spans = world.level.coverage(tower.tile, reach)
     element = tower.kind.element
     taken = []
     for m, track in tracks:
         s = track[index]
+        if allowed is not None and not any(a <= s <= b for a, b in allowed):
+            continue
         for a, b in spans:
             if a <= s <= b:
                 if tower.kind.attack != "venom" or m.kind.taken(element) > 0:   # venom seeks only what it can poison
@@ -164,6 +168,8 @@ def _priced(tower: Tower, curse: Curse, world: World, start: float, times: list[
     left = tower.curses.get(curse, 0.0)
     if left >= spec.duration * 0.5:
         return 0.0   # it is already carrying this curse; recasting would buy little
+    if tower.kind.key in ("grove", "altar"):
+        return _lent(tower, curse, world, start, left, times, tracks)
     begin, end = start + left, start + spec.duration
     full = tower.stats.range * tower.range_mult()
     now = tower.damage_mult() * tower.rate_mult()
@@ -183,6 +189,102 @@ def _priced(tower: Tower, curse: Curse, world: World, start: float, times: list[
             after = before * spec.damage * spec.rate
         total, error = add(total, error, (before - after) * SAMPLE)
     return settle(total, error)
+
+
+def _lent(tower: Tower, curse: Curse, world: World, start: float, left: float, times: list[float],
+          tracks: list[tuple[Monster, list[float]]]) -> float:
+    """What a curse on a support tower stops it lending: a grove's bonus on the towers under its aura,
+    or an altar's amplification on the damage the other towers deal to the monsters in its reach."""
+    spec = CURSES[curse]
+    if tower.silenced:
+        return 0.0   # caged: it lends nothing already
+    if tower.kind.key == "grove":
+        return _lent_grove(tower, spec, world, start, left, times, tracks)
+    return _lent_altar(tower, spec, world, start, left, times, tracks)
+
+
+def _helpers(world: World) -> list[Tower]:
+    """The towers a support tower lends to: every other non-support tower (altars and groves deal no damage)."""
+    return [u for u in world.towers.values() if u.kind.attack not in ("aura", "amplify")]
+
+
+def _lent_grove(tower: Tower, spec: CurseSpec, world: World, start: float, left: float, times: list[float],
+                tracks: list[tuple[Monster, list[float]]]) -> float:
+    stats = tower.stats
+    if spec.silenced:
+        after_share = 0.0
+    elif spec.damage != 1.0:
+        after_share = spec.damage
+    else:
+        return 0.0   # Decrepify slows no pulse here and Dim Vision shrinks no reach: an aura is neither
+    covered = []
+    for u in _helpers(world):
+        dx, dy = u.tile[0] - tower.tile[0], u.tile[1] - tower.tile[1]
+        if dx * dx + dy * dy <= stats.range * stats.range:
+            covered.append(u)
+    if not covered:
+        return 0.0
+    bonus = stats.damage * tower.damage_mult()
+    begin, end = start + left, start + spec.duration
+    total, error = 0.0, 0.0
+    for i in range(len(times)):
+        moment = times[i]
+        if moment < begin or moment >= end:
+            continue
+        for u in covered:
+            if u.silenced:
+                continue
+            full = u.stats.range * u.range_mult()
+            now = u.damage_mult() * u.rate_mult()
+            dealt = _damage_in(u, full, world, tracks, i) * now
+            if dealt > 0:
+                total, error = add(total, error, dealt * SAMPLE)
+    dealt_total = settle(total, error)
+    return dealt_total * bonus * (1.0 - after_share)
+
+
+def _lent_altar(tower: Tower, spec: CurseSpec, world: World, start: float, left: float, times: list[float],
+                tracks: list[tuple[Monster, list[float]]]) -> float:
+    stats = tower.stats
+    full = stats.range * tower.range_mult()
+    if spec.silenced:
+        return _altar_damage(tower, world, times, tracks, start, left, spec, full, full, 0.0, 0.0, True)
+    after_reach = full * spec.range if spec.range != 1.0 else full
+    before = stats.damage * tower.damage_mult()
+    after = before * spec.damage if spec.damage != 1.0 else before
+    if spec.rate != 1.0:
+        after *= spec.rate   # a slower pulse lays its knot less often
+    return _altar_damage(tower, world, times, tracks, start, left, spec, full, after_reach, before, after, False)
+
+
+def _altar_damage(tower: Tower, world: World, times: list[float], tracks: list[tuple[Monster, list[float]]],
+                  start: float, left: float, spec: CurseSpec, full: float, after_reach: float,
+                  before: float, after: float, silenced: bool) -> float:
+    others = _helpers(world)
+    if not others:
+        return 0.0
+    begin, end = start + left, start + spec.duration
+    near_spans = world.level.coverage(tower.tile, full)
+    far_spans = world.level.coverage(tower.tile, after_reach) if after_reach != full else near_spans
+    lent, lent_error = 0.0, 0.0
+    kept, kept_error = 0.0, 0.0
+    for i in range(len(times)):
+        moment = times[i]
+        if moment < begin or moment >= end:
+            continue
+        for u in others:
+            if u.silenced:
+                continue
+            reach = u.stats.range * u.range_mult()
+            now = u.damage_mult() * u.rate_mult()
+            dealt = _damage_in(u, reach, world, tracks, i, near_spans) * now
+            if dealt > 0:
+                lent, lent_error = add(lent, lent_error, dealt * SAMPLE * before)
+            if not silenced and after > 0:
+                dealt = _damage_in(u, reach, world, tracks, i, far_spans) * now
+                if dealt > 0:
+                    kept, kept_error = add(kept, kept_error, dealt * SAMPLE * after)
+    return settle(lent, lent_error) - settle(kept, kept_error)
 
 
 def candidates(world: World, leader: Monster, delay: float = 0.0) -> list[Option]:

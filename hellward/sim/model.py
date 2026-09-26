@@ -24,8 +24,9 @@ from typing import TYPE_CHECKING, Any, Callable, Final
 
 from hellward.sim.campaign import CATHEDRAL, Location
 from hellward.sim.content import (
-    BURN_RADIUS, CONTAGION_REACH, CURSES, DOOR, EARLY_CALL_GOLD, MANA_START, MAX_POISON_STACKS, MONSTERS, SELL_REFUND,
-    SHATTER_RADIUS, SHATTER_SHARE, SOUL, SPELLS, START_LIVES, THORNS, TOWERS, WARD, WAVE_BREAK, Curse, Element,
+    BURN_RADIUS, CONTAGION_REACH, CORPSE_RADIUS, CORPSE_SHARE, CURSES, DOOR, EARLY_CALL_GOLD, HURRICANE_RADIUS,
+    HURRICANE_SLOW, MANA_START, MAX_POISON_STACKS, MONSTERS, SELL_REFUND, SHATTER_RADIUS, SHATTER_SHARE, SOUL, SPELLS,
+    START_LIVES, THORNS, TOWERS, TWISTER_HELD, TWISTER_PERIOD, TWISTER_RADIUS, WARD, WAVE_BREAK, Curse, Element,
     MonsterKind, TowerKind, TowerLevel,
 )
 from hellward.sim.skills import NO_PERKS, RANK_SKILL, SKILLS, Perks, baked
@@ -51,7 +52,8 @@ class Refused(Exception):
 
 class Monster:
     __slots__ = ("id", "kind", "hp", "max_hp", "s", "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
-                 "cooldown", "asking", "ask_left", "chant_curse", "chant_spot", "chant_left", "door")
+                 "cooldown", "asking", "ask_left", "chant_curse", "chant_spot", "chant_left", "door",
+                 "amplified", "amplify")
 
     def __init__(self, id: int, kind: MonsterKind, wave: int, lane: float, jostle: float, hp: float, cooldown: float) -> None:
         self.id = id
@@ -73,6 +75,8 @@ class Monster:
         self.chant_spot: tuple[int, int] = (-1, -1)
         self.chant_left = 0.0
         self.door = -1                        # the door socket it is battering, or -1
+        self.amplified = 0.0                  # seconds of Amplify Damage left
+        self.amplify = 0.0                    # the fraction it takes extra (0.3 = 30% more damage)
 
     def copy(self) -> Monster:
         """Everything but a leader's pending question to its planner."""
@@ -80,6 +84,7 @@ class Monster:
         m.max_hp, m.s, m.chill, m.chill_left, m.frozen = self.max_hp, self.s, self.chill, self.chill_left, self.frozen
         m.poison = [stack[:] for stack in self.poison]
         m.chant_curse, m.chant_spot, m.chant_left, m.door = self.chant_curse, self.chant_spot, self.chant_left, self.door
+        m.amplified, m.amplify = self.amplified, self.amplify
         return m
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -97,7 +102,8 @@ class Monster:
 
 
 class Tower:
-    __slots__ = ("id", "kind", "levels", "level", "tile", "cooldown", "curses", "ward", "spent", "spans", "spans_reach")
+    __slots__ = ("id", "kind", "levels", "level", "tile", "cooldown", "curses", "ward", "spent", "spans", "spans_reach",
+                 "timer")
 
     def __init__(self, id: int, kind: TowerKind, levels: tuple[TowerLevel, ...], tile: tuple[int, int]) -> None:
         self.id = id
@@ -111,11 +117,13 @@ class Tower:
         self.spent = levels[0].cost
         self.spans: tuple[tuple[float, float], ...] = ()   # the path it reaches, for the reach it had last
         self.spans_reach = -1.0
+        self.timer = 0.0                      # a grove's twister clock
 
     def copy(self) -> Tower:
         t = Tower(self.id, self.kind, self.levels, self.tile)
         t.level, t.cooldown, t.curses = self.level, self.cooldown, dict(self.curses)
         t.ward, t.spent, t.spans, t.spans_reach = self.ward, self.spent, self.spans, self.spans_reach
+        t.timer = self.timer
         return t
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -482,7 +490,13 @@ class World:
     def cleanse(self, tower_id: int) -> None:
         tower = self.towers[tower_id]
         if not tower.curses:
-            raise Refused("That tower carries no curse.")
+            if not self.perks.salvation:
+                raise Refused("That tower carries no curse.")
+            self._spend("cleanse")
+            self.cleanses += 1
+            tower.ward = WARD
+            self._emit("cleansed", tower.id, [])
+            return
         self._spend("cleanse")
         self.cleanses += 1
         lifted = sorted(tower.curses)
@@ -687,6 +701,11 @@ class World:
         doors = [d for d in self.doors if d.built]
         end = self.level.length
         monsters = self.monsters
+        groves: list[tuple[float, float]] = []
+        if self.perks.hurricane:
+            for t in self.towers.values():
+                if t.kind.key == "grove" and not t.silenced:
+                    groves.append((t.tile[0] + 0.5, t.tile[1] + 0.5))
         leaked = False
         ordered, last = True, math.inf   # whether those still on the map run furthest first, as they did
         for m in monsters:
@@ -701,6 +720,13 @@ class World:
                     speed = m.kind.speed * (1.0 - m.chill)
                 else:
                     speed = m.kind.speed
+                if groves and not m.kind.flying:
+                    mx, my = self.level.point(m.s)
+                    for gx, gy in groves:
+                        dx, dy = mx - gx, my - gy
+                        if dx * dx + dy * dy <= HURRICANE_RADIUS * HURRICANE_RADIUS:
+                            speed *= HURRICANE_SLOW
+                            break
                 s = m.s + speed * dt
                 m.door = -1
                 if not m.kind.flying:
@@ -745,6 +771,102 @@ class World:
                     self._emit("door_broken", d.index)
                     doors = [x for x in doors if x.built]
 
+    def _aura_mult(self, tower: Tower) -> float:
+        """How much harder a tower strikes under the groves: 1 plus the best aura on it.
+
+        Worked out when the damage is dealt, never kept on the world, so a clone never shares it.
+        A grove's aura is not a reach: Dim Vision and Decrepify do nothing to it, Bone Prison stops it."""
+        best = 0.0
+        tx, ty = tower.tile[0] + 0.5, tower.tile[1] + 0.5
+        for g in self.towers.values():
+            if g.kind.key != "grove" or g.silenced:
+                continue
+            stats = g.levels[g.level]
+            dx, dy = g.tile[0] + 0.5 - tx, g.tile[1] + 0.5 - ty
+            if dx * dx + dy * dy <= stats.range * stats.range:
+                bonus = stats.damage * (g.damage_mult() if g.curses else 1.0)
+                if bonus > best:
+                    best = bonus
+        return 1.0 + best
+
+    def _twister(self, t: Tower, dt: float) -> None:
+        """A grove's root: every 4 s the walker nearest the sanctuary within 2.5 tiles stays put for 1.5 s."""
+        if not self.perks.twister:
+            return
+        t.timer += dt
+        if t.timer < TWISTER_PERIOD:
+            return
+        t.timer -= TWISTER_PERIOD
+        gx, gy = t.tile[0] + 0.5, t.tile[1] + 0.5
+        best: Monster | None = None
+        for m in self.monsters:
+            if m.hp <= 0 or m.kind.flying or m.kind.lives >= 2:
+                continue
+            x, y = self.level.point(m.s)
+            dx, dy = x - gx, y - gy
+            if dx * dx + dy * dy <= TWISTER_RADIUS * TWISTER_RADIUS and (best is None or m.s > best.s):
+                best = m
+        if best is not None:
+            best.frozen = max(best.frozen, TWISTER_HELD)
+            best.door = -1
+            self._emit("twister", t.id, best.id)
+
+    def _altar(self, t: Tower, stats: TowerLevel, spans: tuple[tuple[float, float], ...], near: float, far: float) -> None:
+        """An altar's pulse: amplify the thickest knot of monsters in reach.
+
+        Among the monsters in reach that are not amplified, the centre whose circle of the knot
+        radius holds the most of their life (ties: furthest along the path) lends its circle every
+        monster in it — flyers too — the bonus for the lasting. It does not stack."""
+        monsters = self.monsters
+        level = self.level
+        cand: list[Monster] = []
+        for m in monsters:
+            if m.s < near:
+                break
+            if m.hp > 0 and m.s <= far and m.amplified <= 0 and _inside(m.s, spans):
+                cand.append(m)
+        if not cand:
+            t.cooldown = 0.0   # no monster in reach: no cast, the timer waits
+            return
+        knot = stats.splash
+        knot2 = knot * knot
+        centres: list[tuple[Monster, float, float]] = []
+        for m in cand:
+            x, y = level.point(m.s)
+            centres.append((m, x, y))
+        best_c: Monster | None = None
+        best_x, best_y, best_life = 0.0, 0.0, -1.0
+        for c, cx, cy in centres:
+            total = 0.0
+            for m, x, y in centres:
+                dx, dy = x - cx, y - cy
+                if dx * dx + dy * dy <= knot2 + 1e-9:
+                    total += m.hp
+            if best_c is None:
+                best_c, best_x, best_y, best_life = c, cx, cy, total
+            elif total > best_life or (total == best_life and c.s > best_c.s):
+                best_c, best_x, best_y, best_life = c, cx, cy, total
+        if best_c is None:
+            t.cooldown = 0.0
+            return
+        bonus = stats.damage * (t.damage_mult() if t.curses else 1.0)
+        lasting = stats.lasting
+        hit: list[int] = []
+        for m in monsters:
+            if m.hp <= 0:
+                continue
+            x, y = level.point(m.s)
+            dx, dy = x - best_x, y - best_y
+            if dx * dx + dy * dy <= knot2 + 1e-9:
+                if m.amplify < bonus:
+                    m.amplify = bonus
+                if m.amplified < lasting:
+                    m.amplified = lasting
+                hit.append(m.id)
+        rate = stats.rate * (t.rate_mult() if t.curses else 1.0)
+        t.cooldown += 1.0 / rate
+        self._emit("amplify", t.id, (best_x, best_y), tuple(hit))
+
     def _towers(self, dt: float) -> None:
         monsters = self.monsters
         if not monsters:
@@ -761,6 +883,11 @@ class World:
             if t.curses and t.silenced:
                 t.cooldown = 0.0
                 continue
+            attack = t.kind.attack
+            if attack == "aura":   # a grove never attacks; its timer waits while silenced (above)
+                self._twister(t, dt)
+                t.cooldown = 0.0
+                continue
             stats = t.levels[t.level]
             reach = stats.range * t.range_mult() if t.curses else stats.range
             if reach != t.spans_reach:
@@ -772,7 +899,9 @@ class World:
             # The monsters run furthest first and the spans along the path: none past the last span's end can be in
             # reach, and after the first short of the first span's start, none is.
             near, far = spans[0][0], spans[-1][1]
-            attack = t.kind.attack
+            if attack == "amplify":
+                self._altar(t, stats, spans, near, far)
+                continue
             if attack == "nova":
                 hit = []
                 for m in monsters:
@@ -805,7 +934,8 @@ class World:
             if not hit:
                 t.cooldown = 0.0
                 continue
-            damage = stats.damage * (t.damage_mult() if t.curses else 1.0)
+            aura = self._aura_mult(t)
+            damage = stats.damage * (t.damage_mult() if t.curses else 1.0) * aura
             rate = stats.rate * (t.rate_mult() if t.curses else 1.0)
             t.cooldown += 1.0 / rate
             if attack == "nova":
@@ -825,7 +955,7 @@ class World:
                 last = self.level.point(target.s)
                 distance = _hypot(last[0] - origin[0], last[1] - origin[1])
                 bolt = Bolt(self._id(), t.id, t.kind.key, target.id, distance / t.kind.bolt_speed, damage, t.kind.element,
-                            stats.splash, stats.poison, stats.poison_time, origin, last)
+                            stats.splash, stats.poison * aura, stats.poison_time, origin, last)
                 self.bolts.append(bolt)
                 self._emit("bolt", bolt)
 
@@ -931,6 +1061,9 @@ class World:
                     self._hurt(m, h.dps * min(dt, h.left), Element.FIRE, quiet=True)
                 h.left -= dt
             self.hazards = [h for h in self.hazards if h.left > 0]
+        for m in self.monsters:
+            if m.amplified > 0:
+                m.amplified = max(0.0, m.amplified - dt)
         if any(m.hp <= 0 for m in self.monsters):
             self._bury()
 
@@ -946,7 +1079,10 @@ class World:
     def _hurt(self, m: Monster, amount: float, element: Element | None, *, quiet: bool = False, bursts: bool = True) -> None:
         if m.hp <= 0:
             return
-        m.hp -= amount * self.taken(m, element)
+        taken = self.taken(m, element)
+        if taken > 0 and m.amplified > 0:
+            taken *= 1.0 + m.amplify   # an immunity (taken 0) stays 0
+        m.hp -= amount * taken
         if not quiet:
             self._emit("hit", m.id, element)
         if m.hp <= 0:
@@ -957,6 +1093,9 @@ class World:
         self.kills += 1
         where = self.level.point(m.s)
         self._emit("death", m.id, m.kind.key, element, where, m.kind.bounty)
+        amplified = m.amplified > 0
+        if amplified and self.perks.life_tap:
+            self.mana = min(self.perks.mana_max, self.mana + m.kind.bounty / 5)
         if m.kind.leader is not None and self.perks.soul_harvest:
             self.mana = min(self.perks.mana_max, self.mana + SOUL)
         if self.perks.contagion and m.poison:
@@ -966,6 +1105,11 @@ class World:
             self._emit("shatter", m.id, where)
             for o in around:   # a monster a burst kills does not burst in turn
                 self._hurt(o, m.max_hp * SHATTER_SHARE, Element.COLD, quiet=True, bursts=False)
+        if bursts and self.perks.corpse_explosion and amplified:
+            around = [o for o in self._around(where[0], where[1], CORPSE_RADIUS, flyers=True) if o is not m]
+            self._emit("corpse_explosion", where[0], where[1])
+            for o in around:   # a monster a burst kills does not burst in turn
+                self._hurt(o, m.max_hp * CORPSE_SHARE, None, quiet=True, bursts=False)
 
     def _spread(self, m: Monster, where: tuple[float, float]) -> None:
         """Contagion: a dead monster's venom goes to the nearest living monster it can poison."""

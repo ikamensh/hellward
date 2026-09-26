@@ -37,16 +37,16 @@ def test_a_skill_needs_the_one_above_it_and_enough_sigils():
     assert can_learn(frozenset({"adept_fire"}), "fire_ball", 3)
     with pytest.raises(ValueError):
         check(frozenset({"blaze", "adept_fire"}))
-    assert TREE_COST == 44
+    assert TREE_COST == 60
 
 
-def test_the_tree_costs_forty_four_and_every_tower_column_costs_eight():
-    assert TREE_COST == 44
-    for column in ("fire", "lightning", "cold", "poison"):
+def test_the_tree_costs_sixty_and_every_tower_column_costs_eight():
+    assert TREE_COST == 60
+    for column in ("fire", "lightning", "cold", "poison", "bone", "nature"):
         assert sum(s.cost for s in SKILLS.values() if s.column == column) == 8
     assert sum(s.cost for s in SKILLS.values() if s.column == "warding") == 6
     assert sum(s.cost for s in SKILLS.values() if s.column == "sorcery") == 6
-    assert COLUMNS.keys() >= {"fire", "lightning", "cold", "poison", "warding", "sorcery"}
+    assert COLUMNS.keys() >= {"fire", "lightning", "cold", "poison", "bone", "nature", "warding", "sorcery"}
 
 
 def test_a_pyre_needs_its_adept_and_master_for_the_second_and_third_ranks():

@@ -233,4 +233,6 @@ def tower_top(kind: str, rank: int) -> float:
         "storm": 0.22 + (1.3, 1.65, 2.0)[rank] + 0.45,
         "frost": 0.22 + 0.62 * (1.7, 2.1, 2.5)[rank] * 1.02,
         "plague": 0.22 + (1.15, 1.45, 1.75)[rank] + 0.08,
+        "altar": 1.2 + 0.15 * rank,
+        "grove": 1.0 + 0.1 * rank,
     }[kind]

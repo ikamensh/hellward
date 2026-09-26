@@ -15,6 +15,8 @@ class Element(str, Enum):
     LIGHTNING = "lightning"
     COLD = "cold"
     POISON = "poison"
+    BONE = "bone"
+    NATURE = "nature"
 
 
 class Curse(str, Enum):
@@ -73,6 +75,7 @@ class MonsterKind:
 
 
 F, L, C, P = Element.FIRE, Element.LIGHTNING, Element.COLD, Element.POISON
+B, N = Element.BONE, Element.NATURE
 
 MONSTERS: Final[dict[str, MonsterKind]] = {m.key: m for m in (
     MonsterKind("fallen", "Fallen", hp=48, speed=1.35, bounty=4, door_dps=7, size=0.55),
@@ -104,6 +107,7 @@ class TowerLevel:
     chill_time: float = 0.0
     poison: float = 0.0   # damage per second of one venom stack
     poison_time: float = 0.0
+    lasting: float = 0.0  # seconds an amplification lasts
 
 
 @dataclass(frozen=True)
@@ -138,6 +142,16 @@ TOWERS: Final[dict[str, TowerKind]] = {t.key: t for t in (
         TowerLevel(95, 10, 0.85, 3.2, poison=24, poison_time=4.0),
         TowerLevel(160, 16, 0.9, 3.4, poison=40, poison_time=4.5),
     ), "Venom seeks the strongest monster it can poison; poison stacks up to four times.", bolt_speed=7.0),
+    TowerKind("altar", "Bone Altar", B, "amplify", (
+        TowerLevel(90, 0.30, 0.25, 3.0, splash=1.0, lasting=2.0),
+        TowerLevel(100, 0.45, 1 / 3.6, 3.2, splash=1.2, lasting=2.2),
+        TowerLevel(160, 0.60, 1 / 3.2, 3.4, splash=1.4, lasting=2.5),
+    ), "Lays Amplify Damage on the thickest knot of monsters in reach: they take more damage from everything."),
+    TowerKind("grove", "Druid Grove", N, "aura", (
+        TowerLevel(100, 0.20, 0.0, 1.5),
+        TowerLevel(110, 0.30, 0.0, 1.5),
+        TowerLevel(170, 0.40, 0.0, 2.3),
+    ), "Its aura makes every tower within reach strike harder. Groves do not stack."),
 )}
 
 MAX_POISON_STACKS: Final = 4
@@ -207,3 +221,10 @@ CONTAGION_REACH: Final = 1.5
 THORNS: Final = 0.5               # a gate under Thorns returns this share of each blow, as it would land unchilled
 SOUL: Final = 10.0                # mana a slain leader gives under Soul Harvest
 WARD: Final = 8.0                 # seconds a cleansed tower is warded under Salvation
+CORPSE_SHARE: Final = 0.15        # share of an amplified monster's full life its burst deals
+CORPSE_RADIUS: Final = 1.2        # how far a corpse explosion reaches
+HURRICANE_RADIUS: Final = 2.5     # how far a grove's slowing reaches
+HURRICANE_SLOW: Final = 0.8       # walkers near a grove move this share of their speed
+TWISTER_PERIOD: Final = 4.0       # seconds between a grove's roots
+TWISTER_RADIUS: Final = 2.5       # how far a grove's root reaches
+TWISTER_HELD: Final = 1.5         # seconds a twister holds its monster
