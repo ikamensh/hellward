@@ -11,6 +11,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 
 from hellward.sim.content import DOOR, MANA_MAX, MANA_REGEN, SPELLS, TOWERS, TowerLevel
+from hellward.sim.sums import int_sum
 
 
 @dataclass(frozen=True)
@@ -50,7 +51,7 @@ SKILLS: dict[str, Skill] = {s.key: s for s in (
     Skill("spell_mastery", "Spell Mastery", "sorcery", 3, "Smite, Meteor and Frozen Orb cost 25% less and strike 30% harder."),
 )}
 
-TREE_COST = sum(s.cost for s in SKILLS.values())
+TREE_COST = int_sum(s.cost for s in SKILLS.values())
 
 
 def above(skill: Skill) -> Skill | None:
@@ -62,7 +63,7 @@ def above(skill: Skill) -> Skill | None:
 
 
 def cost(learned: Iterable[str]) -> int:
-    return sum(SKILLS[key].cost for key in learned)
+    return int_sum(SKILLS[key].cost for key in learned)
 
 
 def can_learn(learned: frozenset[str], key: str, sigils: int) -> bool:

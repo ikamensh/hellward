@@ -12,7 +12,6 @@ import math
 from bisect import bisect_right
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import cached_property
 
 
 class Tile(str, Enum):
@@ -33,22 +32,36 @@ class Level:
     doors: tuple[tuple[int, int], ...]
     obstacles: frozenset[tuple[int, int]] = field(default_factory=frozenset)
     pools: frozenset[tuple[int, int]] = field(default_factory=frozenset)
+    # Worked out from the fields above when the level is made (a compiled level has no __dict__ to cache them in):
+    path_tiles: tuple[tuple[int, int], ...] = field(init=False, repr=False, compare=False)
+    grid: tuple[tuple[Tile, ...], ...] = field(init=False, repr=False, compare=False)
+    door_s: tuple[float, ...] = field(init=False, repr=False, compare=False)
+    _starts: tuple[float, ...] = field(init=False, repr=False, compare=False)            # s at each waypoint
+    _points: tuple[tuple[float, float], ...] = field(init=False, repr=False, compare=False)   # each waypoint's centre
+    _coverage: dict[tuple[tuple[int, int], float], tuple[tuple[float, float], ...]] = field(
+        init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         for (x0, y0), (x1, y1) in zip(self.waypoints, self.waypoints[1:]):
             if x0 != x1 and y0 != y1:
                 raise ValueError(f"path leg {(x0, y0)}->{(x1, y1)} is not straight")
+        object.__setattr__(self, "path_tiles", self._walk())
         path = set(self.path_tiles)
         for x, y in self.doors:
             if (x, y) not in path:
                 raise ValueError(f"door socket {(x, y)} is not on the path")
             if (x, y - 1) not in path or (x, y + 1) not in path:
                 raise ValueError(f"door socket {(x, y)} is not on a vertical leg: an arch is drawn facing the camera")
+        object.__setattr__(self, "grid", self._lay())
+        starts, points = self._measure()
+        object.__setattr__(self, "_starts", starts)
+        object.__setattr__(self, "_points", points)
+        object.__setattr__(self, "door_s", tuple(self.s_of(d) for d in self.doors))
+        object.__setattr__(self, "_coverage", {})
 
     # -- Tiles -------------------------------------------------------------------------
 
-    @cached_property
-    def path_tiles(self) -> tuple[tuple[int, int], ...]:
+    def _walk(self) -> tuple[tuple[int, int], ...]:
         tiles: list[tuple[int, int]] = [self.waypoints[0]]
         for (x0, y0), (x1, y1) in zip(self.waypoints, self.waypoints[1:]):
             dx, dy = (x1 > x0) - (x1 < x0), (y1 > y0) - (y1 < y0)
@@ -60,8 +73,7 @@ class Level:
             raise ValueError("the path crosses itself")
         return tuple(tiles)
 
-    @cached_property
-    def grid(self) -> tuple[tuple[Tile, ...], ...]:
+    def _lay(self) -> tuple[tuple[Tile, ...], ...]:
         path = set(self.path_tiles)
         doors = set(self.doors)
         flanks = {(x + dx, y) for x, y in self.doors for dx in (-1, 1)} | {(x, y + dy) for x, y in self.doors for dy in (-1, 1)}
@@ -96,8 +108,7 @@ class Level:
 
     # -- The path ----------------------------------------------------------------------
 
-    @cached_property
-    def _legs(self) -> tuple[tuple[float, ...], tuple[tuple[float, float], ...]]:
+    def _measure(self) -> tuple[tuple[float, ...], tuple[tuple[float, float], ...]]:
         starts = [0.0]
         points = [(x + 0.5, y + 0.5) for x, y in self.waypoints]
         for (x0, y0), (x1, y1) in zip(points, points[1:]):
@@ -106,11 +117,11 @@ class Level:
 
     @property
     def length(self) -> float:
-        return self._legs[0][-1]
+        return self._starts[-1]
 
     def point(self, s: float) -> tuple[float, float]:
         """Where on the map a monster ``s`` tiles along the path stands."""
-        starts, points = self._legs
+        starts, points = self._starts, self._points
         if s <= 0:
             return points[0]
         if s >= starts[-1]:
@@ -122,7 +133,7 @@ class Level:
 
     def heading(self, s: float) -> tuple[float, float]:
         """The unit direction of travel at ``s``."""
-        starts, points = self._legs
+        starts, points = self._starts, self._points
         i = min(max(bisect_right(starts, s) - 1, 0), len(points) - 2)
         (x0, y0), (x1, y1) = points[i], points[i + 1]
         d = math.hypot(x1 - x0, y1 - y0)
@@ -132,22 +143,17 @@ class Level:
         """How far along the path a path tile's centre lies."""
         return self.path_tiles.index(tile) * 1.0
 
-    @cached_property
-    def door_s(self) -> tuple[float, ...]:
-        return tuple(self.s_of(d) for d in self.doors)
-
     def coverage(self, tile: tuple[int, int], reach: float) -> tuple[tuple[float, float], ...]:
         """The stretches of path within ``reach`` of a tile's centre, as ``(s_start, s_end)`` pairs."""
         key = (tile, round(reach, 4))
-        cache = self.__dict__.setdefault("_coverage_cache", {})
-        found = cache.get(key)
+        found = self._coverage.get(key)
         if found is None:
-            found = cache[key] = self._coverage(tile, reach)
+            found = self._coverage[key] = self._cover(tile, reach)
         return found
 
-    def _coverage(self, tile: tuple[int, int], reach: float) -> tuple[tuple[float, float], ...]:
+    def _cover(self, tile: tuple[int, int], reach: float) -> tuple[tuple[float, float], ...]:
         cx, cy = tile[0] + 0.5, tile[1] + 0.5
-        starts, points = self._legs
+        starts, points = self._starts, self._points
         spans: list[tuple[float, float]] = []
         for i in range(len(points) - 1):
             (x0, y0), (x1, y1) = points[i], points[i + 1]

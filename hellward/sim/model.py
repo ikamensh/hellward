@@ -9,6 +9,9 @@ A world is one :class:`~hellward.sim.campaign.Location` at one difficulty, with 
 (:class:`~hellward.sim.skills.Perks`) baked in when it begins.
 
 Events for the view are appended to :attr:`World.events` when ``record`` is on; clones switch it off.
+
+The mutable classes are ``serializable`` for mypyc (:mod:`hellward.sim.fastsim`): compiled, ``cls.__new__(cls)``
+then makes a blank object, as in Python, instead of calling ``__init__``, and a compiled world can be pickled.
 """
 
 from __future__ import annotations
@@ -18,6 +21,8 @@ import random
 from dataclasses import dataclass
 from operator import attrgetter
 from typing import TYPE_CHECKING, Any, Callable
+
+from mypy_extensions import mypyc_attr
 
 from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location
 from hellward.sim.content import (
@@ -48,6 +53,7 @@ class Refused(Exception):
     """A command the rules do not allow right now; the message says why, for the player."""
 
 
+@mypyc_attr(serializable=True)
 class Monster:
     __slots__ = ("id", "kind", "hp", "max_hp", "s", "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
                  "cooldown", "asking", "ask_left", "chant_curse", "chant_tower", "chant_left", "door")
@@ -93,6 +99,7 @@ class Monster:
         return self.chant_curse is not None
 
 
+@mypyc_attr(serializable=True)
 class Tower:
     __slots__ = ("id", "kind", "levels", "level", "tile", "cooldown", "curses", "ward", "spent", "spans", "spans_reach")
 
@@ -154,6 +161,7 @@ class Tower:
         return self.stats.range * self.range_mult()
 
 
+@mypyc_attr(serializable=True)
 class Door:
     __slots__ = ("index", "tile", "s", "hp", "built")
 
@@ -197,6 +205,7 @@ class Meteor:
     burn: float                 # damage per second of the floor it sets burning
 
 
+@mypyc_attr(serializable=True)
 class Hazard:
     """Burning floor: every walker on it takes fire damage each second (flyers pass over)."""
 
@@ -222,6 +231,7 @@ class ForcedCurse:
 Planner = Callable[["World", int], Any]   # returns a handle with .result() -> Decision
 
 
+@mypyc_attr(serializable=True)
 class World:
     def __init__(self, location: Location = CATHEDRAL, *, difficulty: Difficulty = NORMAL, perks: Perks = NO_PERKS,
                  seed: int = 0, planner: Planner | None = None, record: bool = True) -> None:
@@ -510,9 +520,11 @@ class World:
         self._afflictions(dt)
         self._curses(dt)
         self._waves(dt)
-        for m in self.monsters:
-            if m.asking is _ASK:   # asked now, at a step boundary, so the planner's clone starts where a step would
-                m.asking = self.planner(self, m.id)
+        planner = self.planner
+        if planner is not None:   # only a world with a planner has leaders that ask
+            for m in self.monsters:
+                if m.asking is _ASK:   # asked now, at a step boundary, so the planner's clone starts where a step would
+                    m.asking = planner(self, m.id)
 
     def _spawn(self, dt: float) -> None:
         if self.break_left is not None:

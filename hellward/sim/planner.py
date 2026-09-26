@@ -21,8 +21,9 @@ from __future__ import annotations
 import random
 from dataclasses import dataclass, field
 
-from hellward.sim.content import CURSES, Curse
+from hellward.sim.content import CURSES, Curse, LeaderSpec
 from hellward.sim.model import CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, ForcedCurse, Monster, Tower, World
+from hellward.sim.sums import float_sum
 
 ROLLOUT_DT = 0.1
 HORIZON_PAD = 3.0      # seconds a rollout runs past the curse's end, to see what it changed
@@ -69,13 +70,28 @@ def smart(world: World, leader_id: int) -> Inline:
     return Inline(decide(world, leader_id))
 
 
+def _leader(world: World, leader_id: int) -> Monster:
+    """The leader that asks: it is on the map, since it asks at a step boundary and rollouts start from one."""
+    leader = world.monster(leader_id)
+    if leader is None:
+        raise LookupError(f"no monster {leader_id} is on the map")
+    return leader
+
+
+def _spec(leader: Monster) -> LeaderSpec:
+    spec = leader.kind.leader
+    if spec is None:
+        raise ValueError(f"a {leader.kind.name} is no leader: it has no curse to choose")
+    return spec
+
+
 # -- Candidates and the estimate --------------------------------------------------------------
 
 
 def reachable(world: World, leader: Monster, delay: float = 0.0) -> list[Tower]:
     """Towers the leader will still reach when its chant ends, assuming it keeps walking, and that no ward will
     protect then."""
-    spec = leader.kind.leader
+    spec = _spec(leader)
     lands = DECIDE_DELAY + spec.channel + delay
     s = leader.s + leader.speed * lands
     x, y = world.level.point(s)
@@ -126,11 +142,11 @@ def _damage_in(tower: Tower, reach: float, world: World, tracks: list[tuple[Mons
     dps = stats.damage * stats.rate
     attack = tower.kind.attack
     if attack == "nova":
-        return dps * sum(taken)
+        return dps * float_sum(taken)
     taken.sort(reverse=True)
     if attack == "chain":
         keeps = world.perks.leap_keeps
-        return dps * sum(v * keeps ** i for i, v in enumerate(taken[: 1 + stats.chains]))
+        return dps * float_sum(v * keeps ** i for i, v in enumerate(taken[: 1 + stats.chains]))
     if attack == "venom":
         return (dps + stats.poison * min(4, stats.poison_time * stats.rate)) * taken[0]
     splash = 1.0 + 0.6 * min(3, len(taken) - 1) if stats.splash > 0 else 1.0
@@ -140,7 +156,7 @@ def _damage_in(tower: Tower, reach: float, world: World, tracks: list[tuple[Mons
 def estimate(world: World, leader: Monster, tower: Tower, curse: Curse, delay: float = 0.0) -> float:
     """Damage the curse would stop the tower dealing while it lasts, from each monster's projected walk."""
     spec = CURSES[curse]
-    start = DECIDE_DELAY + leader.kind.leader.channel + delay
+    start = DECIDE_DELAY + _spec(leader).channel + delay
     left = tower.curses.get(curse, 0.0)
     if left >= spec.duration * 0.5:
         return 0.0   # it is already carrying this curse; recasting would buy little
@@ -173,7 +189,7 @@ def estimate(world: World, leader: Monster, tower: Tower, curse: Curse, delay: f
 def candidates(world: World, leader: Monster, delay: float = 0.0) -> list[Option]:
     out = []
     for tower in reachable(world, leader, delay):
-        for curse in leader.kind.leader.curses:
+        for curse in _spec(leader).curses:
             out.append(Option(curse, tower.id, delay, estimate(world, leader, tower, curse, delay)))
     out.sort(key=lambda o: (-o.estimate, o.tower, o.curse.value))
     return out
@@ -183,14 +199,14 @@ def candidates(world: World, leader: Monster, delay: float = 0.0) -> list[Option
 
 
 def horizon(leader: Monster) -> float:
-    return max(CURSES[c].duration for c in leader.kind.leader.curses) + HORIZON_PAD
+    return max(CURSES[c].duration for c in _spec(leader).curses) + HORIZON_PAD
 
 
 def utility(after: World, before: World, lasting: float = 0.0) -> float:
     """What the pack has left: standing life, sanctuary life (weighted), life knocked off doors, and
     *lasting*, its life averaged over the look-ahead: a monster that dies later has walked further and
     held the towers' fire longer, even when every one of them is dead by the end."""
-    life = sum(m.hp for m in after.monsters) + after.leaked_life - before.leaked_life + LASTING * lasting
+    life = float_sum(m.hp for m in after.monsters) + after.leaked_life - before.leaked_life + LASTING * lasting
     for d0, d1 in zip(before.doors, after.doors):
         if d0.built:
             life += d0.hp - (d1.hp if d1.built else 0.0)
@@ -200,20 +216,19 @@ def utility(after: World, before: World, lasting: float = 0.0) -> float:
 def rollout(world: World, leader_id: int, option: Option | None, seconds: float, dt: float = ROLLOUT_DT) -> float:
     w = world.clone()
     if option is not None:
-        leader = world.monster(leader_id)
-        at = world.time + DECIDE_DELAY + leader.kind.leader.channel + option.delay
+        at = world.time + DECIDE_DELAY + _spec(_leader(world, leader_id)).channel + option.delay
         w.forced.append(ForcedCurse(at, leader_id, option.curse, option.tower))
     end = world.time + seconds - 1e-9
     lasting = 0.0
     while w.time < end and w.outcome is None:
         w.step(dt)
-        lasting += sum(m.hp for m in w.monsters) * dt
+        lasting += float_sum(m.hp for m in w.monsters) * dt
     return utility(w, world, lasting / seconds)
 
 
 def decide(world: World, leader_id: int, *, dt: float = ROLLOUT_DT, shortlist: int = SHORTLIST,
            timing: bool = True) -> Decision:
-    leader = world.monster(leader_id)
+    leader = _leader(world, leader_id)
     options = candidates(world, leader)
     considered = len(options)
     useful = options[:shortlist]   # an estimate of zero can still be wrong: a chill that holds a door is not damage
@@ -254,18 +269,18 @@ class RandomLeaders:
         self.rng = random.Random(self.seed)
 
     def __call__(self, world: World, leader_id: int) -> Inline:
-        leader = world.monster(leader_id)
+        leader = _leader(world, leader_id)
         towers = reachable(world, leader)
         if not towers:
             return Inline(Decision(leader_id, None, retry=QUIET_RETRY, reason="random: nothing in reach"))
         tower = self.rng.choice(sorted(towers, key=lambda t: t.id))
-        curse = self.rng.choice(leader.kind.leader.curses)
+        curse = self.rng.choice(_spec(leader).curses)
         return Inline(Decision(leader_id, Option(curse, tower.id), reason="random"))
 
 
 def greedy(world: World, leader_id: int) -> Inline:
     """The estimate alone, cast at once: the heuristic without the look-ahead."""
-    leader = world.monster(leader_id)
+    leader = _leader(world, leader_id)
     options = [o for o in candidates(world, leader) if o.estimate > 0]
     if not options:
         return Inline(Decision(leader_id, None, retry=QUIET_RETRY, reason="greedy: nothing in reach"))
@@ -274,10 +289,10 @@ def greedy(world: World, leader_id: int) -> Inline:
 
 def nearest(world: World, leader_id: int) -> Inline:
     """Curses the closest tower with its first curse: what a naive leader does."""
-    leader = world.monster(leader_id)
+    leader = _leader(world, leader_id)
     towers = reachable(world, leader)
     if not towers:
         return Inline(Decision(leader_id, None, retry=QUIET_RETRY, reason="nearest: nothing in reach"))
     x, y = world.level.point(leader.s)
     tower = min(towers, key=lambda t: ((t.centre[0] - x) ** 2 + (t.centre[1] - y) ** 2, t.id))
-    return Inline(Decision(leader_id, Option(leader.kind.leader.curses[0], tower.id), reason="nearest"))
+    return Inline(Decision(leader_id, Option(_spec(leader).curses[0], tower.id), reason="nearest"))

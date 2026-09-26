@@ -12,6 +12,7 @@ from dataclasses import dataclass
 
 from hellward.sim.content import Group, Wave
 from hellward.sim.level import Level
+from hellward.sim.sums import int_sum
 
 
 @dataclass(frozen=True)
@@ -72,7 +73,7 @@ def sigils(outcome: str | None, lives: int) -> int:
     """Sigils a defence earns: none for a fall, then one, two or three by the life kept."""
     if outcome != "victory":
         return 0
-    return sum(1 for need in SIGIL_LIVES if lives >= need)
+    return int_sum(1 for need in SIGIL_LIVES if lives >= need)
 
 
 ALL_TOWERS = ("pyre", "storm", "frost", "plague")

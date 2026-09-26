@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import random
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Protocol
 
@@ -24,6 +25,7 @@ from hellward.sim.campaign import Difficulty, Location
 from hellward.sim.content import Curse
 from hellward.sim.model import SIM_DT, Planner, Refused, World
 from hellward.sim.skills import cost, perks
+from hellward.sim.sums import int_sum
 
 REACT = (0.5, 0.8)    # a person answers a leader's sign this long after it appears, drawn per seed
 AIM_GAP = 0.5         # seconds between two aimed spells
@@ -105,7 +107,7 @@ class Hands:
             elif kind == "leak":
                 self._signs.pop(e[1], None)
                 record.leaks[world.wave] += e[3]
-        record.curse_seconds += sum(len(t.curses) for t in world.towers.values()) * dt
+        record.curse_seconds += int_sum(len(t.curses) for t in world.towers.values()) * dt
         if world.mana >= world.mana_max - 1e-9:
             record.mana_capped += dt
 
@@ -153,8 +155,10 @@ class Hands:
 
 
 def defend(location: Location, difficulty: Difficulty, player: Player, *, seed: int, sigils: int,
-           planner: Planner | None, hp: float = 1.0, limit: float = 3000.0) -> tuple[World, Record]:
-    """One defence played to its end by a player; ``hp`` scales every monster's life (the balance tools' margin)."""
+           planner: Planner | None, hp: float = 1.0, limit: float = 3000.0,
+           watch: Callable[[World], None] | None = None) -> tuple[World, Record]:
+    """One defence played to its end by a player; ``hp`` scales every monster's life (the balance tools' margin).
+    *watch* sees the world after every step, with that step's events."""
     learned = player.skills(location, difficulty, sigils)
     if cost(learned) > sigils:
         raise ValueError(f"{player.name} learned {cost(learned)} sigils' worth of skills with {sigils}")
@@ -165,6 +169,8 @@ def defend(location: Location, difficulty: Difficulty, player: Player, *, seed: 
     while world.outcome is None and world.time < limit:
         player.act(hands)
         world.step(SIM_DT)
+        if watch is not None:
+            watch(world)
         hands.observe(world.events)
         world.events.clear()
     return world, hands.record
