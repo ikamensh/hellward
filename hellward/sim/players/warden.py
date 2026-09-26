@@ -17,6 +17,7 @@ Orb; a dense queue gets a Meteor; and a monster about to reach the sanctuary wit
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -72,17 +73,26 @@ class Plan:
     skills: frozenset[str]
     steps: tuple[Step, ...]
     early: float = 0.9     # call the next wave early once the mana orb is this full (a share of its top)
+    map: str = ""          # the fingerprint of the map it was searched on
 
     def row(self) -> dict:
-        return {"skills": sorted(self.skills), "early": self.early, "steps": [s.row() for s in self.steps]}
+        return {"map": self.map, "skills": sorted(self.skills), "early": self.early, "steps": [s.row() for s in self.steps]}
 
     @staticmethod
     def of(row: dict) -> Plan:
-        return Plan(frozenset(row["skills"]), tuple(Step.of(r) for r in row["steps"]), row["early"])
+        return Plan(frozenset(row["skills"]), tuple(Step.of(r) for r in row["steps"]), row["early"], row["map"])
 
 
 def plan_key(location: Location, difficulty: Difficulty, sigils: int) -> str:
     return f"{location.key}/{difficulty.key}/{sigils}"
+
+
+def fingerprint(location: Location) -> str:
+    """The map and arsenal a plan was searched on: a stored plan for a map that has changed since is not played."""
+    level, arsenal = location.level, location.arsenal
+    text = repr((level.width, level.height, level.waypoints, level.doors, sorted(level.obstacles), sorted(level.pools),
+                 arsenal.towers, arsenal.gates, arsenal.spells))
+    return hashlib.sha1(text.encode()).hexdigest()[:12]
 
 
 def load_plans() -> dict[str, Plan]:
@@ -235,7 +245,7 @@ class Warden:
         if self.plan is not None:
             return self.plan
         stored = self.plans.get(plan_key(location, difficulty, sigils))
-        if stored is not None:
+        if stored is not None and stored.map == fingerprint(location):
             return stored
         learned = draft_skills(location, sigils)
         return Plan(learned, draft_build(location, learned))
