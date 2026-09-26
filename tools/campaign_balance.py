@@ -297,7 +297,7 @@ class Verdict:
     def __init__(self, target: str) -> None:
         self.target = target
         self.played = False
-        self.failed: list[str] = []
+        self.failed: dict[str, list[str]] = {}   # what failed, by location and difficulty
         self.unmeasured: list[str] = []
 
     def check(self, where: str, ok: bool | None, what: str, missing: str = "") -> None:
@@ -307,12 +307,13 @@ class Verdict:
             if missing not in self.unmeasured:
                 self.unmeasured.append(missing)
         elif not ok:
-            self.failed.append(f"{where} {what}")
+            self.failed.setdefault(where, []).append(what)
 
     def result(self) -> list[str]:
         if not self.played:
             return [self.target, "—", "not played"]
-        detail = "; ".join(self.failed + ([f"unmeasured: {', '.join(self.unmeasured)}"] if self.unmeasured else []))
+        failed = [f"{where}: {', '.join(whats)}" for where, whats in self.failed.items()]
+        detail = "; ".join(failed + ([f"unmeasured: {', '.join(self.unmeasured)}"] if self.unmeasured else []))
         verdict = "FAIL" if self.failed else "open" if self.unmeasured else "PASS"
         return [self.target, verdict, detail or "all met"]
 
@@ -330,7 +331,7 @@ def targets(table: list[dict]) -> list[list[str]]:
     leaders = Verdict("From the Cathedral on: smart − random lives lost ≥ 3 and ≥ 20%, "
                       "curse-seconds per leader ≥ 3, at most half of the chants broken")
     for row in (r for r in table if r["best"]):
-        where, wins, n, m = f"{row['location']} {row['difficulty']}:", row["wins"], row["n"], row["M"]
+        where, wins, n, m = f"{row['location']} {row['difficulty']}", row["wins"], row["n"], row["M"]
         margin_text = f"M {show_margin(m)}"
         if row["difficulty"] == "normal" and row["location"] in EASY:
             easy.check(where, wins == n, f"won {wins}/{n}")

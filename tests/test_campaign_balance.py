@@ -33,3 +33,12 @@ def test_the_sigils_follow_the_campaign_so_a_later_location_alone_needs_a_fixed_
     with pytest.raises(SystemExit):
         campaign_balance.main(["--locations", "cathedral", "--out", str(tmp_path)])
     assert not (tmp_path / "table.md").exists()
+
+
+def test_b_star_has_the_best_median_lives_then_more_wins_then_more_mean_lives():
+    def runs(player, *lives, falls=0):
+        return [{"player": player, "lives": n, "outcome": "defeat" if i < falls else "victory"} for i, n in enumerate(lives)]
+
+    assert campaign_balance.best(runs("a", 20, 0, 20) + runs("b", 15, 15, 15), ["a", "b"]) == "a"
+    assert campaign_balance.best(runs("a", 0, 10, 20, falls=1) + runs("b", 10, 10, 10), ["a", "b"]) == "b"
+    assert campaign_balance.best(runs("a", 10, 10, 10) + runs("b", 10, 10, 13), ["a", "b"]) == "b"
