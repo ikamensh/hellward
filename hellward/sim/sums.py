@@ -17,17 +17,25 @@ from collections.abc import Iterable
 def float_sum(values: Iterable[float]) -> float:
     """*values* added as the built-in ``sum`` adds floats: each addition's rounding error is kept aside and the
     errors are added back at the end, unless they cancel to nothing or overflowed."""
-    total = 0.0
-    error = 0.0
+    total, error = 0.0, 0.0
     for value in values:
-        added = total + value
-        if abs(total) >= abs(value):
-            error += (total - added) + value
-        else:
-            error += (value - added) + total
-        total = added
+        total, error = add(total, error, value)
+    return settle(total, error)
+
+
+def add(total: float, error: float, value: float) -> tuple[float, float]:
+    """One addition of :func:`float_sum`: the new total, and the rounding errors so far. A loop that adds the
+    floats of its own objects calls it, rather than :func:`float_sum` over a generator, which boxes every float."""
+    added = total + value
+    if abs(total) >= abs(value):
+        return added, error + ((total - added) + value)
+    return added, error + ((value - added) + total)
+
+
+def settle(total: float, error: float) -> float:
+    """The last step of :func:`float_sum`: the rounding errors added back, unless they cancel or overflowed."""
     if error != 0.0 and not (math.isinf(error) or math.isnan(error)):   # math.isfinite, in primitives mypyc has
-        total += error
+        return total + error
     return total
 
 

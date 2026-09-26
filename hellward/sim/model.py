@@ -20,7 +20,6 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
-from operator import attrgetter
 from typing import TYPE_CHECKING, Any, Callable, Final
 
 from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location
@@ -44,8 +43,6 @@ CAST_SLACK: Final = 1.0         # a curse lands if the tower is within reach + s
 FIRST_WAVE_BREAK: Final = 30.0
 LEAK_WEIGHT: Final = 2.0        # a monster through the sanctuary gate is worth twice its life to its side
 BLAZE_TIME: Final = 2.0         # seconds the floor burns where a fireball lands, under Blaze
-
-_by_s: Final = attrgetter("s")
 
 
 class Refused(Exception):
@@ -613,7 +610,7 @@ class World:
         spec = leader.kind.leader
         x, y = self.level.point(leader.s)
         cx, cy = tower.centre
-        if spec is None or math.hypot(cx - x, cy - y) > spec.cast_range + CAST_SLACK:
+        if spec is None or _hypot(cx - x, cy - y) > spec.cast_range + CAST_SLACK:
             self._emit("fizzle", leader_id, tower_id)
             return
         if tower.ward > 0:
@@ -661,8 +658,8 @@ class World:
                 ordered = False
             last = m.s
             survivors.append(m)
-        if not ordered:   # someone overtook; an ordered list the stable sort would give back as it was
-            survivors.sort(key=_by_s, reverse=True)
+        if not ordered:   # someone overtook
+            _furthest_first(survivors)
         self.monsters = survivors
         if self.lives <= 0 and self.outcome is None:
             self.lives = 0
@@ -759,7 +756,7 @@ class World:
                 target = hit[0]
                 origin = t.centre
                 last = self.level.point(target.s)
-                distance = math.hypot(last[0] - origin[0], last[1] - origin[1])
+                distance = _hypot(last[0] - origin[0], last[1] - origin[1])
                 bolt = Bolt(self._id(), t.id, t.kind.key, target.id, distance / t.kind.bolt_speed, damage, t.kind.element,
                             stats.splash, stats.poison, stats.poison_time, origin, last)
                 self.bolts.append(bolt)
@@ -769,17 +766,18 @@ class World:
         level = self.level
         static = self.perks.static_field
         struck = [first]
+        struck_ids = {first.id}
         where = [level.point(first.s)]
         current, pos = first, where[0]
         for _ in range(jumps):
             best, best_d, best_leader = None, CHAIN_JUMP, False
             for m in self.monsters:
-                if m.hp <= 0 or m in struck:
+                if m.hp <= 0 or m.id in struck_ids:
                     continue
                 if abs(m.s - current.s) > CHAIN_JUMP * 4:   # the path winds, but never that tightly
                     continue
                 x, y = level.point(m.s)
-                d = math.hypot(x - pos[0], y - pos[1])
+                d = _hypot(x - pos[0], y - pos[1])
                 if d >= CHAIN_JUMP:
                     continue
                 leader = static and m.kind.leader is not None
@@ -788,6 +786,7 @@ class World:
             if best is None:
                 break
             struck.append(best)
+            struck_ids.add(best.id)
             pos = level.point(best.s)
             where.append(pos)
             current = best
@@ -964,6 +963,20 @@ class World:
 
 
 _ASK: Final = object()   # a leader that has decided to ask, for the end of this step
+_hypot: Final = math.hypot   # looked up once: compiled, it is a call into Python, and a chain calls it for each leap
+
+
+def _furthest_first(monsters: list[Monster]) -> None:
+    """Sort by s, furthest first, keeping the order of equals: what ``sort(key=s, reverse=True)`` makes of the
+    list, by insertion, since between two steps only a few monsters overtake (compiled, a key function is a call
+    into Python for every monster)."""
+    for i in range(1, len(monsters)):
+        m = monsters[i]
+        j = i - 1
+        while j >= 0 and monsters[j].s < m.s:
+            monsters[j + 1] = monsters[j]
+            j -= 1
+        monsters[j + 1] = m
 
 
 def _inside(s: float, spans: tuple[tuple[float, float], ...]) -> bool:

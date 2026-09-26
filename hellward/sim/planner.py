@@ -24,7 +24,7 @@ from typing import Final
 
 from hellward.sim.content import CURSES, Curse, LeaderSpec
 from hellward.sim.model import CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, ForcedCurse, Monster, Tower, World
-from hellward.sim.sums import float_sum
+from hellward.sim.sums import add, float_sum, settle
 
 ROLLOUT_DT: Final = 0.1
 HORIZON_PAD: Final = 3.0      # seconds a rollout runs past the curse's end, to see what it changed
@@ -207,7 +207,7 @@ def utility(after: World, before: World, lasting: float = 0.0) -> float:
     """What the pack has left: standing life, sanctuary life (weighted), life knocked off doors, and
     *lasting*, its life averaged over the look-ahead: a monster that dies later has walked further and
     held the towers' fire longer, even when every one of them is dead by the end."""
-    life = float_sum(m.hp for m in after.monsters) + after.leaked_life - before.leaked_life + LASTING * lasting
+    life = _life(after) + after.leaked_life - before.leaked_life + LASTING * lasting
     for d0, d1 in zip(before.doors, after.doors):
         if d0.built:
             life += d0.hp - (d1.hp if d1.built else 0.0)
@@ -223,8 +223,16 @@ def rollout(world: World, leader_id: int, option: Option | None, seconds: float,
     lasting = 0.0
     while w.time < end and w.outcome is None:
         w.step(dt)
-        lasting += float_sum(m.hp for m in w.monsters) * dt
+        lasting += _life(w) * dt
     return utility(w, world, lasting / seconds)
+
+
+def _life(world: World) -> float:
+    """The life of the monsters on the map, added as the built-in sum adds it (:mod:`hellward.sim.sums`)."""
+    total, error = 0.0, 0.0
+    for m in world.monsters:
+        total, error = add(total, error, m.hp)
+    return settle(total, error)
 
 
 def decide(world: World, leader_id: int, *, dt: float = ROLLOUT_DT, shortlist: int = SHORTLIST,
