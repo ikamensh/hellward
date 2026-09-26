@@ -23,7 +23,7 @@ from sagaforge.synth import SAMPLE_RATE
 
 SCENE_CUES = {"click", "refuse", "build", "upgrade", "sell", "door_build", "door_hit", "door_break", "wave", "cleared", "leak",
               "gold", "cleanse", "ponder", "chant", "curse", "fizzle", "fire_cast", "fire_hit", "fireball", "lightning", "frost",
-              "venom_cast", "venom_hit", "victory", "defeat"}
+              "venom_cast", "venom_hit", "victory", "defeat", "smite", "meteor_fall", "meteor", "orb", "ward", "broken"}
 STEMS = list(files())
 
 

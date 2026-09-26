@@ -2,8 +2,10 @@
 
 Input: a build slot (or 1–5) picks a tower or a gate to place, a click on the floor or on an arch places
 it, a click on a tower selects it (U upgrades, S sells, C cleanses), right click or Esc lets go; Esc with
-nothing to let go of opens the menu. Space calls the next wave, F doubles the pace, P pauses, Tab shows or
-hides what the leaders were thinking.
+nothing to let go of opens the menu. Q, W and E pick Smite, Meteor and Frozen Orb, aimed with a click; Q with
+a leader pondering or chanting smites the one closest to cursing at once. Spells wait while the fight is
+paused. Space calls the next wave, F doubles the pace, P pauses, Tab shows or hides what the leaders were
+thinking.
 """
 
 from __future__ import annotations
@@ -14,8 +16,8 @@ from typing import Any, Callable
 from saga2d import Camera, RenderLayer, Scene
 
 from hellward.art.sprites import Art
-from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location
-from hellward.sim.content import CURSES, DOOR, MONSTERS
+from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location, first_offering, offers
+from hellward.sim.content import CURSES, DOOR, MONSTERS, SPELLS
 from hellward.sim.model import SIM_DT, Monster, Refused, Tower, World
 from hellward.sim.players.hands import Hands, Player
 from hellward.sim.skills import NO_PERKS, Perks
@@ -43,6 +45,7 @@ class BattleScene(Scene):
         "1": "slot_1", "2": "slot_2", "3": "slot_3", "4": "slot_4", "5": "slot_5",
         "space": "call_wave", "f": "toggle_speed", "p": "toggle_pause", "tab": "toggle_thoughts",
         "u": "upgrade", "s": "sell", "c": "cleanse", "escape": "cancel",
+        "q": "spell_smite", "w": "spell_meteor", "e": "spell_orb",
     }
 
     def __init__(self, art: Art, location: Location = CATHEDRAL, *, difficulty: Difficulty = NORMAL, perks: Perks = NO_PERKS,
@@ -110,6 +113,7 @@ class BattleScene(Scene):
                 world.events.clear()
         if self.selected is not None and self.selected.id not in world.towers:
             self.selected = None
+        self.fx.selected = self.selected.id if self.selected is not None else -1
         self.view.sync(self.acc / SIM_DT if not self.paused else 1.0, dt)
         self.fx.update(dt)
         self.hud.update(dt)
@@ -196,6 +200,23 @@ class BattleScene(Scene):
             sound.play("curse")
         elif kind == "fizzle":
             sound.play("fizzle")
+        elif kind == "smite":
+            sound.play("smite")
+        elif kind == "meteor_cast":
+            sound.play("meteor_fall")
+        elif kind == "meteor":
+            sound.play("meteor")
+        elif kind == "orb":
+            sound.play("orb")
+        elif kind == "broken":
+            sound.play("broken")
+            leader = world.monster(e[1])
+            self.hud.note(f"{leader.kind.name if leader else 'The leader'} loses its curse.", style.HOLY)
+        elif kind == "ward_holds":
+            sound.play("ward")
+            tower = world.towers.get(e[2])
+            if tower is not None:
+                self.hud.note(f"{CURSES[e[3]].name} breaks on the ward of the {tower.kind.name}.", style.HOLY)
         elif kind == "ponder":
             sound.play("ponder", volume=0.6)
         elif kind == "plan":
@@ -232,9 +253,70 @@ class BattleScene(Scene):
             return False
 
     def pick(self, key: str) -> None:
+        if not offers(self.location, key):
+            self._refuse(f"Not in {self.location.name}: it arrives in {first_offering(key).name}.")
+            return
         self.selected = None
         self.placing = None if self.placing == key else key
         self.sound.play("click")
+
+    def _refuse(self, why: str) -> None:
+        self.hud.note(why, style.DIM)
+        self.sound.play("refuse")
+
+    # -- Spells ----------------------------------------------------------------------------------
+
+    def spell(self, key: str) -> None:
+        """Pick a spell to aim, as a tower is picked. Smite with a leader pondering or chanting strikes it at once."""
+        if self.paused:
+            self._refuse("Spells are cast in the fight's own time: resume it first (P).")
+            return
+        if not offers(self.location, key):
+            self._refuse(f"{SPELLS[key].name} is not yet yours: you learn it for {first_offering(key).name}.")
+            return
+        if key == "smite":
+            leader = self.threat()
+            if leader is not None:
+                if self._try(lambda: self.world.smite(leader.id)):
+                    self.placing = None
+                return
+        self.selected = None
+        self.placing = None if self.placing == f"spell:{key}" else f"spell:{key}"
+        self.sound.play("click")
+
+    def spell_smite(self) -> None:
+        self.spell("smite")
+
+    def spell_meteor(self) -> None:
+        self.spell("meteor")
+
+    def spell_orb(self) -> None:
+        self.spell("orb")
+
+    def threat(self) -> Monster | None:
+        """The leader closest to cursing: the chant nearest its end, else the pondering nearest its end."""
+        leaders = self.world.leaders()
+        chanting = [m for m in leaders if m.chant_curse is not None]
+        if chanting:
+            return min(chanting, key=lambda m: (m.chant_left, m.id))
+        pondering = [m for m in leaders if m.asking is not None]
+        return min(pondering, key=lambda m: (m.ask_left, m.id)) if pondering else None
+
+    def _cast_at(self, key: str, wx: float, wy: float) -> bool:
+        if self.paused:
+            self._refuse("Spells are cast in the fight's own time: resume it first (P).")
+            return False
+        world = self.world
+        x, y = (wx - MAP_X) / T, (wy - MAP_Y) / T
+        if key == "smite":
+            target = self.monster_at(wx, wy) or self.nearest_monster(wx, wy, T)
+            if target is None:
+                self._refuse("Smite strikes a monster: click on one.")
+                return False
+            return self._try(lambda: world.smite(target.id))
+        if key == "meteor":
+            return self._try(lambda: world.meteor(x, y))
+        return self._try(lambda: world.orb(x, y))
 
     def slot_1(self) -> None:
         self.pick(BUILD[0])
@@ -316,6 +398,18 @@ class BattleScene(Scene):
                 best, best_d = m, d
         return best
 
+    def nearest_monster(self, wx: float, wy: float, within: float) -> Monster | None:
+        """The monster nearest a point within ``within`` pixels, a leader before any other."""
+        best, best_key = None, (True, within)
+        for figure in self.view.figures.values():
+            m = figure.monster
+            cx, cy = self.view.chest(m)
+            d = math.hypot(wx - cx, wy - cy)
+            key = (m.kind.leader is None, d)
+            if d <= within and key < best_key:
+                best, best_key = m, key
+        return best
+
     def door_at(self, tile: tuple[int, int] | None) -> int | None:
         if tile is None:
             return None
@@ -335,6 +429,10 @@ class BattleScene(Scene):
                 self._control(control.name, control.enabled)
                 return True
             if event.y >= 672:
+                return True
+            if self.placing is not None and self.placing.startswith("spell:"):
+                if self._cast_at(self.placing[6:], event.world_x, event.world_y) and not event.shift:
+                    self.placing = None
                 return True
             tile = self.tile_at(event.world_x, event.world_y)
             if self.placing == "gate":
@@ -356,18 +454,21 @@ class BattleScene(Scene):
 
     def _control(self, name: str, enabled: bool) -> None:
         if not enabled:
-            self.sound.play("refuse")
+            if name.startswith(("build:", "spell:")):
+                getattr(self, "pick" if name.startswith("build:") else "spell")(name.split(":")[1])   # says why not
+            else:
+                self.sound.play("refuse")
             return
         if name.startswith("build:"):
             self.pick(name.split(":")[1])
+        elif name.startswith("spell:"):
+            self.spell(name.split(":")[1])
         elif name == "call":
             self.call_wave()
         elif name == "speed":
             self.toggle_speed()
         elif name == "menu":
             self.open_menu()
-        elif name == "thoughts":
-            self.toggle_thoughts()
         elif name in ("upgrade", "sell", "cleanse"):
             getattr(self, name)()
 
@@ -383,6 +484,8 @@ class BattleScene(Scene):
             tile = self.tile_at(wx, wy)
             if self.placing == "gate":
                 self._gate_sockets(self.door_at(tile))
+            elif self.placing is not None and self.placing.startswith("spell:"):
+                self._aim(self.placing[6:], wx, wy, hovered)
             elif self.placing is not None and tile is not None:
                 self._ghost(self.placing, tile)
         if self.selected is not None:
@@ -390,7 +493,7 @@ class BattleScene(Scene):
         self._bars()
         self.fx.draw()
         self.hud.draw(placing=self.placing, selected=self.selected, hovered=hovered, speed=self.speed, paused=self.paused,
-                      thoughts=self.fx.show_thoughts, mouse=mouse, costs=self.cost)
+                      mouse=mouse, costs=self.cost)
         if mouse is not None and mouse[1] < 672 and self.placing is None and hovered is None:
             tile = self.tile_at(*self.camera.screen_to_world(*mouse))
             tower = world.tower_at(tile) if tile is not None else None
@@ -411,6 +514,19 @@ class BattleScene(Scene):
             a0, a1 = 2 * math.pi * i / steps, 2 * math.pi * (i + 1) / steps
             self.draw_line(cx + r * math.cos(a0), cy + r * math.sin(a0), cx + r * math.cos(a1), cy + r * math.sin(a1), color, 1.6,
                            space="world", layer=RenderLayer.EFFECTS)
+
+    def _aim(self, key: str, wx: float, wy: float, hovered: Monster | None) -> None:
+        """Where a held spell would strike: its circle on the floor, or the monster Smite would hit."""
+        ready = self.world.mana >= self.world.spell_cost(key) and not self.paused
+        if key == "smite":
+            target = hovered or self.nearest_monster(wx, wy, T)
+            if target is not None:
+                x, y = self.view.chest(target)
+                r = target.kind.size * T * 0.7
+                self._ring(((x - MAP_X) / T, (y - MAP_Y) / T), r / T, (255, 226, 140, 230) if ready else (160, 140, 120, 160))
+            return
+        color = {"meteor": (255, 140, 60, 220), "orb": (150, 210, 255, 220)}[key] if ready else (160, 140, 120, 160)
+        self._ring(((wx - MAP_X) / T, (wy - MAP_Y) / T), SPELLS[key].radius, color)
 
     def _ghost(self, key: str, tile: tuple[int, int]) -> None:
         level = self.world.level

@@ -19,6 +19,7 @@ CURSE = (222, 132, 255, 255)
 UNIQUE = (199, 179, 119, 255)     # a leader's name, as Diablo writes a unique monster's
 BOSS = (255, 140, 40, 255)
 MAGIC = (110, 130, 255, 255)
+MANA = (120, 150, 255, 255)
 HOLY = (255, 232, 150, 255)
 PANEL = (22, 18, 20, 255)
 PANEL_EDGE = (92, 76, 58, 255)

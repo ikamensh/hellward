@@ -277,3 +277,17 @@ HELLS_GATE = Location(
 LOCATIONS: dict[str, Location] = {loc.key: loc for loc in (TRISTRAM, GRAVEYARD, CATHEDRAL, CATACOMBS, CAVES, HELLS_GATE)}
 ORDER = tuple(LOCATIONS)   # the campaign's order, which the balance tools also use for the points a player holds
 LAST = HELLS_GATE.key
+
+
+def first_offering(thing: str) -> Location:
+    """The first location in the campaign that offers a tower kind, a spell, or "gate"."""
+    for key in ORDER:
+        arsenal = LOCATIONS[key].arsenal
+        if thing in arsenal.towers or thing in arsenal.spells or (thing == "gate" and arsenal.gates):
+            return LOCATIONS[key]
+    raise KeyError(thing)
+
+
+def offers(location: Location, thing: str) -> bool:
+    arsenal = location.arsenal
+    return thing in arsenal.towers or thing in arsenal.spells or (thing == "gate" and arsenal.gates)

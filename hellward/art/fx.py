@@ -177,6 +177,8 @@ def textures() -> dict[str, Callable[[], Image.Image]]:
     out["ui/panel"] = partial(panel, 1280 * d, 128 * d)
     out["ui/slot"] = partial(slot, 68 * d, False)
     out["ui/slot_lit"] = partial(slot, 68 * d, True)
+    for name in SPELL_ICONS:
+        out[f"ui/spell/{name}"] = partial(spell_icon, name, 56 * d)
     return out
 
 
@@ -242,3 +244,58 @@ def slot(size: int, lit: bool) -> Image.Image:
         image = Image.alpha_composite(image, warm)
     return image
 
+
+
+SPELL_ICONS = ("smite", "meteor", "orb", "cleanse")
+
+
+def spell_icon(name: str, size: int) -> Image.Image:
+    """A spell's icon: its light blooming on a dark round, and its sign drawn over it."""
+    color = {"smite": ELEMENT_COLORS["holy"], "meteor": ELEMENT_COLORS["fire"], "orb": ELEMENT_COLORS["cold"],
+             "cleanse": ELEMENT_COLORS["holy"]}[name]
+    base = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    ImageDraw.Draw(base).ellipse((1, 1, size - 2, size - 2), fill=(16, 12, 14, 255))
+    halo = glow(color, size, falloff=1.6, core=0.0)
+    halo.putalpha(Image.fromarray((np.asarray(halo)[..., 3] * 0.8).astype(np.uint8)))
+    image = Image.alpha_composite(base, halo)
+    draw = ImageDraw.Draw(image)
+    c, u = size / 2, size / 56
+    rng = random.Random(size)
+    if name == "smite":   # a bolt of holy lightning striking down
+        points = [(c + 4 * u, 6 * u), (c - 7 * u, 27 * u), (c + 2 * u, 27 * u), (c - 6 * u, 50 * u), (c + 10 * u, 22 * u), (c + 1 * u, 22 * u),
+                  (c + 10 * u, 6 * u)]
+        draw.polygon(points, fill=(255, 244, 200, 255), outline=(200, 150, 60, 255))
+        for a in range(0, 360, 45):
+            r0, r1 = 20 * u, 26 * u
+            draw.line((c + r0 * math.cos(math.radians(a)), c + r0 * math.sin(math.radians(a)),
+                       c + r1 * math.cos(math.radians(a)), c + r1 * math.sin(math.radians(a))), fill=(255, 220, 130, 200), width=max(1, int(2 * u)))
+    elif name == "meteor":   # a burning rock coming down, its trail behind it
+        for i in range(12):
+            t = i / 11
+            x, y = c + 16 * u * (1 - t) - 4 * u, c - 16 * u * (1 - t) + 4 * u
+            r = (3 + 7 * t) * u
+            draw.ellipse((x - r, y - r, x + r, y + r), fill=(255, int(90 + 120 * (1 - t)), 30, int(70 + 150 * t)))
+        x, y, r = c - 6 * u, c + 7 * u, 11 * u
+        draw.ellipse((x - r, y - r, x + r, y + r), fill=(90, 44, 30, 255), outline=(255, 150, 50, 255), width=max(1, int(2 * u)))
+        for _ in range(5):
+            a, d = rng.uniform(0, 2 * math.pi), rng.uniform(0, 7) * u
+            draw.ellipse((x + d * math.cos(a) - 2 * u, y + d * math.sin(a) - 2 * u, x + d * math.cos(a) + 2 * u, y + d * math.sin(a) + 2 * u),
+                         fill=(255, 200, 90, 255))
+    elif name == "orb":   # an orb of ice throwing shards out
+        for k in range(8):
+            a = k * math.pi / 4 + math.pi / 8
+            tip = (c + 25 * u * math.cos(a), c + 25 * u * math.sin(a))
+            left = (c + 9 * u * math.cos(a - 0.3), c + 9 * u * math.sin(a - 0.3))
+            right = (c + 9 * u * math.cos(a + 0.3), c + 9 * u * math.sin(a + 0.3))
+            draw.polygon([left, tip, right], fill=(200, 240, 255, 235), outline=(120, 190, 240, 255))
+        r = 11 * u
+        draw.ellipse((c - r, c - r, c + r, c + r), fill=(170, 225, 255, 255), outline=(240, 252, 255, 255), width=max(1, int(2 * u)))
+        draw.ellipse((c - r * 0.5, c - r * 0.6, c - r * 0.1, c - r * 0.2), fill=(255, 255, 255, 220))
+    else:   # cleanse: a cross of light
+        w = 5 * u
+        draw.rectangle((c - w, 10 * u, c + w, 46 * u), fill=(255, 240, 190, 255), outline=(200, 150, 60, 255))
+        draw.rectangle((16 * u, 20 * u, 40 * u, 20 * u + 2 * w), fill=(255, 240, 190, 255), outline=(200, 150, 60, 255))
+    mask = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(mask).ellipse((1, 1, size - 2, size - 2), fill=255)
+    image.putalpha(Image.fromarray(np.minimum(np.asarray(image)[..., 3], np.asarray(mask))))
+    return image

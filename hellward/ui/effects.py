@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from saga2d import ParticleEmitter, RenderLayer, Scene, Sprite
 
-from hellward.sim.content import CURSES, MONSTERS
+from hellward.sim.content import CURSES, MONSTERS, SPELLS, Curse
 from hellward.sim.model import Bolt, World
 from hellward.sim.planner import Decision
 from hellward.ui import style
@@ -91,6 +91,39 @@ class Glow:
 
 
 @dataclass
+class Pillar:
+    """Smite: a column of holy lightning from the vault to a monster."""
+
+    x: float
+    y: float
+    life: float = 0.4
+    age: float = 0.0
+    seed: int = 0
+
+
+@dataclass
+class Falling:
+    """A meteor on its way down: a burning rock from the sky and a shadow on the floor growing under it."""
+
+    x: float
+    y: float
+    life: float
+    head: Sprite
+    trail: Sprite
+    age: float = 0.0
+
+
+@dataclass
+class Telegraph:
+    """A chant's countdown: a rune circle on the floor under the tower it is aimed at, closing as the chant runs out."""
+
+    leader: int
+    tower: int
+    rune: Sprite
+    inner: Sprite
+
+
+@dataclass
 class Effects:
     scene: Scene
     view: WorldView
@@ -102,8 +135,14 @@ class Effects:
     thoughts: list[Thought] = field(default_factory=list)
     glows: list[Glow] = field(default_factory=list)
     decals: list[Sprite] = field(default_factory=list)
+    pillars: list[Pillar] = field(default_factory=list)
+    falling: list[Falling] = field(default_factory=list)
+    telegraphs: dict[int, Telegraph] = field(default_factory=dict)
     rng: random.Random = field(default_factory=lambda: random.Random(5))
     show_thoughts: bool = True
+    edge_flash: float = 0.0          # seconds left of the violet flash at the screen's edges
+    drip: float = 0.0                # the lasting looks of curses emit on this clock
+    selected: int = -1               # the tower the player has selected, for the edge flash
 
     # -- Building blocks --------------------------------------------------------------------
 
@@ -216,9 +255,10 @@ class Effects:
             standing.pulse = 1.0
 
     def on_hit(self, monster_id: int, element) -> None:
-        self.view.hit(monster_id, element.value)
+        self.view.hit(monster_id, element.value if element is not None else "holy")
 
     def on_death(self, monster_id: int, key: str, element, where: tuple[float, float], bounty: int) -> None:
+        self._end_telegraph(monster_id)
         figure = self.view.kill(monster_id)
         x, y = (figure.x, figure.y) if figure is not None else px(*where)
         size = MONSTERS[key].size
@@ -227,7 +267,7 @@ class Effects:
             self.burst("fx/dust", x, y - 10, 10, speed=(30, 90), size=(10, 10))
         else:
             self.burst("fx/blood", x, y - T * size * 0.4, 10, speed=(30, 110), size=(9, 9))
-        if element.value == "fire":
+        if element is not None and element.value == "fire":
             self.burst([f"fx/smoke/{i}" for i in range(3)], x, y - 14, 4, speed=(5, 25), life=(0.6, 1.1), size=(26, 26), shrink=False)
         self.say(f"+{bounty}", x, y - T * size - 8, style.GOLD, size=13 if bounty < 20 else 17)
         if key == "azazel":
@@ -289,18 +329,118 @@ class Effects:
         m = self.world.monster(leader_id)
         if m is not None:
             x, y = self.view.chest(m)
-            self.bloom("fx/soft/curse", x, y, 10, 60, 0.9, opacity=200)
+            self.bloom("fx/soft/curse", x, y, 10, 80, 0.9, opacity=220)
+            self.burst([f"fx/miasma/{i}" for i in range(3)], x, y, 8, speed=(20, 50), life=(0.5, 0.9), size=(20, 20), shrink=False)
+        tower = self.world.towers.get(tower_id)
+        if tower is not None:
+            bx, by = self.view.tower_base(tower)
+            rune = self.scene.add_sprite(Sprite("fx/sigil/curse", position=(bx, by), size=(T * 2.4, T * 1.3), layer=RenderLayer.OBJECTS,
+                                                opacity=0))
+            inner = self.scene.add_sprite(Sprite("fx/soft/curse", position=(bx, by), size=(T * 2.0, T * 1.1), layer=RenderLayer.OBJECTS,
+                                                 opacity=0))
+            old = self.telegraphs.pop(leader_id, None)
+            if old is not None:
+                old.rune.remove()
+                old.inner.remove()
+            self.telegraphs[leader_id] = Telegraph(leader_id, tower_id, rune, inner)
+
+    def _end_telegraph(self, leader_id: int) -> tuple[float, float] | None:
+        telegraph = self.telegraphs.pop(leader_id, None)
+        if telegraph is None:
+            return None
+        where = telegraph.rune.position
+        telegraph.rune.remove()
+        telegraph.inner.remove()
+        return where
 
     def on_cursed(self, leader_id: int, tower_id: int, curse) -> None:
+        self._end_telegraph(leader_id)
         tower = self.world.towers[tower_id]
         x, y = self.view.tower_top(tower)
-        self.bloom("fx/sigil/curse", x, y, 80, 30, 0.5, spin=300)
-        self.bloom("fx/glow/curse", x, y, 20, 90, 0.5)
-        self.burst([f"fx/miasma/{i}" for i in range(3)], x, y + 20, 10, speed=(20, 60), life=(0.6, 1.2), size=(26, 26), shrink=False)
-        self.light(x, y, 140, (170, 40, 220), 1.2, 0.6)
-        self.say(CURSES[curse].name, x - 30, y - 34, style.CURSE, size=16, life=1.8, font=style.TITLE_FONT)
+        bx, by = self.view.tower_base(tower)
+        self.bloom("fx/sigil/curse", x, y - 6, 170, 46, 0.35, spin=420)              # the sigil slams down on it
+        self.bloom("fx/ring/curse", bx, by, 20, T * 3.4, 0.55, opacity=240, aspect=0.55)   # and the blow rings out along the floor
+        self.bloom("fx/glow/curse", x, y, 30, 130, 0.5)
+        self.burst([f"fx/miasma/{i}" for i in range(3)], x, y + 20, 16, speed=(30, 90), life=(0.6, 1.3), size=(30, 30), shrink=False)
+        self.burst("fx/spark", x, y, 18, speed=(60, 160), size=(6, 6))
+        self.light(x, y, 190, (170, 40, 220), 1.5, 0.7)
+        if not self.show_thoughts:   # the leaders' minds already name the curse over the tower
+            self.say(CURSES[curse].name, x, y - 46, style.CURSE, size=22, life=2.0, rise=34, font=style.TITLE_FONT)
+        dearest = max(self.world.towers.values(), key=lambda t: (t.spent, -t.id))
+        if tower_id == self.selected or tower is dearest:
+            self.edge_flash = 0.6
+
+    def on_broken(self, leader_id: int, tower_id: int) -> None:
+        """A spell broke a leader's pondering or chant: the rune shatters, the curse never comes."""
+        where = self._end_telegraph(leader_id)
+        if where is not None:
+            self.burst([f"fx/miasma/{i}" for i in range(3)], *where, 12, speed=(40, 120), life=(0.3, 0.7), size=(22, 22))
+            self.bloom("fx/ring/holy", *where, 20, T * 2.2, 0.4, opacity=220, aspect=0.55)
+        m = self.world.monster(leader_id)
+        if m is not None:
+            x, y = self.view.chest(m)
+            self.burst("fx/shard", x, y, 14, speed=(60, 150), life=(0.3, 0.5), size=(8, 8), shrink=False)
+            self.say("Curse broken", x, y - 40, style.HOLY, size=16, life=1.6, font=style.TITLE_FONT)
+
+    def on_ward_holds(self, leader_id: int, tower_id: int, curse) -> None:
+        self._end_telegraph(leader_id)
+        tower = self.world.towers.get(tower_id)
+        if tower is not None:
+            x, y = self.view.tower_top(tower)
+            self.bloom("fx/ring/holy", x, y + 20, 30, 120, 0.5, opacity=240, aspect=0.8)
+            self.burst("fx/spark", x, y, 20, speed=(50, 130), size=(6, 6))
+            self.say("The ward holds", x, y - 40, style.HOLY, size=16, life=1.6, font=style.TITLE_FONT)
+            self.light(x, y, 150, (255, 230, 150), 1.2, 0.5)
+
+    def on_smite(self, monster_id: int, where) -> None:
+        m = self.world.monster(monster_id)
+        x, y = self.view.chest(m) if m is not None else px(*where)
+        self.pillars.append(Pillar(x, y, seed=self.rng.randrange(1 << 20)))
+        self.bloom("fx/glow/holy", x, y, 20, 120, 0.4)
+        self.bloom("fx/ring/holy", x, y + 10, 10, 90, 0.4, opacity=230, aspect=0.5)
+        self.burst("fx/spark", x, y, 28, speed=(60, 180), size=(7, 7))
+        self.light(x, y, 220, (255, 236, 170), 1.8, 0.45)
+
+    def on_meteor_cast(self, x: float, y: float, delay: float) -> None:
+        tx, ty = px(x, y)
+        head = self.scene.add_sprite(Sprite("fx/glow/fire", position=(tx + 260, ty - 520), size=(46, 46), layer=RenderLayer.EFFECTS))
+        trail = self.scene.add_sprite(Sprite("fx/trail/fire", position=(tx + 260, ty - 520), size=(140, 40), layer=RenderLayer.EFFECTS,
+                                             opacity=230))
+        self.falling.append(Falling(tx, ty, delay, head, trail))
+
+    def on_meteor(self, x: float, y: float, struck: list[int]) -> None:
+        cx, cy = px(x, y)
+        radius = SPELLS["meteor"].radius * T
+        self.bloom("fx/glow/fire", cx, cy - 10, 40, radius * 3.2, 0.6)
+        self.bloom("fx/ring/fire", cx, cy, 20, radius * 2.6, 0.55, opacity=240, aspect=0.6)
+        self.burst("fx/spark", cx, cy, 60, speed=(80, 280), size=(8, 8))
+        self.burst([f"fx/smoke/{i}" for i in range(3)], cx, cy - 10, 14, speed=(20, 90), life=(0.8, 1.6), size=(44, 44), shrink=False)
+        self.decal("fx/dust", cx, cy + 6, radius * 1.6)
+        self.light(cx, cy, 320, (255, 130, 40), 2.0, 0.8)
+        self.scene.camera.shake(6, 0.4)
+
+    def on_orb(self, x: float, y: float, struck: list[int]) -> None:
+        cx, cy = px(x, y)
+        radius = SPELLS["orb"].radius * T
+        self.bloom("fx/soft/cold", cx, cy, 30, radius * 2.4, 0.7, opacity=200)
+        self.bloom("fx/ring/cold", cx, cy, 20, radius * 2.2, 0.5, opacity=245, aspect=0.6)
+        self.bloom("fx/glow/cold", cx, cy - 20, 60, 20, 0.4)
+        self.burst("fx/shard", cx, cy - 16, 46, speed=(120, 260), life=(0.35, 0.7), size=(11, 11), shrink=False)
+        self.light(cx, cy, radius * 1.6, (150, 220, 255), 1.6, 0.8)
+
+    def on_shatter(self, monster_id: int, where) -> None:
+        x, y = px(*where)
+        self.burst("fx/shard", x, y - 14, 16, speed=(80, 170), life=(0.25, 0.45), size=(8, 8), shrink=False)
+        self.bloom("fx/ring/cold", x, y, 10, T * 2.4, 0.3, opacity=200, aspect=0.6)
+
+    def on_contagion(self, dead_id: int, next_id: int) -> None:
+        m = self.world.monster(next_id)
+        if m is not None:
+            x, y = self.view.chest(m)
+            self.burst([f"fx/venom/{i}" for i in range(3)], x, y, 8, speed=(10, 40), life=(0.4, 0.8), size=(18, 18))
 
     def on_fizzle(self, leader_id: int, tower_id: int) -> None:
+        self._end_telegraph(leader_id)
         m = self.world.monster(leader_id)
         if m is not None:
             x, y = self.view.chest(m)
@@ -320,6 +460,7 @@ class Effects:
     # -- Every frame ------------------------------------------------------------------------------
 
     def update(self, dt: float) -> None:
+        self._update_magic(dt)
         for missile in list(self.missiles.values()):
             missile.age += dt
             bolt = missile.bolt
@@ -373,6 +514,55 @@ class Effects:
             if glow.age >= glow.life:
                 self.glows.remove(glow)
 
+    def _update_magic(self, dt: float) -> None:
+        """The chants' countdowns, the meteors falling, the pillars of holy light and the curses' lasting looks."""
+        world = self.world
+        for leader_id, telegraph in list(self.telegraphs.items()):
+            m = world.monster(leader_id)
+            tower = world.towers.get(telegraph.tower)
+            if m is None or m.chant_curse is None or tower is None:
+                self._end_telegraph(leader_id)
+                continue
+            left = max(0.0, m.chant_left / m.kind.leader.channel)
+            closing = 0.9 + 1.5 * left           # the circle closes on the tower as the chant runs out
+            telegraph.rune.size = (T * closing * 1.3, T * closing * 0.72)
+            telegraph.rune.rotation = (self.view.clock * 140) % 360
+            telegraph.rune.opacity = int(255 * min(1.0, (1 - left) * 4 + 0.3))
+            telegraph.inner.size = (T * closing * 1.1, T * closing * 0.6)
+            telegraph.inner.opacity = int(120 + 100 * (1 - left))
+        for pillar in list(self.pillars):
+            pillar.age += dt
+            if pillar.age >= pillar.life:
+                self.pillars.remove(pillar)
+        for rock in list(self.falling):
+            rock.age += dt
+            t = min(1.0, rock.age / rock.life)
+            ease = t * t
+            x, y = rock.x + 260 * (1 - ease), rock.y - 520 * (1 - ease)
+            rock.head.position = (x, y)
+            rock.head.size = (30 + 30 * t, 30 + 30 * t)
+            angle = math.degrees(math.atan2(520, -260))
+            rock.trail.rotation = angle
+            rock.trail.position = (x + 60, y - 110)
+            if rock.age >= rock.life:
+                rock.head.remove()
+                rock.trail.remove()
+                self.falling.remove(rock)
+        self.edge_flash = max(0.0, self.edge_flash - dt)
+        self.drip -= dt
+        if self.drip <= 0:
+            self.drip = 0.28
+            for tower in world.towers.values():
+                if not tower.curses:
+                    continue
+                x, y = self.view.tower_top(tower)
+                if Curse.WEAKEN in tower.curses:   # the tower bleeds
+                    self.burst("fx/blood", x + self.rng.uniform(-8, 8), y + 6, 2, speed=(15, 40), life=(0.5, 0.8), size=(7, 7),
+                               direction=(80, 100))
+                if Curse.DIM_VISION in tower.curses:   # black smoke hangs over it
+                    self.burst([f"fx/smoke/{i}" for i in range(3)], x, y - 4, 2, speed=(4, 14), life=(0.8, 1.3), size=(30, 30),
+                               direction=(250, 290), shrink=False)
+
     def lights(self) -> list[Light]:
         out = [Light(g.light.x, g.light.y, g.light.radius, g.light.color, g.light.intensity * (1 - g.age / g.life)) for g in self.glows]
         for missile in self.missiles.values():
@@ -385,6 +575,7 @@ class Effects:
 
     def draw(self) -> None:
         scene = self.scene
+        self._draw_magic()
         for chain in self.chains:
             rng = random.Random(chain.seed + int(chain.age / 0.045))
             fade = 1 - chain.age / chain.life
@@ -403,10 +594,17 @@ class Effects:
             spec = leader.kind.leader
             grow = 1 - leader.chant_left / spec.channel
             rng = random.Random(leader.id * 7 + int(self.view.clock / 0.06))
-            path = _zigzag(rng, x0, y0, x0 + (x1 - x0) * grow, y0 + (y1 - y0) * grow, jag=7)
-            for width, color in ((6, (120, 20, 160, 90)), (2.5, (210, 90, 255, 220)), (1, (255, 220, 255, 255))):
+            ex, ey = x0 + (x1 - x0) * grow, y0 + (y1 - y0) * grow
+            path = _zigzag(rng, x0, y0, ex, ey, jag=8)
+            pulse = 0.75 + 0.25 * math.sin(self.view.clock * 18)
+            for width, color in ((14, (110, 16, 150, int(70 * pulse))), (6, (170, 50, 230, 170)), (2.5, (230, 140, 255, 240)),
+                                 (1.2, (255, 235, 255, 255))):
                 for (a, b), (c, d) in zip(path, path[1:]):
                     scene.draw_line(a, b, c, d, color, width, space="world", layer=RenderLayer.EFFECTS)
+            for k in range(5):   # motes streaming along the beam to the tower
+                f = (self.view.clock * 1.6 + k / 5) % 1.0 * grow
+                mx, my = x0 + (x1 - x0) * f, y0 + (y1 - y0) * f
+                scene.draw_image("fx/glow/curse", mx - 7, my - 7, 14, 14, space="world", layer=RenderLayer.EFFECTS)
         for words in self.words:
             t = words.age / words.life
             alpha = int(words.color[3] * (1 - max(0.0, t - 0.6) / 0.4))
@@ -418,6 +616,111 @@ class Effects:
         if self.show_thoughts:
             for thought in self.thoughts:
                 self._draw_thought(thought)
+
+    def _draw_magic(self) -> None:
+        scene = self.scene
+        world = self.world
+        clock = self.view.clock
+        for pillar in self.pillars:   # Smite: a column of holy lightning from the top of the screen
+            fade = 1 - pillar.age / pillar.life
+            rng = random.Random(pillar.seed + int(pillar.age / 0.05))
+            path = _zigzag(rng, pillar.x, pillar.y - 700, pillar.x, pillar.y, jag=14)
+            for width, color in ((26, (255, 210, 120, int(60 * fade))), (10, (255, 226, 150, int(160 * fade))),
+                                 (3.5, (255, 250, 220, int(255 * fade)))):
+                for (a, b), (c, d) in zip(path, path[1:]):
+                    scene.draw_line(a, b, c, d, color, width, space="world", layer=RenderLayer.EFFECTS)
+        for rock in self.falling:   # the meteor's shadow on the floor, growing as it comes down
+            t = min(1.0, rock.age / rock.life)
+            r = SPELLS["meteor"].radius * T * (0.3 + 0.7 * t)
+            scene.draw_image("fx/soft/ember", rock.x - r, rock.y - r * 0.55, 2 * r, 1.1 * r, opacity=0.25 + 0.5 * t,
+                             space="world", layer=RenderLayer.OBJECTS)
+        for h in world.hazards:   # burning floor
+            cx, cy = px(h.x, h.y)
+            r = h.radius * T
+            life = min(1.0, h.left / 0.6)
+            scene.draw_image("fx/soft/ember", cx - r, cy - r * 0.6, 2 * r, 1.2 * r, opacity=0.55 * life, space="world",
+                             layer=RenderLayer.OBJECTS)
+            flames = random.Random(int(h.x * 97 + h.y * 31))
+            for k in range(7):
+                a, d = flames.uniform(0, 2 * math.pi), r * math.sqrt(flames.random()) * 0.85
+                fx, fy = cx + d * math.cos(a), cy + d * math.sin(a) * 0.6
+                flick = 0.6 + 0.4 * math.sin(clock * (9 + k) + k * 1.7)
+                size = (14 + 10 * flick) * life
+                scene.draw_image("fx/glow/fire", fx - size / 2, fy - size, size, size * 1.3, opacity=0.9 * life,
+                                 space="world", layer=RenderLayer.EFFECTS)
+        for figure in self.view.figures.values():   # frozen solid: a block of ice over it
+            m = figure.monster
+            if m.frozen > 0:
+                w = m.kind.size * T * 1.2
+                x, y = self.view.chest(m)
+                scene.draw_image("fx/soft/cold", x - w / 2, y - w * 0.75, w, w * 1.5, opacity=0.55 + 0.2 * min(1.0, m.frozen),
+                                 space="world", layer=RenderLayer.EFFECTS)
+        for tower in world.towers.values():
+            x, y = self.view.tower_top(tower)
+            bx, by = self.view.tower_base(tower)
+            if tower.ward > 0:   # a dome of holy light no curse passes
+                pulse = 0.8 + 0.2 * math.sin(clock * 5 + tower.id)
+                fade = min(1.0, tower.ward / 1.0)
+                scene.draw_image("fx/ring/holy", bx - T * 0.9, y - 10, T * 1.8, by - y + 20, opacity=0.8 * fade * pulse,
+                                 space="world", layer=RenderLayer.EFFECTS)
+            if not tower.curses:
+                continue
+            if Curse.BONE_PRISON in tower.curses:
+                self._cage(bx, by, y)
+            if Curse.DECREPIFY in tower.curses:   # rust-coloured motes circling slowly
+                for k in range(3):
+                    a = clock * 1.3 + k * 2 * math.pi / 3
+                    mx, my = x + 22 * math.cos(a), y + 26 + 9 * math.sin(a)
+                    scene.draw_image("fx/glow/ember", mx - 6, my - 6, 12, 12, opacity=0.85, space="world", layer=RenderLayer.EFFECTS)
+            if Curse.DIM_VISION in tower.curses:   # the reach it has left, dashed
+                self._dashed_ring(bx, by - 0.25 * T, tower.reach * T, (120, 90, 170, 200))
+            left = max(tower.curses.values()) / max(CURSES[c].duration for c in tower.curses)
+            self._arc(x, y - 44, 11, left, (230, 150, 255, 230))
+        if self.edge_flash > 0:   # a curse on the tower that matters most
+            a = int(150 * self.edge_flash / 0.6)
+            with scene.screen_layer(3):
+                for i in range(6):
+                    k = int(a * (1 - i / 6))
+                    scene.draw_rect(0, i * 10, 1280, 10, (150, 30, 200, k))
+                    scene.draw_rect(0, 662 - i * 10, 1280, 10, (150, 30, 200, k))
+                    scene.draw_rect(i * 10, 0, 10, 672, (150, 30, 200, k))
+                    scene.draw_rect(1270 - i * 10, 0, 10, 672, (150, 30, 200, k))
+
+    def _cage(self, bx: float, by: float, top: float) -> None:
+        """Bone Prison: pale bars closing round the tower, drawn in lines."""
+        scene = self.scene
+        bone, shade = (226, 214, 186, 240), (60, 50, 44, 200)
+        h = by - top + 14
+        for k in range(7):
+            a = math.pi * (0.1 + 0.8 * k / 6)
+            x = bx - math.cos(a) * T * 0.62
+            lean = math.sin(a) * 6
+            for width, color in ((5.5, shade), (3.2, bone)):
+                scene.draw_line(x, by + lean * 0.3, x + (bx - x) * 0.15, by - h, color, width, space="world", layer=RenderLayer.EFFECTS)
+        for yy, rx in ((by, T * 0.64), (by - h, T * 0.54)):
+            self._ellipse(bx, yy, rx, rx * 0.35, bone, 3.0)
+
+    def _ellipse(self, cx: float, cy: float, rx: float, ry: float, color, width: float, steps: int = 24) -> None:
+        for i in range(steps):
+            a0, a1 = 2 * math.pi * i / steps, 2 * math.pi * (i + 1) / steps
+            self.scene.draw_line(cx + rx * math.cos(a0), cy + ry * math.sin(a0), cx + rx * math.cos(a1), cy + ry * math.sin(a1),
+                                 color, width, space="world", layer=RenderLayer.EFFECTS)
+
+    def _dashed_ring(self, cx: float, cy: float, r: float, color) -> None:
+        steps = 48
+        for i in range(0, steps, 2):
+            a0, a1 = 2 * math.pi * i / steps, 2 * math.pi * (i + 1) / steps
+            self.scene.draw_line(cx + r * math.cos(a0), cy + r * math.sin(a0), cx + r * math.cos(a1), cy + r * math.sin(a1),
+                                 color, 2.0, space="world", layer=RenderLayer.EFFECTS)
+
+    def _arc(self, cx: float, cy: float, r: float, share: float, color) -> None:
+        """A small ring draining clockwise: the time a curse has left."""
+        steps = 20
+        self.scene.draw_circle(cx, cy, r + 2, (20, 6, 24, 170), space="world", layer=RenderLayer.EFFECTS)
+        for i in range(int(steps * share)):
+            a0, a1 = -math.pi / 2 + 2 * math.pi * i / steps, -math.pi / 2 + 2 * math.pi * (i + 1) / steps
+            self.scene.draw_line(cx + r * math.cos(a0), cy + r * math.sin(a0), cx + r * math.cos(a1), cy + r * math.sin(a1),
+                                 color, 2.5, space="world", layer=RenderLayer.UI_WORLD)
 
     def _draw_thought(self, thought: Thought) -> None:
         scene = self.scene

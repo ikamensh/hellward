@@ -294,6 +294,48 @@ def fizzle(_: int) -> np.ndarray:
     return mix(lowpass(sag, 2500) * 0.6, sparks * 0.5, noise(0.3, 400, 2000, attack=0.01, tau=0.1, seed=631) * 0.25)
 
 
+# -- The player's spells -------------------------------------------------------------------------------
+
+
+def smite(take: int) -> np.ndarray:
+    """Holy lightning from the vault: the thunder crack, a deep blow under it, a bright sung chord blooming over it."""
+    return mix(lightning(take) * 0.9, (0.01, thump(110, 38, 0.7, attack=0.001, tau=0.16) * 0.6), (0.05, cleanse(0) * 0.55))
+
+
+def meteor_fall(_: int) -> np.ndarray:
+    """A meteor coming down: a roar that swells and drops in pitch for the second before it lands."""
+    length = 1.2
+    roar = noise(length, 120, 2200, attack=length * 0.85, tau=0.08, seed=700)
+    howl = glide(520, 140, length, partials=((1, 1.0), (2, 0.4), (3, 0.2)), vibrato=(9, 0.03), seed=701) * shape(length, 0.9, 0.08)
+    return mix(roar * 0.7, lowpass(howl, 1800) * 0.25, sputter(length, 1500, 6000, rate=35, seed=702) * shape(length, 0.8, 0.1) * 0.3)
+
+
+def meteor(take: int) -> np.ndarray:
+    """The meteor landing: the blast, a ground-shaking boom, rubble falling after."""
+    boom = mix(thump(70, 24, 1.3, attack=0.002, tau=0.35), noise(0.6, 40, 900, attack=0.001, tau=0.18, seed=710 + take) * 0.6)
+    return room(mix(fireball(take), (0.01, boom * 0.9), (0.25, pieces.take("stone_crumble", take % 2, 0.5))), 1.4, 0.25, seed=take)
+
+
+def orb(take: int) -> np.ndarray:
+    """A frozen orb bursting: ice exploding outwards, the air freezing with a glassy ring."""
+    ring = mix(*(inst.chime(f, 1.4) * 0.35 for f in (2349.3, 2793.8, 3520.0)))
+    return mix(frost(take), (0.03, pieces.take("ice_shatter", (take + 1) % 3, 0.9)), thump(320, 110, 0.35, attack=0.001, tau=0.08) * 0.5,
+               (0.08, ring))
+
+
+def ward(_: int) -> np.ndarray:
+    """A ward closing round a tower: a held bright chord and a rising shimmer, the answer to a curse."""
+    bells = [(i * 0.05, inst.chime(f, 1.3) * 0.45) for i, f in enumerate(("E5", "G#5", "B5", "E6"))]
+    hum = mix(*(inst.choir(f, 1.2, attack=0.15, seed=10 + i) * 0.3 for i, f in enumerate(("E4", "B4"))))
+    return room(mix(hum, *bells), 1.6, 0.3, seed=5)
+
+
+def broken(_: int) -> np.ndarray:
+    """A leader's curse broken before it lands: the chant snaps with a glassy crack and collapses."""
+    crack = mix(noise(0.08, 1500, 12000, attack=0.0005, tau=0.02, seed=720), thump(260, 60, 0.3, attack=0.001, tau=0.07) * 0.6)
+    return mix(crack, (0.03, fizzle(0) * 0.8))
+
+
 # -- Waves and outcome ----------------------------------------------------------------------------------
 
 
@@ -425,6 +467,12 @@ CUES: dict[str, Cue] = {
     "frost": Cue(frost, 3, "battle", BATTLE, pitch=0.04, yields=1),
     "venom_cast": Cue(venom_cast, 3, "battle", BATTLE * 0.8, pitch=0.04, yields=1),
     "venom_hit": Cue(venom_hit, 3, "battle", BATTLE, pitch=0.04, yields=1),
+    "smite": Cue(smite, 3, "alert", ALERT * 0.9),
+    "meteor_fall": Cue(meteor_fall, 1, "action", ACTION),
+    "meteor": Cue(meteor, 2, "alert", ALERT),
+    "orb": Cue(orb, 3, "alert", ALERT * 0.9),
+    "ward": Cue(ward, 1, "action", ACTION),
+    "broken": Cue(broken, 1, "alert", ACTION * 1.1),
     "victory": Cue(victory, 1, "alert", ALERT),
     "defeat": Cue(defeat, 1, "alert", ALERT),
     **{f"death_{kind}": Cue(_death(kind), fall.takes, "alert" if kind == "azazel" else "battle",

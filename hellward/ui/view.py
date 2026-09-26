@@ -169,7 +169,7 @@ class WorldView:
         if figure is not None:
             figure.flash = 0.09
             figure.flash_tint = {"fire": (1.0, 0.7, 0.45), "lightning": (0.75, 0.85, 1.0), "cold": (0.7, 0.9, 1.0),
-                                 "poison": (0.7, 1.0, 0.55)}[element]
+                                 "poison": (0.7, 1.0, 0.55), "holy": (1.0, 0.95, 0.7)}[element]
 
     def build(self, tower: Tower) -> None:
         cx, cy = px(tower.tile[0] + 0.5, tower.tile[1] + 0.5)
@@ -189,6 +189,11 @@ class WorldView:
         standing = self.towers.pop(tower_id)
         for sprite in (standing.sprite, standing.glow, *standing.sigils.values()):
             sprite.remove()
+
+    def tower_base(self, tower: Tower) -> tuple[float, float]:
+        """Where a tower meets the floor, in world pixels."""
+        cx, cy = px(tower.tile[0] + 0.5, tower.tile[1] + 0.5)
+        return cx, cy + 0.25 * T
 
     def tower_top(self, tower: Tower) -> tuple[float, float]:
         cx, cy = px(tower.tile[0] + 0.5, tower.tile[1] + 0.5)
@@ -240,7 +245,9 @@ class WorldView:
             sprite.image = f"mon/{m.kind.key}/{facing}/{frame}"
             sprite.position = (x - cell.origin[0], y_draw - cell.origin[1])
             tint = (1.0, 1.0, 1.0)
-            if m.chill_left > 0:
+            if m.frozen > 0:
+                tint = (0.55, 0.78, 1.0)
+            elif m.chill_left > 0:
                 tint = (0.62, 0.8, 1.0)
             elif m.poison:
                 tint = (0.74, 1.0, 0.62)

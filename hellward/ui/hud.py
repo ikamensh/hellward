@@ -6,13 +6,15 @@ Everything is drawn immediately in screen space; :meth:`Hud.hit` says which cont
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Callable
 
 from saga2d import Scene
 
 from hellward.art.fx import ORB_LEVELS
-from hellward.sim.content import CURSES, DOOR, SELL_REFUND, START_LIVES, TOWERS, Element
+from hellward.sim.campaign import first_offering, offers
+from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, START_LIVES, TOWERS, Element
 from hellward.sim.model import Monster, Tower, World
 from hellward.ui import style
 
@@ -20,6 +22,9 @@ TOP = 672
 SLOT = 68
 BUILD = ("pyre", "storm", "frost", "plague", "gate")
 SLOT_X = 146
+SPELL_BAR = ("smite", "meteor", "orb")       # Cleanse is C, and the button on a selected tower
+SPELL_KEYS = {"smite": "Q", "meteor": "W", "orb": "E"}
+SPELL_X = 918
 ELEMENT_NAMES = {Element.FIRE: "Fire", Element.LIGHTNING: "Lightning", Element.COLD: "Cold", Element.POISON: "Poison"}
 
 
@@ -73,12 +78,14 @@ class Hud:
     # -- Drawing ----------------------------------------------------------------------------------
 
     def draw(self, *, placing: str | None, selected: Tower | None, hovered: Monster | None, speed: float, paused: bool,
-             thoughts: bool, mouse: tuple[float, float] | None, costs: Callable[[str], int]) -> None:
+             mouse: tuple[float, float] | None, costs: Callable[[str], int]) -> None:
         scene = self.scene
         self.controls = []
         scene.draw_image("ui/panel", 0, TOP, 1280, 128)
         with scene.screen_layer(1):
-            self._panel(placing, selected, speed, paused, thoughts, costs)
+            self._panel(placing, selected, costs)
+            self._spells(placing, paused)
+            self._corner(speed)
         with scene.screen_layer(3):
             if hovered is not None:
                 self._monster_bar(hovered)
@@ -90,7 +97,7 @@ class Hud:
                 with scene.screen_layer(5):
                     self._tooltip(control.tip, mouse)
 
-    def _panel(self, placing, selected, speed, paused, thoughts, costs) -> None:
+    def _panel(self, placing, selected, costs) -> None:
         scene = self.scene
         world = self.world
         scene.draw_rect(0, 0, 40, TOP, (14, 11, 12, 255))
@@ -99,31 +106,83 @@ class Hud:
         scene.draw_line(1240, 0, 1240, TOP, (90, 70, 44, 255), 2)
         self._orb("life", 14, TOP + 8, world.lives / START_LIVES, f"{world.lives}", "Life")
         self._orb("mana", 1154, TOP + 8, world.mana / world.mana_max, f"{int(world.mana)}", "Mana")
+        location = world.location
         for i, key in enumerate(BUILD):
             x = SLOT_X + i * (SLOT + 10)
             y = TOP + 16
-            cost = costs(key)
-            lit = placing == key
-            affordable = world.gold >= cost
-            scene.draw_image("ui/slot_lit" if lit else "ui/slot", x, y, SLOT, SLOT)
-            with scene.screen_layer(2):
-                if key == "gate":
-                    scene.draw_image("gate/intact", x + 12, y + 2, 44, 44 * 80 / 60, opacity=1.0 if affordable else 0.4)
-                else:
-                    scene.draw_image(f"tower/{key}/0", x + 12, y - 16, 44, 44 * 150 / 72, opacity=1.0 if affordable else 0.4)
             if key == "gate":
                 name, tip = "Warded Gate", f"Bar an arch on the path. Walkers must break it ({world.gate_life:.0f} life); flyers pass over."
             else:
                 kind = TOWERS[key]
                 name, tip = kind.name, f"{ELEMENT_NAMES[kind.element]}. {kind.blurb}"
+            offered = offers(location, key)
+            cost = costs(key)
+            affordable = offered and world.gold >= cost
+            scene.draw_image("ui/slot_lit" if placing == key else "ui/slot", x, y, SLOT, SLOT)
             with scene.screen_layer(2):
-                scene.draw_rect(x + 3, y + 3, 17, 17, (0, 0, 0, 170), radius=3)
-                scene.draw_text(str(i + 1), x + 11.5, y + 12, font_size=12, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
-            scene.draw_text(f"{cost}", x + SLOT / 2, y + SLOT + 16, font_size=14, color=style.GOLD if affordable else style.DIM,
-                            anchor_x="center", anchor_y="center")
-            self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), affordable, f"{name} — {cost} gold\n{tip}"))
+                shown = 1.0 if affordable else 0.4 if offered else 0.12
+                if key == "gate":
+                    scene.draw_image("gate/intact", x + 12, y + 2, 44, 44 * 80 / 60, opacity=shown)
+                else:
+                    scene.draw_image(f"tower/{key}/0", x + 12, y - 16, 44, 44 * 150 / 72, opacity=shown)
+                self._keycap(x, y, str(i + 1))
+                if not offered:
+                    self._padlock(x + SLOT / 2, y + SLOT / 2)
+            if offered:
+                scene.draw_text(f"{cost}", x + SLOT / 2, y + SLOT + 16, font_size=14, color=style.GOLD if affordable else style.DIM,
+                                anchor_x="center", anchor_y="center")
+                self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), affordable, f"{name} — {cost} gold\n{tip}"))
+            else:
+                self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), False,
+                                             f"{name}\nNot here. It arrives in {first_offering(key).name}."))
         self._centre(selected)
-        self._right(speed, paused, thoughts)
+
+    def _keycap(self, x: float, y: float, key: str) -> None:
+        scene = self.scene
+        scene.draw_rect(x + 3, y + 3, 17, 17, (0, 0, 0, 170), radius=3)
+        scene.draw_text(key, x + 11.5, y + 12, font_size=12, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
+
+    def _padlock(self, cx: float, cy: float) -> None:
+        """A small iron padlock over a slot the location does not offer."""
+        scene = self.scene
+        iron, dark = (150, 136, 116, 235), (30, 24, 22, 255)
+        for i in range(10):   # the shackle, a half ring of short strokes
+            a0, a1 = math.pi + math.pi * i / 10, math.pi + math.pi * (i + 1) / 10
+            scene.draw_line(cx + 8 * math.cos(a0), cy - 2 + 9 * math.sin(a0), cx + 8 * math.cos(a1), cy - 2 + 9 * math.sin(a1), iron, 3.5)
+        scene.draw_rect(cx - 12, cy - 2, 24, 18, iron, border_color=dark, border_width=1.5, radius=3)
+        scene.draw_circle(cx, cy + 5, 3, dark)
+        scene.draw_line(cx, cy + 5, cx, cy + 11, dark, 2.5)
+
+    def _spells(self, placing: str | None, paused: bool) -> None:
+        """Smite, Meteor and Frozen Orb, with the mana each costs under it."""
+        scene = self.scene
+        world = self.world
+        for i, key in enumerate(SPELL_BAR):
+            spec = SPELLS[key]
+            x, y = SPELL_X + i * (SLOT + 9), TOP + 16
+            offered = offers(world.location, key)
+            cost = world.spell_cost(key)
+            ready = offered and world.mana >= cost and not paused
+            scene.draw_image("ui/slot_lit" if placing == f"spell:{key}" else "ui/slot", x, y, SLOT, SLOT)
+            with scene.screen_layer(2):
+                scene.draw_image(f"ui/spell/{key}", x + 6, y + 6, SLOT - 12, SLOT - 12, opacity=1.0 if ready else 0.45 if offered else 0.12)
+                self._keycap(x, y, SPELL_KEYS[key])
+                if not offered:
+                    self._padlock(x + SLOT / 2, y + SLOT / 2)
+            if offered:
+                scene.draw_text(f"{cost:.0f}", x + SLOT / 2, y + SLOT + 16, font_size=14,
+                                color=style.MANA if world.mana >= cost else style.DIM, anchor_x="center", anchor_y="center")
+                how = ("Q with a leader pondering or chanting smites the one closest to cursing. " if key == "smite" else "")
+                self.controls.append(Control(f"spell:{key}", (x, y, SLOT, SLOT), ready,
+                                             f"{spec.name} — {cost:.0f} mana\n{spec.blurb} {how}Not while paused."))
+            else:
+                self.controls.append(Control(f"spell:{key}", (x, y, SLOT, SLOT), False,
+                                             f"{spec.name}\nNot yet yours. You learn it for {first_offering(key).name}."))
+
+    def _corner(self, speed: float) -> None:
+        """Pace and Menu, small, at the top right over the wall."""
+        self._button("speed", 1104, 8, 70, 26, f"Pace {speed:.0f}x", tip="[F] Double the pace of the fight, or restore it.")
+        self._button("menu", 1180, 8, 56, 26, "Menu", tip="[Esc] Pause, settings and volume, start again or leave.")
 
     def _orb(self, which: str, x: float, y: float, fill: float, value: str, label: str) -> None:
         scene = self.scene
@@ -147,10 +206,12 @@ class Hud:
         scene = self.scene
         world = self.world
         x0, y0 = 560, TOP + 14
+        self._gold()
         if selected is not None:
             kind = selected.kind
             stats = selected.stats
-            scene.draw_text(f"{kind.name} {'I' * (selected.level + 1)}", x0, y0 + 14, style="heading", anchor_y="center")
+            scene.draw_text(scene.fit_text(f"{kind.name} {'I' * (selected.level + 1)}", 250, style="heading"), x0, y0 + 14,
+                            style="heading", anchor_y="center")
             parts = [f"{stats.damage * selected.damage_mult():.0f} {ELEMENT_NAMES[kind.element].lower()}",
                      f"{stats.rate * selected.rate_mult():.2f}/s", f"reach {selected.reach:.1f}"]
             if stats.splash:
@@ -176,7 +237,7 @@ class Hud:
             return
         names = world.location.wave_names
         title = world.location.name if world.wave < 0 else names[world.wave]
-        scene.draw_text(scene.fit_text(title, 340, style="heading"), x0, y0 + 14, style="heading", anchor_y="center")
+        scene.draw_text(scene.fit_text(title, 250, style="heading"), x0, y0 + 14, style="heading", anchor_y="center")
         if world.outcome is not None:
             status = "Victory." if world.outcome == "victory" else "The sanctuary has fallen."
         elif world.schedule or world.monsters:
@@ -198,18 +259,14 @@ class Hud:
             label = "Summon the next wave" + (f"  +{bonus}" if bonus else "")
             self._button("call", x0, TOP + 86, 250, 28, label, tip="[Space] Call the next wave now; gold for every second you spare.")
 
-    def _right(self, speed: float, paused: bool, thoughts: bool) -> None:
+    def _gold(self) -> None:
         scene = self.scene
-        world = self.world
-        x0 = 918
-        scene.draw_circle(x0 + 10, TOP + 30, 9, (200, 160, 60, 255))
-        scene.draw_circle(x0 + 10, TOP + 30, 6, (240, 204, 110, 255))
-        scene.draw_text(f"{world.gold}", x0 + 26, TOP + 30, font_size=22, color=style.GOLD, font=style.TITLE_FONT, anchor_y="center")
-        self._button("speed", x0, TOP + 52, 108, 26, f"Pace {speed:.0f}x", tip="[F] Double the pace of the fight, or restore it.")
-        self._button("menu", x0 + 114, TOP + 52, 108, 26, "Menu", tip="[Esc] Pause, settings and volume, start again or leave.")
-        self._button("thoughts", x0, TOP + 86, 222, 28, "Leaders' minds: " + ("shown" if thoughts else "hidden"),
-                     tip="[Tab] Show what each leader weighed before it cursed: the life each curse would save its pack.",
-                     accent=style.CURSE)
+        x = 896
+        text = f"{self.world.gold}"
+        scene.draw_text(text, x, TOP + 28, font_size=22, color=style.GOLD, font=style.TITLE_FONT, anchor_x="right", anchor_y="center")
+        width, _ = scene.game.backend.measure_text(text, 22, style.TITLE_FONT)
+        scene.draw_circle(x - width - 13, TOP + 29, 8, (200, 160, 60, 255))
+        scene.draw_circle(x - width - 13, TOP + 29, 5, (240, 204, 110, 255))
 
     def _monster_bar(self, m: Monster) -> None:
         """Diablo's bar at the top of the screen: the name, the life left, and what it resists."""
