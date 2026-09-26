@@ -31,6 +31,14 @@ PLANS = Path(__file__).parent / "plans" / "warden.json"
 THINK = 0.25          # seconds between two looks at the gold
 ARRIVING = 3.0        # tiles of path before a tower's reach whose monsters count as its work to come
 SEVERITY = {Curse.WEAKEN: 0.65, Curse.DECREPIFY: 0.6, Curse.DIM_VISION: 0.5, Curse.BONE_PRISON: 1.0}
+CLEANSE_BAR = 150.0   # damage a cleanse must win back with the orb empty (nothing when it is full)
+METEOR_BITE = 3.0     # a Meteor must take this many of its blows' worth of life
+ORB_CROWD = 400.0     # life (at a wave's life of one) an orb on a chanting leader must also catch
+GATE_CROWD = 600.0    # life a queue must hold for an orb to keep its breaking gate standing
+LEAK_SMITE = 2.5      # seconds from the sanctuary a monster one Smite kills is smitten
+FULL = 8.0            # mana short of the orb's top at which it is spent on lesser targets rather than wasted
+FULL_BITE = 1.5       # the Meteor's bar then
+QUEUE_FALLOFF = 0.5   # each arch further along the path counts this much less: the first queue fights most
 
 
 # -- The build as data ----------------------------------------------------------------------------
@@ -159,7 +167,7 @@ def tile_value(location: Location, kind: str, tile: tuple[int, int], reach: floa
     """A tower's use on a tile: the path it watches, and the queues it watches most of all."""
     spans = location.level.coverage(tile, reach)
     length = sum(b - a for a, b in spans)
-    queues = sum(1 for q in queue_points(location) if _inside(q, spans))
+    queues = sum(QUEUE_FALLOFF ** i for i, q in enumerate(sorted(queue_points(location))) if _inside(q, spans))
     if kind == "frost":
         return 10.0 * queues + (0.6 if not location.level.doors else 0.2) * length
     if kind == "plague":
@@ -341,8 +349,23 @@ class Warden:
             return
         if "orb" in spells and self._hold_gate(hands):
             return
-        if "meteor" in spells:
-            self._meteor(hands)
+        if "meteor" in spells and self._meteor(hands, METEOR_BITE):
+            return
+        if world.mana >= world.mana_max - FULL:
+            self._spill(hands)
+
+    def _spill(self, hands: Hands) -> None:
+        """The orb is full: a Meteor on a lesser crowd, or a Smite on a leader or the monster it hurts most."""
+        world = hands.world
+        spells = world.location.arsenal.spells
+        if "meteor" in spells and self._meteor(hands, FULL_BITE):
+            return
+        if "smite" not in spells or world.mana < world.spell_cost("smite"):
+            return
+        damage = SPELLS["smite"].damage * world.power()
+        target = max(world.monsters, key=lambda m: (m.kind.leader is not None, min(m.hp, damage), m.s))
+        hands.smite(target.id)
+        self.last_aim = world.time
 
     def tower_value(self, world: World, tower: Tower) -> float:
         """How much a tower is about to do: its strength times the monsters in or coming into its reach."""
@@ -380,7 +403,7 @@ class Warden:
             if value > best_value:
                 best, best_value = t, value
         full = world.mana / world.mana_max
-        if best is not None and best_value >= 150.0 * (1.0 - full) + 20.0:
+        if best is not None and best_value >= CLEANSE_BAR * (1.0 - full) + 20.0:
             hands.cleanse(best.id)
 
     def _break_chant(self, hands: Hands) -> bool:
@@ -408,7 +431,7 @@ class Warden:
         if "orb" in spells and world.mana >= world.spell_cost("orb"):
             x, y = world.level.point(best.s)
             caught = _near(world, x, y, SPELLS["orb"].radius)
-            if sum(1 for m in caught if m in chanting) >= 2 or sum(m.hp for m in caught) >= 900 * world.power():
+            if sum(1 for m in caught if m in chanting) >= 2 or sum(m.hp for m in caught) >= ORB_CROWD * world.power():
                 hands.orb(x, y)
                 self.last_aim = world.time
                 return True
@@ -426,7 +449,7 @@ class Warden:
         damage = SPELLS["smite"].damage * world.power()
         end = world.level.length
         for m in world.monsters:   # furthest along first
-            if m.s < end - 2.5 * m.kind.speed:
+            if m.s < end - LEAK_SMITE * m.kind.speed:
                 break
             if m.hp <= damage:
                 hands.smite(m.id)
@@ -449,7 +472,7 @@ class Warden:
             if door.hp > blows * 1.5:
                 continue
             queue = [m for m in world.monsters if not m.kind.flying and door.s - 2.5 < m.s < door.s]
-            if sum(m.hp for m in queue) < 600 * world.power():
+            if sum(m.hp for m in queue) < GATE_CROWD * world.power():
                 continue
             x, y = world.level.point(door.s - DOOR_STOP - JOSTLE / 2)
             hands.orb(x, y)
@@ -457,13 +480,13 @@ class Warden:
             return True
         return False
 
-    def _meteor(self, hands: Hands) -> None:
-        """A Meteor where the monsters will stand when it lands, if it would take a good bite of life."""
+    def _meteor(self, hands: Hands, bite: float) -> bool:
+        """A Meteor where the monsters will stand when it lands, if it would take ``bite`` blows' worth of life."""
         world = hands.world
         cost = world.spell_cost("meteor")
         reserve = world.spell_cost("smite") if "smite" in world.location.arsenal.spells else 0.0
-        if world.mana < cost or (world.mana < cost + reserve and world.mana < world.mana_max - 5):
-            return
+        if world.mana < cost or (world.mana < cost + reserve and world.mana < world.mana_max - FULL):
+            return False
         spec = SPELLS["meteor"]
         damage = spec.damage * world.power()
         points = [(m, _ahead(world, m, spec.delay)) for m in world.monsters]
@@ -476,9 +499,11 @@ class Warden:
                     value += min(m.hp, damage * max(0.0, m.kind.taken(Element.FIRE)))
             if value > best_value:
                 best, best_value = (cx, cy), value
-        if best is not None and best_value >= 3.0 * damage:
-            hands.meteor(*best)
-            self.last_aim = world.time
+        if best is None or best_value < bite * damage:
+            return False
+        hands.meteor(*best)
+        self.last_aim = world.time
+        return True
 
 
 def _clear(world: World, s: float) -> bool:
