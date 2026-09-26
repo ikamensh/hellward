@@ -1,4 +1,5 @@
-"""Hellward: ``uv run hellward`` (``--demo`` lets the scripted defender play; ``--seed N`` changes the queues)."""
+"""Hellward: ``uv run hellward`` (``--demo`` lets a strong scripted player defend the Cathedral; ``--seed N`` changes
+the queues)."""
 
 from __future__ import annotations
 
@@ -10,7 +11,7 @@ from saga2d import Game
 
 from hellward.art import fx, sprites
 from hellward.audio.bank import SoundBank
-from hellward.sim.players.ordinary import Ordinary
+from hellward.sim.players.adaptive import Adaptive
 from hellward.ui import menus, style
 from hellward.ui.battle import HEIGHT, WIDTH
 from hellward.ui.flow import Flow
@@ -54,7 +55,7 @@ def main(argv: list[str] | None = None) -> None:
     sound = SoundBank(game)
     thinker = Thinker()
     flow = Flow(game, art, sound=sound, planner=thinker, settings=values, progress=Progress.load(game),
-                demo_player=Ordinary, seed=args.seed)
+                demo_player=Adaptive, seed=args.seed)
 
     try:
         if args.demo:
