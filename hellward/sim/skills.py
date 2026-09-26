@@ -20,6 +20,7 @@ class Skill:
     column: str
     tier: int            # 1 to 3, top to bottom; a skill costs its tier in sigils
     blurb: str
+    needs: tuple[str, ...] = ()   # what it works on (a tower kind, "gate" or a spell): it does nothing where none is offered
 
     @property
     def cost(self) -> int:
@@ -30,24 +31,24 @@ COLUMNS: dict[str, str] = {"fire": "Fire", "lightning": "Lightning", "cold": "Co
                            "warding": "Warding", "sorcery": "Sorcery"}
 
 SKILLS: dict[str, Skill] = {s.key: s for s in (
-    Skill("fire_mastery", "Fire Mastery", "fire", 1, "Pyres deal 25% more damage."),
-    Skill("fire_ball", "Fire Ball", "fire", 2, "A Pyre's first rank bursts into fireballs too, and every blast is 0.3 wider."),
-    Skill("blaze", "Blaze", "fire", 3, "Fireballs leave the floor burning for 2 seconds."),
-    Skill("lightning_mastery", "Lightning Mastery", "lightning", 1, "Storm Obelisks deal 25% more damage."),
-    Skill("chain_lightning", "Chain Lightning", "lightning", 2, "One more leap at every rank, and a leap keeps 95% of its strength."),
-    Skill("static_field", "Static Field", "lightning", 3, "Lightning strikes a leader in reach first, and leaps to leaders first."),
-    Skill("cold_mastery", "Cold Mastery", "cold", 1, "Frost chills 10 points deeper and 30% longer."),
-    Skill("glacial_spike", "Glacial Spike", "cold", 2, "Frost novas reach 0.4 further and hit 50% harder."),
-    Skill("shatter", "Shatter", "cold", 3, "A monster that dies chilled bursts: a tenth of its life as cold to those around it."),
-    Skill("poison_mastery", "Poison Mastery", "poison", 1, "Venom is 30% stronger."),
-    Skill("contagion", "Contagion", "poison", 2, "When a poisoned monster dies, its venom leaps to the nearest monster."),
-    Skill("lower_resist", "Lower Resist", "poison", 3, "A poisoned monster resists everything 25 points less. Immunities hold."),
-    Skill("holy_shield", "Holy Shield", "warding", 1, "Warded gates have 50% more life and mend fully between waves."),
-    Skill("salvation", "Salvation", "warding", 2, "Cleanse costs 25 mana and wards the tower against curses for 8 seconds."),
-    Skill("thorns", "Thorns", "warding", 3, "A gate returns half of each blow to the monster that strikes it, frost or no frost."),
+    Skill("fire_mastery", "Fire Mastery", "fire", 1, "Pyres deal 25% more damage.", ("pyre",)),
+    Skill("fire_ball", "Fire Ball", "fire", 2, "A Pyre's first rank bursts into fireballs too, and every blast is 0.3 wider.", ("pyre",)),
+    Skill("blaze", "Blaze", "fire", 3, "Fireballs leave the floor burning for 2 seconds.", ("pyre",)),
+    Skill("lightning_mastery", "Lightning Mastery", "lightning", 1, "Storm Obelisks deal 25% more damage.", ("storm",)),
+    Skill("chain_lightning", "Chain Lightning", "lightning", 2, "One more leap at every rank, and a leap keeps 95% of its strength.", ("storm",)),
+    Skill("static_field", "Static Field", "lightning", 3, "Lightning strikes a leader in reach first, and leaps to leaders first.", ("storm",)),
+    Skill("cold_mastery", "Cold Mastery", "cold", 1, "Frost chills 10 points deeper and 30% longer.", ("frost",)),
+    Skill("glacial_spike", "Glacial Spike", "cold", 2, "Frost novas reach 0.4 further and hit 50% harder.", ("frost",)),
+    Skill("shatter", "Shatter", "cold", 3, "A monster that dies chilled bursts: a tenth of its life as cold to those around it.", ("frost",)),
+    Skill("poison_mastery", "Poison Mastery", "poison", 1, "Venom is 30% stronger.", ("plague",)),
+    Skill("contagion", "Contagion", "poison", 2, "When a poisoned monster dies, its venom leaps to the nearest monster.", ("plague",)),
+    Skill("lower_resist", "Lower Resist", "poison", 3, "A poisoned monster resists everything 25 points less. Immunities hold.", ("plague",)),
+    Skill("holy_shield", "Holy Shield", "warding", 1, "Warded gates have 50% more life and mend fully between waves.", ("gate",)),
+    Skill("salvation", "Salvation", "warding", 2, "Cleanse costs 25 mana and wards the tower against curses for 8 seconds.", ("cleanse",)),
+    Skill("thorns", "Thorns", "warding", 3, "A gate returns half of each blow to the monster that strikes it, frost or no frost.", ("gate",)),
     Skill("warmth", "Warmth", "sorcery", 1, "Mana flows 40% faster, and the orb holds 25 more."),
     Skill("soul_harvest", "Soul Harvest", "sorcery", 2, "Every slain leader gives 10 mana."),
-    Skill("spell_mastery", "Spell Mastery", "sorcery", 3, "Smite, Meteor and Frozen Orb cost 25% less and strike 30% harder."),
+    Skill("spell_mastery", "Spell Mastery", "sorcery", 3, "Smite, Meteor and Frozen Orb cost 25% less and strike 30% harder.", ("smite", "meteor", "orb")),
 )}
 
 TREE_COST = sum(s.cost for s in SKILLS.values())

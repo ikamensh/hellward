@@ -11,11 +11,12 @@ from saga2d import Game
 from hellward.art import fx, sprites
 from hellward.audio.bank import SoundBank
 from hellward.sim.players.ordinary import Ordinary
-from hellward.sim.model import World
 from hellward.ui import menus, style
-from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
+from hellward.ui.battle import HEIGHT, WIDTH
+from hellward.ui.flow import Flow
+from hellward.ui.progress import Progress
 from hellward.ui.thinking import Thinker
-from hellward.ui.title import LoadingScene, ReckoningScene, TitleScene
+from hellward.ui.title import LoadingScene, TitleScene
 
 DATA = Path.home() / ".hellward"
 
@@ -52,27 +53,15 @@ def main(argv: list[str] | None = None) -> None:
         game.set_fullscreen(True)   # --fullscreen is for this session; the saved choice is the settings
     sound = SoundBank(game)
     thinker = Thinker()
-
-    def title() -> None:
-        game.clear_and_push(TitleScene(begin, game.quit))   # from under a menu or the reckoning too
-        sound.music("title")
-
-    def battle(autopilot: bool) -> BattleScene:
-        return BattleScene(art, seed=args.seed, planner=thinker, sound=sound, autopilot=Ordinary() if autopilot else None,
-                           on_end=end, settings=values, restart=lambda: begin(autopilot), to_title=title)
-
-    def begin(autopilot: bool) -> None:
-        game.clear_and_push(battle(autopilot))
-
-    def end(world: World) -> None:
-        game.push(ReckoningScene(world, again=lambda: begin(False), title=title))
+    flow = Flow(game, art, sound=sound, planner=thinker, settings=values, progress=Progress.load(game),
+                demo_player=Ordinary, seed=args.seed)
 
     try:
         if args.demo:
-            game.run(battle(True))
+            game.run(flow.demo_scene())
         else:
             sound.music("title")
-            game.run(TitleScene(begin, game.quit))
+            game.run(TitleScene(flow))
     except KeyboardInterrupt:
         pass   # Ctrl-C in the terminal: the player's way out, not an error
     finally:

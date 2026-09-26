@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import math
-from typing import Callable
+from typing import TYPE_CHECKING
 
-from saga2d import Anchor, Button, Column, Scene
+from saga2d import Anchor, Button, Column, Row, Scene
 
+from hellward.sim.campaign import ORDER, LOCATIONS, sigils
 from hellward.sim.content import START_LIVES
 from hellward.sim.model import World
-from hellward.ui import style
+from hellward.ui import style, widgets
 from hellward.ui.menus import SettingsScene, settings
+
+if TYPE_CHECKING:
+    from hellward.ui.flow import Flow
 
 
 class LoadingScene(Scene):
@@ -28,9 +32,8 @@ class TitleScene(Scene):
 
     controls = {"s": "open_settings"}
 
-    def __init__(self, begin: Callable[[bool], None], quit: Callable[[], None]) -> None:
-        self.begin = begin
-        self.quit = quit
+    def __init__(self, flow: Flow) -> None:
+        self.flow = flow
         self.clock = 0.0
 
     def open_settings(self) -> None:
@@ -39,10 +42,10 @@ class TitleScene(Scene):
     def on_enter(self) -> None:
         self.art = self.game.assets.has_image("title")
         menu = Column(
-            Button("Descend", shortcut="Enter", on_click=lambda: self.begin(False), width=320),
-            Button("Watch the leaders at work", shortcut="D", on_click=lambda: self.begin(True), width=320),
+            Button("Descend", shortcut="Enter", on_click=self.flow.world_map, width=320),
+            Button("Watch the leaders at work", shortcut="D", on_click=self.flow.demo, width=320),
             Button("Settings", hotkey="S", on_click=self.open_settings, width=320),
-            Button("Leave", shortcut="Q", on_click=self.quit, width=320),
+            Button("Leave", shortcut="Q", on_click=self.game.quit, width=320),
             anchor=Anchor.BOTTOM, margin=(0, 70), spacing=12)
         self.ui.add(menu)
 
@@ -70,33 +73,61 @@ class TitleScene(Scene):
 
 
 class ReckoningScene(Scene):
+    """The end of a defence: how it went, the sigils it won (lit one by one), and where the way goes now."""
+
     transparent = True
     background_color = None
 
-    def __init__(self, world: World, again: Callable[[], None], title: Callable[[], None]) -> None:
+    def __init__(self, flow: Flow, world: World, gained: int) -> None:
+        self.flow = flow
         self.world = world
-        self.again = again
-        self.title = title
-        self.curses = 0
+        self.gained = gained
+        self.earned = sigils(world.outcome, world.lives)
+        self.clock = 0.0
+        self.lit = 0
+        key = world.location.key
+        index = ORDER.index(key)
+        after = LOCATIONS[ORDER[index + 1]] if index + 1 < len(ORDER) else None
+        self.opened = after if after is not None and gained and flow.progress.best(key) == self.earned and \
+            flow.progress.opened(after) and not flow.progress.held(after.key) else None
 
     def on_enter(self) -> None:
-        self.ui.add(Column(
-            Button("Defend again", shortcut="Enter", on_click=self.again, width=280),
-            Button("To the title", shortcut="Esc", on_click=self.title, width=280),
-            anchor=Anchor.BOTTOM, margin=(0, 190), spacing=10))
+        location = self.world.location
+        self.ui.add(Row(Button("Again", shortcut="Enter", on_click=lambda: self.flow.intro(location), width=220),
+                        Button("To the map", shortcut="Esc", on_click=self.flow.world_map, width=220),
+                        anchor=Anchor.BOTTOM, margin=(0, 150), spacing=16))
+
+    def update(self, dt: float) -> None:
+        self.clock += dt
+        due = min(self.earned, int((self.clock - 0.6) / 0.45) + 1) if self.clock > 0.6 else 0
+        while self.lit < due:
+            self.lit += 1
+            self.flow.sound.play("upgrade")
 
     def draw(self) -> None:
         world = self.world
         won = world.outcome == "victory"
-        self.draw_rect(0, 0, 1280, 800, (0, 0, 0, 185))
+        self.draw_rect(0, 0, 1280, 800, (0, 0, 0, 190))
         title = "The Sanctuary Holds" if won else "The Sanctuary Has Fallen"
-        self.draw_text(title, 643, 213, style="title", color=(0, 0, 0, 230), anchor_x="center", anchor_y="center")
-        self.draw_text(title, 640, 210, style="title", color=style.GOLD if won else style.BLOOD, anchor_x="center", anchor_y="center")
+        self.draw_text(title, 643, 153, style="title", color=(0, 0, 0, 230), anchor_x="center", anchor_y="center")
+        self.draw_text(title, 640, 150, style="title", color=style.GOLD if won else style.BLOOD, anchor_x="center", anchor_y="center")
+        self.draw_text(world.location.name, 640, 200, style="heading", color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
         lines = [
             f"Waves withstood: {world.wave + (1 if won else 0)} of {len(world.waves)}",
             f"Monsters slain: {world.kills}",
             f"Life kept: {world.lives} of {START_LIVES}",
-            f"Curses the leaders laid on your towers: {world.curses_landed}, and you cleansed {world.cleanses}",
+            f"Curses the leaders laid on your towers: {world.curses_landed}. You cleansed {world.cleanses} "
+            f"and broke {world.chants_broken} before they landed.",
         ]
         for i, line in enumerate(lines):
-            self.draw_text(line, 640, 300 + i * 32, font_size=19, color=style.BONE, anchor_x="center", anchor_y="center")
+            self.draw_text(line, 640, 250 + i * 30, font_size=18, color=style.BONE, anchor_x="center", anchor_y="center")
+        widgets.sigil_pips(self, 640, 410, self.lit, size=16, gap=48)
+        if won:
+            note = (f"{self.gained} new sigil{'s' if self.gained > 1 else ''}: spend {'them' if self.gained > 1 else 'it'} on skills."
+                    if self.gained else "No new sigils: you have held this place as well before.")
+        else:
+            note = "No sigils for a fallen sanctuary. Reshape your skills and try again."
+        self.draw_text(note, 640, 450, font_size=16, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
+        if self.opened is not None:
+            self.draw_text(f"The way down to {self.opened.name} is open.", 640, 482, font_size=17, color=style.HOLY,
+                           anchor_x="center", anchor_y="center")

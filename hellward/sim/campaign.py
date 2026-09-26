@@ -34,7 +34,6 @@ class Location:
     blurb: str                        # what the place is, one or two sentences
     taunt: str                        # the Bone Priest, who has seen this fight before
     requires: tuple[str, ...] = ()    # the location that must be held first
-    at: tuple[float, float] = (0.5, 0.5)   # where it lies on the world map, as shares of its width and height
 
     def __post_init__(self) -> None:
         if len(self.wave_names) != len(self.waves):
@@ -111,7 +110,6 @@ TRISTRAM = Location(
           "them, and a shaman sings them on.",
     taunt="Every one of them has died before. My shaman sings them up again. When he looks at your fire, "
           "it will falter.",
-    at=(0.2, 0.16),
 )
 
 GRAVEYARD = Location(
@@ -142,7 +140,6 @@ GRAVEYARD = Location(
     taunt="I buried every one of them, and they still come when I call. Build your gates. I will cage the fire "
           "behind them.",
     requires=("tristram",),
-    at=(0.46, 0.2),
 )
 
 CATHEDRAL = Location(
@@ -174,7 +171,6 @@ CATHEDRAL = Location(
     taunt="This was my house before it was yours. The witch will make your towers old, and the goatmen do not "
           "fear your thunder.",
     requires=("graveyard",),
-    at=(0.74, 0.17),
 )
 
 CATACOMBS = Location(
@@ -206,7 +202,6 @@ CATACOMBS = Location(
     taunt="Four doors between you and the dark. An Overlord needs a few breaths for each, and my priest will "
           "blind whatever watches them.",
     requires=("cathedral",),
-    at=(0.27, 0.52),
 )
 
 CAVES = Location(
@@ -237,7 +232,6 @@ CAVES = Location(
     blurb="Below the catacombs the caves open onto lava. Gargoyles nest in the vault and fly where they please.",
     taunt="Walls mean nothing to wings. Look up.",
     requires=("catacombs",),
-    at=(0.73, 0.55),
 )
 
 HELLS_GATE = Location(
@@ -271,7 +265,6 @@ HELLS_GATE = Location(
     blurb="The door your saints built the cathedral on. Azazel the Flayer waits behind it with the council of curses.",
     taunt="I have watched this fight more times than you have drawn breath. In every one of them, the lamp goes out.",
     requires=("caves",),
-    at=(0.5, 0.85),
 )
 
 LOCATIONS: dict[str, Location] = {loc.key: loc for loc in (TRISTRAM, GRAVEYARD, CATHEDRAL, CATACOMBS, CAVES, HELLS_GATE)}
@@ -291,3 +284,8 @@ def first_offering(thing: str) -> Location:
 def offers(location: Location, thing: str) -> bool:
     arsenal = location.arsenal
     return thing in arsenal.towers or thing in arsenal.spells or (thing == "gate" and arsenal.gates)
+
+
+def idle(location: Location, needs: tuple[str, ...]) -> bool:
+    """Whether a skill that works on ``needs`` does nothing here: none of them is offered."""
+    return bool(needs) and not any(offers(location, thing) for thing in needs)

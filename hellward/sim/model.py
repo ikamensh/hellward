@@ -258,6 +258,7 @@ class World:
         self.curses_landed = 0
         self.cleanses = 0
         self.spells_cast = 0
+        self.chants_broken = 0
         self._next_id = 1
 
     # -- Copies for the planner ---------------------------------------------------------
@@ -279,7 +280,7 @@ class World:
         w.wave, w.schedule, w.wave_time, w.break_left = self.wave, list(self.schedule), self.wave_time, self.break_left
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
         w.leaked_life, w.forced, w.outcome, w.kills, w._next_id = self.leaked_life, [], self.outcome, self.kills, self._next_id
-        w.curses_landed, w.cleanses, w.spells_cast = self.curses_landed, self.cleanses, self.spells_cast
+        w.curses_landed, w.cleanses, w.spells_cast, w.chants_broken = self.curses_landed, self.cleanses, self.spells_cast, self.chants_broken
         return w
 
     def _id(self) -> int:
@@ -577,6 +578,7 @@ class World:
         spec = m.kind.leader
         if spec is not None:
             m.cooldown = spec.cooldown * self.difficulty.leader_pace
+        self.chants_broken += 1
         self._emit("broken", m.id, tower)
 
     def _land(self, leader_id: int, curse: Curse, tower_id: int) -> None:

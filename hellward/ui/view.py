@@ -9,12 +9,14 @@ the battering at a door, and a leader raises its staff when its chant begins.
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import dataclass
 
 from saga2d import RenderLayer, Scene, Sprite, SpriteAnchor
 
 from hellward.art import figures, sprites
 from hellward.art.fx import ELEMENT_COLORS
+from hellward.art.mapart import THEMES
 from hellward.art.rig import PROJECTION, TILE
 from hellward.art.sprites import Art, Cell
 from hellward.art.structures import tower_top
@@ -31,6 +33,7 @@ ELEMENT_LIGHT = {"pyre": ELEMENT_COLORS["fire"], "storm": ELEMENT_COLORS["lightn
                  "plague": ELEMENT_COLORS["poison"]}
 CURSE_TINT = {Curse.WEAKEN: (0.9, 0.55, 0.55), Curse.DECREPIFY: (0.8, 0.72, 0.55), Curse.DIM_VISION: (0.55, 0.5, 0.75),
               Curse.BONE_PRISON: (0.6, 0.6, 0.6)}
+TORCH = (255, 150, 60)
 CURSE_COLOR = {Curse.WEAKEN: "blood", Curse.DECREPIFY: "ember", Curse.DIM_VISION: "curse", Curse.BONE_PRISON: "holy"}
 
 
@@ -90,16 +93,18 @@ class WorldView:
             cx, cy = px(x + 0.5, y + 0.5)
             scene.add_sprite(placed("arch", art.arch, cx, cy + 0.3 * T))
         self.gates: dict[int, Sprite] = {}
-        for x in range(level.width):
-            for y in range(level.height):
-                if level.tile(x, y) is Tile.PILLAR:
-                    cx, cy = px(x + 0.5, y + 0.5)
-                    scene.add_sprite(placed("pillar", art.pillar, cx, cy + 0.2 * T))
+        self.theme = THEMES[world.location.theme]
+        if self.theme.pillars:   # elsewhere the obstacles lie flat in the painted floor
+            for x in range(level.width):
+                for y in range(level.height):
+                    if level.tile(x, y) is Tile.PILLAR:
+                        cx, cy = px(x + 0.5, y + 0.5)
+                        scene.add_sprite(placed("pillar", art.pillar, cx, cy + 0.2 * T))
         self.figures: dict[int, Figure] = {}
         self.towers: dict[int, Standing] = {}
         self.dying: list[Figure] = []
         self.static_lights = self._static_lights()
-        self.torches = [self._sprite_glow("fire", l.x, l.y, 22) for l in self.static_lights if l.color == (255, 150, 60)]
+        self.torches = [self._sprite_glow("fire", l.x, l.y, 22) for l in self.static_lights if l.color == TORCH]
 
     def _sprite_glow(self, element: str, x: float, y: float, size: float) -> Sprite:
         return self.scene.add_sprite(Sprite(f"fx/glow/{element}", position=(x, y), size=(size, size), layer=RenderLayer.EFFECTS))
@@ -111,15 +116,32 @@ class WorldView:
         lights.append(Light(*px(x + 0.5, y + 0.5), 190, (255, 60, 30), 1.1))
         x, y = level.waypoints[-1]
         lights.append(Light(*px(x + 0.5, y + 0.5), 170, (255, 214, 140), 1.1))
-        for x in range(1, level.width - 1, 3):   # torches along the north wall, between the windows
-            lights.append(Light(*px(x + 0.5, 0.85), 95, (255, 150, 60), 0.75))
-        for y in range(3, level.height - 1, 4):
-            lights.append(Light(*px(0.85, y + 0.5), 80, (255, 150, 60), 0.6))
-            lights.append(Light(*px(level.width - 0.85, y + 0.5), 80, (255, 150, 60), 0.6))
-        for x in range(level.width):
-            for y in range(level.height):
-                if level.tile(x, y) is Tile.PILLAR:
-                    lights.append(Light(*px(x + 0.5, y + 0.2), 90, (255, 190, 110), 0.7))
+        rng = random.Random(level.name)
+        kind = self.theme.lights
+        if kind == "torches":   # along the north wall, between the windows, and down the sides
+            for x in range(1, level.width - 1, 3):
+                lights.append(Light(*px(x + 0.5, 0.85), 95, TORCH, 0.75))
+            for y in range(3, level.height - 1, 4):
+                lights.append(Light(*px(0.85, y + 0.5), 80, TORCH, 0.6))
+                lights.append(Light(*px(level.width - 0.85, y + 0.5), 80, TORCH, 0.6))
+        elif kind == "fires":   # the houses round the square are burning
+            for _ in range(9):
+                edge = rng.choice(("top", "bottom", "left", "right"))
+                x = rng.uniform(1, level.width - 1) if edge in ("top", "bottom") else (0.6 if edge == "left" else level.width - 0.6)
+                y = rng.uniform(1, level.height - 1) if edge in ("left", "right") else (0.6 if edge == "top" else level.height - 0.6)
+                lights.append(Light(*px(x, y), rng.uniform(110, 170), (255, 110, 40), 0.9))
+        elif kind == "moon":   # cold moonlight in patches through the mist
+            for _ in range(8):
+                x, y = rng.uniform(2, level.width - 2), rng.uniform(2, level.height - 2)
+                lights.append(Light(*px(x, y), rng.uniform(150, 230), (150, 170, 220), 0.45))
+        for x, y in sorted(level.pools):
+            if self.theme.pool == "lava":
+                lights.append(Light(*px(x + 0.5, y + 0.5), 110, (255, 100, 30), 0.9))
+        if self.theme.pillars:
+            for x in range(level.width):
+                for y in range(level.height):
+                    if level.tile(x, y) is Tile.PILLAR:
+                        lights.append(Light(*px(x + 0.5, y + 0.2), 90, (255, 190, 110), 0.7))
         for x, y in level.doors:
             lights.append(Light(*px(x + 0.5, y + 0.3), 60, (255, 210, 140), 0.45))
         s = 2.5
@@ -320,7 +342,7 @@ class WorldView:
     def lights(self) -> list[Light]:
         lights = list(self.static_lights)
         for i, light in enumerate(lights):
-            if light.color == (255, 150, 60):
+            if light.color in (TORCH, (255, 110, 40), (255, 100, 30)):   # flames flicker
                 lights[i] = Light(light.x, light.y, light.radius, light.color,
                                   light.intensity * (0.85 + 0.15 * math.sin(self.clock * 13 + i * 2.1)))
         for standing in self.towers.values():

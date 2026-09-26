@@ -22,13 +22,13 @@ from PIL import Image, ImageOps
 from saga2d import Game
 from sagaforge import restyle
 
-from hellward.art import figures, mapart, rig, structures
+from hellward.art import figures, mapart, rig, structures, worldmap
 from hellward.art.rig import DENSITY
 from hellward.sim.content import MONSTERS
 from hellward.sim.campaign import Location
 
 PAINTED = Path(__file__).resolve().parent.parent / "assets" / "painted"
-_SOURCES = [Path(m.__file__) for m in (figures, rig, structures, mapart)]
+_SOURCES = [Path(m.__file__) for m in (figures, rig, structures, mapart, worldmap)]
 
 
 def art_version() -> str:
@@ -157,6 +157,7 @@ def register(game: Game, cache_dir: Path) -> Art:
         image = image.resize((width, height), Image.LANCZOS)
         top = (height - 800 * DENSITY) // 2
         assets.image_from_pil("title", image.crop((0, top, width, top + 800 * DENSITY)))
+    assets.image_from_pil("worldmap", worldmap.picture())
     return Art(cells, _cell(*structures.TOWER_CELL), _cell(*structures.GATE_CELL), _cell(*structures.ARCH_CELL),
                _cell(*structures.PILLAR_CELL), painted)
 
@@ -166,7 +167,8 @@ def ground(game: Game, location: Location) -> str:
     name = f"ground/{location.key}"
     if not game.assets.has_image(name):
         level = location.level
-        image = mapart.stand_in(level) if procedural() else mapart.ground(location.key, level)
+        theme = mapart.THEMES[location.theme]
+        image = mapart.stand_in(level, theme) if procedural() else mapart.ground(location.key, level, theme)
         game.assets.image_from_pil(name, image)
     return name
 

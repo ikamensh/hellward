@@ -3,7 +3,9 @@
     uv run python tools/restyle.py refresh DIR                    # every subject: dump, render (Codex), cut, preview
     uv run python tools/restyle.py --subjects mon-skeleton,towers refresh DIR
     uv run python tools/restyle.py dump DIR | render DIR | cut DIR [--force] | preview DIR
-    uv run python tools/restyle.py ground DIR                     # the cathedral floor, painted over its stand-in
+    uv run python tools/restyle.py ground DIR                     # every location's floor, painted over its stand-in
+    uv run python tools/restyle.py --locations caves ground DIR   # one location's floor (a painted one is kept)
+    uv run python tools/restyle.py worldmap DIR                   # the world map, painted over its stand-in
     uv run python tools/restyle.py keyart DIR                     # the title screen's painting, from words alone
 
 Subjects: ``mon-<kind>`` (a row per facing, the frames across; Azazel is painted one facing per sheet so the
@@ -26,11 +28,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from PIL import Image  # noqa: E402
 from sagaforge import restyle  # noqa: E402
 
-from hellward.art import figures, mapart, structures  # noqa: E402
+from hellward.art import figures, mapart, structures, worldmap  # noqa: E402
 from hellward.art.rig import DENSITY  # noqa: E402
 from hellward.art.sprites import PAINTED, monster_sheet  # noqa: E402
 from hellward.sim.content import MONSTERS  # noqa: E402
-from hellward.sim.level import CATHEDRAL  # noqa: E402
+from hellward.sim.campaign import LOCATIONS  # noqa: E402
 
 STYLE = ("Style: dark gothic action-RPG sprite art in the manner of the late-1990s pre-rendered classics of the genre: painterly, "
          "gritty and richly detailed, hard rim light from the upper left, deep shadows, muted earthen and bone colours with small "
@@ -317,36 +319,74 @@ def cmd_refresh(args: argparse.Namespace) -> None:
 
 GROUND_PROMPT = (
     "Edit target: the attached top-down map of a tower-defence level, {w}x{h} px. Repaint it as a finished, richly detailed painted "
-    "game map of a desecrated gothic cathedral floor seen from above, in the manner of the late-1990s dark action-RPG classics: worn "
-    "grey flagstones with cracks, moss and old blood; a long torn crimson carpet with gold trim running along the exact path shown; "
-    "the north wall of dark stone with tall lancet windows glowing red from fires beyond; walls around the other edges; a swirling "
-    "hell portal of fire at the left end of the carpet and a radiant golden sanctuary door at its right end; scattered bones, skulls "
-    "and candle stubs. The light is dim and even: do not paint strong spotlights or darkness, the game adds its own lighting.\n\n"
-    "Keep exactly: the position and width of the carpet path and every one of its turns, the square grid of floor tiles (every tile "
-    "stays where it is: towers are built on them), the walls, the portal and the door. No text, no characters, no monsters, no "
-    "towers. Output the same {w}x{h} layout.")
+    "game map seen from above, in the manner of the late-1990s dark action-RPG classics: {words}. The lighter band that winds from "
+    "the swirling hell portal of fire to the radiant golden sanctuary door is the path the monsters walk; the dark squares and "
+    "blobs lying on the floor are obstacles and pits: keep each one where it is and paint it as what the words describe. The light "
+    "is dim and even: do not paint strong spotlights or darkness, the game adds its own lighting.\n\n"
+    "Keep exactly: the position and width of the path and every one of its turns, the square grid of floor tiles (every tile "
+    "stays where it is: towers are built on them), the walls, the pits, the obstacles, the portal and the door. No text, no "
+    "characters, no monsters, no towers. Output the same {w}x{h} layout.")
+
+
+def _paint(source: Path, prompt: str, out: Path, provider: str, aspect: str) -> None:
+    if out.exists():
+        return
+    if provider == "codex":
+        restyle.render_with_codex(source, prompt, out, model=CODEX_MODEL, effort="low")
+    else:
+        restyle.render_with_openrouter(source, prompt, out, model="google/gemini-3.1-flash-image-preview",
+                                       api_key=restyle.openrouter_api_key(), aspect_ratio=aspect, image_size="2K")
+
+
+def _ground(directory: Path, key: str, provider: str) -> str:
+    location = LOCATIONS[key]
+    theme = mapart.THEMES[location.theme]
+    image = mapart.stand_in(location.level, theme)
+    small = image.resize((image.width // 2, image.height // 2), Image.LANCZOS)
+    source = directory / f"ground-{key}.input.png"
+    small.save(source)
+    out = directory / f"ground-{key}" / f"{provider}.png"
+    _paint(source, GROUND_PROMPT.format(w=small.width, h=small.height, words=theme.words), out, provider, "16:9")
+    painted = Image.open(out).convert("RGB").resize(image.size, Image.LANCZOS)
+    painted.save(mapart.painted(key))
+    Image.blend(image, painted, 0.5).save(directory / f"ground-{key}-overlay.png")
+    return f"installed {mapart.painted(key)}; compare {directory / f'ground-{key}-overlay.png'}"
 
 
 def cmd_ground(args: argparse.Namespace) -> None:
     args.dir.mkdir(parents=True, exist_ok=True)
-    image = mapart.stand_in(CATHEDRAL)
-    small = image.resize((image.width // 2, image.height // 2), Image.LANCZOS)
-    source = args.dir / "ground.input.png"
-    small.save(source)
-    prompt = GROUND_PROMPT.format(w=small.width, h=small.height)
-    out = args.dir / "ground" / f"{args.provider}.png"
-    if not out.exists():
-        if args.provider == "codex":
-            restyle.render_with_codex(source, prompt, out, model=CODEX_MODEL, effort="low")
-        else:
-            restyle.render_with_openrouter(source, prompt, out, model="google/gemini-3.1-flash-image-preview",
-                                           api_key=restyle.openrouter_api_key(), aspect_ratio="16:9", image_size="2K")
-    painted = Image.open(out).convert("RGB").resize(image.size, Image.LANCZOS)
     PAINTED.mkdir(parents=True, exist_ok=True)
-    painted.save(PAINTED / "ground.png")
-    blend = Image.blend(image, painted, 0.5)
-    blend.save(args.dir / "ground-overlay.png")
-    print(f"installed {PAINTED / 'ground.png'}; compare {args.dir / 'ground-overlay.png'}")
+    keys = sorted(args.locations) if args.locations else [k for k in LOCATIONS if not mapart.painted(k).exists()]
+    with ThreadPoolExecutor(args.jobs) as pool:
+        for line in pool.map(lambda key: _ground(args.dir, key, args.provider), keys):
+            print(line, flush=True)
+
+
+WORLDMAP_PROMPT = (
+    "Edit target: the attached map, {w}x{h} px, the world map of a dark gothic tower-defence game. Repaint it as one finished, richly "
+    "detailed painting in the manner of the late-1990s dark action-RPG classics: a cut-away view of the ground under a medieval "
+    "village at night. On the surface, under a starry sky with a blood-red moon: the burning village of Tristram on the left, a "
+    "churchyard of crooked crosses and headstones with a crypt's mouth in the middle, and a great dark gothic cathedral with a "
+    "spire on the right, its windows glowing red. Below the ground, layers of rock that grow darker and redder with depth, and "
+    "four chambers joined by narrow tunnels, each exactly where the dark cavity is: under the cathedral a labyrinth hall lit "
+    "violet with pillars; to the left, deeper, catacombs of bone-lined arches lit pale; to the right, deeper still, a cave with a "
+    "glowing lava lake; at the bottom, the gate of hell: a huge burning archway of black stone in fire and smoke.\n\n"
+    "Keep exactly: where each chamber, tunnel, building and the moon is, and the horizon line. No text, no labels, no people, no "
+    "monsters. Output the same {w}x{h} layout.")
+
+
+def cmd_worldmap(args: argparse.Namespace) -> None:
+    args.dir.mkdir(parents=True, exist_ok=True)
+    image = worldmap.stand_in()
+    small = image.resize((image.width // 2, image.height // 2), Image.LANCZOS)
+    source = args.dir / "worldmap.input.png"
+    small.save(source)
+    out = args.dir / "worldmap" / f"{args.provider}.png"
+    _paint(source, WORLDMAP_PROMPT.format(w=small.width, h=small.height), out, args.provider, "16:10" if args.provider == "codex" else "3:2")
+    painted = Image.open(out).convert("RGB").resize(image.size, Image.LANCZOS)
+    painted.save(worldmap.PAINTED, quality=92)
+    Image.blend(image, painted, 0.5).save(args.dir / "worldmap-overlay.png")
+    print(f"installed {worldmap.PAINTED}; compare {args.dir / 'worldmap-overlay.png'}")
 
 
 KEYART_PROMPT = (
@@ -383,12 +423,13 @@ def cmd_keyart(args: argparse.Namespace) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--subjects", type=lambda s: set(s.split(",")), default=None)
+    parser.add_argument("--locations", type=lambda s: set(s.split(",")), default=None, help="floors to paint (ground)")
     parser.add_argument("--provider", choices=PROVIDERS, default="codex", help="render with, and cut this one's render first")
     parser.add_argument("--jobs", type=int, default=3)
     parser.add_argument("--effort", default="low", help="Codex's reasoning effort: raise it when the painter drops instructions")
     parser.add_argument("--tolerance", type=int, default=2, help="flagged cells a sheet may have and still be installed")
     parser.add_argument("--force", action="store_true")
-    parser.add_argument("command", choices=("dump", "render", "cut", "preview", "refresh", "ground", "keyart"))
+    parser.add_argument("command", choices=("dump", "render", "cut", "preview", "refresh", "ground", "worldmap", "keyart"))
     parser.add_argument("dir", type=Path)
     args = parser.parse_args()
     globals()[f"cmd_{args.command}"](args)

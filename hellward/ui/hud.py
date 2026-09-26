@@ -14,9 +14,9 @@ from saga2d import Scene
 
 from hellward.art.fx import ORB_LEVELS
 from hellward.sim.campaign import first_offering, offers
-from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, START_LIVES, TOWERS, Element
+from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, START_LIVES, TOWERS, Element, MonsterKind
 from hellward.sim.model import Monster, Tower, World
-from hellward.ui import style
+from hellward.ui import style, widgets
 
 TOP = 672
 SLOT = 68
@@ -26,6 +26,22 @@ SPELL_BAR = ("smite", "meteor", "orb")       # Cleanse is C, and the button on a
 SPELL_KEYS = {"smite": "Q", "meteor": "W", "orb": "E"}
 SPELL_X = 918
 ELEMENT_NAMES = {Element.FIRE: "Fire", Element.LIGHTNING: "Lightning", Element.COLD: "Cold", Element.POISON: "Poison"}
+
+
+def monster_notes(kind: MonsterKind) -> list[str]:
+    """What a monster resists, in Diablo's words, and whether it flies."""
+    notes = []
+    for element in Element:
+        r = kind.resist.get(element, 0.0)
+        if r >= 1:
+            notes.append(f"Immune to {ELEMENT_NAMES[element]}")
+        elif r > 0:
+            notes.append(f"Resists {ELEMENT_NAMES[element]}")
+        elif r < 0:
+            notes.append(f"Weak to {ELEMENT_NAMES[element]}")
+    if kind.flying:
+        notes.append("Flies over gates")
+    return notes
 
 
 @dataclass
@@ -278,17 +294,7 @@ class Hud:
         scene.draw_rect(x, y, w, 24, (40, 6, 8, 230), border_color=(120, 30, 30, 255), border_width=1.5)
         scene.draw_rect(x + 2, y + 2, (w - 4) * max(0.0, m.hp / max_hp), 20, (150, 16, 20, 255))
         scene.draw_text(kind.name, 640, y + 12, font_size=16, color=color, font=style.TITLE_FONT, anchor_x="center", anchor_y="center")
-        notes = []
-        for element in Element:
-            r = kind.resist.get(element, 0.0)
-            if r >= 1:
-                notes.append(f"Immune to {ELEMENT_NAMES[element]}")
-            elif r > 0:
-                notes.append(f"Resists {ELEMENT_NAMES[element]}")
-            elif r < 0:
-                notes.append(f"Weak to {ELEMENT_NAMES[element]}")
-        if kind.flying:
-            notes.append("Flies over gates")
+        notes = monster_notes(kind)
         if kind.leader:
             notes.append("Leader: curses " + " and ".join(CURSES[c].name for c in kind.leader.curses))
         if notes:
@@ -333,15 +339,4 @@ class Hud:
             self._tooltip("\n".join(lines), mouse, above=mouse[1] - 30)
 
     def _tooltip(self, tip: str, mouse: tuple[float, float], above: float = TOP - 8) -> None:
-        scene = self.scene
-        lines = tip.split("\n")
-        width = 320
-        layout = [scene.layout_text(line, width - 20, font_size=13) for line in lines]
-        height = sum(l.height for l in layout) + 10 * len(layout) + 8
-        x = min(max(mouse[0] - width / 2, 44), 1236 - width)
-        y = max(4, above - height)
-        scene.draw_rect(x, y, width, height, (16, 12, 12, 240), border_color=style.PANEL_EDGE, border_width=1.5, radius=4)
-        yy = y + 8
-        for i, line in enumerate(lines):
-            yy += scene.draw_paragraph(line, x + 10, yy, width - 20, font_size=13, color=style.GOLD if i == 0 else style.BONE) + 8
-
+        widgets.tooltip(self.scene, tip, mouse, above)

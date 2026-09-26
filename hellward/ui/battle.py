@@ -52,7 +52,7 @@ class BattleScene(Scene):
                  seed: int = 0, planner: Callable | None = None, sound: Any = None,
                  autopilot: Player | None = None, on_end: Callable[[World], None] | None = None,
                  settings: Any = None, restart: Callable[[], None] | None = None,
-                 to_title: Callable[[], None] | None = None) -> None:
+                 to_title: Callable[[], None] | None = None, to_map: Callable[[], None] | None = None) -> None:
         self.art = art
         self.location = location
         self.difficulty = difficulty
@@ -60,6 +60,7 @@ class BattleScene(Scene):
         self.settings = settings
         self.restart = restart
         self.to_title = to_title
+        self.to_map = to_map
         self.seed = seed
         self.planner = planner
         self.sound = sound or Silent()
@@ -371,10 +372,10 @@ class BattleScene(Scene):
             self.open_menu()
 
     def open_menu(self) -> None:
-        if self.restart is None or self.to_title is None:
+        if self.restart is None or self.to_title is None or self.to_map is None:
             self.paused = True   # a scene without a game around it (tests, clips) can only pause; P resumes
             return
-        self.game.push(PauseScene(restart=self.restart, to_title=self.to_title, on_settings=self.settings_changed))
+        self.game.push(PauseScene(restart=self.restart, to_map=self.to_map, to_title=self.to_title, on_settings=self.settings_changed))
 
     def settings_changed(self) -> None:
         self.fx.show_thoughts = self.settings["minds"]

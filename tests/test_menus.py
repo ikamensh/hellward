@@ -8,9 +8,14 @@ from saga2d import Game
 
 from hellward.__main__ import build
 from hellward.sim import planner
+from hellward.sim.campaign import CATHEDRAL
+from hellward.sim.players.ordinary import Ordinary
 from hellward.ui import menus
-from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
+from hellward.ui.battle import HEIGHT, WIDTH, BattleScene, Silent
+from hellward.ui.flow import Flow
+from hellward.ui.mapscreen import MapScene
 from hellward.ui.menus import PauseScene, SettingsScene
+from hellward.ui.progress import Progress
 from hellward.ui.title import TitleScene
 
 
@@ -27,21 +32,21 @@ def game(cache, tmp_path):
     g.close()
 
 
+def flow_of(g: Game, art) -> Flow:
+    return Flow(g, art, sound=Silent(), planner=planner.smart, settings=menus.settings(g), progress=Progress.load(g),
+                demo_player=Ordinary)
+
+
 def fight(g: Game, art) -> BattleScene:
-    """A defence the way the game starts one: settings in hand, a way to start again and back to the title."""
-    values = menus.settings(g)
-
-    def begin() -> None:
-        g.clear_and_push(fight_scene())
-
-    def fight_scene() -> BattleScene:
-        return BattleScene(art, planner=planner.smart, settings=values, restart=begin,
-                           to_title=lambda: g.clear_and_push(TitleScene(lambda _: None, g.quit)))
-
-    scene = fight_scene()
-    g.push(scene)
+    """A defence the way the game starts one: settings in hand, ways to start again, to the map and to the title."""
+    flow_of(g, art).defend(CATHEDRAL)
     g.tick(1 / 30)
-    return scene
+    return g.scenes[-1]
+
+
+def title(g: Game, art) -> None:
+    g.push(TitleScene(flow_of(g, art)))
+    g.tick(1 / 30)
 
 
 def press(g: Game, key: str) -> None:
@@ -110,14 +115,17 @@ def test_starting_again_and_leaving_for_the_title_leave_no_old_fight_behind(game
     assert len(g.scenes) == 1 and isinstance(g.scenes[0], BattleScene) and g.scenes[0] is not first
     assert g.scenes[0].world.time < 0.1
     press(g, "escape")
+    press(g, "m")
+    assert len(g.scenes) == 1 and isinstance(g.scenes[0], MapScene)
+    fight(g, art)
+    press(g, "escape")
     press(g, "t")
     assert len(g.scenes) == 1 and isinstance(g.scenes[0], TitleScene)
 
 
 def test_escape_on_the_title_does_not_quit(game):
-    g, _ = game
-    g.push(TitleScene(lambda _: None, g.quit))
-    g.tick(1 / 30)
+    g, art = game
+    title(g, art)
     press(g, "escape")
     assert g.running
     press(g, "s")
@@ -173,10 +181,9 @@ def test_a_broken_settings_file_is_set_aside_and_the_game_saves_again(cache, tmp
 
 
 def test_changing_a_volume_neither_leaves_nor_saves_a_session_fullscreen(game):
-    g, _ = game
+    g, art = game
     g.set_fullscreen(True)                            # what --fullscreen does for one session
-    g.push(TitleScene(lambda _: None, g.quit))
-    g.tick(1 / 30)
+    title(g, art)
     press(g, "s")
     press(g, "right")
     assert g.fullscreen

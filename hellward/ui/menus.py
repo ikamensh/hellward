@@ -60,16 +60,17 @@ class _Overlay(Scene):
 
 
 class PauseScene(_Overlay):
-    controls = {"s": "open_settings", "r": "restart", "t": "to_title", "q": "quit"}
+    controls = {"s": "open_settings", "r": "restart", "m": "to_map", "t": "to_title", "q": "quit"}
 
-    def __init__(self, *, restart: Callable[[], None], to_title: Callable[[], None], on_settings: Callable[[], None]) -> None:
-        self._restart, self._to_title, self._on_settings = restart, to_title, on_settings
+    def __init__(self, *, restart: Callable[[], None], to_map: Callable[[], None], to_title: Callable[[], None],
+                 on_settings: Callable[[], None]) -> None:
+        self._restart, self._to_map, self._to_title, self._on_settings = restart, to_map, to_title, on_settings
 
     def on_enter(self) -> None:
         panel = self.panel("Paused")
         for text, key, action in (("Resume", "Esc", self.game.pop), ("Settings", "S", self.open_settings),
-                                  ("Begin the defence again", "R", self.restart), ("Back to the title", "T", self.to_title),
-                                  ("Leave the game", "Q", self.quit)):
+                                  ("Start this defence again", "R", self.restart), ("To the map", "M", self.to_map),
+                                  ("Back to the title", "T", self.to_title), ("Leave the game", "Q", self.quit)):
             panel.add(Button(text, hotkey=key, on_click=action, width=340, style=None if text == "Resume" else QUIET_BUTTON))
 
     def open_settings(self) -> None:
@@ -77,6 +78,9 @@ class PauseScene(_Overlay):
 
     def restart(self) -> None:
         self._restart()
+
+    def to_map(self) -> None:
+        self._to_map()
 
     def to_title(self) -> None:
         self._to_title()
