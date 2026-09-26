@@ -20,7 +20,7 @@ from hellward.sim.campaign import CATHEDRAL, Location, first_offering, offers
 from hellward.sim.content import CURSES, DOOR, MONSTERS, SPELLS
 from hellward.sim.model import SIM_DT, Monster, Refused, Tower, World
 from hellward.sim.players.hands import Hands, Player
-from hellward.sim.skills import NO_PERKS, Perks
+from hellward.sim.skills import NO_PERKS, SKILLS, Perks
 from hellward.ui import style
 from hellward.ui.effects import Effects
 from hellward.ui.hud import BUILD, Hud
@@ -476,6 +476,11 @@ class BattleScene(Scene):
         elif kind == "build" and not offers(self.location, key):
             self.pick(key)    # it says where the slot's tower arrives
         elif not enabled:
+            if name == "upgrade" and self.selected is not None:
+                need = self.world.rank_needs(self.selected)
+                if need is not None:
+                    self._refuse(f"Learn {SKILLS[need].name} in the skill tree (K)")
+                    return
             self.sound.play("refuse")
         elif kind == "build":
             self.pick(key)

@@ -132,29 +132,29 @@ def draft_skills(location: Location, sigils: int) -> frozenset[str]:
     arsenal = location.arsenal
     wanted: list[str] = []
     if "pyre" in arsenal.towers:
-        wanted += ["fire_mastery", "fire_ball"]
+        wanted += ["adept_fire", "fire_ball"]
     if arsenal.gates:
         wanted += ["holy_shield"]
     if "smite" in arsenal.spells:
         wanted += ["warmth"]
     if "storm" in arsenal.towers and flyers(location) > 0.1:
-        wanted += ["lightning_mastery", "chain_lightning"]
+        wanted += ["adept_lightning", "chain_lightning"]
     if "cleanse" in arsenal.spells and arsenal.gates:
         wanted += ["salvation"]
     if "frost" in arsenal.towers:
-        wanted += ["cold_mastery"]
+        wanted += ["adept_cold"]
     if "pyre" in arsenal.towers:
-        wanted += ["blaze"]
+        wanted += ["master_fire", "blaze"]
     if "smite" in arsenal.spells:
         wanted += ["soul_harvest"]
     if arsenal.gates:
         wanted += ["thorns"]
     if "storm" in arsenal.towers:
-        wanted += ["lightning_mastery", "chain_lightning", "static_field"]
+        wanted += ["adept_lightning", "chain_lightning", "master_lightning", "static_field"]
     if "plague" in arsenal.towers:
-        wanted += ["poison_mastery", "contagion", "lower_resist"]
+        wanted += ["adept_poison", "contagion", "master_poison", "lower_resist"]
     if "frost" in arsenal.towers:
-        wanted += ["glacial_spike", "shatter"]
+        wanted += ["glacial_spike", "master_cold", "shatter"]
     if len(arsenal.spells) > 2:
         wanted += ["spell_mastery"]
     learned: frozenset[str] = frozenset()
@@ -309,6 +309,9 @@ class Warden:
                 tower = world.tower_at(step.tile)
                 cost = world.upgrade_cost(tower) if tower is not None else None
                 if cost is not None:
+                    if world.rank_needs(tower) is not None:
+                        self.done += 1
+                        continue
                     if world.gold < cost:
                         return
                     world.upgrade(tower.id)
@@ -318,7 +321,8 @@ class Warden:
     def _more(self, world: World) -> None:
         """With the build done: a rank for the tower that has worked hardest, or a new tower on the best tile left."""
         while True:
-            ranked = [t for t in world.towers.values() if world.upgrade_cost(t) is not None]
+            ranked = [t for t in world.towers.values()
+                      if world.upgrade_cost(t) is not None and world.rank_needs(t) is None]
             if ranked:
                 tower = max(ranked, key=lambda t: (self.work.get(t.id, 0.0) / t.spent, -t.id))
                 if world.gold < world.upgrade_cost(tower):

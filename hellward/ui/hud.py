@@ -16,6 +16,7 @@ from hellward.art.fx import ORB_LEVELS
 from hellward.sim.campaign import first_offering, offers
 from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, START_LIVES, TOWERS, Element, MonsterKind
 from hellward.sim.model import Monster, Tower, World
+from hellward.sim.skills import SKILLS
 from hellward.ui import style, widgets
 
 TOP = 672
@@ -253,8 +254,14 @@ class Hud:
                 scene.draw_text(scene.fit_text(text, 340, font_size=13), x0, y0 + 58, font_size=13, color=style.CURSE, anchor_y="center")
             cost = world.upgrade_cost(selected)
             by = TOP + 86
-            self._button("upgrade", x0, by, 112, 28, f"Upgrade {cost}" if cost else "Highest rank", enabled=bool(cost) and world.gold >= cost,
-                         tip="[U] The next rank: more damage and reach, and a finer look.")
+            need = world.rank_needs(selected)
+            if need is not None:
+                self._button("upgrade", x0, by, 112, 28, f"Upgrade {cost}", enabled=False,
+                             tip=f"Learn {SKILLS[need].name} in the skill tree (K)")
+                self._padlock(x0 + 56, by + 14)
+            else:
+                self._button("upgrade", x0, by, 112, 28, f"Upgrade {cost}" if cost else "Highest rank", enabled=bool(cost) and world.gold >= cost,
+                             tip="[U] The next rank: more damage and reach, and a finer look.")
             self._button("sell", x0 + 118, by, 100, 28, f"Sell +{int(selected.spent * SELL_REFUND)}", tip="[S] Tear it down for most of its cost.")
             cleanse = world.spell_cost("cleanse")
             self._button("cleanse", x0 + 224, by, 116, 28, f"Cleanse {cleanse:.0f}", enabled=bool(selected.curses) and world.mana >= cleanse,

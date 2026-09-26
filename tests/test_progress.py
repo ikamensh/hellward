@@ -51,7 +51,7 @@ def test_sigils_learning_and_the_lantern_last_to_the_next_session(tmp_path):
     try:
         progress = Progress.load(first)
         assert progress.record("tristram", "victory", 18) == 3
-        assert progress.learn("fire_mastery")
+        assert progress.learn("adept_fire")
         progress.move("graveyard")
     finally:
         first.close()
@@ -65,6 +65,14 @@ def test_sigils_learning_and_the_lantern_last_to_the_next_session(tmp_path):
         second.close()
 
 
+def test_a_save_listing_a_removed_mastery_loads_with_it_forgotten(game):
+    game.save_manager.save("campaign", {"won": {"tristram": 3}, "learned": ["fire_mastery", "adept_fire"],
+                                        "at": "tristram"}, "Progress", summary={})
+    progress = Progress.load(game)
+    assert progress.learned == frozenset({"adept_fire"})
+    assert progress.free == 2
+
+
 def test_an_old_save_with_a_difficulty_loads_its_normal_sigils(game):
     game.save_manager.save("campaign", {"won": {"normal": {"tristram": 3}, "hell": {}},
                                         "learned": [], "at": "tristram", "difficulty": "hell"},
@@ -74,20 +82,20 @@ def test_an_old_save_with_a_difficulty_loads_its_normal_sigils(game):
 
 def test_learning_needs_its_prerequisite_and_free_sigils_and_unlearning_returns_them_all(game):
     progress = Progress.load(game)
-    assert not can_learn(progress.learned, "fire_mastery", progress.sigils)
-    assert not progress.learn("fire_mastery")   # no sigils yet
+    assert not can_learn(progress.learned, "adept_fire", progress.sigils)
+    assert not progress.learn("adept_fire")   # no sigils yet
     assert not progress.learn("fire_ball")   # its prerequisite is missing too
     assert progress.record("tristram", "victory", 18) == 3
     assert not can_learn(progress.learned, "fire_ball", progress.sigils)
-    assert not progress.learn("fire_ball")   # still needs Fire Mastery first
-    assert can_learn(progress.learned, "fire_mastery", progress.sigils)
-    assert progress.learn("fire_mastery")
-    assert progress.free == progress.sigils - SKILLS["fire_mastery"].cost
+    assert not progress.learn("fire_ball")   # still needs Adept of Fire first
+    assert can_learn(progress.learned, "adept_fire", progress.sigils)
+    assert progress.learn("adept_fire")
+    assert progress.free == progress.sigils - SKILLS["adept_fire"].cost
     assert can_learn(progress.learned, "fire_ball", progress.sigils)
     assert progress.learn("fire_ball")
     assert progress.free == 0
     assert not progress.learn("warmth")   # no sigils left
-    assert not progress.learn("blaze")   # three sigils short of the last tier
+    assert not progress.learn("master_fire")   # one sigil short of the next tier
     earned = progress.sigils
     progress.unlearn_all()
     assert progress.learned == frozenset()

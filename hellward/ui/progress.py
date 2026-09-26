@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from saga2d import Game
 
 from hellward.sim.campaign import LOCATIONS, ORDER, Location, sigils
-from hellward.sim.skills import can_learn, check, cost
+from hellward.sim.skills import SKILLS, can_learn, check, cost
 
 SLOT = "campaign"
 
@@ -30,7 +30,8 @@ class Progress:
             return cls(game=game)
         state = data["state"]
         won = state["won"]["normal"] if "difficulty" in state else state["won"]   # a save from before the acts
-        progress = cls(won=dict(won), learned=frozenset(state["learned"]), at=state["at"], game=game)
+        learned = frozenset(k for k in state["learned"] if k in SKILLS)
+        progress = cls(won=dict(won), learned=learned, at=state["at"], game=game)
         check(progress.learned)
         return progress
 

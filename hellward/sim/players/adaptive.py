@@ -77,17 +77,24 @@ BOSS = 5               # lives a monster costs that make it worth every spare Sm
 
 PLANS = Path(__file__).parent / "plans" / "adaptive.json"
 ORDERS: dict[str, tuple[str, ...]] = {
-    "mixed": ("holy_shield", "fire_mastery", "warmth", "cold_mastery", "fire_ball", "lightning_mastery",
-              "chain_lightning", "salvation", "poison_mastery", "glacial_spike", "soul_harvest", "thorns",
-              "spell_mastery"),
-    "warden": ("holy_shield", "warmth", "cold_mastery", "salvation", "fire_mastery", "poison_mastery",
-               "lightning_mastery", "thorns", "glacial_spike", "soul_harvest"),
-    "sorcerer": ("warmth", "soul_harvest", "spell_mastery", "holy_shield", "cold_mastery", "fire_mastery",
-                 "poison_mastery", "lightning_mastery", "glacial_spike"),
-    "frost": ("cold_mastery", "glacial_spike", "holy_shield", "warmth", "shatter", "fire_mastery", "poison_mastery"),
-    "fire": ("fire_mastery", "fire_ball", "holy_shield", "warmth", "cold_mastery", "blaze"),
-    "storm": ("lightning_mastery", "chain_lightning", "holy_shield", "warmth", "cold_mastery", "static_field"),
-    "venom": ("poison_mastery", "holy_shield", "contagion", "warmth", "cold_mastery", "lower_resist"),
+    "mixed": ("adept_fire", "adept_cold", "holy_shield", "warmth", "fire_ball", "glacial_spike",
+              "adept_lightning", "chain_lightning", "salvation", "adept_poison", "contagion",
+              "soul_harvest", "master_fire", "master_cold", "master_lightning", "master_poison",
+              "thorns", "blaze", "shatter", "static_field", "lower_resist", "spell_mastery"),
+    "warden": ("holy_shield", "warmth", "adept_cold", "salvation", "adept_fire", "adept_poison",
+               "adept_lightning", "fire_ball", "glacial_spike", "chain_lightning", "contagion",
+               "thorns", "soul_harvest", "master_fire", "master_cold", "master_lightning", "master_poison"),
+    "sorcerer": ("warmth", "soul_harvest", "spell_mastery", "holy_shield", "adept_cold", "adept_fire",
+                 "adept_poison", "adept_lightning", "fire_ball", "glacial_spike", "chain_lightning",
+                 "contagion", "master_fire", "master_cold", "master_lightning", "master_poison"),
+    "frost": ("adept_cold", "glacial_spike", "holy_shield", "warmth", "master_cold", "shatter",
+              "adept_fire", "adept_poison", "fire_ball", "contagion", "master_fire", "master_poison"),
+    "fire": ("adept_fire", "fire_ball", "holy_shield", "warmth", "adept_cold", "master_fire", "blaze",
+             "glacial_spike", "master_cold"),
+    "storm": ("adept_lightning", "chain_lightning", "holy_shield", "warmth", "adept_cold", "master_lightning",
+              "static_field", "glacial_spike", "master_cold"),
+    "venom": ("adept_poison", "holy_shield", "contagion", "warmth", "adept_cold", "master_poison",
+              "lower_resist", "glacial_spike", "master_cold"),
 }
 DEFAULT_ORDER = "mixed"
 TOWER_OF = {"fire": "pyre", "lightning": "storm", "cold": "frost", "poison": "plague"}
@@ -445,7 +452,7 @@ class Adaptive:
                 darts = [d - t.stats.rate if b in own else d for b, d in enumerate(self.darts)]
             self.tower_worth[t.id] = self.worth(t.kind.key, t.level, t.stats, t.tile, chilled, darts)
             cost = world.upgrade_cost(t)
-            if cost is not None:
+            if cost is not None and world.rank_needs(t) is None:
                 better = self.worth(t.kind.key, t.level + 1, t.levels[t.level + 1], t.tile, chilled, darts)
                 prices[("upgrade", t.id)] = (better - self.tower_worth[t.id]) * (1.0 - self._curse_share(t)) / cost
         standing = {t.tile for t in world.towers.values()}

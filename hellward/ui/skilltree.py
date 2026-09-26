@@ -1,4 +1,4 @@
-"""The skill tree: six columns of three skills, learned with sigils, unlearned for free.
+"""The skill tree: tower columns of four skills and two columns of three, learned with sigils.
 
 Opened from the world map or from a location's intro (then the columns that do nothing there are greyed). A
 click learns a skill whose parent is learned and that the free sigils pay for; Unlearn all gives every sigil back.
@@ -21,10 +21,8 @@ ICONS = {"fire": ("tower/pyre/2", 150 / 72), "lightning": ("tower/storm/2", 150 
          "poison": ("tower/plague/2", 150 / 72), "warding": ("gate/intact", 80 / 60), "sorcery": ("ui/orb/mana/30", 1.0)}
 COLOURS = {"fire": (255, 130, 50), "lightning": (140, 190, 255), "cold": (160, 225, 255), "poison": (130, 230, 70),
            "warding": (255, 222, 140), "sorcery": (120, 150, 255)}
-COLUMN_X = 140
-COLUMN_GAP = 200
-TIER_Y = (220, 395, 570)
-NODE_W, NODE_H = 176, 140
+TIER_Y = (196, 336, 476, 616)
+NODE_H = 128
 
 
 class SkillTreeScene(Scene):
@@ -71,15 +69,19 @@ class SkillTreeScene(Scene):
         free = f"{progress.free} sigil{'' if progress.free == 1 else 's'} free"
         self.draw_text(f"{free} of {progress.sigils} won. Unlearning is free.{where}", 640, 88, font_size=15,
                        color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
-        for i, (column, name) in enumerate(COLUMNS.items()):
-            cx = COLUMN_X + i * COLUMN_GAP
+        columns = list(COLUMNS.items())
+        n = len(columns)
+        gap = min(200.0, 1160.0 / max(1, n - 1)) if n > 1 else 200.0
+        node_w = min(176.0, gap - 24.0)
+        for i, (column, name) in enumerate(columns):
+            cx = 640 - (n - 1) * gap / 2 + i * gap
             image, aspect = ICONS[column]
-            height = 36 * aspect if aspect > 1 else 36
-            self.draw_image(image, cx - 18, 172 - height, 36, height)   # every icon stands on one line
+            height = 30 * aspect if aspect > 1 else 30
+            self.draw_image(image, cx - 15, 158 - height, 30, height)   # every icon stands on one line
             skills = sorted((s for s in SKILLS.values() if s.column == column), key=lambda s: s.tier)
-            self.draw_text(name, cx, 192, style="heading", color=COLOURS[column] + (255,), anchor_x="center", anchor_y="center")
+            self.draw_text(name, cx, 176, style="heading", color=COLOURS[column] + (255,), anchor_x="center", anchor_y="center")
             for skill in skills:
-                self._node(skill, cx)
+                self._node(skill, cx, node_w)
         mouse = self.game.mouse_position
         if mouse is not None:
             spot = widgets.hit(self.spots, *mouse)
@@ -87,9 +89,9 @@ class SkillTreeScene(Scene):
                 with self.screen_layer(5):
                     widgets.tooltip(self, spot.tip, mouse, mouse[1] - 16)
 
-    def _node(self, skill: Skill, cx: float) -> None:
+    def _node(self, skill: Skill, cx: float, node_w: float = 176.0) -> None:
         progress = self.progress
-        x, y = cx - NODE_W / 2, TIER_Y[skill.tier - 1]
+        x, y = cx - node_w / 2, TIER_Y[skill.tier - 1]
         learned = skill.key in progress.learned
         learnable = can_learn(progress.learned, skill.key, progress.sigils)
         dormant = self.location is not None and idle(self.location, skill.needs)
@@ -100,21 +102,21 @@ class SkillTreeScene(Scene):
             self.draw_line(cx, y - 35, cx, y, colour + (220,) if lit else (70, 60, 52, 200), 4 if lit else 2)
         fill = (40, 30, 22, 245) if learned else (18, 13, 14, 240)
         border = colour + (255,) if learned else (200, 170, 110, 255) if learnable else (70, 60, 52, 255)
-        self.draw_rect(x, y, NODE_W, NODE_H, fill, border_color=border, border_width=2.5 if learned else 1.5, radius=8)
+        self.draw_rect(x, y, node_w, NODE_H, fill, border_color=border, border_width=2.5 if learned else 1.5, radius=8)
         if learned:
-            self.draw_image(f"fx/soft/{_glow(skill.column)}", x + 10, y - 20, NODE_W - 20, 70, opacity=0.35)
+            self.draw_image(f"fx/soft/{_glow(skill.column)}", x + 10, y - 20, node_w - 20, 70, opacity=0.35)
         text = style.PALE_GOLD if (learned or learnable) else style.DIM
-        size = 16 if len(skill.name) < 15 else 14
-        self.draw_text(self.fit_text(skill.name, NODE_W - 12, font_size=size, font=style.TITLE_FONT), cx, y + 20, font_size=size,
+        size = 15 if len(skill.name) < 15 else 13
+        self.draw_text(self.fit_text(skill.name, node_w - 12, font_size=size, font=style.TITLE_FONT), cx, y + 20, font_size=size,
                        color=text, font=style.TITLE_FONT, anchor_x="center", anchor_y="center")
-        widgets.centred(self, skill.blurb, cx, y + 36, NODE_W - 16, font_size=12, color=style.BONE if not dormant else style.DIM,
+        widgets.centred(self, skill.blurb, cx, y + 36, node_w - 16, font_size=11, color=style.BONE if not dormant else style.DIM,
                         max_lines=4)
         for k in range(skill.cost):   # its price in sigils
-            px = cx + (k - (skill.cost - 1) / 2) * 16
-            self.draw_circle(px, y + NODE_H - 14, 5.5, (230, 184, 90, 255) if learned else (120, 96, 60, 255))
+            px = cx + (k - (skill.cost - 1) / 2) * 15
+            self.draw_circle(px, y + NODE_H - 14, 5.0, (230, 184, 90, 255) if learned else (120, 96, 60, 255))
         if dormant:
             with self.screen_layer(1):   # a veil over the whole node, its words and pips too
-                self.draw_rect(x, y, NODE_W, NODE_H, (0, 0, 0, 150), radius=8)
+                self.draw_rect(x, y, node_w, NODE_H, (0, 0, 0, 150), radius=8)
         if learned:
             state = "Learned."
         elif learnable:
@@ -124,7 +126,7 @@ class SkillTreeScene(Scene):
         else:
             state = f"Costs {skill.cost} sigils; {progress.free} are free."
         note = "\nNothing to work on here." if dormant else ""
-        self.spots.append(widgets.Hotspot(skill.key, (x, y, NODE_W, NODE_H), learnable, f"{skill.name}\n{skill.blurb}\n{state}{note}"))
+        self.spots.append(widgets.Hotspot(skill.key, (x, y, node_w, NODE_H), learnable, f"{skill.name}\n{skill.blurb}\n{state}{note}"))
 
 
 def _glow(column: str) -> str:

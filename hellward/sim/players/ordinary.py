@@ -86,7 +86,8 @@ class Ordinary:
                     return
                 world.build(kind, tile)
                 continue
-            upgrades = [(t, cost) for t in world.towers.values() if (cost := world.upgrade_cost(t)) is not None]
+            upgrades = [(t, cost) for t in world.towers.values()
+                        if (cost := world.upgrade_cost(t)) is not None and world.rank_needs(t) is None]
             if not upgrades:
                 return
             tower, cost = min(upgrades, key=lambda u: (u[0].level, u[0].id))

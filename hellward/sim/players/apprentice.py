@@ -15,8 +15,10 @@ from hellward.sim.players.hands import Hands
 from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.skills import SKILLS, can_learn
 
-FIRST = ("fire_mastery", "warmth", "cold_mastery", "lightning_mastery", "holy_shield", "fire_ball",
-         "poison_mastery", "salvation", "glacial_spike", "chain_lightning", "soul_harvest")
+FIRST = ("adept_fire", "warmth", "adept_cold", "adept_lightning", "holy_shield", "fire_ball",
+         "adept_poison", "salvation", "glacial_spike", "chain_lightning", "soul_harvest",
+         "contagion", "master_fire", "master_cold", "master_lightning", "master_poison",
+         "blaze", "shatter", "static_field", "lower_resist", "thorns", "spell_mastery")
 
 METEOR_CROWD = 4     # others within METEOR_REACH of the aimed monster that make a Meteor worth it
 METEOR_REACH = 1.4   # tiles around the aimed monster

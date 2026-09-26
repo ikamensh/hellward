@@ -10,9 +10,9 @@
    "seeds": "0-3"
   },
   "skills": [
-   "cold_mastery",
+   "adept_cold",
    "fire_ball",
-   "fire_mastery",
+   "adept_fire",
    "holy_shield",
    "warmth"
   ],
@@ -183,8 +183,8 @@
    "seeds": "0-3"
   },
   "skills": [
-   "cold_mastery",
-   "fire_mastery",
+   "adept_cold",
+   "adept_fire",
    "holy_shield",
    "warmth"
   ],
@@ -351,11 +351,11 @@
   },
   "skills": [
    "chain_lightning",
-   "cold_mastery",
-   "fire_mastery",
+   "adept_cold",
+   "adept_fire",
    "holy_shield",
-   "lightning_mastery",
-   "poison_mastery",
+   "adept_lightning",
+   "adept_poison",
    "warmth"
   ],
   "steps": [
@@ -477,7 +477,7 @@
    "seeds": "0-3"
   },
   "skills": [
-   "cold_mastery",
+   "adept_cold",
    "holy_shield"
   ],
   "steps": [
@@ -594,13 +594,13 @@
    "seeds": "0-3"
   },
   "skills": [
-   "cold_mastery",
+   "adept_cold",
    "fire_ball",
-   "fire_mastery",
+   "adept_fire",
    "glacial_spike",
    "holy_shield",
-   "lightning_mastery",
-   "poison_mastery",
+   "adept_lightning",
+   "adept_poison",
    "warmth"
   ],
   "steps": [
