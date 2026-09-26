@@ -1,8 +1,8 @@
 """The pause menu and the settings: overlays over the fight or the title.
 
 Settings live in ``~/.hellward/settings.json`` (``game.settings``): the music and effects volumes, the
-window, and whether the leaders' minds show over the towers. They apply the moment they change and are
-saved when the settings close.
+window, and whether the leaders' minds show over the towers. They apply and are saved the moment they
+change. ``--fullscreen`` starts one session fullscreen without changing the saved choice.
 """
 
 from __future__ import annotations
@@ -26,15 +26,19 @@ def validate(values: dict[str, Any]) -> None:
 
 
 def settings(game: Game) -> Settings:
-    return game.settings(DEFAULTS, validator=validate)
+    """The game's settings. A file that cannot be read or holds impossible values is kept aside as
+    ``settings.recovery-<id>.json`` and replaced by the defaults, so saving never fails on it later."""
+    values = game.settings(DEFAULTS, validator=validate)
+    if values.error is not None:
+        print(f"Hellward: {values.error}; starting from the default settings (the old file is kept as a recovery copy)")
+        values.reset()
+        values.save()
+    return values
 
 
-def apply(game: Game, values: Settings) -> None:
-    """Make the game sound and sit the way the settings say."""
+def apply_volumes(game: Game, values: Settings) -> None:
     game.audio.set_volume("music", values["music"])
     game.audio.set_volume("sfx", values["sfx"])
-    if game.fullscreen != values["fullscreen"]:
-        game.set_fullscreen(values["fullscreen"])
 
 
 class _Overlay(Scene):
@@ -82,7 +86,7 @@ class PauseScene(_Overlay):
 
 
 class SettingsScene(_Overlay):
-    """↑↓ pick a row, ←→ change it, Esc saves and closes; the − and + buttons do the same with the mouse."""
+    """↑↓ pick a row, ←→ change it, Esc closes; the − and + buttons do the same with the mouse."""
 
     controls = {"left": "decrease", "right": "increase"}
     ROWS = (("Music", "music", "percent"), ("Sound effects", "sfx", "percent"), ("Fullscreen", "fullscreen", "toggle"),
@@ -106,7 +110,7 @@ class SettingsScene(_Overlay):
             row.add(Button("+", on_click=lambda k=key: self.change(k, 1), width=40, focusable=False, style=QUIET_BUTTON))
             panel.add(row)
         self.ui.focus(next(iter(self.rows)))
-        panel.add(Label("↑↓ choose   ←→ change   Esc saves and closes", text_style="small", width=460, align="center"))
+        panel.add(Label("↑↓ choose   ←→ change   Esc closes", text_style="small", width=460, align="center"))
 
     def shown(self, key: str, kind: str) -> str:
         value = self.values[key]
@@ -116,9 +120,13 @@ class SettingsScene(_Overlay):
         kind = next(k for _name, row_key, k in self.ROWS if row_key == key)
         if kind == "percent":
             self.values[key] = round(max(0.0, min(1.0, self.values[key] + 0.1 * direction)), 2)
+            apply_volumes(self.game, self.values)
         else:
             self.values[key] = not self.values[key]
-        apply(self.game, self.values)
+            if key == "fullscreen":
+                self.game.set_fullscreen(self.values["fullscreen"])
+        # Saved at once: Cmd+Q, and Ctrl-C on a Mac, end the process without closing any scene.
+        self.values.save()
 
     def decrease(self) -> None:
         self.change(self.rows[self.ui.focused], -1)
@@ -127,6 +135,5 @@ class SettingsScene(_Overlay):
         self.change(self.rows[self.ui.focused], 1)
 
     def on_exit(self) -> None:
-        self.values.save()
         if self.after is not None:
             self.after()

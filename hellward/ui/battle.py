@@ -78,8 +78,12 @@ class BattleScene(Scene):
         self.sound.music("battle")
 
     def on_background(self) -> None:
-        if self.autopilot is None:
-            self.paused = True
+        """A player who looks away comes back to the pause menu, whose Resume resumes."""
+        if self.autopilot is None and self.game.scenes[-1] is self:
+            self.open_menu()
+
+    def on_reveal(self) -> None:
+        self.paused = False   # closing the menu resumes, whatever paused the fight before it opened
 
     # -- The clock -------------------------------------------------------------------------------
 
@@ -277,7 +281,7 @@ class BattleScene(Scene):
 
     def open_menu(self) -> None:
         if self.restart is None or self.to_title is None:
-            self.paused = not self.paused   # a scene without a game around it (tests, clips) can only pause
+            self.paused = True   # a scene without a game around it (tests, clips) can only pause; P resumes
             return
         self.game.push(PauseScene(restart=self.restart, to_title=self.to_title, on_settings=self.settings_changed))
 
@@ -386,6 +390,7 @@ class BattleScene(Scene):
         if self.paused:
             with self.screen_layer(4):
                 self.draw_text("Paused", 640, 330, style="banner", anchor_x="center", anchor_y="center")
+                self.draw_text("P resumes", 640, 372, font_size=16, color=style.BONE, anchor_x="center", anchor_y="center")
 
     def _ring(self, centre: tuple[float, float], reach: float, color, fill: bool = True) -> None:
         cx, cy = px(*centre)

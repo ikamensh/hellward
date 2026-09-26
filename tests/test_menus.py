@@ -80,8 +80,7 @@ def test_volumes_change_at_once_and_are_remembered(game):
     press(g, "left")
     press(g, "left")                  # effects two steps down
     assert g.audio.get_volume("sfx") == pytest.approx(menus.DEFAULTS["sfx"] - 0.2)
-    press(g, "escape")                # closing the settings saves them
-    saved = json.loads((g.data_dir / "settings.json").read_text())
+    saved = json.loads((g.data_dir / "settings.json").read_text())   # saved as they change, before closing
     assert saved["music"] == pytest.approx(music + 0.1) and saved["sfx"] == pytest.approx(menus.DEFAULTS["sfx"] - 0.2)
 
 
@@ -126,3 +125,91 @@ def test_escape_on_the_title_does_not_quit(game):
     press(g, "escape")
     press(g, "q")
     assert not g.running
+
+
+def test_a_player_who_looks_away_comes_back_to_the_menu_and_resume_resumes(game):
+    g, art = game
+    g.backend.inject_focus(True)
+    g.tick(1 / 30)
+    scene = fight(g, art)
+    g.backend.inject_focus(False)
+    g.tick(1 / 30)
+    g.backend.inject_focus(True)
+    g.tick(1 / 30)
+    assert isinstance(g.scenes[-1], PauseScene)
+    press(g, "escape")
+    time = scene.world.time
+    for _ in range(30):
+        g.tick(1 / 30)
+    assert g.scenes[-1] is scene and scene.world.time > time
+
+
+def test_resume_also_lifts_a_pause_from_the_p_key(game):
+    g, art = game
+    scene = fight(g, art)
+    press(g, "p")
+    assert scene.paused
+    press(g, "escape")
+    press(g, "escape")
+    assert not scene.paused
+
+
+def test_a_broken_settings_file_is_set_aside_and_the_game_saves_again(cache, tmp_path):
+    saves = tmp_path / "saves"
+    saves.mkdir()
+    (tmp_path / "settings.json").write_text('{"music": 7, "sfx": "loud"')
+    g = Game("Hellward", backend="mock", resolution=(WIDTH, HEIGHT), asset_path=cache, save_dir=saves)
+    try:
+        art = build(g, cache)
+        values = menus.settings(g)
+        assert values["music"] == menus.DEFAULTS["music"]
+        assert list(tmp_path.glob("settings.recovery-*.json"))
+        scene = fight(g, art)
+        press(g, "tab")                               # saves: no longer refused because of the old file
+        assert json.loads((tmp_path / "settings.json").read_text())["minds"] is False
+        assert scene.fx.show_thoughts is False
+    finally:
+        g.close()
+
+
+def test_changing_a_volume_neither_leaves_nor_saves_a_session_fullscreen(game):
+    g, _ = game
+    g.set_fullscreen(True)                            # what --fullscreen does for one session
+    g.push(TitleScene(lambda _: None, g.quit))
+    g.tick(1 / 30)
+    press(g, "s")
+    press(g, "right")
+    assert g.fullscreen
+    assert json.loads((g.data_dir / "settings.json").read_text())["fullscreen"] is False
+
+
+def test_the_planners_workers_end_with_the_game_however_it_ends(tmp_path):
+    """Cmd+Q on a Mac ends the process without closing the pool; the workers must not outlive it."""
+    import os
+    import subprocess
+    import sys
+    import time
+
+    script = tmp_path / "orphan.py"
+    script.write_text(
+        "import os, signal\n"
+        "from hellward.ui.thinking import Thinker\n"
+        "if __name__ == '__main__':\n"
+        "    thinker = Thinker()\n"
+        "    print(' '.join(str(p) for p in thinker.pool._processes), flush=True)\n"
+        "    os.kill(os.getpid(), signal.SIGKILL)\n")
+    run = subprocess.run([sys.executable, str(script)], capture_output=True, text=True, timeout=60)
+    workers = [int(p) for p in run.stdout.split()]
+    assert workers
+
+    def alive(pid: int) -> bool:
+        try:
+            os.kill(pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+
+    deadline = time.monotonic() + 10
+    while any(alive(p) for p in workers) and time.monotonic() < deadline:
+        time.sleep(0.1)
+    assert not any(alive(p) for p in workers)

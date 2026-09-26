@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import signal
 from pathlib import Path
 
 from saga2d import Game
@@ -43,11 +44,13 @@ def main(argv: list[str] | None = None) -> None:
     cache.mkdir(parents=True, exist_ok=True)
     game = Game("Hellward", resolution=(WIDTH, HEIGHT), fullscreen=args.fullscreen, asset_path=cache,
                 save_dir=DATA / "saves")
+    # pyglet's Cocoa loop makes Ctrl-C end the process on the spot; Python's own handler lets it unwind instead
+    signal.signal(signal.SIGINT, signal.default_int_handler)
     art = build(game, cache)
     values = menus.settings(game)
-    if args.fullscreen:
-        values["fullscreen"] = True
-    menus.apply(game, values)
+    menus.apply_volumes(game, values)
+    if values["fullscreen"] and not args.fullscreen:
+        game.set_fullscreen(True)   # --fullscreen is for this session; the saved choice is the settings
     sound = SoundBank(game)
     thinker = Thinker()
 

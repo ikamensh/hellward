@@ -7,7 +7,11 @@ The world asks for a decision at a step boundary and reads it half a second of g
 
 from __future__ import annotations
 
+import multiprocessing
+import multiprocessing.connection
+import os
 import signal
+import threading
 from concurrent.futures import Future, ProcessPoolExecutor
 
 from hellward.sim import planner
@@ -18,13 +22,22 @@ def _decide(world: World, leader_id: int) -> planner.Decision:
     return planner.decide(world, leader_id)
 
 
-def _ignore_interrupts() -> None:
-    signal.signal(signal.SIGINT, signal.SIG_IGN)   # Ctrl-C in the terminal is for the game, which closes the pool
+def _serve_the_game() -> None:
+    """A worker ignores Ctrl-C (the game closes the pool) and ends with the game however it ends: Cmd+Q on
+    a Mac, for one, exits the process without closing anything."""
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    parent = multiprocessing.parent_process()
+
+    def watch() -> None:
+        multiprocessing.connection.wait([parent.sentinel])
+        os._exit(0)
+
+    threading.Thread(target=watch, name="hellward-parent-watch", daemon=True).start()
 
 
 class Thinker:
     def __init__(self, workers: int = 2) -> None:
-        self.pool = ProcessPoolExecutor(workers, initializer=_ignore_interrupts)
+        self.pool = ProcessPoolExecutor(workers, initializer=_serve_the_game)
         self.pool.submit(int, 0).result()   # start the workers now, not in the first fight
 
     def __call__(self, world: World, leader_id: int) -> Future:
