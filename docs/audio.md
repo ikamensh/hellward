@@ -41,6 +41,12 @@ in a row and varies the pitch of repeated cues by up to ±4 % (deaths ±3 %).
 | `chant` | 1 | 1.15 s: a low D–E♭–A♭ drone rising a major third, with whispered syllables over it |
 | `curse` | 1 | a reversed swell sucking in for 0.2 s to a dark impact that rings a low minor second |
 | `fizzle` | 1 | the drone sagging from 420 to 95 Hz and guttering out in sparks |
+| `smite` | 3 | holy lightning from the vault: the thunder crack, a deep blow under it, a sung A-major chord blooming over it |
+| `meteor_fall` | 1 | a roar swelling and dropping in pitch for the second before a meteor lands |
+| `meteor` | 2 | the meteor landing: the blast, a ground-shaking boom, rubble falling after |
+| `orb` | 3 | a frozen orb bursting: ice exploding outwards, a glassy ring of cold |
+| `ward` | 1 | a ward closing round a tower: a held bright E-major chord and a rising shimmer |
+| `broken` | 1 | a curse broken before it lands: a glassy crack and the chant collapsing |
 | `fire_cast` | 3 | a fiery whoosh |
 | `fire_hit` | 3 | a small burst of flame landing |
 | `fireball` | 3 | the flame landing, a deep fiery blast on its heels and a sub-boom |
