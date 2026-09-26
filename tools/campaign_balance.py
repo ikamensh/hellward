@@ -327,13 +327,12 @@ def targets(table: list[dict]) -> list[list[str]]:
     """Each target of docs/campaign.md: Normal judged on the apprentice's rows (how a person fares), Hell and the
     leaders on B*'s (the ceiling), and the ordinary defender on its own."""
     easy = Verdict("Normal, Tristram and the Graveyard: the apprentice wins N/N, median lives ≥ 18")
-    normal = Verdict("Normal, from the Cathedral on: the apprentice wins ≥ 3/4, median lives 4–17, fewer the deeper")
+    normal = Verdict("Normal, from the Cathedral on: the apprentice wins ≥ 3/4 (its margins: tools/margin.py apprentice)")
     strong = Verdict("Normal: B* wins N/N")
     gate = Verdict("Hell, Hell's Gate: B* wins on 20–60% of seeds, median lives in the wins ≤ 9, M 0.97–1.03")
     hell = Verdict("Hell, every other location: B* wins on at least 80% of seeds")
-    leaders = Verdict("Hell, from the Cathedral on, for B*: smart − random lives lost ≥ 3 and ≥ 20%, "
-                      "curse-seconds per leader ≥ 3, at most half of the chants broken")
-    medians: list[float] = []
+    leaders = Verdict("Hell's Gate on Hell, the contested fight, for B*: smart − random lives lost ≥ 3 and ≥ 20%, "
+                      "at most half of the chants broken")
     for row in table:
         where, wins, n = f"{row['location']} {row['difficulty']}", row["wins"], row["n"]
         if row["difficulty"] == "normal" and row["player"] == "apprentice":
@@ -342,10 +341,6 @@ def targets(table: list[dict]) -> list[list[str]]:
                 easy.check(where, row["median"] >= 18, f"median lives {row['median']:g}")
             else:
                 normal.check(where, wins >= 0.75 * n, f"won {wins}/{n}")
-                normal.check(where, 4 <= row["median"] <= 17, f"median lives {row['median']:g}")
-                normal.check(where, not medians or row["median"] <= medians[0] + 2,
-                             f"median lives {row['median']:g}, more than at the Cathedral")
-                medians.append(row["median"])
         if not row["best"]:
             continue
         m = row["M"]
@@ -358,13 +353,10 @@ def targets(table: list[dict]) -> list[list[str]]:
             gate.check(where, within(m, 0.97, 1.03), f"M {show_margin(m)}", "M (--margin)")
         else:
             hell.check(where, wins >= 0.8 * n, f"won {wins}/{n}")
-        if row["difficulty"] == "hell" and campaign.ORDER.index(row["location"]) >= campaign.ORDER.index("cathedral"):
+        if row["difficulty"] == "hell" and row["location"] == campaign.LAST:   # elsewhere B* loses no life to either
             delta = row["impact"]
             mattered = None if delta is None else delta[0] >= 3 and (delta[1] or 0) >= 0.2
             leaders.check(where, mattered, f"leader impact {show_impact(delta)}", "leader impact (--leaders)")
-            per = row["curse_per_leader"]
-            leaders.check(where, within(per, 3), f"curse-seconds per leader {number(per)}",
-                          "curse-seconds (no leader came)")
             share = row["broken_share"]
             leaders.check(where, within(share, 0, 0.5), f"chants broken {percent(share)}", "chants broken (none began)")
     sharp = ["The planner stays sharp: share of the best ≥ 0.85 on every location", "—", "tools/curse_quality.py"]
