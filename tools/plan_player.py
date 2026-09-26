@@ -316,6 +316,15 @@ def change_skill(plan: Plan, location: Location, rng: random.Random, tiles: list
     plan.skills.insert(rng.randrange(min(len(plan.skills) + 1, 8)), key)
 
 
+def promote_column(plan: Plan, location: Location, rng: random.Random, tiles: list[tuple[int, int]]) -> None:
+    """A skill brought forward with the ones above it, so a deep skill can be learned in one change."""
+    skill = SKILLS[rng.choice(plan.skills)]
+    chain = [k for k, s in SKILLS.items() if s.column == skill.column and s.tier <= skill.tier]
+    rest = [k for k in plan.skills if k not in chain]
+    at = rng.randrange(min(len(rest) + 1, 6))
+    plan.skills = rest[:at] + chain + rest[at:]
+
+
 def change_call(plan: Plan, location: Location, rng: random.Random, tiles: list[tuple[int, int]]) -> None:
     plan.calls[rng.randrange(len(plan.calls))] = rng.choice(CALLS)
 
@@ -331,8 +340,8 @@ def change_spells(plan: Plan, location: Location, rng: random.Random, tiles: lis
 
 
 CHANGES = (move_tower, move_tower, move_tower, change_kind, change_kind, move_step, move_step, swap_steps, swap_steps,
-           add_tower, drop_tower, add_rank, drop_rank, toggle_gate, change_skill, change_call, change_spells,
-           change_spells)
+           add_tower, drop_tower, add_rank, drop_rank, toggle_gate, change_skill, promote_column, change_call,
+           change_spells, change_spells)
 
 
 # -- The climb ----------------------------------------------------------------------------------------
