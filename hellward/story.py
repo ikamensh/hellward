@@ -31,17 +31,18 @@ REFERENCES: dict[str, str] = {
 }
 
 STYLES: dict[int, str] = {
-    1: "A panel from a gothic horror graphic novel: heavy black ink shadows over most of the frame, bold brush contours, "
-       "flat muted colours of bone, rust and dried-blood crimson, and the magic as the only glowing colour; rough paper "
-       "grain.",
-    2: "A panel from a gothic horror graphic novel: heavy black ink shadows over most of the frame, bold brush contours, "
-       "flat muted colours of moss green, black water, tarnished gilt and torchlight, and the magic as the only glowing "
-       "colour; rough paper grain.",
+    1: "A full-bleed painting in the style of a gothic horror graphic novel: heavy black ink shadows over most of the frame, bold brush contours, "
+       "flat muted colours of bone, rust and dried-blood crimson, lit only by the lights the description names; rough "
+       "paper grain.",
+    2: "A full-bleed painting in the style of a gothic horror graphic novel: heavy black ink shadows over most of the frame, bold brush contours, "
+       "flat muted colours of moss green, black water, tarnished gilt and torchlight, lit only by the lights the "
+       "description names; rough paper grain.",
 }
 
-RULES = ("Keep the designs of the reference images, redrawn in this ink style. The lower quarter of the frame falls "
-         "into black shadow; the subject sits in the upper three quarters. Violet glow is the Bone Priest's sight. "
-         "No text, letters, writing, speech bubbles or panel borders.")
+RULES = ("Nothing glows unless the description says so: no glowing eyes, no magic swirls. No text, letters, writing or "
+         "speech bubbles. No border, frame, margin or paper edge: the painting fills the whole picture to every edge.")
+FRAMING = ("Keep the designs of the reference images, redrawn in this ink style. The lower quarter of the frame falls "
+           "into black shadow; the subject sits in the upper three quarters.")
 
 
 @dataclass(frozen=True)

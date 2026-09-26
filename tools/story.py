@@ -20,8 +20,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from hellward.story import REFERENCES, RULES, STORIES, STYLES, Page  # noqa: E402
+from hellward.story import FRAMING, REFERENCES, RULES, STORIES, STYLES, Page  # noqa: E402
 from intro import paint  # noqa: E402
+import numpy as np  # noqa: E402
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
 STORY_DIR = ROOT / "hellward" / "assets" / "story"
@@ -41,7 +42,7 @@ def prompt(page: Page, act: int) -> str:
     """The painter's prompt for a page: the act's style, what the panel shows, each named
     reference's design to keep, and the panel rules."""
     keeps = [f"Keep this design: {REFERENCES[name]}." for name in page.refs if not name.startswith("floor:")]
-    return " ".join([STYLES[act], page.panel, *keeps, RULES])
+    return " ".join([STYLES[act], page.panel, *keeps, FRAMING, RULES])
 
 
 def pictures(page: Page) -> list[Path]:
@@ -78,9 +79,33 @@ def page_prompt(page: Page, act: int) -> tuple[str, list[Path]]:
     return text, pics
 
 
+def trim(image: Image.Image) -> Image.Image:
+    """Cut away the paper margin the painter keeps drawing round a picture: light, flat rows and columns at the edges
+    (at most an eighth of the picture on each side)."""
+    grey = np.asarray(image.convert("L"), dtype=np.float32)
+    h, w = grey.shape
+
+    def paper(line: np.ndarray) -> bool:
+        return float(line.mean()) > 150 and float(line.std()) < 40
+
+    top = 0
+    while top < h // 8 and paper(grey[top]):
+        top += 1
+    bottom = h
+    while h - bottom < h // 8 and paper(grey[bottom - 1]):
+        bottom -= 1
+    left = 0
+    while left < w // 8 and paper(grey[top:bottom, left]):
+        left += 1
+    right = w
+    while w - right < w // 8 and paper(grey[top:bottom, right - 1]):
+        right -= 1
+    return image.crop((left, top, right, bottom))
+
+
 def save_jpeg(tmp: Path, out: Path, quality: int, longest: int = 0, width: int = 0) -> None:
-    """The painter's PNG as a JPEG, then delete the temporary file."""
-    image = Image.open(tmp).convert("RGB")
+    """The painter's PNG as a JPEG, its paper margin trimmed, then delete the temporary file."""
+    image = trim(Image.open(tmp).convert("RGB"))
     if longest:
         image.thumbnail((longest, longest), Image.LANCZOS)
     elif width and image.width != width:
@@ -91,16 +116,16 @@ def save_jpeg(tmp: Path, out: Path, quality: int, longest: int = 0, width: int =
 
 
 def refs_all() -> None:
-    """Paint each missing reference portrait: the figure or object on a plain dark
-    background, in its act's style, with the priest and the lamp as style references."""
-    style_refs = [p for p in (REFS_DIR / "priest.jpg", REFS_DIR / "lamp.jpg") if p.exists()]
+    """Paint each missing reference portrait: the one figure or object alone, whole, on a plain dark background, in
+    its act's style. No picture goes with it: a model shown other figures draws them in too."""
     for name, design in REFERENCES.items():
         out = REFS_DIR / f"{name}.jpg"
         if out.exists():
             continue
         act = 2 if name in ACT2_REFS else 1
-        paint(f"{STYLES[act]} A single reference portrait of {design}, on a plain dark background. {RULES}",
-              style_refs, out.parent / f"{out.stem}.tmp.png", "1:1")
+        paint(f"{STYLES[act]} A character sheet of one subject: {design}. Only this one subject, whole and centred, on "
+              f"a plain dark background, with nothing and no one else in the picture. {RULES}",
+              [], out.parent / f"{out.stem}.tmp.png", "1:1")
         save_jpeg(out.parent / f"{out.stem}.tmp.png", out, quality=88, longest=1024)
 
 
