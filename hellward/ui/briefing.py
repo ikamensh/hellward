@@ -141,7 +141,7 @@ class BriefingScene(Scene):
         for curse in curses:
             spec = CURSES[curse]
             self.draw_rect(x, y + 24, width, 84, (26, 10, 30, 230), border_color=(150, 70, 190, 255), border_width=1.5, radius=6)
-            self.draw_text(f"{spec.name}, {spec.duration:g} s", x + 12, y + 42, font_size=17, color=style.CURSE,
+            self.draw_text(f"{spec.name}, {spec.duration:g} s, radius {spec.radius:g}", x + 12, y + 42, font_size=17, color=style.CURSE,
                            font=style.TITLE_FONT, anchor_y="center")
             self.draw_paragraph(f"The tower {spec.blurb}.", x + 12, y + 58, width - 24, font_size=12, color=style.BONE, max_lines=2)
             self.spots.append(widgets.Hotspot(f"curse:{curse.value}", (x, y + 24, width, 84), True, f"{spec.name}\n{answer}"))

@@ -76,7 +76,7 @@ def judge(world: World, leader_id: int, horizon: float) -> dict:
     leader = world.monster(leader_id)
     options = planner.candidates(world, leader)
     base = planner.rollout(world, leader_id, None, horizon, SIM_DT)
-    truth = {(o.curse, o.tower): planner.rollout(world, leader_id, o, horizon, SIM_DT) - base for o in options}
+    truth = {(o.curse, o.spot): planner.rollout(world, leader_id, o, horizon, SIM_DT) - base for o in options}
     started = time.perf_counter()
     smart = planner.decide(world, leader_id, timing=False)
     smart_ms = (time.perf_counter() - started) * 1000
@@ -84,15 +84,17 @@ def judge(world: World, leader_id: int, horizon: float) -> dict:
     picks = {
         "smart": smart.cast or (smart.options[0] if smart.options else None),
         "greedy": planner.greedy(world, leader_id).result().cast,
-        "nearest": planner.nearest(world, leader_id).result().cast,
     }
-    values = {name: truth[(o.curse, o.tower)] if o is not None else 0.0 for name, o in picks.items()}
+    values = {name: truth[(o.curse, o.spot)] if o is not None else 0.0 for name, o in picks.items()}
+    # the nearest tower's spot may be one the candidates folded away (same towers, same curse): play it out
+    near = planner.nearest(world, leader_id).result().cast
+    values["nearest"] = planner.rollout(world, leader_id, near, horizon, SIM_DT) - base if near is not None else 0.0
     values["random"] = statistics.mean(truth.values())
     wait = None
     if timed.cast is None and timed.later is not None and smart.options:
         now = smart.options[0]
         later = timed.later
-        wait = (planner.rollout(world, leader_id, planner.Option(now.curse, now.tower), horizon + 4, SIM_DT),
+        wait = (planner.rollout(world, leader_id, planner.Option(now.curse, now.spot), horizon + 4, SIM_DT),
                 planner.rollout(world, leader_id, later, horizon + 4, SIM_DT))
     return {"best": max(truth.values()), "worst": min(truth.values()), "values": values, "options": len(truth),
             "smart_ms": smart_ms, "rollouts": smart.rollouts, "wait": wait}

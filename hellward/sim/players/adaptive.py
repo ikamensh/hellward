@@ -626,7 +626,8 @@ class Adaptive:
             return False
         full = world.mana >= world.mana_max - 5
         for sign, m in chants:
-            if self._share(sign.tower) * SEVERITY[sign.curse] >= SMITE_SHARE or full:
+            share = sum(self._share(t.id) for t in world.caught(sign.spot, sign.radius))
+            if share * SEVERITY[sign.curse] >= SMITE_SHARE or full:
                 hands.smite(m.id)
                 return True
         blow = SPELLS["smite"].damage * world.power()

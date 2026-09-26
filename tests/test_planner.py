@@ -29,11 +29,11 @@ def shaman(world: World) -> int:
 
 def test_a_leader_leaves_alone_a_tower_its_pack_is_immune_to():
     world = skeleton_pack()
-    plague = next(t.id for t in world.towers.values() if t.kind.key == "plague")
-    pyre = next(t.id for t in world.towers.values() if t.kind.key == "pyre")
-    assert planner.nearest(world, shaman(world)).result().cast.tower == plague   # the naive choice
+    plague = next(t.tile for t in world.towers.values() if t.kind.key == "plague")
+    pyre = next(t.tile for t in world.towers.values() if t.kind.key == "pyre")
+    assert planner.nearest(world, shaman(world)).result().cast.spot == plague   # the naive choice
     decision = planner.decide(world, shaman(world), timing=False)
-    assert decision.cast.tower == pyre
+    assert decision.cast.spot == pyre
     assert decision.cast.gain > 0
 
 
@@ -50,10 +50,10 @@ def test_every_considered_tower_is_within_reach_when_the_chant_ends():
     for tile in ((12, 2), (20, 6), (22, 11), (10, 9)):
         world.build("storm", tile)
     leader = world.monster(shaman(world))
-    towers = {t.id for t in planner.reachable(world, leader)}
-    far = {t.id for t in world.towers.values() if t.tile in ((12, 2), (20, 6), (22, 11), (10, 9))}
-    assert towers and not towers & far
-    assert all(o.tower in towers for o in planner.decide(world, leader.id).options)
+    tiles = {t.tile for t in planner.reachable(world, leader)}
+    far = {t.tile for t in world.towers.values() if t.tile in ((12, 2), (20, 6), (22, 11), (10, 9))}
+    assert tiles and not tiles & far
+    assert all(o.spot in tiles for o in planner.decide(world, leader.id).options)
 
 
 def test_smart_curses_are_close_to_the_best_and_beat_the_naive_ones():
@@ -81,15 +81,17 @@ def test_smart_curses_are_close_to_the_best_and_beat_the_naive_ones():
     for moment, leader_id in found:
         options = planner.candidates(moment, moment.monster(leader_id))
         base = planner.rollout(moment, leader_id, None, 14.0, SIM_DT)
-        truth = {(o.curse, o.tower): planner.rollout(moment, leader_id, o, 14.0, SIM_DT) - base for o in options}
+        truth = {(o.curse, o.spot): planner.rollout(moment, leader_id, o, 14.0, SIM_DT) - base for o in options}
         best = max(truth.values())
         if best <= 1:
             continue
         smart = planner.decide(moment, leader_id, timing=False)
         pick = smart.cast or smart.options[0]
-        shares["smart"].append(max(0.0, truth[(pick.curse, pick.tower)]) / best)
+        shares["smart"].append(max(0.0, truth[(pick.curse, pick.spot)]) / best)
         naive = planner.nearest(moment, leader_id).result().cast
-        shares["nearest"].append(max(0.0, truth[(naive.curse, naive.tower)]) / best)
+        # the naive spot may be one the candidates folded away (same towers, same curse): play it out
+        naive_gain = planner.rollout(moment, leader_id, naive, 14.0, SIM_DT) - base if naive is not None else 0.0
+        shares["nearest"].append(max(0.0, naive_gain) / best)
     assert shares["smart"]
     assert statistics.mean(shares["smart"]) >= 0.85
     assert statistics.mean(shares["smart"]) > statistics.mean(shares["nearest"])

@@ -1,8 +1,9 @@
 """How a leader chooses its curse: shortlist by a quick estimate, then look ahead by simulation.
 
 When a leader's curse is ready it considers every tower it could reach and every curse it knows. A cheap
-estimate (:func:`estimate`) says how much damage the curse would stop that tower dealing while it lasts,
-from where each monster will walk and what it resists. The best few go to **rollouts**: the world is cloned
+estimate (:func:`candidates`) says how much damage the curse would stop that tower dealing while it lasts,
+from where each monster will walk and what it resists. A curse falls on a spot, so each candidate is a
+(curse, spot) pair priced by every unwarded tower its circle catches. The best few go to **rollouts**: the world is cloned
 and played forward a little past the curse's end at a coarse step, once with nothing cast and once per
 option, and each option's *gain* is how much more life the pack keeps (the life of the monsters still
 standing, monsters that reached the sanctuary at twice their life, and the life knocked off doors).
@@ -23,12 +24,14 @@ from dataclasses import dataclass, field
 from typing import Final
 
 from hellward.sim.content import CURSES, Curse, LeaderSpec
-from hellward.sim.model import CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, ForcedCurse, Monster, Tower, World
+from hellward.sim.model import (
+    CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, ForcedCurse, Monster, Tower, World, curse_radius,
+)
 from hellward.sim.sums import add, float_sum, settle
 
 ROLLOUT_DT: Final = 0.1
 HORIZON_PAD: Final = 3.0      # seconds a rollout runs past the curse's end, to see what it changed
-SHORTLIST: Final = 10         # (curse, tower) pairs that get a rollout
+SHORTLIST: Final = 10         # (curse, spot) pairs that get a rollout
 DELAYS: Final = (2.0, 4.0)    # later moments tried for the best targets
 LATER_TRIED: Final = 3
 LATER_MARGIN: Final = 1.2     # waiting must beat casting now by this factor ...
@@ -41,7 +44,7 @@ LASTING: Final = 0.5          # the weight of the pack's average life over the l
 @dataclass(frozen=True)
 class Option:
     curse: Curse
-    tower: int
+    spot: tuple[int, int]
     delay: float = 0.0     # seconds after now that the leader would start
     estimate: float = 0.0  # the quick estimate of damage prevented
     gain: float = 0.0      # life the pack keeps over holding, by rollout
@@ -55,7 +58,7 @@ class Decision:
     later: Option | None = None        # the delayed option that made the leader hold
     retry: float = HOLD_RETRY
     rollouts: int = 0
-    considered: int = 0                # (curse, tower) pairs the estimate looked at
+    considered: int = 0                # (curse, spot) pairs the estimate looked at
     reason: str = ""
 
 
@@ -154,26 +157,21 @@ def _damage_in(tower: Tower, reach: float, world: World, tracks: list[tuple[Mons
     return dps * taken[0] * splash
 
 
-def estimate(world: World, leader: Monster, tower: Tower, curse: Curse, delay: float = 0.0) -> float:
-    """Damage the curse would stop the tower dealing while it lasts, from each monster's projected walk."""
+def _priced(tower: Tower, curse: Curse, world: World, start: float, times: list[float],
+            tracks: list[tuple[Monster, list[float]]]) -> float:
+    """Damage the curse would stop one tower dealing, over the shared tracks at ``times``."""
     spec = CURSES[curse]
-    start = DECIDE_DELAY + _spec(leader).channel + delay
     left = tower.curses.get(curse, 0.0)
     if left >= spec.duration * 0.5:
         return 0.0   # it is already carrying this curse; recasting would buy little
-    begin = start + left
-    times = []
-    t = begin
-    while t < start + spec.duration:
-        times.append(t)
-        t += SAMPLE
-    if not times:
-        return 0.0
-    tracks = [(m, _trajectory(world, m, times)) for m in world.monsters]
+    begin, end = start + left, start + spec.duration
     full = tower.stats.range * tower.range_mult()
     now = tower.damage_mult() * tower.rate_mult()
-    total = 0.0
+    total, error = 0.0, 0.0
     for i in range(len(times)):
+        moment = times[i]
+        if moment < begin or moment >= end:
+            continue
         before = _damage_in(tower, full, world, tracks, i) * now
         if before <= 0:
             continue
@@ -183,16 +181,45 @@ def estimate(world: World, leader: Monster, tower: Tower, curse: Curse, delay: f
             after = _damage_in(tower, full * spec.range, world, tracks, i) * now
         else:
             after = before * spec.damage * spec.rate
-        total += (before - after) * SAMPLE
-    return total
+        total, error = add(total, error, (before - after) * SAMPLE)
+    return settle(total, error)
 
 
 def candidates(world: World, leader: Monster, delay: float = 0.0) -> list[Option]:
+    """One (curse, spot) pair per tower in reach: the tower's tile, priced by the unwarded towers the circle
+    catches. Spots catching the same towers with the same curse are one candidate."""
+    towers = reachable(world, leader, delay)
+    if not towers:
+        return []
+    spec = _spec(leader)
+    start = DECIDE_DELAY + spec.channel + delay
+    curses = spec.curses
+    longest = max(CURSES[c].duration for c in curses)
+    times = []
+    t = start
+    while t < start + longest:
+        times.append(t)
+        t += SAMPLE
+    if not times:
+        return []
+    tracks = [(m, _trajectory(world, m, times)) for m in world.monsters]
+    loss: dict[tuple[int, Curse], float] = {}
+    for tower in world.towers.values():
+        if tower.ward > start:
+            continue   # warded until after the curse would land
+        for curse in curses:
+            loss[(tower.id, curse)] = _priced(tower, curse, world, start, times, tracks)
     out = []
-    for tower in reachable(world, leader, delay):
-        for curse in _spec(leader).curses:
-            out.append(Option(curse, tower.id, delay, estimate(world, leader, tower, curse, delay)))
-    out.sort(key=lambda o: (-o.estimate, o.tower, o.curse.value))
+    seen: set[tuple[Curse, tuple[int, ...]]] = set()
+    for spot in sorted({t.tile for t in towers}):
+        for curse in curses:
+            caught = tuple(t.id for t in world.caught(spot, curse_radius(curse, leader.kind)) if t.ward <= start)
+            key = (curse, caught)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(Option(curse, spot, delay, float_sum(loss[(tid, curse)] for tid in caught)))
+    out.sort(key=lambda o: (-o.estimate, o.spot, o.curse.value))
     return out
 
 
@@ -218,7 +245,7 @@ def rollout(world: World, leader_id: int, option: Option | None, seconds: float,
     w = world.clone()
     if option is not None:
         at = world.time + DECIDE_DELAY + _spec(_leader(world, leader_id)).channel + option.delay
-        w.forced.append(ForcedCurse(at, leader_id, option.curse, option.tower))
+        w.forced.append(ForcedCurse(at, leader_id, option.curse, option.spot))
     end = world.time + seconds - 1e-9
     lasting = 0.0
     while w.time < end and w.outcome is None:
@@ -245,18 +272,18 @@ def decide(world: World, leader_id: int, *, dt: float = ROLLOUT_DT, shortlist: i
         return Decision(leader_id, None, retry=QUIET_RETRY, considered=considered, reason="nothing in reach is hurting the pack")
     seconds = horizon(leader) + (max(DELAYS) if timing else 0.0)
     base = rollout(world, leader_id, None, seconds, dt)
-    rolled = [Option(o.curse, o.tower, 0.0, o.estimate, rollout(world, leader_id, o, seconds, dt) - base) for o in useful]
-    rolled.sort(key=lambda o: (-o.gain, o.tower, o.curse.value))
+    rolled = [Option(o.curse, o.spot, 0.0, o.estimate, rollout(world, leader_id, o, seconds, dt) - base) for o in useful]
+    rolled.sort(key=lambda o: (-o.gain, o.spot, o.curse.value))
     count = 1 + len(rolled)
     best = rolled[0]
     later = None
     if timing:
         for o in rolled[:LATER_TRIED]:
             for delay in DELAYS:
-                gain = rollout(world, leader_id, Option(o.curse, o.tower, delay), seconds, dt) - base
+                gain = rollout(world, leader_id, Option(o.curse, o.spot, delay), seconds, dt) - base
                 count += 1
                 if later is None or gain > later.gain:
-                    later = Option(o.curse, o.tower, delay, o.estimate, gain)
+                    later = Option(o.curse, o.spot, delay, o.estimate, gain)
     if later is not None and later.gain > best.gain * LATER_MARGIN + MIN_GAIN:
         return Decision(leader_id, None, tuple(rolled), later, HOLD_RETRY, count, considered, "waiting is worth more")
     if best.gain < MIN_GAIN:
@@ -284,7 +311,7 @@ class RandomLeaders:
             return Inline(Decision(leader_id, None, retry=QUIET_RETRY, reason="random: nothing in reach"))
         tower = self.rng.choice(sorted(towers, key=lambda t: t.id))
         curse = self.rng.choice(_spec(leader).curses)
-        return Inline(Decision(leader_id, Option(curse, tower.id), reason="random"))
+        return Inline(Decision(leader_id, Option(curse, tower.tile), reason="random"))
 
 
 def greedy(world: World, leader_id: int) -> Inline:
@@ -304,4 +331,4 @@ def nearest(world: World, leader_id: int) -> Inline:
         return Inline(Decision(leader_id, None, retry=QUIET_RETRY, reason="nearest: nothing in reach"))
     x, y = world.level.point(leader.s)
     tower = min(towers, key=lambda t: ((t.centre[0] - x) ** 2 + (t.centre[1] - y) ** 2, t.id))
-    return Inline(Decision(leader_id, Option(_spec(leader).curses[0], tower.id), reason="nearest"))
+    return Inline(Decision(leader_id, Option(_spec(leader).curses[0], tower.tile), reason="nearest"))

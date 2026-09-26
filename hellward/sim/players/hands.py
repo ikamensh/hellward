@@ -24,7 +24,7 @@ from typing import Protocol
 
 from hellward.sim.campaign import Location
 from hellward.sim.content import Curse
-from hellward.sim.model import SIM_DT, Planner, Refused, World
+from hellward.sim.model import SIM_DT, Planner, Refused, World, curse_radius
 from hellward.sim.skills import cost, perks
 from hellward.sim.sums import int_sum
 
@@ -48,8 +48,9 @@ class Sign:
     kind: str                     # "ponder" (the dots) or "chant" (the beam)
     since: float                  # when it appeared
     at: tuple[float, float]       # where the leader stood then: where a person's aim goes
-    tower: int = -1               # a chant's tower: the beam points at it
+    spot: tuple[int, int] = (-1, -1)   # a chant's marked tile: the rune circle is drawn on it
     curse: Curse | None = None    # a chant's curse: its colour and sigil show which
+    radius: float = 0.0           # the circle's radius, widening included (0 for a pondering)
 
 
 @dataclass
@@ -104,7 +105,7 @@ class Hands:
             elif kind == "broken":
                 self._signs.pop(e[1], None)
                 record.broken += 1
-                record.broken_chants += e[2] != -1   # a broken pondering has no tower yet
+                record.broken_chants += e[2] != (-1, -1)   # a broken pondering marked no spot yet
             elif kind == "cursed":
                 self._signs.pop(e[1], None)
                 record.landed += 1
@@ -123,10 +124,11 @@ class Hands:
         if world.mana >= world.mana_max - 1e-9:
             record.mana_capped += dt
 
-    def _sign(self, leader: int, kind: str, tower: int = -1, curse: Curse | None = None) -> None:
+    def _sign(self, leader: int, kind: str, spot: tuple[int, int] = (-1, -1), curse: Curse | None = None) -> None:
         m = self.world.monster(leader)
         if m is not None:   # a leader killed in the step it spoke leaves no sign
-            self._signs[leader] = Sign(leader, kind, self.world.time, self.world.position(m), tower, curse)
+            radius = curse_radius(curse, m.kind) if curse is not None else 0.0
+            self._signs[leader] = Sign(leader, kind, self.world.time, self.world.position(m), spot, curse, radius)
 
     def threats(self) -> list[Sign]:
         """The leaders' signs a person has taken in by now, the oldest first: those most about to curse."""

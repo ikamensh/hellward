@@ -120,7 +120,7 @@ def test_under_salvation_a_cleansed_tower_is_warded_and_no_leader_can_curse_it()
     assert world.mana == pytest.approx(75)
     assert pyre.ward > 0
     assert pyre.id not in {t.id for t in planner.reachable(world, world.monster(leader))}
-    world.forced.append(ForcedCurse(world.time, leader, Curse.BONE_PRISON, pyre.id))
+    world.forced.append(ForcedCurse(world.time, leader, Curse.BONE_PRISON, pyre.tile))
     run(world, 2)
     assert not pyre.curses and events(world, "ward_holds")
 
