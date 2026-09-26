@@ -46,13 +46,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-# -- The compiled simulation: the one place it is switched on ------------------------------------------------------
-# Before anything imports the rules, in the main process and in every worker (a spawned worker imports this module
-# again). When hellward/sim/fastsim.py lands, this line becomes
-#     from hellward.sim import fastsim
-#     BUILD = <the build's source hash, from fastsim.activate()>
-# and every run records the build it ran on instead of "source".
+from hellward.sim import fastsim  # noqa: E402
+
+# The compiled simulation, before anything imports the rules: in the main process and in every worker (a spawned worker
+# imports this module again as __mp_main__), unless HELLWARD_INTERPRETED is set. Every run records what it ran on.
 BUILD = "source"
+if __name__ in ("__main__", "__mp_main__"):
+    _built = fastsim.activate()
+    BUILD = _built.name if _built is not None else "source"
 
 from hellward.sim import campaign, planner  # noqa: E402
 from hellward.sim.content import MONSTERS, START_LIVES  # noqa: E402
