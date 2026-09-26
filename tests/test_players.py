@@ -92,6 +92,7 @@ def test_the_record_tells_a_broken_chant_from_a_broken_pondering():
         for kind, leader in signs:
             if kind not in smitten and leader not in smitten.values():
                 world.mana = 100
+                world.recharge.clear()   # two Smites a moment apart: the test's, not a player's
                 world.smite(leader)
                 smitten[kind] = leader
         assert world.time < 60
