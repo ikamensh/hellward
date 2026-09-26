@@ -565,6 +565,10 @@ class Effects:
 
     def lights(self) -> list[Light]:
         out = [Light(g.light.x, g.light.y, g.light.radius, g.light.color, g.light.intensity * (1 - g.age / g.life)) for g in self.glows]
+        for telegraph in self.telegraphs.values():   # the doomed tower's floor burns violet as the chant runs out
+            x, y = telegraph.rune.position
+            swell = min(1.0, telegraph.rune.opacity / 255)
+            out.append(Light(x, y - 10, 90 + 50 * swell, (190, 60, 255), 0.5 + 0.9 * swell))
         for missile in self.missiles.values():
             x, y = missile.head.position
             if missile.bolt.kind == "pyre":
