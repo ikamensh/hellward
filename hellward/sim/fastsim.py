@@ -168,7 +168,7 @@ def attach(path: str | os.PathLike[str]) -> None:
     folders = {name: str(root / name.replace(".", "/")) for name in packages}
     if all(name in sys.modules and folders[name] in sys.modules[name].__path__ for name in packages):
         return
-    loaded = sorted(name for name in sys.modules if name.startswith("hellward.") and name[9:] in MODULES)
+    loaded = sorted(name for name in sys.modules if name.startswith("hellward.") and name.removeprefix("hellward.") in MODULES)
     if loaded:
         raise RuntimeError(f"the compiled simulation must be activated before it is imported; already loaded: {loaded}")
     sys.path.insert(0, str(root))   # mypyc's shared library of the whole group
@@ -177,7 +177,8 @@ def attach(path: str | os.PathLike[str]) -> None:
     os.environ[ENV] = str(root)
     for module in MODULES:
         for value in vars(importlib.import_module(f"hellward.{module}")).values():
-            if isinstance(value, type) and dataclasses.is_dataclass(value) and value.__dataclass_params__.frozen:  # type: ignore[attr-defined]
+            params = getattr(value, "__dataclass_params__", None)   # a dataclass's, or its instances'
+            if isinstance(value, type) and params is not None and params.frozen:
                 copyreg.pickle(value, _by_fields)
 
 

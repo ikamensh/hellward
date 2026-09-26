@@ -34,10 +34,11 @@ import sim_bench  # noqa: E402
 
 COMPILED = """
 import json, pickle, sys
-sys.path[:0] = [{root!r}, {tools!r}]
+sys.path[:0] = [{root!r}, {tools!r}, {tests!r}]
 from hellward.sim import fastsim
 fastsim.attach({build!r})
 import sim_bench
+from test_fastsim import full_fight
 from hellward.sim import planner
 from hellward.sim.campaign import CATHEDRAL, LOCATIONS, NORMAL
 from hellward.sim.players.hands import defend
@@ -51,7 +52,7 @@ for _ in range(200):
     kept.step()
     back.step()
 same.append(sim_bench.state(back) == sim_bench.state(kept))
-print(json.dumps({{"compiled": fastsim.compiled(), "pickled": same,
+print(json.dumps({{"compiled": fastsim.compiled(), "pickled": same, "full_fight": full_fight(),
                   "digests": {{key: sim_bench.defence(key)[1] for key in LOCATIONS}}}}))
 """
 
@@ -64,7 +65,7 @@ def compiled() -> dict:
     except fastsim.NoToolchain as missing:
         pytest.skip(f"this machine cannot compile the simulation: {missing}")
     env = {k: v for k, v in os.environ.items() if k not in (fastsim.ENV, fastsim.OPT_OUT)}
-    script = COMPILED.format(root=str(ROOT), tools=str(ROOT / "tools"), build=str(build))
+    script = COMPILED.format(root=str(ROOT), tools=str(ROOT / "tools"), tests=str(ROOT / "tests"), build=str(build))
     done = subprocess.run([sys.executable, "-c", script], cwd=ROOT, env=env, capture_output=True, text=True, timeout=900)
     assert done.returncode == 0, done.stderr
     return json.loads(done.stdout)
@@ -78,6 +79,11 @@ def test_a_compiled_defence_is_the_source_defence(key: str, compiled: dict) -> N
     assert compiled["digests"][key] == digest
 
 
+def test_a_compiled_fight_with_every_skill_and_spell_is_the_sources(compiled: dict) -> None:
+    """The ordinary player learns no skill and casts nothing but Cleanse: this fight has them all."""
+    assert compiled["full_fight"] == full_fight()
+
+
 def test_a_compiled_world_survives_pickling(compiled: dict) -> None:
     """A compiled frozen dataclass refuses its fields one by one, so fastsim pickles it by its constructor."""
     assert compiled["pickled"] == [True, True]
@@ -86,8 +92,9 @@ def test_a_compiled_world_survives_pickling(compiled: dict) -> None:
 def busy_world() -> World:
     """Hell's Gate on Hell with the whole skill tree, at a moment when its fight is full: towers of every kind,
     gates under blows, venom and frost on the monsters, bolts in flight and burning floor, two waves on the map and
-    one still coming. Then a meteor is cast (in the air), a frozen orb (monsters frozen), and a warded tower, two
-    cursed ones and a leader chanting are set by hand. Like a clone, it has no planner and no leader waiting for one."""
+    one still coming. Then a meteor is cast (in the air), a frozen orb (monsters frozen) and a smite, and a warded
+    tower, two cursed ones and a leader chanting are set by hand. Like a clone, it has no planner and no leader
+    waiting for one."""
     world = World(LOCATIONS["hells_gate"], difficulty=HELL, perks=perks(SKILLS), seed=5, planner=planner.smart)
     player, hands = Ordinary(), Hands(world, react=0.6)
 
@@ -110,6 +117,8 @@ def busy_world() -> World:
     world.meteor(*world.position(world.monsters[0]))
     world.mana = world.mana_max
     world.orb(*world.position(next(m for m in reversed(world.monsters) if m.door < 0)))
+    world.mana = world.mana_max
+    world.smite(world.monsters[1].id)
     towers = sorted(world.towers.values(), key=lambda t: t.id)
     towers[0].curses[Curse.DECREPIFY] = 5.0
     towers[1].curses[Curse.BONE_PRISON] = 3.0
@@ -117,6 +126,14 @@ def busy_world() -> World:
     leader = world.leaders()[0]
     leader.chant_curse, leader.chant_tower, leader.chant_left = Curse.WEAKEN, towers[3].id, 0.8
     return world
+
+
+def full_fight() -> str:
+    """The busy world played on for 300 steps with every skill, written out with every event on the way."""
+    world = busy_world()
+    for _ in range(300):
+        world.step()
+    return sim_bench.digest(world, [(0.0, world.events)])
 
 
 def test_a_clone_steps_as_its_world() -> None:
