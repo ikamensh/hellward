@@ -105,15 +105,17 @@ location does not offer does nothing there, and the intro says so.
 Mana (the blue orb) fills at 1.5 a second up to 100 and starts at 60, about two casts a wave.
 Four spells spend it:
 
-| Spell | Mana | Aim | What it does |
-|---|---|---|---|
-| **Cleanse** | 35 | a tower | Burns every curse off it: **C**, or the button on a selected tower. |
-| **Smite** | 30 | a monster | Holy lightning from the vault: 100 damage, which no resistance reduces. A leader it strikes while pondering or chanting loses its curse and waits its whole cooldown again. |
-| **Meteor** | 60 | the floor | Lands 1.2 s later: 110 fire damage within 1.4 tiles. The floor burns for 3 s after, 12 a second. |
-| **Frozen Orb** | 50 | the floor | Everything within 1.8 tiles freezes for 2.5 s: it cannot walk or batter, and a leader's pondering or chant breaks. It also deals 50 cold damage. |
+| Spell | Mana | Recharge | Aim | What it does |
+|---|---|---|---|---|
+| **Cleanse** | 35 | — | a tower | Burns every curse off it: **C**, or the button on a selected tower. |
+| **Smite** | 35 | 8 s | a monster | Holy lightning from the vault: 100 damage, which no resistance reduces. A leader it strikes while pondering or chanting loses its curse and waits its whole cooldown again. |
+| **Meteor** | 60 | 10 s | the floor | Lands 1.2 s later: 110 fire damage within 1.4 tiles. The floor burns for 3 s after, 12 a second. |
+| **Frozen Orb** | 50 | 12 s | the floor | Everything within 1.8 tiles freezes for 2.5 s: it cannot walk or batter, and a leader's pondering or chant breaks. It also deals 50 cold damage. |
 
 Smite, Meteor and Frozen Orb sit in a bar of three slots on the panel's right (**Q W E**), with
-their mana under them the way the towers show their gold. A spell is picked, then aimed with a
+their mana under them the way the towers show their gold. After a cast a spell **gathers itself**
+for its recharge before it can be cast again, and its slot shows the seconds; so a player cannot
+answer every chant, and chooses which curses to stop, which to cleanse and which to bear. A spell is picked, then aimed with a
 click, as a tower is placed; right click or Esc lets go of it. **Q while a leader ponders or
 chants smites the one closest to cursing**, with no aiming: that is the answer to the
 telegraph, and a player can give it at a glance. Aimed spells are **not cast while paused**:
@@ -203,17 +205,13 @@ is saved in `~/.hellward/saves` after every change.
 
 ## Tuning by simulation
 
-The locations and difficulties are tuned by playing them with **strong scripted players**. The
-yardstick is how the best of them fares, not the ordinary scripted defender of the demo.
+The locations and difficulties are tuned by playing them with **scripted players**: strong ones that
+set the ceiling, and a human-like one that sets how Normal feels.
 
-- **The players** (`hellward/sim/players/`). Several strategies are written independently by
-  sub-agents and compete, each aiming to be the strongest. A player sees what a human sees: the
-  intro's roster, the map, the gold, the mana, the leaders' chants. It chooses its skills for
-  the location, places and upgrades towers, builds gates and casts every spell (Smite at a
-  chanting leader, Frozen Orb at a breaking gate, Meteor at a queue, Cleanse on the tower that
-  matters). It may plan a location's build by simulating it offline, as a player who has
-  replayed the location many times has in effect done. At 18 sigils per difficulty that is a
-  ceiling on skill, and difficulty is set against the ceiling.
+- **What a player may do.** A player sees what a human sees: the intro's roster, the map, the gold, the
+  mana, the leaders' chants. It chooses its skills for the location, places and upgrades towers, builds
+  gates and casts every spell. It may plan a location's build by simulating it offline, as a player who
+  has replayed the location many times has in effect done.
 - **A human's hands.** The strong players play under a shared harness that gives them a human's
   limits: they see a leader's pondering and chant 0.6 s of game time late (drawn per seed
   between 0.5 and 0.8 s), aim where the leader was when they began to react, cast at most one
@@ -224,24 +222,41 @@ yardstick is how the best of them fares, not the ordinary scripted defender of t
   the tables is measured on evaluation seeds 1000–1019. Seeds differ in the monsters' lanes and
   queue places and in the players' reaction times.
 - **The margin M** is the continuous measure of difficulty: the largest factor on every
-  monster's life at which the best player B* still wins, bisected to 2% and the median over 8
-  seeds. B* is the frozen player with the best median lives at a location, with its own skills.
-- **Targets**, with the sigils B* has earned by then by playing the campaign in order:
-  - **Normal**, Tristram and the Graveyard: wins 20 of 20, median lives ≥ 18, M ≥ 1.5. They
-    teach, and may be easy.
-  - **Normal**, from the Cathedral on: wins 20 of 20, median lives 10–17, the fewest ≥ 5,
-    M 1.10–1.35. The demo's ordinary defender loses at least one of the Catacombs, the Caves
-    and Hell's Gate.
-  - **Hell**, with the whole tree: Hell's Gate won on 4–12 of 20 seeds, median lives in the
-    wins ≤ 9, M 0.97–1.03. Every other location is won on at least 16 of 20.
-  - **The leaders matter**, from the Cathedral on, with B* and its build: the lives it loses
-    against the smart leaders minus those against random ones (uncapped, as `balance.py` counts
-    them) ≥ 3 and ≥ 20% of the lives lost; curse-seconds held on towers per leader ≥ 3; at most
-    half of all chants broken.
-  - **The planner stays sharp:** `curse_quality.py` share of the best ≥ 0.85 on every location,
-    with B*'s skills.
-- **The knobs** are per location (the waves, their life multiplier, the starting gold) and per
-  difficulty (monster life, the leaders' cooldown). `tools/campaign_balance.py` plays every
+  monster's life at which a player still wins, bisected to 2% and the median over 8 seeds. B* is
+  the strong player with the best median lives at a location, with its own skills.
+- **The players** (`hellward/sim/players/`), each written by a sub-agent racing the others:
+  - **warden**: a veteran's rules, drafting its skills and build from the intro, with builds searched
+    offline for each location (`tools/warden_plans.py`);
+  - **planned**: a build found by hill-climbing thousands of defences on training seeds
+    (`tools/plan_player.py`), followed step by step;
+  - **adaptive**: no stored build; it learns a picture of the path while it watches and prices every
+    tower, upgrade and spell by the damage it adds;
+  - **apprentice**: a thoughtful player on a first descent: the ordinary build, a sensible order of skills,
+    Smite on a leader's sign and a Meteor on a thick crowd, never a timed Frozen Orb;
+  - **ordinary**: the demo's defender, no skills and no spell but Cleanse.
+- **What the strong players found first.** At the first measurement all three won every location with
+  every life, at margins of 3 to 18 times the monsters' life (the ordinary player: 0.5 to 1.8). The
+  warden found why: a gate queue under a frost shrine and three or four fireball pyres was a kill zone,
+  and the gate was warded again the moment it broke. And every strong player broke seven chants in ten with
+  Smite, so the leaders barely mattered. Two rules answer it: **a broken gate lies in rubble until its wave
+  is cleared**, and **each spell gathers itself** after a cast (the table above).
+- **Targets.** The strong players plan with thousands of simulated defences and react within a person's
+  reaction time every time; no person plays like that. Tuned to their ceiling, Normal would be unwinnable
+  for people, so each difficulty has its own yardstick:
+  - **Normal** is tuned against the **apprentice** with two sigils per earlier location. Tristram and the
+    Graveyard teach: it wins them keeping nearly every life. From the Cathedral on it wins, keeping fewer
+    lives the deeper it goes, and Hell's Gate costs it most of them. Its margin M falls from about 2 at
+    Tristram to about 1.1 at Hell's Gate. The strong players win Normal easily.
+  - **Hell** is tuned against **the best strong player B\*** with the whole tree: Hell's Gate is won on
+    some seeds, not all (M about 1.0), and every other location is won with a margin of about 1.1 to 1.3.
+    This is where even the strongest players find the game hard.
+  - **The leaders matter**, from the Cathedral on, for B*: the lives it loses against the smart leaders
+    minus those against random ones (uncapped) ≥ 3 and ≥ 20% of the lives lost; curse-seconds held on
+    towers per leader ≥ 3; at most half of all chants broken.
+  - **The planner stays sharp:** `curse_quality.py` share of the best ≥ 0.85.
+- **The knobs** are per location (its **life** factor over its whole wave ramp, the waves, the starting
+  gold) and per difficulty (monster life, the leaders' cooldown). `tools/margin.py PLAYER` bisects any
+  player's margin location by location; the life factors are set from it. `tools/campaign_balance.py` plays every
   player on every location and difficulty over the seeds and prints the table the targets are
   read from. It records, per run: the player and its commit, source or build hash, location,
   difficulty, seed, reaction time, skills, leader policy, outcome, lives kept and lost, sigils,
