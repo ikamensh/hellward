@@ -403,7 +403,6 @@ class Warden:
     def _break_chant(self, hands: Hands) -> bool:
         """Smite the leader whose chant would cost the most, or freeze it when other chants or a crowd stand by."""
         world = hands.world
-        spells = world.location.arsenal.spells
         chanting: list[Monster] = []
         best, best_value = None, 0.0
         for sign in hands.threats():
