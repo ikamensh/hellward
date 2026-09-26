@@ -15,6 +15,7 @@ from saga2d import Anchor, Button, Row, Scene
 from hellward.art import worldmap
 from hellward.sim.campaign import LOCATIONS, ORDER
 from hellward.ui import style, widgets
+from hellward.ui.story import INPUT_GUARD
 
 if TYPE_CHECKING:
     from hellward.ui.flow import Flow
@@ -50,6 +51,8 @@ class MapScene(Scene):
         self.flow.skills()
 
     def to_title(self) -> None:
+        if self.clock < INPUT_GUARD:   # a key held through a story page must not skip the map unread
+            return
         self.flow.title()
 
     def go(self, key: str) -> None:
@@ -72,6 +75,8 @@ class MapScene(Scene):
     def handle_input(self, event) -> bool:
         if event.type != "click":
             return False
+        if self.clock < INPUT_GUARD:
+            return True
         if self.going is not None:   # a click skips the walk
             self._arrive()
             return True

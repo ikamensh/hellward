@@ -3,7 +3,8 @@
     uv run python tools/screens.py OUT [--only NAME,NAME] [--seconds 60] [--seed 1]
 
 Writes ``OUT/<name>.png``: ``title``, ``map``, ``intro-<location>`` for every location,
-``skills``, ``battle-<location>`` for every location, ``magic`` and ``reckoning``.
+``skills``, ``battle-<location>`` for every location, ``magic``, ``reckoning``, ``story-tristram-before``,
+``prologue-12``, ``prologue-27`` and ``chronicle-first``.
 The display must be awake (``caffeinate -u``). The frames are for looking at,
 not for keeping in the repository.
 """
@@ -34,9 +35,11 @@ def main() -> None:
     from hellward.sim.content import Curse
     from hellward.sim.players.ordinary import Ordinary
     from hellward.sim.skills import perks
+    from hellward.story import STORIES
     from hellward.ui.battle import BattleScene, Silent
     from hellward.ui.flow import Flow
     from hellward.ui.progress import Progress
+    from hellward.ui.story import ChronicleScene, PrologueScene, StoryScene
 
     cache = Path.home() / ".hellward" / "cache"
     game = Game("Hellward", resolution=(1280, 800), backend="pyglet", visible=False,
@@ -138,7 +141,29 @@ def main() -> None:
         ticks(150)
         shot("reckoning")
 
-    frames = {"title": title, "map": world_map, "skills": skills, "magic": magic, "reckoning": reckoning}
+    def story_page() -> None:
+        game.clear_and_push(StoryScene(flow, STORIES["tristram/before"].pages, then=lambda: None))
+        ticks(60)
+        shot("story-tristram-before")
+
+    def make_prologue(name: str, seconds: float):
+        def prologue() -> None:
+            game.clear_and_push(PrologueScene(flow, then=lambda: None))
+            ticks(int(seconds * 30))
+            shot(name)
+        return prologue
+
+    def chronicle_first() -> None:
+        progress.won = {k: 1 for k in LOCATIONS}   # every before/after moment has come
+        scene = ChronicleScene(flow, then=lambda: None)
+        game.clear_and_push(scene)
+        scene._prologue.clock = scene._prologue.end   # past the prologue, onto the first story page
+        ticks(60)
+        shot("chronicle-first")
+
+    frames = {"title": title, "map": world_map, "skills": skills, "magic": magic, "reckoning": reckoning,
+              "story-tristram-before": story_page, "prologue-12": make_prologue("prologue-12", 12.0),
+              "prologue-27": make_prologue("prologue-27", 27.0), "chronicle-first": chronicle_first}
     for key in LOCATIONS:
         frames[f"intro-{key}"] = make_intro(key)
     for key in LOCATIONS:

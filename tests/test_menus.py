@@ -16,6 +16,7 @@ from hellward.ui.flow import Flow
 from hellward.ui.mapscreen import MapScene
 from hellward.ui.menus import PauseScene, SettingsScene
 from hellward.ui.progress import Progress
+from hellward.ui.story import StoryScene
 from hellward.ui.title import TitleScene
 
 
@@ -118,6 +119,9 @@ def test_starting_again_and_leaving_for_the_title_leave_no_old_fight_behind(game
     assert g.scenes[0].world.time < 0.1
     press(g, "escape")
     press(g, "m")
+    assert isinstance(g.scenes[-1], StoryScene)   # Tristram's after page is due and unseen on the way to the map
+    press(g, "return")
+    press(g, "return")
     assert len(g.scenes) == 1 and isinstance(g.scenes[0], MapScene)
     fight(g, art)
     press(g, "escape")
