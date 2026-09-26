@@ -37,6 +37,7 @@ METEOR_BITE = 3.0     # a Meteor must take this many of its blows' worth of life
 ORB_CROWD = 400.0     # life (at a wave's life of one) an orb on a chanting leader must also catch
 GATE_CROWD = 600.0    # life a queue must hold for an orb to keep its breaking gate standing
 LEAK_SMITE = 2.5      # seconds from the sanctuary a monster one Smite kills is smitten
+BOSS = 5              # lives a monster costs at the sanctuary for every spare Smite to go to it (Azazel)
 FULL = 8.0            # mana short of the orb's top at which it is spent on lesser targets rather than wasted
 FULL_BITE = 1.5       # the Meteor's bar then
 QUEUE_FALLOFF = 0.5   # each arch further along the path counts this much less: the first queue fights most
@@ -357,6 +358,8 @@ class Warden:
             return
         if ("smite" in spells or "orb" in spells) and self._break_chant(hands):
             return
+        if "smite" in spells and self._smite_boss(hands):
+            return
         if "orb" in spells and self._hold_gate(hands):
             return
         if "meteor" in spells and self._meteor(hands, METEOR_BITE):
@@ -466,6 +469,19 @@ class Warden:
                 self.last_aim = world.time
                 return True
         return False
+
+    def _smite_boss(self, hands: Hands) -> bool:
+        """A monster that would cost many lives at the sanctuary: every Smite not kept for a chant goes to it."""
+        world = hands.world
+        cost = world.spell_cost("smite")
+        if world.mana < 2 * cost:
+            return False
+        bosses = [m for m in world.monsters if m.kind.lives >= BOSS]
+        if not bosses:
+            return False
+        hands.smite(max(bosses, key=lambda m: m.s).id)
+        self.last_aim = world.time
+        return True
 
     def _hold_gate(self, hands: Hands) -> bool:
         """A Frozen Orb on the queue at a gate about to break, when the queue is worth holding."""
