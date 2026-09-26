@@ -13,7 +13,7 @@ spectrograms and levels, not by ear.
 | `hellward/assets/pieces/` | 71 generated pieces (mono, 16-bit, 44.1 kHz, 7.1 MB) and `manifest.json` with each prompt, seed and hash |
 | `tools/pieces.py` | the pieces' prompts, seeds and style suffixes; `refresh` remakes what changed |
 | `hellward/audio/cues.py` | every cue the scene plays, composed from pieces and `sagaforge.synth` |
-| `hellward/audio/music.py`, `instruments.py` | the three loops and their instruments |
+| `hellward/audio/music.py`, `instruments.py` | the eight loops and their instruments |
 | `hellward/audio/bank.py` | `SoundBank`: the cache, takes, pitch, the voice budget, music crossfades |
 | `tools/sampler.py` | every cue back to back in one WAV, and the music, to listen to |
 
@@ -108,7 +108,7 @@ time", "one soft dull thud". One coin take was rejected as a click and re-seeded
 ```bash
 uv run python tools/pieces.py refresh               # generates what is missing or whose prompt/seed changed
 uv run python tools/pieces.py sampler /tmp/pieces   # pieces.wav + pieces.txt, every piece back to back
-uv run python tools/sampler.py /tmp/cues --music    # cues.wav + cues.txt, and title/battle/boss.wav
+uv run python tools/sampler.py /tmp/cues --music    # cues.wav + cues.txt, and one WAV per track
 ```
 
 After a refresh, or any change to a cue or the music, bump `VERSION` in `hellward/audio/bank.py`
@@ -125,13 +125,20 @@ the loop, the reverb too, so the loops are seamless.
 | Track | Length | What plays |
 |---|---|---|
 | `title` | 45 s, 12 bars at 64 | D aeolian over a D–A drone: a lone twelve-string arpeggio, a slow falling melody on it, distant voices from bar 5, a bell at the top and two-thirds in, a heart under the second half |
-| `battle` | 80 s, 24 bars at 72 | D phrygian: the heart on every half bar, the arpeggio quickening to sixteenths in the middle third with a frame drum, rattles and a low bow; monks and far voices; bells every eight bars |
-| `boss` | 54.5 s, 20 bars at 88 | D phrygian over a D–E♭ drone: war drums and taiko, a low bow hammering the flat second, a sixteenth-note twelve-string, organ clusters, monks, a falling choir line, timpani and bells |
+| `battle_tristram` | 56.5 s, 16 bars at 68 | D aeolian over D–A: the familiar village night with a pulse — the heart on every half bar, frame and bones joining halfway, a low bow and far voices in the second half |
+| `battle_graveyard` | 48 s, 12 bars at 60 | E dorian over E–B: moon over open graves — a sparse high guitar, organ and a lament sung by far voices, dry bones for drums, funeral bells through the biggest room of the descent |
+| `battle_cathedral` | 53 s, 16 bars at 72 | D phrygian: a torchlit procession — the heart on every half bar, the arpeggio quickening to sixteenths in the second half with a frame drum, rattles and a low bow; monks and far voices; bells every eight bars |
+| `battle_catacombs` | 43.5 s, 12 bars at 66 | C phrygian over a C–D♭ drone: the bone halls, narrow and close — a cello hammering the flat second, toms and a heart in the walls, low monks and organ, one deep bell, no high strings; the driest room down here |
+| `battle_caves` | 42 s, 16 bars at 92 | F phrygian-dominant: lava light — restless taiko and war drums, a bright sixteenth-note guitar and a driving bow, a rising ember of a melody; no church bells this deep, only timpani and stone |
+| `battle_hells_gate` | 46 s, 16 bars at 84 | D phrygian over a D–E♭ drone: the gate opens — war drums and taiko, a low bow on the flat second, organ clusters and monks, a falling choir line, and the village's own melody returning corrupted on the guitar |
+| `boss` | 54.5 s, 20 bars at 88 | D phrygian over a D–E♭ drone: Azazel's last wave — war drums and taiko, a low bow hammering the flat second, a sixteenth-note twelve-string, organ clusters, monks, a falling choir line, timpani and bells |
 
+A location's intro already plays its battle track (`Flow.intro`), so the briefing carries the
+dungeon's feel before the first wave; a defence keeps it, and Azazel's wave breaks in with `boss`.
 `SoundBank.prepare` renders the cues synchronously (about 2.5 s of CPU on an M-series Mac) and
-composes the music in a background thread, title first (all three took 24 s here while other jobs
-held the load average near 100); `bank.music(mood)` starts a track, crossfading 1.5–2.5 s, the moment it is
-on disk. The cache is about 16 MB of cues and 30 MB of music under the game's asset path.
+composes the music in a background thread, title first, then the dungeons in the campaign's order,
+boss last; `bank.music(mood)` starts a track, crossfading 1.5–2.5 s, the moment it is
+on disk. The cache is about 16 MB of cues and 70 MB of music under the game's asset path.
 
 ## Tests
 

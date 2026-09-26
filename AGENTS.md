@@ -39,7 +39,7 @@ uv run python tools/intro.py STEP OUT        # the story intro as film and as co
   (`build/fastsim/`); `sums.py` adds floats as source and compiled both do. `tests/test_fastsim.py` holds the
   compiled simulation to the source, event for event.
 - `hellward/audio/` — `cues.py` (every cue by name, from the pieces in `assets/pieces/` and synth),
-  `music.py` (the three loops), `bank.py` (`SoundBank`: cache, takes, voice budget, crossfades);
+  `music.py` (the eight loops: title, one battle per location, boss), `bank.py` (`SoundBank`: cache, takes, voice budget, crossfades);
   `docs/audio.md`. Bump `bank.VERSION` after changing any sound.
 - `hellward/art/` — `rig.py`, `figures.py`, `structures.py` (the posed low-poly stand-ins: monsters in
   three facings, towers in three ranks, gates, arches), `mapart.py` (each location's floor by its

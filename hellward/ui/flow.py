@@ -10,6 +10,7 @@ from typing import Any, Callable
 from saga2d import Game, Scene
 
 from hellward.art.sprites import Art
+from hellward.audio.music import track_for
 from hellward.sim.campaign import CATHEDRAL, LAST, ORDER, Location
 from hellward.sim.model import World
 from hellward.sim.players.hands import Player
@@ -90,6 +91,7 @@ class Flow:
     def _open_intro(self, location: Location) -> None:
         self.progress.move(location.key)
         self.game.clear_and_push(BriefingScene(self, location))
+        self.sound.music(track_for(location.key))
 
     def story(self, location: Location) -> None:
         """Replay a location's before page from its intro, back to the intro."""

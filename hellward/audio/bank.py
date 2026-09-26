@@ -6,9 +6,10 @@
     game = Game("Hellward", asset_path=cache_dir)
     bank = SoundBank(game)
     bank.play("door_hit")                        # a take, never the last one, a touch of pitch; within the voice budget
-    bank.music("battle")                         # crossfades as soon as the track is composed
+    bank.music("battle_cathedral")               # crossfades as soon as the track is composed
 
 Every cue name is in :data:`hellward.audio.cues.CUES`, every track in :data:`hellward.audio.music.PIECES`.
+A location's battle track is :func:`hellward.audio.music.track_for` of its key.
 A new :data:`VERSION` discards the whole cache; bump it after changing a cue, a piece or the music.
 """
 
@@ -25,16 +26,16 @@ import time
 from typing import ClassVar
 
 from hellward.audio.cues import CUES, files
-from hellward.audio.music import PIECES
+from hellward.audio.music import BATTLE_FOR, PIECES
 from saga2d import Game
 from sagaforge.synth import write_wav
 
-VERSION = "2"
+VERSION = "3"
 SOUNDS, MUSIC = "sounds", "music"
-#: The composer's order: the title plays first, the boss last.
-COMPOSE_ORDER = ("title", "battle", "boss")
+#: The composer's order: the title plays first, then the dungeons in the campaign's order, the boss last.
+COMPOSE_ORDER = ("title",) + tuple(BATTLE_FOR.values()) + ("boss",)
 #: Seconds each track takes to fade in over whatever was playing.
-FADE_IN = {"title": 2.5, "battle": 2.0, "boss": 1.5}
+FADE_IN = {"title": 2.5, "boss": 1.5, **{name: 2.0 for name in BATTLE_FOR.values()}}
 #: The voice budget for ``battle`` cues: at most BURST in BURST_WINDOW seconds and CROWD in CROWD_WINDOW,
 #: and the same cue not again within REPEAT_GAP.  A cue that ``yields`` stops short of the limits, so a
 #: volley of casts cannot crowd out a death.  Interface cues, alerts and leaders always play.
@@ -145,7 +146,7 @@ class SoundBank:
         return _track(self.cache_dir, name).exists()
 
     def music(self, mood: str) -> None:
-        """Crossfade to *mood*'s track (``title``, ``battle``, ``boss``) now, or the moment it is composed."""
+        """Crossfade to *mood*'s track (``title``, a ``battle_<location>``, ``boss``) now, or the moment it is composed."""
         if mood not in PIECES:
             raise KeyError(f"Unknown track {mood!r}. Tracks: {', '.join(PIECES)}")
         self._wanted = None if self._audio.music_name == mood else mood

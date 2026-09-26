@@ -80,7 +80,7 @@ def soundtrack(recorder: Recorder, cache: Path, frames: int, fps: int, path: Pat
     rate = 44_100
     length = int(frames / fps * rate) + rate
     mix = np.zeros((length, 2), dtype=np.float64)
-    tracks = recorder.music or [(0, "battle")]
+    tracks = recorder.music or [(0, "title")]
     for i, (start, name) in enumerate(tracks):
         end = tracks[i + 1][0] if i + 1 < len(tracks) else frames
         clip = _stereo(read_wav(cache / "music" / f"{name}.wav"))

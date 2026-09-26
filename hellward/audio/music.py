@@ -1,10 +1,11 @@
-"""Hellward's music: three loops for a town under a cathedral, composed with
+"""Hellward's music: a loop for the town and one for each dungeon on the way down, composed with
 :mod:`hellward.audio.instruments` on :mod:`sagaforge.synth`.
 
 The mood is the old Tristram and Cathedral one: slow, dark and sparse, a detuned twelve-string
 arpeggio in a minor mode over a low drone, distant voices, a heartbeat for a drum, a great deal
-of room and now and then a bell.  ``title`` is the night over the town, ``battle`` the same
-world with a pulse under it, ``boss`` the last wave, with drums.
+of room and now and then a bell.  ``title`` is the night over the town; each ``battle_<location>``
+is the same world heard from one dungeon down the descent, with its own key, pulse and consort;
+``boss`` is Azazel's last wave, with drums.
 
 A piece is a :class:`Score` of 4/4 bars filled by layer functions (pedal, pad, arpeggio, line, ostinato,
 drums, bells).  Everything that runs past the end wraps round to the start, the room's tail too,
@@ -27,7 +28,12 @@ Voice = Callable[..., np.ndarray]
 Motif = tuple[tuple[int, float], ...]  # (scale degree relative to the phrase centre, beats)
 Progression = tuple[int, ...]  # chord root degrees, one per bar, cycling
 
-MODES = {"aeolian": (0, 2, 3, 5, 7, 8, 10), "phrygian": (0, 1, 3, 5, 7, 8, 10)}
+MODES = {
+    "aeolian": (0, 2, 3, 5, 7, 8, 10),
+    "phrygian": (0, 1, 3, 5, 7, 8, 10),
+    "dorian": (0, 2, 3, 5, 7, 9, 10),
+    "phrygian_dominant": (0, 1, 4, 5, 7, 8, 10),
+}
 _NOTE_INDEX = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5, "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11}
 SPREAD = (0, 2, 4, 7, 9, 11, 14)  # chord tones stacked in thirds: root, third, fifth, octave, tenth, twelfth, two octaves
 
@@ -185,7 +191,12 @@ def bells(score: Score, key: Key, strikes: tuple[tuple[float, int], ...], *, gai
 
 TRISTRAM: Motif = ((4, 1.5), (3, 0.5), (2, 1.0), (1, 1.0), (0, 3.0), (-1, 1.0))
 DESCENT: Motif = ((7, 1.0), (6, 0.5), (4, 0.5), (5, 2.0), (4, 1.0), (1, 1.0), (0, 2.0))
+LAMENT: Motif = ((7, 2.0), (5, 1.0), (4, 2.0), (3, 1.0), (2, 3.0), (0, 2.0))
+EMBER: Motif = ((0, 0.5), (1, 0.5), (4, 0.5), (5, 1.0), (4, 0.5), (1, 0.5), (0, 2.0))
 HEART_KIT = {"heart": (inst.heartbeat, 0.32, 0.0), "frame": (inst.frame_drum, 0.16, -0.3), "rattle": (inst.rattle, 0.06, 0.45)}
+BONE_KIT = {"heart": (inst.heartbeat, 0.22, 0.0), "frame": (inst.frame_drum, 0.12, -0.3), "rattle": (inst.rattle, 0.12, 0.45)}
+LAVA_KIT = {"war": (inst.war_drum, 0.22, -0.1), "taiko": (inst.taiko, 0.22, 0.25), "tom": (inst.tom, 0.16, -0.35),
+            "heart": (inst.heartbeat, 0.2, 0.0), "rattle": (inst.rattle, 0.08, 0.5)}
 DOOM_KIT = {"war": (inst.war_drum, 0.28, 0.0), "taiko": (inst.taiko, 0.22, 0.2), "tom": (inst.tom, 0.2, -0.35),
             "heart": (inst.heartbeat, 0.25, 0.0), "rattle": (inst.rattle, 0.07, 0.5)}
 
@@ -204,32 +215,132 @@ def title(s: Score) -> np.ndarray:
     return s.master(room=4.5, wet=0.45, damping=3800, rms=0.085, seed=11)
 
 
-def battle(s: Score) -> np.ndarray:
-    """The same night with a pulse: the heart on every half bar, the guitar quickening, monks and a low bow."""
+def battle_tristram(s: Score) -> np.ndarray:
+    """The burning village: the familiar night, sad and open, embers in the air. A lone twelve-string
+    over a D-A drone, the heart under it, a low bow and far voices joining for the second half."""
+    key, prog = Key("D2", "aeolian"), (0, 0, 5, 5, 6, 6, 3, 4)
+    pedal(s, (key.hz(0, 0), key.hz(4, 0)), inst.drone, gain=0.16, span=8, seed=1)
+    drums(s, HEART_KIT, {"heart": "x.......x......."}, bars=16, seed=2)
+    drums(s, HEART_KIT, {"frame": "......o.......o.", "rattle": "....o.......o..."}, bars=8, start=8, seed=3)
+    arpeggio(s, key, prog, inst.twelve_string, bars=16, gain=0.2, at=-0.2, pattern=(0, 2, 3, 4, 3, 2, 1, 2), octave=1, ring=3.0,
+             rest=(7,), seed=4)
+    arpeggio(s, key, prog, inst.twelve_string, bars=8, start=8, gain=0.11, at=-0.25, pattern=(0, 2, 3, 4, 3, 2), step=0.25,
+             octave=1, ring=2.2, seed=5)
+    ostinato(s, key, prog, inst.cello, bars=8, start=8, gain=0.07, figure=(0, None, 0, None, 0, None, 4, None), step=0.5, octave=0,
+             ring=0.95, at=0.15, seed=6)
+    pad(s, key, prog, inst.hollow_choir, bars=8, start=8, gain=0.06, octave=1, voicing=(0, 4, 7), seed=7)
+    line(s, key, prog, TRISTRAM, inst.twelve_string, bars=4, start=4, gain=0.13, at=0.3, octave=2, shapes=("A", "A_end"), seed=8)
+    line(s, key, prog, TRISTRAM, inst.twelve_string, bars=4, start=12, gain=0.11, at=0.35, octave=2, shapes=("B", "A_end"), seed=9)
+    bells(s, key, ((0.0, 0), (32.0, 4)), gain=0.1)
+    s.add(inst.timpani(key.hz(0, -1), 1.6, seed=3), 32, gain=0.1)
+    return s.master(room=4.5, wet=0.45, damping=3800, rms=0.09, seed=21)
+
+
+def battle_graveyard(s: Score) -> np.ndarray:
+    """Moon over open graves: cold mist, wet turf, bones in the earth. An E dorian lament on high strings
+    and far voices over an organ, dry bones for drums, funeral bells through the biggest room of the descent."""
+    key, prog = Key("E2", "dorian"), (0, 0, 3, 3, 4, 4, 3, 2)
+    pedal(s, (key.hz(0, 0), key.hz(4, 0)), inst.drone, gain=0.15, span=6, seed=1)
+    drums(s, BONE_KIT, {"heart": "x..............."}, bars=12, seed=2)
+    drums(s, BONE_KIT, {"frame": "......o.........", "rattle": "..o...o...o...o."}, bars=6, start=6, seed=3)
+    arpeggio(s, key, prog, inst.twelve_string, bars=12, gain=0.13, at=-0.2, pattern=(0, 3, 4, 3, 2, 1, 0, 2), octave=2, ring=3.2,
+             rest=(1, 3, 5, 6, 7), seed=4)
+    pad(s, key, prog, inst.organ, bars=12, gain=0.05, octave=1, voicing=(0, 2, 4, 7), seed=5)
+    pad(s, key, prog, inst.hollow_choir, bars=6, start=6, gain=0.05, octave=2, voicing=(0, 4), seed=6)
+    line(s, key, prog, LAMENT, inst.hollow_choir, bars=6, start=4, gain=0.06, at=0.2, octave=2, legato=1.2, phrase_bars=3,
+         shapes=("A", "A_end"), seed=7)
+    bells(s, key, ((0.0, 0), (16.0, 2), (32.0, 0)), gain=0.1, length=7.0)
+    return s.master(room=5.0, wet=0.5, damping=3200, rms=0.08, seed=22)
+
+
+def battle_cathedral(s: Score) -> np.ndarray:
+    """The desecrated nave: a liturgical procession under torchlight. D phrygian, the heart on every half
+    bar, the guitar quickening to sixteenths in the second half with frame drum, rattles and a low bow;
+    monks and far voices; bells every eight bars."""
     key, prog = Key("D2", "phrygian"), (0, 0, 5, 6, 0, 0, 1, 0)
     pedal(s, (key.hz(0, 0), key.hz(4, 0)), inst.drone, gain=0.15, span=8, seed=1)
     drums(s, HEART_KIT, {"heart": "x.......x......."}, bars=8, seed=2)
     drums(s, HEART_KIT, {"heart": "x.......x.......", "frame": "......o.......o.", "rattle": "....o.......o..."}, bars=8, start=8,
-          fill={"frame": "......o...o.o.o.", "heart": "x.......x......."}, seed=3)
-    drums(s, HEART_KIT, {"heart": "x.......x.......", "rattle": "....o.......o..."}, bars=8, start=16, seed=4)
-    arpeggio(s, key, prog, inst.twelve_string, bars=8, gain=0.2, at=-0.2, pattern=(0, 2, 3, 2, 4, 2, 3, 1), octave=1, ring=2.6, seed=5)
+          fill={"frame": "......o...o.o.o.", "heart": "x.......x......."}, every=8, seed=3)
+    arpeggio(s, key, prog, inst.twelve_string, bars=8, gain=0.2, at=-0.2, pattern=(0, 2, 3, 2, 4, 2, 3, 1), octave=1, ring=2.6, seed=4)
     arpeggio(s, key, prog, inst.twelve_string, bars=8, start=8, gain=0.15, at=-0.25, pattern=(0, 2, 3, 4, 3, 2), step=0.25, octave=1,
-             ring=2.2, seed=6)
-    arpeggio(s, key, prog, inst.twelve_string, bars=8, start=16, gain=0.19, at=-0.2, pattern=(0, 2, 3, 4, 3, 2, 1, 2), octave=1,
-             ring=2.6, rest=(7,), seed=7)
+             ring=2.2, seed=5)
     ostinato(s, key, prog, inst.cello, bars=8, start=8, gain=0.09, figure=(0, None, 0, None, 0, None, 1, None), step=0.5, octave=0,
-             ring=0.95, at=0.15, seed=8)
-    pad(s, key, prog, inst.monks, bars=16, start=8, gain=0.06, octave=1, voicing=(0, 4), seed=9)
-    pad(s, key, prog, inst.hollow_choir, bars=8, start=16, gain=0.05, octave=2, voicing=(0, 2, 4), seed=10)
-    line(s, key, prog, DESCENT, inst.twelve_string, bars=8, start=4, gain=0.12, at=0.3, octave=2, seed=11)
-    line(s, key, prog, TRISTRAM, inst.twelve_string, bars=4, start=18, gain=0.11, at=0.35, octave=2, shapes=("B", "A_end"), seed=12)
-    bells(s, key, ((0.0, 0), (32.0, 4), (64.0, 0)), gain=0.09)
+             ring=0.95, at=0.15, seed=6)
+    pad(s, key, prog, inst.monks, bars=8, start=8, gain=0.06, octave=1, voicing=(0, 4), seed=7)
+    pad(s, key, prog, inst.hollow_choir, bars=4, start=12, gain=0.05, octave=2, voicing=(0, 2, 4), seed=8)
+    line(s, key, prog, DESCENT, inst.twelve_string, bars=4, start=4, gain=0.12, at=0.3, octave=2, seed=9)
+    line(s, key, prog, TRISTRAM, inst.twelve_string, bars=4, start=12, gain=0.11, at=0.35, octave=2, shapes=("B", "A_end"), seed=10)
+    bells(s, key, ((0.0, 0), (32.0, 4)), gain=0.09)
     s.add(inst.timpani(key.hz(0, -1), 1.6, seed=3), 32, gain=0.12)
-    return s.master(room=4.0, wet=0.4, damping=4000, rms=0.095, seed=12)
+    return s.master(room=4.0, wet=0.4, damping=4000, rms=0.095, seed=23)
+
+
+def battle_catacombs(s: Score) -> np.ndarray:
+    """The bone halls: narrow, low and close, torchlight on stacked skulls. A C-Db drone under a cello
+    hammering the flat second, toms and a heart in the walls, low monks and organ, one deep bell. No
+    high strings: nothing sparkles down here. The driest room of the descent."""
+    key, prog = Key("C2", "phrygian"), (0, 0, 1, 1, 0, 6, 1, 1)
+    pedal(s, (key.hz(0, 0), key.hz(1, 0)), inst.drone, gain=0.08, span=6, seed=1)
+    drums(s, HEART_KIT, {"heart": "x...............", "tom": "....x.......x..."}, bars=12, seed=2)
+    drums(s, HEART_KIT, {"frame": "......o.......o."}, bars=6, start=6, seed=3)
+    ostinato(s, key, prog, inst.cello, bars=12, gain=0.1, figure=(0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 6, 0, 1, 0), step=0.25, octave=0,
+             ring=0.9, at=0.1, seed=4)
+    pad(s, key, prog, inst.organ, bars=12, gain=0.05, octave=1, voicing=(0, 1), seed=5)
+    pad(s, key, prog, inst.monks, bars=6, start=6, gain=0.07, octave=0, voicing=(0, 1, 4), seed=6)
+    line(s, key, prog, DESCENT, inst.cello, bars=4, start=4, gain=0.1, at=0.15, octave=0, shapes=("A", "B"), seed=7)
+    for bar in range(0, 12, 4):
+        s.add(inst.timpani(key.hz(chord_at(prog, bar), -1), 1.4, seed=bar), bar * 4, gain=0.12)
+    bells(s, key, ((0.0, 0),), gain=0.06, length=7.0)
+    return s.master(room=2.8, wet=0.3, damping=4600, rms=0.09, seed=24)
+
+
+def battle_caves(s: Score) -> np.ndarray:
+    """Lava light: a primal vault of rock and fire, wings overhead. F phrygian-dominant, restless taiko
+    and war drums under a bright sixteenth-note guitar and a driving bow, a rising ember of a melody.
+    No church bells this deep: only timpani and stone."""
+    key, prog = Key("F2", "phrygian_dominant"), (0, 0, 5, 4, 0, 6, 5, 4)
+    pedal(s, (key.hz(0, 0), key.hz(4, 0)), inst.drone, gain=0.12, span=8, seed=1)
+    drums(s, LAVA_KIT, {"taiko": "....x.......x...", "heart": "........x......."}, bars=4, seed=2)
+    drums(s, LAVA_KIT, {"war": "x.....x...x.....", "taiko": "....x.......x..x", "heart": "........x.......", "rattle": "..o...o...o...o."},
+          bars=12, start=4, fill={"tom": "x.x.x.x.x.xxx.xx", "war": "x.....x...x....."}, seed=3)
+    arpeggio(s, key, prog, inst.twelve_string, bars=12, start=4, gain=0.14, at=-0.3, pattern=(0, 3, 2, 3, 4, 3, 2, 3), step=0.25, octave=1,
+             ring=1.6, seed=4)
+    ostinato(s, key, prog, inst.cello, bars=12, start=4, gain=0.09, figure=(0, None, 4, None, 5, None, 4, None), step=0.5, octave=0,
+             ring=0.9, at=0.1, seed=5)
+    pad(s, key, prog, inst.hollow_choir, bars=8, start=8, gain=0.045, octave=2, voicing=(0, 2, 4), seed=6)
+    line(s, key, prog, EMBER, inst.twelve_string, bars=4, start=8, gain=0.11, at=0.3, octave=2, seed=7)
+    for bar in (0, 8):
+        s.add(inst.timpani(key.hz(chord_at(prog, bar), -1), 1.4, seed=bar), bar * 4, gain=0.1)
+    return s.master(room=3.5, wet=0.35, damping=5000, rms=0.095, seed=25)
+
+
+def battle_hells_gate(s: Score) -> np.ndarray:
+    """The gate opens: everything at once, an apocalyptic march on brimstone. D phrygian over a D-Eb
+    drone: war drums and taiko, a low bow on the flat second, organ clusters and monks, a falling choir
+    line, and the village's own melody returning corrupted on the guitar. The boss takes it from here."""
+    key, prog = Key("D2", "phrygian"), (0, 0, 1, 1, 0, 0, 6, 5)
+    pedal(s, (key.hz(0, 0), key.hz(1, 0)), inst.drone, gain=0.07, span=4, seed=1)
+    drums(s, DOOM_KIT, {"war": "x.....x...x.....", "heart": "........x......."}, bars=4, seed=2)
+    drums(s, DOOM_KIT, {"war": "x.....x...x.....", "taiko": "....x.......x..x", "heart": "........x.......", "rattle": "..o...o...o...o."},
+          bars=12, start=4, fill={"tom": "x.x.x.x.x.xxx.xx", "war": "x.....x...x....."}, seed=3)
+    ostinato(s, key, prog, inst.cello, bars=16, gain=0.09, figure=(0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0, 1, 0), step=0.25, octave=0,
+             ring=0.9, at=0.1, seed=4)
+    arpeggio(s, key, prog, inst.twelve_string, bars=12, start=4, gain=0.13, at=-0.3, pattern=(0, 3, 2, 3, 4, 3, 2, 3), step=0.25, octave=1,
+             ring=1.6, seed=5)
+    pad(s, key, prog, inst.organ, bars=8, start=8, gain=0.06, octave=1, voicing=(0, 1, 4, 7), seed=6)
+    pad(s, key, prog, inst.monks, bars=12, start=4, gain=0.07, octave=1, voicing=(0, 4), seed=7)
+    line(s, key, prog, DESCENT, inst.hollow_choir, bars=8, start=8, gain=0.07, at=0.2, octave=2, phrase_bars=4, shapes=("A", "B"), seed=8)
+    line(s, key, prog, TRISTRAM, inst.twelve_string, bars=4, start=12, gain=0.1, at=0.3, octave=2, shapes=("B", "A_end"), seed=9)
+    for bar in range(0, 16, 4):
+        s.add(inst.timpani(key.hz(chord_at(prog, bar), -1), 1.4, seed=bar), bar * 4, gain=0.12)
+    bells(s, key, ((0.0, 0), (32.0, 1)), gain=0.08, length=5.0)
+    return s.master(room=3.2, wet=0.32, damping=4200, rms=0.1, seed=26)
 
 
 def boss(s: Score) -> np.ndarray:
-    """The last wave: war drums, a low bow hammering the flat second, an organ and monks in clusters, bells."""
+    """Azazel the Flayer: the last wave of Hell's Gate. War drums, a low bow hammering the flat second,
+    an organ and monks in clusters, bells."""
     key, prog = Key("D2", "phrygian"), (0, 0, 1, 1, 0, 0, 6, 1)
     pedal(s, (key.hz(0, 0), key.hz(1, 0)), inst.drone, gain=0.07, span=4, seed=1)
     drums(s, DOOM_KIT, {"war": "x.....x...x.....", "heart": "........x......."}, bars=4, seed=2)
@@ -264,4 +375,28 @@ class Piece:
         return self.compose(Score(self.bpm, self.bars))
 
 
-PIECES: dict[str, Piece] = {"title": Piece(title, 64, 12), "battle": Piece(battle, 72, 24), "boss": Piece(boss, 88, 20)}
+PIECES: dict[str, Piece] = {
+    "title": Piece(title, 64, 12),
+    "battle_tristram": Piece(battle_tristram, 68, 16),
+    "battle_graveyard": Piece(battle_graveyard, 60, 12),
+    "battle_cathedral": Piece(battle_cathedral, 72, 16),
+    "battle_catacombs": Piece(battle_catacombs, 66, 12),
+    "battle_caves": Piece(battle_caves, 92, 16),
+    "battle_hells_gate": Piece(battle_hells_gate, 84, 16),
+    "boss": Piece(boss, 88, 20),
+}
+
+#: Every location's battle track, in the campaign's order.
+BATTLE_FOR: dict[str, str] = {
+    "tristram": "battle_tristram",
+    "graveyard": "battle_graveyard",
+    "cathedral": "battle_cathedral",
+    "catacombs": "battle_catacombs",
+    "caves": "battle_caves",
+    "hells_gate": "battle_hells_gate",
+}
+
+
+def track_for(location_key: str) -> str:
+    """The battle track for a location's key (``"tristram"`` → ``"battle_tristram"``)."""
+    return BATTLE_FOR[location_key]
