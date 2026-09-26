@@ -41,10 +41,17 @@ import sim_bench
 from test_fastsim import full_fight
 from hellward.sim import planner
 from hellward.sim.campaign import CATHEDRAL, LOCATIONS, NORMAL
-from hellward.sim.players.hands import defend
+from hellward.sim.model import World
+from hellward.sim.players.hands import Hands
 from hellward.sim.players.ordinary import Ordinary
 
-world, _ = defend(CATHEDRAL, NORMAL, Ordinary(), seed=2, sigils=0, planner=planner.smart, limit=100.0)
+world = World(CATHEDRAL, difficulty=NORMAL, seed=2, planner=planner.smart)   # a hundred seconds into a defence
+player, hands = Ordinary(), Hands(world, react=0.6)
+while world.time < 100.0:
+    player.act(hands)
+    world.step()
+    hands.observe(world.events)
+    world.events.clear()
 kept = world.clone()
 back = pickle.loads(pickle.dumps(kept))   # what tools/curse_quality.py sends its workers
 same = [sim_bench.state(back) == sim_bench.state(kept)]
