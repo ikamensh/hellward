@@ -255,7 +255,7 @@ class BattleScene(Scene):
 
     def pick(self, key: str) -> None:
         if not offers(self.location, key):
-            self._refuse(f"Not in {self.location.name}: it arrives in {first_offering(key).name}.")
+            self._refuse(f"Not in {self.location.called}: it arrives in {first_offering(key).called}.")
             return
         self.selected = None
         self.placing = None if self.placing == key else key
@@ -273,7 +273,7 @@ class BattleScene(Scene):
             self._refuse("Spells are cast in the fight's own time: resume it first (P).")
             return
         if not offers(self.location, key):
-            self._refuse(f"{SPELLS[key].name} is not yet yours: you learn it for {first_offering(key).name}.")
+            self._refuse(f"{SPELLS[key].name} is not yet yours: you learn it for {first_offering(key).called}.")
             return
         if key == "smite":
             leader = self.threat()

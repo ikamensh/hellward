@@ -42,6 +42,11 @@ class Location:
             raise ValueError(f"{self.key}: arches but no gates to put in them")
 
     @property
+    def called(self) -> str:
+        """The name as it reads inside a sentence: "the Graveyard", "Tristram"."""
+        return "the" + self.name[3:] if self.name.startswith("The ") else self.name
+
+    @property
     def monsters(self) -> tuple[str, ...]:
         """Every monster kind that comes here, in the order they first appear."""
         seen: dict[str, None] = {}

@@ -67,7 +67,7 @@ class SkillTreeScene(Scene):
         progress = self.progress
         self.spots = []
         self.draw_text("Skills", 640, 46, style="banner", anchor_x="center", anchor_y="center")
-        where = f"  ·  greyed: nothing to work on in {self.location.name}" if self.location is not None else ""
+        where = f"  ·  greyed: nothing to work on in {self.location.called}" if self.location is not None else ""
         free = f"{progress.free} sigil{'' if progress.free == 1 else 's'} free"
         self.draw_text(f"{free} of {progress.sigils} won. Unlearning is free.{where}", 640, 88, font_size=15,
                        color=style.PALE_GOLD, anchor_x="center", anchor_y="center")

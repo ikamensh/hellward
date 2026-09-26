@@ -350,7 +350,7 @@ class World:
     def build(self, kind: str, tile: tuple[int, int]) -> Tower:
         tower_kind = TOWERS[kind]
         if kind not in self.location.arsenal.towers:
-            raise Refused(f"No {tower_kind.name} can be raised in {self.location.name}.")
+            raise Refused(f"No {tower_kind.name} can be raised in {self.location.called}.")
         if not self.level.buildable(*tile):
             raise Refused("Towers stand on the bare floor, not on the path, the walls or the pits.")
         if self.tower_at(tile) is not None:
@@ -391,7 +391,7 @@ class World:
 
     def build_door(self, index: int) -> None:
         if not self.location.arsenal.gates:
-            raise Refused(f"There are no arches to ward in {self.location.name}.")
+            raise Refused(f"There are no arches to ward in {self.location.called}.")
         door = self.doors[index]
         if door.built:
             raise Refused("The gate already stands.")
@@ -406,7 +406,7 @@ class World:
 
     def _spend(self, key: str) -> None:
         if key not in self.location.arsenal.spells:
-            raise Refused(f"{SPELLS[key].name} is not yours to cast in {self.location.name}.")
+            raise Refused(f"{SPELLS[key].name} is not yours to cast in {self.location.called}.")
         cost = self.spell_cost(key)
         if self.mana < cost:
             raise Refused(f"{SPELLS[key].name} takes {cost:.0f} mana.")

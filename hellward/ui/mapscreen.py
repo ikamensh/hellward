@@ -201,9 +201,9 @@ class MapScene(Scene):
             widgets.sigil_pips(self, x, label_y + 26 if label_y > y else label_y - 26, won, size=6, gap=16)
 
     def _spot(self, key: str, location, x: float, y: float, opened: bool, won: int) -> None:
-        need = LOCATIONS[location.requires[0]].name if location.requires else ""
+        need = LOCATIONS[location.requires[0]].called if location.requires else ""
         tip = (f"{location.name}\n{location.blurb}\nSigils won here: {won} of 3." if opened
-               else f"{location.name}\nThe way opens when {need} holds.")
+               else f"{location.name}\nThe way opens when {need} holds." if need else location.name)
         self.spots.append(widgets.Hotspot(key, (x - 34, y - 34, 68, 68), opened, tip))
 
     def _lantern(self) -> None:

@@ -129,5 +129,5 @@ class ReckoningScene(Scene):
             note = "No sigils for a fallen sanctuary. Reshape your skills and try again."
         self.draw_text(note, 640, 450, font_size=16, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
         if self.opened is not None:
-            self.draw_text(f"The way down to {self.opened.name} is open.", 640, 482, font_size=17, color=style.HOLY,
+            self.draw_text(f"The way down to {self.opened.called} is open.", 640, 482, font_size=17, color=style.HOLY,
                            anchor_x="center", anchor_y="center")

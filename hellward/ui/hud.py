@@ -150,7 +150,7 @@ class Hud:
                 self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), affordable, f"{name} — {cost} gold\n{tip}"))
             else:
                 self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), False,
-                                             f"{name}\nNot here. It arrives in {first_offering(key).name}."))
+                                             f"{name}\nNot here. It arrives in {first_offering(key).called}."))
         self._centre(selected)
 
     def _keycap(self, x: float, y: float, key: str) -> None:
@@ -193,7 +193,7 @@ class Hud:
                                              f"{spec.name} — {cost:.0f} mana\n{spec.blurb} {how}Not while paused."))
             else:
                 self.controls.append(Control(f"spell:{key}", (x, y, SLOT, SLOT), False,
-                                             f"{spec.name}\nNot yet yours. You learn it for {first_offering(key).name}."))
+                                             f"{spec.name}\nNot yet yours. You learn it for {first_offering(key).called}."))
 
     def _corner(self, speed: float) -> None:
         """Pace and Menu, small, at the top right over the wall."""
