@@ -134,7 +134,7 @@ def mutate(plan: Plan, location: Location, sigils: int, rng: random.Random) -> P
     tiles = [(x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y)]
     for _ in range(rng.choice((1, 1, 2, 3))):
         builds = [i for i, s in enumerate(steps) if s.what == "build"]
-        move = rng.choice(("kind", "nudge", "jump", "shift", "shift", "rank", "tower", "drop", "skills", "early"))
+        move = rng.choice(("kind", "nudge", "jump", "shift", "shift", "rank", "tower", "gate", "drop", "skills", "early"))
         if move in ("kind", "nudge", "jump") and builds:
             i = rng.choice(builds)
             old = steps[i]
@@ -164,6 +164,10 @@ def mutate(plan: Plan, location: Location, sigils: int, rng: random.Random) -> P
             free = [t for t in tiles if not any(s.what == "build" and s.tile == t for s in steps)]
             tile = rng.choice(sorted(free, key=lambda t: -tile_value(location, kind, t, reach))[:JUMP])
             steps.insert(rng.randrange(len(steps) + 1), Step("build", kind, tile))
+        elif move == "gate":
+            unset = [i for i in range(len(level.doors)) if Step("gate", door=i) not in steps]
+            if unset:
+                steps.insert(rng.randrange(len(steps) + 1), Step("gate", door=rng.choice(unset)))
         elif move == "drop" and steps:
             step = steps.pop(rng.randrange(len(steps)))
             if step.what == "build":
