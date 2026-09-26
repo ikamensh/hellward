@@ -623,9 +623,10 @@ class World:
     def _move(self, dt: float) -> None:
         doors = [d for d in self.doors if d.built]
         end = self.level.length
-        survivors = []
-        ordered, last = True, math.inf   # whether the survivors still run furthest first, as they did
-        for m in self.monsters:
+        monsters = self.monsters
+        leaked = False
+        ordered, last = True, math.inf   # whether those still on the map run furthest first, as they did
+        for m in monsters:
             if m.frozen > 0:
                 m.frozen -= dt
                 m.door = -1
@@ -653,20 +654,21 @@ class World:
                     self.leaked_life += m.max_hp * LEAK_WEIGHT
                     self._count_off(m)
                     self._emit("leak", m.id, m.kind.key, m.kind.lives)
+                    leaked = True
                     continue
             if m.s > last:
                 ordered = False
             last = m.s
-            survivors.append(m)
+        if leaked:   # through the sanctuary gate: those that walked to the path's end, and only they
+            monsters = self.monsters = [m for m in monsters if m.s < end]
         if not ordered:   # someone overtook
-            _furthest_first(survivors)
-        self.monsters = survivors
+            _furthest_first(monsters)
         if self.lives <= 0 and self.outcome is None:
             self.lives = 0
             self.outcome = "defeat"
             self._emit("defeat")
         thorns = self.perks.thorns
-        for m in survivors:
+        for m in monsters:
             if m.door >= 0:
                 d = self.doors[m.door]
                 blow = m.kind.door_dps * dt
