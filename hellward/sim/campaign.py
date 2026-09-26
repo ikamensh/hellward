@@ -78,7 +78,9 @@ class Difficulty:
 
 
 NORMAL = Difficulty("normal", "Normal", 1.0, 1.0, None)
-HELL = Difficulty("hell", "Hell", 2.2, 0.75, "normal")
+HELL = Difficulty("hell", "Hell", 2.2, 0.75, "normal",   # each location set so the strongest player's margin is about 1.4, and
+                  life=(("tristram", 3.5), ("graveyard", 3.85), ("cathedral", 6.9),   # about 1.0 at Hell's Gate
+                        ("catacombs", 2.75), ("caves", 1.5), ("hells_gate", 1.75)))
 DIFFICULTIES: dict[str, Difficulty] = {d.key: d for d in (NORMAL, HELL)}
 
 SIGIL_LIVES = (1, 10, 18)   # sanctuary life to keep for one, two and three sigils (a victory keeps at least one)
