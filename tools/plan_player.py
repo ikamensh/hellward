@@ -37,8 +37,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim import planner  # noqa: E402
-from hellward.sim.campaign import DIFFICULTIES, HELL, LOCATIONS, NORMAL, ORDER, Location  # noqa: E402
-from hellward.sim.content import MONSTERS, START_LIVES, TOWERS  # noqa: E402
+from hellward.sim.campaign import DIFFICULTIES, LOCATIONS, ORDER, Location  # noqa: E402
+from hellward.sim.content import MONSTERS, TOWERS  # noqa: E402
 from hellward.sim.model import DOOR_STOP, JOSTLE, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.hands import defend  # noqa: E402
@@ -61,6 +61,7 @@ WORTHS = ("smite_worth", "cleanse_worth", "meteor_worth", "orb_worth")
 HOLD = 36.0                   # a build scoring this (16 lives kept) has room: the monsters' life goes up
 FALTER = 26.0                 # below this (a fall, or 6 lives) it comes down again
 TOP_TILES = 40                # tiles a moved or added tower may jump to
+FIRST_TOWERS = 12             # towers in a first build
 
 
 # -- Playing ------------------------------------------------------------------------------------------
@@ -78,10 +79,10 @@ def score(world: World) -> float:
     return 20.0 * world.kills / total
 
 
-def play(plan: dict, location: str, difficulty: str, sigils: int, seed: int, hp: float, leaders: str) -> dict:
-    world, record = defend(LOCATIONS[location], DIFFICULTIES[difficulty], Planned(plan=Plan.from_json(plan)), seed=seed,
-                           sigils=sigils, planner=LEADERS[leaders], hp=hp)
-    return {"score": score(world), "outcome": world.outcome, "lives": world.lives, "spells": dict(record.spells)}
+def play(plan: dict, location: str, difficulty: str, sigils: int, seed: int, hp: float, leaders: str) -> float:
+    world, _ = defend(LOCATIONS[location], DIFFICULTIES[difficulty], Planned(plan=Plan.from_json(plan)), seed=seed,
+                      sigils=sigils, planner=LEADERS[leaders], hp=hp)
+    return score(world)
 
 
 def evaluate(pool: ProcessPoolExecutor, plans: list[Plan], location: str, difficulty: str, seeds: list[int], hp: float,
@@ -91,7 +92,7 @@ def evaluate(pool: ProcessPoolExecutor, plans: list[Plan], location: str, diffic
     jobs = [(p.to_json(), location, difficulty, sigils, s, hp, leaders) for p in plans for s in seeds]
     results = list(pool.map(play, *zip(*jobs)))
     n = len(seeds)
-    return [statistics.mean(r["score"] for r in results[i * n:(i + 1) * n]) for i in range(len(plans))]
+    return [statistics.mean(results[i * n:(i + 1) * n]) for i in range(len(plans))]
 
 
 # -- The builds a person tries first --------------------------------------------------------------------
@@ -129,12 +130,12 @@ def ranked_tiles(location: Location, reach: float, door_bonus: float) -> list[tu
     return [tile for _, tile in scored]
 
 
-def first_plan(location: Location, kinds: list[str], towers: int, gates_after: int) -> Plan:
-    """Towers of the given kinds (in turn) on the best tiles for their reach, the gates after a few towers, then
+def first_plan(location: Location, kinds: list[str]) -> Plan:
+    """Twelve towers of the given kinds (in turn) on the best tiles for their reach, the gates after the third, then
     ranks and further towers in turn."""
     used: set[tuple[int, int]] = set()
     placed = []
-    for i in range(towers):
+    for i in range(FIRST_TOWERS):
         kind = kinds[i % len(kinds)]
         reach = TOWERS[kind].levels[1].range
         bonus = 6.0 if kind == "frost" else 3.0
@@ -146,12 +147,10 @@ def first_plan(location: Location, kinds: list[str], towers: int, gates_after: i
     rank_queue = [("rank", tile) for _, tile in placed] * 2
     for i, (kind, tile) in enumerate(placed):
         steps.append(("build", kind, tile))
-        if i + 1 == gates_after:
+        if i == 2:
             steps.extend(gates)
-        if i >= 3 and rank_queue:
+        if i >= 3:
             steps.append(rank_queue.pop(0))
-    if gates_after > len(placed):
-        steps.extend(gates)
     steps.extend(rank_queue)
     return Plan(skills=first_skills(kinds, location), steps=steps, calls=[100.0] + [0.0] * (len(location.waves) - 1))
 
@@ -178,7 +177,7 @@ def first_plans(location: Location) -> list[Plan]:
     arsenal = location.arsenal.towers
     by_fit = sorted(arsenal, key=lambda k: -fit(location, k))
     mixes = [tuple(k for k in mix if k in arsenal) for mix in MIXES] + [tuple(by_fit[:2])]
-    return [first_plan(location, list(mix), 12, gates_after=3) for mix in dict.fromkeys(m for m in mixes if m)]
+    return [first_plan(location, list(mix)) for mix in dict.fromkeys(m for m in mixes if m)]
 
 
 # -- Changes ------------------------------------------------------------------------------------------
@@ -414,9 +413,11 @@ def table(pool: ProcessPoolExecutor, players: list[str], seeds: list[int]) -> No
             lives = [r["lives"] for r in mine]
             wins = sum(r["outcome"] == "victory" for r in mine)
             spells = sum((r["spells"].get(k, 0) for r in mine for k in r["spells"]), 0) / len(mine)
+            landed = statistics.mean(r["landed"] for r in mine)
+            broken = statistics.mean(r["broken"] for r in mine)
             print(f"{loc:11s} {d:6s} sigils {sig:2d}  {p:9s} wins {wins}/{len(mine)}  lives median "
-                  f"{statistics.median(lives):4.1f} fewest {min(lives):2d}  curses landed {statistics.mean(r['landed'] for r in mine):4.1f} "
-                  f"broken {statistics.mean(r['broken'] for r in mine):4.1f}  spells {spells:4.1f}", flush=True)
+                  f"{statistics.median(lives):4.1f} fewest {min(lives):2d}  curses landed {landed:4.1f} broken {broken:4.1f}  "
+                  f"spells {spells:4.1f}", flush=True)
 
 
 def dumps(plan: Plan) -> str:
