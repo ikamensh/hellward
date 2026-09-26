@@ -9,8 +9,10 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
+from typing import Final
 
 from hellward.sim.content import DOOR, MANA_MAX, MANA_REGEN, SPELLS, TOWERS, TowerLevel
+from hellward.sim.sums import int_sum
 
 
 @dataclass(frozen=True)
@@ -51,7 +53,7 @@ SKILLS: dict[str, Skill] = {s.key: s for s in (
     Skill("spell_mastery", "Spell Mastery", "sorcery", 3, "Smite, Meteor and Frozen Orb cost 25% less and strike 30% harder.", ("smite", "meteor", "orb")),
 )}
 
-TREE_COST = sum(s.cost for s in SKILLS.values())
+TREE_COST = int_sum(s.cost for s in SKILLS.values())
 
 
 def above(skill: Skill) -> Skill | None:
@@ -63,7 +65,7 @@ def above(skill: Skill) -> Skill | None:
 
 
 def cost(learned: Iterable[str]) -> int:
-    return sum(SKILLS[key].cost for key in learned)
+    return int_sum(SKILLS[key].cost for key in learned)
 
 
 def can_learn(learned: frozenset[str], key: str, sigils: int) -> bool:
@@ -111,7 +113,7 @@ class Perks:
     spell_power: float = 1.0
 
 
-NO_PERKS = Perks()
+NO_PERKS: Final = Perks()
 
 
 def perks(learned: Iterable[str]) -> Perks:
@@ -155,6 +157,18 @@ def perks(learned: Iterable[str]) -> Perks:
     if "spell_mastery" in chosen:
         p = replace(p, spell_cost=0.75, spell_power=1.3)
     return p
+
+
+_BAKED: Final[dict[Perks, dict[str, tuple[TowerLevel, ...]]]] = {}
+
+
+def baked(p: Perks) -> dict[str, tuple[TowerLevel, ...]]:
+    """Every tower kind's ranks with the perks in them, worked out once per set of perks: every world begins with
+    them, and so does every clone the planner looks ahead in. Nothing changes them."""
+    found = _BAKED.get(p)
+    if found is None:
+        found = _BAKED[p] = {kind: tower_levels(kind, p) for kind in TOWERS}
+    return found
 
 
 def tower_levels(kind: str, p: Perks) -> tuple[TowerLevel, ...]:

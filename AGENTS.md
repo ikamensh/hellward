@@ -15,6 +15,7 @@ uv run pytest -q                             # the suite
 uv run python tools/balance.py --location caves      # every leader policy against eight ordinary defenders
 uv run python tools/curse_quality.py --location caves  # how close the leaders' curses are to the best possible
 uv run python tools/campaign_balance.py --out DIR   # the campaign's tuning table (heavy: through ~/saga/tools/slot.py)
+uv run python tools/sim_bench.py             # a defence per location, source against compiled: time and digests
 uv run python tools/sampler.py DIR --music   # every sound cue back to back, and the music, to listen to
 uv run python tools/pieces.py refresh        # regenerate changed foley pieces (Stable Audio 3, docs/audio.md)
 uv run python tools/restyle.py refresh DIR   # repaint the stand-ins (Codex; --provider openrouter), install the cut
@@ -32,6 +33,9 @@ uv run python tools/intro.py STEP OUT        # the story intro as film and as co
   one coordinate `s`, reach as intervals of `s`), `model.py` (the fixed-step `World`, cheap to
   clone), `planner.py` (the leaders' curse choice), `players/` (scripted players, which act
   through `hands.py`: a person's view and reaction time).
+- `hellward/sim/fastsim.py` — the simulation compiled with mypyc for the tools that play many defences
+  (`build/fastsim/`); `sums.py` adds floats as source and compiled both do. `tests/test_fastsim.py` holds the
+  compiled simulation to the source, event for event.
 - `hellward/audio/` — `cues.py` (every cue by name, from the pieces in `assets/pieces/` and synth),
   `music.py` (the three loops), `bank.py` (`SoundBank`: cache, takes, voice budget, crossfades);
   `docs/audio.md`. Bump `bank.VERSION` after changing any sound.
@@ -55,6 +59,10 @@ uv run python tools/intro.py STEP OUT        # the story intro as film and as co
   the sources): never a leader's planner, cooldown or chant clock, never a clone of the live world.
 - After a rules change run `tools/balance.py` and `tools/curse_quality.py`; quote the before and
   after numbers in the commit.
+- The tools run the simulation compiled (`HELLWARD_INTERPRETED=1` runs the source), which keeps it to
+  mypyc's terms: `uv run mypy` stays clean, no simulation module calls the built-in `sum`, a `Final`
+  constant is never rebound, and nothing reads `vars()` or `__dict__` of a simulation object. A new tool
+  that plays many defences activates it before importing the simulation, as `tools/balance.py` does.
 - Anything that builds the game in a script needs an `if __name__ == "__main__":` guard: the planner's
   and the stand-ins' process pools spawn, and a spawned worker re-imports the main module.
 - A new frame, facing or monster makes its painted sheet stale (the game warns and draws the stand-in):

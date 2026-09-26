@@ -9,6 +9,10 @@ A world is one :class:`~hellward.sim.campaign.Location` at one difficulty, with 
 (:class:`~hellward.sim.skills.Perks`) baked in when it begins.
 
 Events for the view are appended to :attr:`World.events` when ``record`` is on; clones switch it off.
+
+Compiled by mypyc (:mod:`hellward.sim.fastsim`), a class's ``__new__`` runs its ``__init__``, so there is no blank
+object to fill: copies are made by the constructors, and the classes whose constructor needs arguments say in
+``__reduce__`` how they are pickled.
 """
 
 from __future__ import annotations
@@ -16,8 +20,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
-from operator import attrgetter
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Final
 
 from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location
 from hellward.sim.content import (
@@ -25,23 +28,21 @@ from hellward.sim.content import (
     SHATTER_RADIUS, SHATTER_SHARE, SOUL, SPELLS, START_LIVES, THORNS, TOWERS, WARD, WAVE_BREAK, Curse, Element,
     MonsterKind, TowerKind, TowerLevel,
 )
-from hellward.sim.skills import NO_PERKS, Perks, tower_levels
+from hellward.sim.skills import NO_PERKS, Perks, baked
 
 if TYPE_CHECKING:
     from hellward.sim.planner import Decision
 
-SIM_DT = 0.05
-DOOR_STOP = 0.45         # how far before a door's centre the front of a queue stands
-JOSTLE = 0.6             # the queue behind a door is this deep
-CHAIN_JUMP = 1.7         # how far chain lightning leaps
-DECIDE_DELAY = 0.5       # a leader ponders this long between asking its planner and starting to chant
-HOLD_RETRY = 1.0         # a leader that holds its curse thinks again after this long
-CAST_SLACK = 1.0         # a curse lands if the tower is within reach + slack when the chant ends
-FIRST_WAVE_BREAK = 30.0
-LEAK_WEIGHT = 2.0        # a monster through the sanctuary gate is worth twice its life to its side
-BLAZE_TIME = 2.0         # seconds the floor burns where a fireball lands, under Blaze
-
-_by_s = attrgetter("s")
+SIM_DT: Final = 0.05
+DOOR_STOP: Final = 0.45         # how far before a door's centre the front of a queue stands
+JOSTLE: Final = 0.6             # the queue behind a door is this deep
+CHAIN_JUMP: Final = 1.7         # how far chain lightning leaps
+DECIDE_DELAY: Final = 0.5       # a leader ponders this long between asking its planner and starting to chant
+HOLD_RETRY: Final = 1.0         # a leader that holds its curse thinks again after this long
+CAST_SLACK: Final = 1.0         # a curse lands if the tower is within reach + slack when the chant ends
+FIRST_WAVE_BREAK: Final = 30.0
+LEAK_WEIGHT: Final = 2.0        # a monster through the sanctuary gate is worth twice its life to its side
+BLAZE_TIME: Final = 2.0         # seconds the floor burns where a fireball lands, under Blaze
 
 
 class Refused(Exception):
@@ -74,13 +75,15 @@ class Monster:
         self.door = -1                        # the door socket it is battering, or -1
 
     def copy(self) -> Monster:
-        m = Monster.__new__(Monster)
-        m.id, m.kind, m.hp, m.max_hp, m.s, m.lane, m.jostle = self.id, self.kind, self.hp, self.max_hp, self.s, self.lane, self.jostle
-        m.chill, m.chill_left, m.frozen, m.wave, m.cooldown = self.chill, self.chill_left, self.frozen, self.wave, self.cooldown
+        """Everything but a leader's pending question to its planner."""
+        m = Monster(self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown)
+        m.max_hp, m.s, m.chill, m.chill_left, m.frozen = self.max_hp, self.s, self.chill, self.chill_left, self.frozen
         m.poison = [stack[:] for stack in self.poison]
-        m.asking, m.ask_left = None, 0.0
         m.chant_curse, m.chant_tower, m.chant_left, m.door = self.chant_curse, self.chant_tower, self.chant_left, self.door
         return m
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return Monster, (self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown), self.__getstate__()
 
     @property
     def speed(self) -> float:
@@ -110,11 +113,13 @@ class Tower:
         self.spans_reach = -1.0
 
     def copy(self) -> Tower:
-        t = Tower.__new__(Tower)
-        t.id, t.kind, t.levels, t.level, t.tile, t.cooldown = self.id, self.kind, self.levels, self.level, self.tile, self.cooldown
-        t.curses = dict(self.curses)
+        t = Tower(self.id, self.kind, self.levels, self.tile)
+        t.level, t.cooldown, t.curses = self.level, self.cooldown, dict(self.curses)
         t.ward, t.spent, t.spans, t.spans_reach = self.ward, self.spent, self.spans, self.spans_reach
         return t
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return Tower, (self.id, self.kind, self.levels, self.tile), self.__getstate__()
 
     @property
     def stats(self) -> TowerLevel:
@@ -165,27 +170,42 @@ class Door:
         self.built = False
 
     def copy(self) -> Door:
-        d = Door.__new__(Door)
-        d.index, d.tile, d.s, d.hp, d.built = self.index, self.tile, self.s, self.hp, self.built
+        d = Door(self.index, self.tile, self.s)
+        d.hp, d.built = self.hp, self.built
         return d
 
+    def __reduce__(self) -> tuple[Any, ...]:
+        return Door, (self.index, self.tile, self.s), self.__getstate__()
 
-@dataclass
+
 class Bolt:
-    """A firebolt or a venom dart in flight; it lands on its monster, or where that monster fell."""
+    """A firebolt or a venom dart in flight; it lands on its monster, or where that monster fell.
 
-    id: int
-    tower: int
-    kind: str          # the tower kind's key
-    target: int
-    left: float        # seconds to impact
-    damage: float
-    element: Element
-    splash: float
-    poison: float
-    poison_time: float
-    origin: tuple[float, float]
-    last: tuple[float, float]   # the target's last known position
+    A bolt is never changed: each step makes a flying bolt anew, so clones and the view keep the ones they were
+    given. It is a class of its own rather than a dataclass, whose ``__init__`` runs interpreted when compiled."""
+
+    __slots__ = ("id", "tower", "kind", "target", "left", "damage", "element", "splash", "poison", "poison_time",
+                 "origin", "last")
+
+    def __init__(self, id: int, tower: int, kind: str, target: int, left: float, damage: float, element: Element,
+                 splash: float, poison: float, poison_time: float, origin: tuple[float, float],
+                 last: tuple[float, float]) -> None:
+        self.id = id
+        self.tower = tower
+        self.kind = kind                # the tower kind's key
+        self.target = target
+        self.left = left                # seconds to impact
+        self.damage = damage
+        self.element = element
+        self.splash = splash
+        self.poison = poison
+        self.poison_time = poison_time
+        self.origin = origin
+        self.last = last                # the target's last known position
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return Bolt, (self.id, self.tower, self.kind, self.target, self.left, self.damage, self.element, self.splash,
+                      self.poison, self.poison_time, self.origin, self.last)
 
 
 @dataclass(frozen=True)
@@ -207,6 +227,9 @@ class Hazard:
 
     def copy(self) -> Hazard:
         return Hazard(self.x, self.y, self.radius, self.dps, self.left)
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return Hazard, (self.x, self.y, self.radius, self.dps, self.left)
 
 
 @dataclass
@@ -230,7 +253,7 @@ class World:
         self.waves = location.waves
         self.difficulty = difficulty
         self.perks = perks
-        self.tower_levels = {kind: tower_levels(kind, perks) for kind in TOWERS}
+        self.tower_levels = baked(perks)
         self.rng = random.Random(seed)
         self.planner = planner
         self.record = record
@@ -265,10 +288,7 @@ class World:
 
     def clone(self) -> World:
         """A private copy to look ahead in: no events, no planner, its own random stream."""
-        w = World.__new__(World)
-        w.location, w.level, w.waves, w.difficulty, w.perks = self.location, self.level, self.waves, self.difficulty, self.perks
-        w.tower_levels, w.planner, w.record, w.events = self.tower_levels, None, False, []
-        w.rng = random.Random()
+        w = World(self.location, difficulty=self.difficulty, perks=self.perks, record=False)
         w.rng.setstate(self.rng.getstate())
         w.time, w.gold, w.lives, w.mana = self.time, self.gold, self.lives, self.mana
         w.towers = {i: t.copy() for i, t in self.towers.items()}
@@ -464,11 +484,11 @@ class World:
 
     def _around(self, x: float, y: float, radius: float, *, flyers: bool) -> list[Monster]:
         found = []
-        point = self.level.point
+        level = self.level
         for m in self.monsters:
             if m.hp <= 0 or (m.kind.flying and not flyers):
                 continue
-            mx, my = point(m.s)
+            mx, my = level.point(m.s)
             if (mx - x) ** 2 + (my - y) ** 2 <= radius * radius:
                 found.append(m)
         return found
@@ -511,9 +531,11 @@ class World:
         self._afflictions(dt)
         self._curses(dt)
         self._waves(dt)
-        for m in self.monsters:
-            if m.asking is _ASK:   # asked now, at a step boundary, so the planner's clone starts where a step would
-                m.asking = self.planner(self, m.id)
+        planner = self.planner
+        if planner is not None:   # only a world with a planner has leaders that ask
+            for m in self.monsters:
+                if m.asking is _ASK:   # asked now, at a step boundary, so the planner's clone starts where a step would
+                    m.asking = planner(self, m.id)
 
     def _spawn(self, dt: float) -> None:
         if self.break_left is not None:
@@ -590,7 +612,7 @@ class World:
         spec = leader.kind.leader
         x, y = self.level.point(leader.s)
         cx, cy = tower.centre
-        if spec is None or math.hypot(cx - x, cy - y) > spec.cast_range + CAST_SLACK:
+        if spec is None or _hypot(cx - x, cy - y) > spec.cast_range + CAST_SLACK:
             self._emit("fizzle", leader_id, tower_id)
             return
         if tower.ward > 0:
@@ -603,46 +625,52 @@ class World:
     def _move(self, dt: float) -> None:
         doors = [d for d in self.doors if d.built]
         end = self.level.length
-        survivors = []
-        for m in self.monsters:
+        monsters = self.monsters
+        leaked = False
+        ordered, last = True, math.inf   # whether those still on the map run furthest first, as they did
+        for m in monsters:
             if m.frozen > 0:
                 m.frozen -= dt
                 m.door = -1
                 if m.chill_left > 0:
                     m.chill_left -= dt
-                survivors.append(m)
-                continue
-            if m.chill_left > 0:
-                m.chill_left -= dt
-                speed = m.kind.speed * (1.0 - m.chill)
             else:
-                speed = m.kind.speed
-            s = m.s + speed * dt
-            m.door = -1
-            if not m.kind.flying:
-                for d in doors:
-                    stop = d.s - DOOR_STOP - m.jostle
-                    if m.s <= stop + 1e-9 < s or stop - 1e-9 <= m.s < d.s:
-                        s = min(s, stop)
-                        if s >= stop - 1e-6:
-                            m.door = d.index
-                        break
-            m.s = s
-            if s >= end:
-                self.lives -= m.kind.lives
-                self.leaked_life += m.max_hp * LEAK_WEIGHT
-                self._count_off(m)
-                self._emit("leak", m.id, m.kind.key, m.kind.lives)
-                continue
-            survivors.append(m)
-        survivors.sort(key=_by_s, reverse=True)
-        self.monsters = survivors
+                if m.chill_left > 0:
+                    m.chill_left -= dt
+                    speed = m.kind.speed * (1.0 - m.chill)
+                else:
+                    speed = m.kind.speed
+                s = m.s + speed * dt
+                m.door = -1
+                if not m.kind.flying:
+                    for d in doors:
+                        stop = d.s - DOOR_STOP - m.jostle
+                        if m.s <= stop + 1e-9 < s or stop - 1e-9 <= m.s < d.s:
+                            s = min(s, stop)
+                            if s >= stop - 1e-6:
+                                m.door = d.index
+                            break
+                m.s = s
+                if s >= end:
+                    self.lives -= m.kind.lives
+                    self.leaked_life += m.max_hp * LEAK_WEIGHT
+                    self._count_off(m)
+                    self._emit("leak", m.id, m.kind.key, m.kind.lives)
+                    leaked = True
+                    continue
+            if m.s > last:
+                ordered = False
+            last = m.s
+        if leaked:   # through the sanctuary gate: those that walked to the path's end, and only they
+            monsters = self.monsters = [m for m in monsters if m.s < end]
+        if not ordered:   # someone overtook
+            _furthest_first(monsters)
         if self.lives <= 0 and self.outcome is None:
             self.lives = 0
             self.outcome = "defeat"
             self._emit("defeat")
         thorns = self.perks.thorns
-        for m in survivors:
+        for m in monsters:
             if m.door >= 0:
                 d = self.doors[m.door]
                 blow = m.kind.door_dps * dt
@@ -662,7 +690,7 @@ class World:
             for t in self.towers.values():
                 t.cooldown = max(0.0, t.cooldown - dt)
             return
-        coverage = self.level.coverage
+        level = self.level
         static = self.perks.static_field
         for t in self.towers.values():
             if t.cooldown > 0:
@@ -675,21 +703,37 @@ class World:
             stats = t.levels[t.level]
             reach = stats.range * t.range_mult() if t.curses else stats.range
             if reach != t.spans_reach:
-                t.spans, t.spans_reach = coverage(t.tile, reach), reach
+                t.spans, t.spans_reach = level.coverage(t.tile, reach), reach
             spans = t.spans
+            if not spans:
+                t.cooldown = 0.0
+                continue
+            # The monsters run furthest first and the spans along the path: none past the last span's end can be in
+            # reach, and after the first short of the first span's start, none is.
+            near, far = spans[0][0], spans[-1][1]
             attack = t.kind.attack
             if attack == "nova":
-                hit = [m for m in monsters if m.hp > 0 and _inside(m.s, spans)]
+                hit = []
+                for m in monsters:
+                    if m.s < near:
+                        break
+                    if m.hp > 0 and m.s <= far and _inside(m.s, spans):
+                        hit.append(m)
             elif attack == "venom":   # the strongest it can poison
                 best = None
                 for m in monsters:
-                    if m.hp > 0 and (best is None or m.hp > best.hp) and m.kind.taken(Element.POISON) > 0 and _inside(m.s, spans):
+                    if m.s < near:
+                        break
+                    if (m.hp > 0 and m.s <= far and (best is None or m.hp > best.hp) and m.kind.taken(Element.POISON) > 0
+                            and _inside(m.s, spans)):
                         best = m
                 hit = [best] if best is not None else []
             else:
                 hit = []
                 for m in monsters:
-                    if m.hp > 0 and _inside(m.s, spans):
+                    if m.s < near:
+                        break
+                    if m.hp > 0 and m.s <= far and _inside(m.s, spans):
                         if not hit:
                             hit = [m]
                             if not (static and attack == "chain") or m.kind.leader is not None:
@@ -716,27 +760,28 @@ class World:
                 target = hit[0]
                 origin = t.centre
                 last = self.level.point(target.s)
-                distance = math.hypot(last[0] - origin[0], last[1] - origin[1])
+                distance = _hypot(last[0] - origin[0], last[1] - origin[1])
                 bolt = Bolt(self._id(), t.id, t.kind.key, target.id, distance / t.kind.bolt_speed, damage, t.kind.element,
                             stats.splash, stats.poison, stats.poison_time, origin, last)
                 self.bolts.append(bolt)
                 self._emit("bolt", bolt)
 
     def _chain(self, tower: Tower, first: Monster, damage: float, jumps: int) -> None:
-        point = self.level.point
+        level = self.level
         static = self.perks.static_field
         struck = [first]
-        where = [point(first.s)]
+        struck_ids = {first.id}
+        where = [level.point(first.s)]
         current, pos = first, where[0]
         for _ in range(jumps):
             best, best_d, best_leader = None, CHAIN_JUMP, False
             for m in self.monsters:
-                if m.hp <= 0 or m in struck:
+                if m.hp <= 0 or m.id in struck_ids:
                     continue
                 if abs(m.s - current.s) > CHAIN_JUMP * 4:   # the path winds, but never that tightly
                     continue
-                x, y = point(m.s)
-                d = math.hypot(x - pos[0], y - pos[1])
+                x, y = level.point(m.s)
+                d = _hypot(x - pos[0], y - pos[1])
                 if d >= CHAIN_JUMP:
                     continue
                 leader = static and m.kind.leader is not None
@@ -745,7 +790,8 @@ class World:
             if best is None:
                 break
             struck.append(best)
-            pos = point(best.s)
+            struck_ids.add(best.id)
+            pos = level.point(best.s)
             where.append(pos)
             current = best
         self._emit("chain", tower.id, [m.id for m in struck], where)
@@ -920,7 +966,21 @@ class World:
             self.break_left = WAVE_BREAK
 
 
-_ASK = object()   # a leader that has decided to ask, for the end of this step
+_ASK: Final = object()   # a leader that has decided to ask, for the end of this step
+_hypot: Final = math.hypot   # looked up once: compiled, it is a call into Python, and a chain calls it for each leap
+
+
+def _furthest_first(monsters: list[Monster]) -> None:
+    """Sort by s, furthest first, keeping the order of equals: what ``sort(key=s, reverse=True)`` makes of the
+    list, by insertion, since between two steps only a few monsters overtake (compiled, a key function is a call
+    into Python for every monster)."""
+    for i in range(1, len(monsters)):
+        m = monsters[i]
+        j = i - 1
+        while j >= 0 and monsters[j].s < m.s:
+            monsters[j + 1] = monsters[j]
+            j -= 1
+        monsters[j + 1] = m
 
 
 def _inside(s: float, spans: tuple[tuple[float, float], ...]) -> bool:

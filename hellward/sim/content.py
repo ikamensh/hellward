@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Final
 
 
 class Element(str, Enum):
@@ -34,7 +35,7 @@ class CurseSpec:
     blurb: str = ""
 
 
-CURSES: dict[Curse, CurseSpec] = {
+CURSES: Final[dict[Curse, CurseSpec]] = {
     Curse.WEAKEN: CurseSpec("Weaken", 8.0, damage=0.35, blurb="deals a third of its damage"),
     Curse.DECREPIFY: CurseSpec("Decrepify", 8.0, rate=0.4, blurb="attacks at 40% speed"),
     Curse.DIM_VISION: CurseSpec("Dim Vision", 8.0, range=0.55, blurb="sees half as far"),
@@ -71,7 +72,7 @@ class MonsterKind:
 
 F, L, C, P = Element.FIRE, Element.LIGHTNING, Element.COLD, Element.POISON
 
-MONSTERS: dict[str, MonsterKind] = {m.key: m for m in (
+MONSTERS: Final[dict[str, MonsterKind]] = {m.key: m for m in (
     MonsterKind("fallen", "Fallen", hp=48, speed=1.35, bounty=4, door_dps=7, size=0.55),
     MonsterKind("skeleton", "Skeleton", hp=95, speed=1.0, bounty=7, door_dps=11, resist={P: 1.0, C: 0.25}, size=0.75),
     MonsterKind("zombie", "Zombie", hp=240, speed=0.6, bounty=12, door_dps=20, resist={F: -0.5, P: 0.5}, size=0.8),
@@ -114,7 +115,7 @@ class TowerKind:
     bolt_speed: float = 9.0   # tiles per second; a nova and a chain strike at once
 
 
-TOWERS: dict[str, TowerKind] = {t.key: t for t in (
+TOWERS: Final[dict[str, TowerKind]] = {t.key: t for t in (
     TowerKind("pyre", "Pyre", F, "bolt", (
         TowerLevel(70, 24, 1.0, 3.0),
         TowerLevel(90, 40, 1.0, 3.2, splash=0.9),
@@ -137,8 +138,8 @@ TOWERS: dict[str, TowerKind] = {t.key: t for t in (
     ), "Venom seeks the strongest monster it can poison; poison stacks up to four times.", bolt_speed=7.0),
 )}
 
-MAX_POISON_STACKS = 4
-SELL_REFUND = 0.7
+MAX_POISON_STACKS: Final = 4
+SELL_REFUND: Final = 0.7
 
 
 @dataclass(frozen=True)
@@ -148,7 +149,7 @@ class DoorSpec:
     repair: float = 0.5    # share of its missing life a standing door regains when a wave is cleared
 
 
-DOOR = DoorSpec()
+DOOR: Final = DoorSpec()
 
 
 @dataclass(frozen=True)
@@ -180,7 +181,7 @@ class SpellSpec:
     burn: float = 0.0     # damage per second of the burning ground
 
 
-SPELLS: dict[str, SpellSpec] = {s.key: s for s in (
+SPELLS: Final[dict[str, SpellSpec]] = {s.key: s for s in (
     SpellSpec("cleanse", "Cleanse", 35, "tower", "Burns every curse off one tower."),
     SpellSpec("smite", "Smite", 30, "monster", "Holy lightning strikes one monster, and no resistance softens it. "
               "A leader it strikes while pondering or chanting loses its curse.", damage=100),
@@ -190,16 +191,16 @@ SPELLS: dict[str, SpellSpec] = {s.key: s for s in (
               "curse breaks.", damage=50, radius=1.8, lasting=2.5),
 )}
 
-START_LIVES = 20
-MANA_MAX = 100.0
-MANA_START = 60.0
-MANA_REGEN = 1.5
-WAVE_BREAK = 25.0          # seconds between a cleared wave and the next, unless called early
-EARLY_CALL_GOLD = 1.0      # gold per second of break skipped
-BURN_RADIUS = 1.1          # the burning floor a meteor leaves
-SHATTER_RADIUS = 1.2
-SHATTER_SHARE = 0.1        # of a shattered monster's full life
-CONTAGION_REACH = 1.5
-THORNS = 0.5               # a gate under Thorns returns this share of each blow, as it would land unchilled
-SOUL = 10.0                # mana a slain leader gives under Soul Harvest
-WARD = 8.0                 # seconds a cleansed tower is warded under Salvation
+START_LIVES: Final = 20
+MANA_MAX: Final = 100.0
+MANA_START: Final = 60.0
+MANA_REGEN: Final = 1.5
+WAVE_BREAK: Final = 25.0          # seconds between a cleared wave and the next, unless called early
+EARLY_CALL_GOLD: Final = 1.0      # gold per second of break skipped
+BURN_RADIUS: Final = 1.1          # the burning floor a meteor leaves
+SHATTER_RADIUS: Final = 1.2
+SHATTER_SHARE: Final = 0.1        # of a shattered monster's full life
+CONTAGION_REACH: Final = 1.5
+THORNS: Final = 0.5               # a gate under Thorns returns this share of each blow, as it would land unchilled
+SOUL: Final = 10.0                # mana a slain leader gives under Soul Harvest
+WARD: Final = 8.0                 # seconds a cleansed tower is warded under Salvation

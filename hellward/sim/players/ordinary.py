@@ -13,6 +13,7 @@ from hellward.sim.campaign import Difficulty, Location
 from hellward.sim.content import DOOR, WAVE_BREAK
 from hellward.sim.model import DOOR_STOP, JOSTLE, Refused, Tower, World
 from hellward.sim.players.hands import Hands
+from hellward.sim.sums import float_sum, int_sum
 
 ROTATION = ("pyre", "frost", "storm", "plague", "pyre", "storm", "plague", "pyre", "frost", "storm")
 DOOR_BONUS = 4.0     # path tiles a door queue in reach is worth when ranking a tile
@@ -28,8 +29,8 @@ def tile_scores(world: World, reach: float = 3.0) -> list[tuple[float, tuple[int
             if not level.buildable(x, y):
                 continue
             spans = level.coverage((x, y), reach)
-            score = sum(b - a for a, b in spans)
-            score += DOOR_BONUS * sum(1 for q in queues if any(a <= q <= b for a, b in spans))
+            score = float_sum(b - a for a, b in spans)
+            score += DOOR_BONUS * int_sum(1 for q in queues if any(a <= q <= b for a, b in spans))
             scored.append((score, (x, y)))
     scored.sort(key=lambda item: (-item[0], item[1]))
     return scored
@@ -85,11 +86,11 @@ class Ordinary:
                     return
                 world.build(kind, tile)
                 continue
-            upgradable = [t for t in world.towers.values() if world.upgrade_cost(t) is not None]
-            if not upgradable:
+            upgrades = [(t, cost) for t in world.towers.values() if (cost := world.upgrade_cost(t)) is not None]
+            if not upgrades:
                 return
-            tower = min(upgradable, key=lambda t: (t.level, t.id))
-            if world.gold < world.upgrade_cost(tower):
+            tower, cost = min(upgrades, key=lambda u: (u[0].level, u[0].id))
+            if world.gold < cost:
                 return
             world.upgrade(tower.id)
 
