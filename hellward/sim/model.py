@@ -29,7 +29,7 @@ from hellward.sim.content import (
     SHATTER_RADIUS, SHATTER_SHARE, SOUL, SPELLS, START_LIVES, THORNS, TOWERS, WARD, WAVE_BREAK, Curse, Element,
     MonsterKind, TowerKind, TowerLevel,
 )
-from hellward.sim.skills import NO_PERKS, Perks, tower_levels
+from hellward.sim.skills import NO_PERKS, Perks, baked
 
 if TYPE_CHECKING:
     from hellward.sim.planner import Decision
@@ -244,7 +244,7 @@ class World:
         self.waves = location.waves
         self.difficulty = difficulty
         self.perks = perks
-        self.tower_levels = {kind: tower_levels(kind, perks) for kind in TOWERS}
+        self.tower_levels = baked(perks)
         self.rng = random.Random(seed)
         self.planner = planner
         self.record = record
@@ -278,10 +278,7 @@ class World:
 
     def clone(self) -> World:
         """A private copy to look ahead in: no events, no planner, its own random stream."""
-        w = World.__new__(World)
-        w.location, w.level, w.waves, w.difficulty, w.perks = self.location, self.level, self.waves, self.difficulty, self.perks
-        w.tower_levels, w.planner, w.record, w.events = self.tower_levels, None, False, []
-        w.rng = random.Random()
+        w = World(self.location, difficulty=self.difficulty, perks=self.perks, record=False)
         w.rng.setstate(self.rng.getstate())
         w.time, w.gold, w.lives, w.mana = self.time, self.gold, self.lives, self.mana
         w.towers = {i: t.copy() for i, t in self.towers.items()}
@@ -477,11 +474,11 @@ class World:
 
     def _around(self, x: float, y: float, radius: float, *, flyers: bool) -> list[Monster]:
         found = []
-        point = self.level.point
+        level = self.level
         for m in self.monsters:
             if m.hp <= 0 or (m.kind.flying and not flyers):
                 continue
-            mx, my = point(m.s)
+            mx, my = level.point(m.s)
             if (mx - x) ** 2 + (my - y) ** 2 <= radius * radius:
                 found.append(m)
         return found
@@ -618,38 +615,42 @@ class World:
         doors = [d for d in self.doors if d.built]
         end = self.level.length
         survivors = []
+        ordered, last = True, math.inf   # whether the survivors still run furthest first, as they did
         for m in self.monsters:
             if m.frozen > 0:
                 m.frozen -= dt
                 m.door = -1
                 if m.chill_left > 0:
                     m.chill_left -= dt
-                survivors.append(m)
-                continue
-            if m.chill_left > 0:
-                m.chill_left -= dt
-                speed = m.kind.speed * (1.0 - m.chill)
             else:
-                speed = m.kind.speed
-            s = m.s + speed * dt
-            m.door = -1
-            if not m.kind.flying:
-                for d in doors:
-                    stop = d.s - DOOR_STOP - m.jostle
-                    if m.s <= stop + 1e-9 < s or stop - 1e-9 <= m.s < d.s:
-                        s = min(s, stop)
-                        if s >= stop - 1e-6:
-                            m.door = d.index
-                        break
-            m.s = s
-            if s >= end:
-                self.lives -= m.kind.lives
-                self.leaked_life += m.max_hp * LEAK_WEIGHT
-                self._count_off(m)
-                self._emit("leak", m.id, m.kind.key, m.kind.lives)
-                continue
+                if m.chill_left > 0:
+                    m.chill_left -= dt
+                    speed = m.kind.speed * (1.0 - m.chill)
+                else:
+                    speed = m.kind.speed
+                s = m.s + speed * dt
+                m.door = -1
+                if not m.kind.flying:
+                    for d in doors:
+                        stop = d.s - DOOR_STOP - m.jostle
+                        if m.s <= stop + 1e-9 < s or stop - 1e-9 <= m.s < d.s:
+                            s = min(s, stop)
+                            if s >= stop - 1e-6:
+                                m.door = d.index
+                            break
+                m.s = s
+                if s >= end:
+                    self.lives -= m.kind.lives
+                    self.leaked_life += m.max_hp * LEAK_WEIGHT
+                    self._count_off(m)
+                    self._emit("leak", m.id, m.kind.key, m.kind.lives)
+                    continue
+            if m.s > last:
+                ordered = False
+            last = m.s
             survivors.append(m)
-        survivors.sort(key=_by_s, reverse=True)
+        if not ordered:   # someone overtook; an ordered list the stable sort would give back as it was
+            survivors.sort(key=_by_s, reverse=True)
         self.monsters = survivors
         if self.lives <= 0 and self.outcome is None:
             self.lives = 0
@@ -676,7 +677,7 @@ class World:
             for t in self.towers.values():
                 t.cooldown = max(0.0, t.cooldown - dt)
             return
-        coverage = self.level.coverage
+        level = self.level
         static = self.perks.static_field
         for t in self.towers.values():
             if t.cooldown > 0:
@@ -689,21 +690,37 @@ class World:
             stats = t.levels[t.level]
             reach = stats.range * t.range_mult() if t.curses else stats.range
             if reach != t.spans_reach:
-                t.spans, t.spans_reach = coverage(t.tile, reach), reach
+                t.spans, t.spans_reach = level.coverage(t.tile, reach), reach
             spans = t.spans
+            if not spans:
+                t.cooldown = 0.0
+                continue
+            # The monsters run furthest first and the spans along the path: none past the last span's end can be in
+            # reach, and after the first short of the first span's start, none is.
+            near, far = spans[0][0], spans[-1][1]
             attack = t.kind.attack
             if attack == "nova":
-                hit = [m for m in monsters if m.hp > 0 and _inside(m.s, spans)]
+                hit = []
+                for m in monsters:
+                    if m.s < near:
+                        break
+                    if m.hp > 0 and m.s <= far and _inside(m.s, spans):
+                        hit.append(m)
             elif attack == "venom":   # the strongest it can poison
                 best = None
                 for m in monsters:
-                    if m.hp > 0 and (best is None or m.hp > best.hp) and m.kind.taken(Element.POISON) > 0 and _inside(m.s, spans):
+                    if m.s < near:
+                        break
+                    if (m.hp > 0 and m.s <= far and (best is None or m.hp > best.hp) and m.kind.taken(Element.POISON) > 0
+                            and _inside(m.s, spans)):
                         best = m
                 hit = [best] if best is not None else []
             else:
                 hit = []
                 for m in monsters:
-                    if m.hp > 0 and _inside(m.s, spans):
+                    if m.s < near:
+                        break
+                    if m.hp > 0 and m.s <= far and _inside(m.s, spans):
                         if not hit:
                             hit = [m]
                             if not (static and attack == "chain") or m.kind.leader is not None:
@@ -737,10 +754,10 @@ class World:
                 self._emit("bolt", bolt)
 
     def _chain(self, tower: Tower, first: Monster, damage: float, jumps: int) -> None:
-        point = self.level.point
+        level = self.level
         static = self.perks.static_field
         struck = [first]
-        where = [point(first.s)]
+        where = [level.point(first.s)]
         current, pos = first, where[0]
         for _ in range(jumps):
             best, best_d, best_leader = None, CHAIN_JUMP, False
@@ -749,7 +766,7 @@ class World:
                     continue
                 if abs(m.s - current.s) > CHAIN_JUMP * 4:   # the path winds, but never that tightly
                     continue
-                x, y = point(m.s)
+                x, y = level.point(m.s)
                 d = math.hypot(x - pos[0], y - pos[1])
                 if d >= CHAIN_JUMP:
                     continue
@@ -759,7 +776,7 @@ class World:
             if best is None:
                 break
             struck.append(best)
-            pos = point(best.s)
+            pos = level.point(best.s)
             where.append(pos)
             current = best
         self._emit("chain", tower.id, [m.id for m in struck], where)

@@ -157,6 +157,18 @@ def perks(learned: Iterable[str]) -> Perks:
     return p
 
 
+_BAKED: dict[Perks, dict[str, tuple[TowerLevel, ...]]] = {}
+
+
+def baked(p: Perks) -> dict[str, tuple[TowerLevel, ...]]:
+    """Every tower kind's ranks with the perks in them, worked out once per set of perks: every world begins with
+    them, and so does every clone the planner looks ahead in. Nothing changes them."""
+    found = _BAKED.get(p)
+    if found is None:
+        found = _BAKED[p] = {kind: tower_levels(kind, p) for kind in TOWERS}
+    return found
+
+
 def tower_levels(kind: str, p: Perks) -> tuple[TowerLevel, ...]:
     """A tower kind's ranks with the perks baked in."""
     ranks = TOWERS[kind].levels
