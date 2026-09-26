@@ -10,7 +10,7 @@ from typing import Any, Callable
 from saga2d import Game, Scene
 
 from hellward.art.sprites import Art
-from hellward.sim.campaign import CATHEDRAL, DIFFICULTIES, Location
+from hellward.sim.campaign import CATHEDRAL, Location
 from hellward.sim.model import World
 from hellward.sim.players.hands import Player
 from hellward.sim.skills import perks
@@ -57,10 +57,10 @@ class Flow:
 
     def defend(self, location: Location) -> None:
         if not self.progress.opened(location):
-            self.world_map()   # the way there is not open on this difficulty
+            self.world_map()   # the way there is not open
             return
         self.game.clear_and_push(BattleScene(
-            self.art, location, difficulty=DIFFICULTIES[self.progress.difficulty], perks=perks(self.progress.learned),
+            self.art, location, perks=perks(self.progress.learned),
             seed=self.seed, planner=self.planner, sound=self.sound, on_outcome=self.keep, on_end=self.reckon,
             settings=self.settings, restart=lambda: self.defend(location), to_title=self.title, to_map=self.world_map))
 

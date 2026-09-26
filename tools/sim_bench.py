@@ -36,14 +36,14 @@ if __name__ in ("__main__", "__mp_main__"):   # run as a program, not as a libra
     fastsim.activate()   # the compiled simulation, unless HELLWARD_INTERPRETED is set
 
 from hellward.sim import planner  # noqa: E402
-from hellward.sim.campaign import LOCATIONS, NORMAL  # noqa: E402
+from hellward.sim.campaign import LOCATIONS  # noqa: E402
 from hellward.sim.model import World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.hands import defend  # noqa: E402
 
 SEED = 1
 #: What a world carries that is not its state: fixed for the defence (by name), or deliberately not cloned.
-CONFIG = {"location", "level", "waves", "difficulty", "perks", "tower_levels"}
+CONFIG = {"location", "level", "waves", "hardness", "perks", "tower_levels"}
 UNCLONED = {"planner", "record", "events"}
 
 
@@ -80,7 +80,7 @@ def attributes(value: Any) -> list[str]:
 
 def state(world: World) -> str:
     """The world written out, all but its configuration (named) and what a clone leaves out."""
-    parts = [f"{world.location.key}:{world.difficulty.key}:{canon(world.perks)}"]
+    parts = [f"{world.location.key}:{world.hardness}:{canon(world.perks)}"]
     for name in attributes(world):
         if name not in CONFIG | UNCLONED:
             parts.append(f"{name}={canon(getattr(world, name))}")
@@ -96,7 +96,7 @@ def play(key: str, seed: int = SEED) -> tuple[World, list[tuple[float, list[tupl
         if world.events:
             events.append((world.time, list(world.events)))
 
-    world, _ = defend(LOCATIONS[key], NORMAL, PLAYERS["ordinary"](seed), seed=seed, sigils=0, planner=planner.smart,
+    world, _ = defend(LOCATIONS[key], PLAYERS["ordinary"](seed), seed=seed, sigils=0, planner=planner.smart,
                       watch=watch)
     return world, events
 

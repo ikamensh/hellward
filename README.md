@@ -43,8 +43,8 @@ cast while paused. The red orb is the sanctuary's life.
 **The campaign.** Each location's intro names who comes, what they resist, the curses their
 leaders cast and how to answer them. A victory earns one to three **sigils** by the life you keep;
 spend them in the **skill tree** (K on the map or an intro), and unlearn them for free before the
-next place. A slot with a padlock is something this place does not offer yet. Holding Hell's Gate
-opens the **Hell** difficulty. Progress is saved in `~/.hellward/saves`.
+next place. A slot with a padlock is something this place does not offer yet. Holding Hell's Gate wins the
+descent. Progress is saved in `~/.hellward/saves`.
 
 ## More
 

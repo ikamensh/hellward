@@ -1,7 +1,7 @@
 """The warden's builds, searched offline the way a player who replays a location many times finds them.
 
-    uv run python tools/warden_plans.py search cathedral                         # Normal, with the campaign's sigils
-    uv run python tools/warden_plans.py search hells_gate --difficulty hell --sigils 36
+    uv run python tools/warden_plans.py search cathedral                         # with the campaign's sigils
+    uv run python tools/warden_plans.py search hells_gate --sigils 36
     uv run python tools/warden_plans.py check cathedral                          # margins: the stored plan and the draft
 
 A plan (``hellward/sim/players/warden.py``: the skills, and a list of steps the warden takes as the gold comes) is
@@ -24,13 +24,12 @@ import statistics
 import sys
 import time
 from concurrent.futures import ProcessPoolExecutor
-from dataclasses import replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim import planner  # noqa: E402
-from hellward.sim.campaign import DIFFICULTIES, LOCATIONS, ORDER, Location  # noqa: E402
+from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.model import SIM_DT, World  # noqa: E402
 from hellward.sim.players.hands import Hands, defend, react_for  # noqa: E402
 from hellward.sim.players.warden import (  # noqa: E402
@@ -50,15 +49,14 @@ JUMP = 40                          # a tower jumps to one of this many best tile
 # -- Playing a plan -------------------------------------------------------------------------------
 
 
-def lost(row: dict, key: str, difficulty: str, sigils: int, seed: int, hp: float, leaders: str) -> int:
+def lost(row: dict, key: str, sigils: int, seed: int, hp: float, leaders: str) -> int:
     """Lives a plan loses in one defence with every monster's life times ``hp``, counted past a fall."""
     if seed not in TRAINING:
         raise ValueError(f"seed {seed} is not a training seed")
-    location, diff = LOCATIONS[key], DIFFICULTIES[difficulty]
+    location = LOCATIONS[key]
     player = Warden(plan=Plan.of(row))
-    learned = player.skills(location, diff, sigils)
-    world = World(location, difficulty=replace(diff, hp=diff.hp * hp), perks=perks(learned), seed=seed,
-                  planner=LEADERS[leaders])
+    learned = player.skills(location, sigils)
+    world = World(location, hardness=hp, perks=perks(learned), seed=seed, planner=LEADERS[leaders])
     world.lives = UNCAPPED
     hands = Hands(world, react_for(seed))
     while world.outcome is None and world.time < LIMIT:
@@ -69,22 +67,22 @@ def lost(row: dict, key: str, difficulty: str, sigils: int, seed: int, hp: float
     return UNCAPPED - world.lives
 
 
-def won(row: dict, key: str, difficulty: str, sigils: int, seed: int, hp: float, leaders: str) -> bool:
+def won(row: dict, key: str, sigils: int, seed: int, hp: float, leaders: str) -> bool:
     if seed not in TRAINING:
         raise ValueError(f"seed {seed} is not a training seed")
-    world, _ = defend(LOCATIONS[key], DIFFICULTIES[difficulty], Warden(plan=Plan.of(row)), seed=seed, sigils=sigils,
+    world, _ = defend(LOCATIONS[key], Warden(plan=Plan.of(row)), seed=seed, sigils=sigils,
                       planner=LEADERS[leaders], hp=hp)
     return world.outcome == "victory"
 
 
-def margin(row: dict, key: str, difficulty: str, sigils: int, seed: int, leaders: str, hi: float = 16.0) -> float:
+def margin(row: dict, key: str, sigils: int, seed: int, leaders: str, hi: float = 16.0) -> float:
     """The largest factor on every monster's life at which the plan still wins, bisected to 2% (0 when it loses at 1)."""
-    if not won(row, key, difficulty, sigils, seed, 1.0, leaders):
+    if not won(row, key, sigils, seed, 1.0, leaders):
         return 0.0
     lo = 1.0
     while hi / lo > 1.02:
         mid = (lo * hi) ** 0.5
-        if won(row, key, difficulty, sigils, seed, mid, leaders):
+        if won(row, key, sigils, seed, mid, leaders):
             lo = mid
         else:
             hi = mid
@@ -188,11 +186,11 @@ def plan_reach(kind: str, learned: frozenset[str]) -> float:
 # -- The search -----------------------------------------------------------------------------------
 
 
-def stored(key: str, difficulty: str, sigils: int) -> tuple[dict, dict]:
+def stored(key: str, sigils: int) -> tuple[dict, dict]:
     """Every stored row, and the row for this location's plan: the stored one, or the draft."""
     rows = json.loads(PLANS.read_text()) if PLANS.exists() else {}
     location = LOCATIONS[key]
-    found = rows.get(plan_key(location, DIFFICULTIES[difficulty], sigils))
+    found = rows.get(plan_key(location, sigils))
     if found is not None and found["map"] == fingerprint(location):
         return rows, found
     return rows, draft(location, sigils).row()
@@ -203,42 +201,42 @@ def draft(location: Location, sigils: int) -> Plan:
     return Plan(learned, draft_build(location, learned), map=fingerprint(location))
 
 
-def score(pool: ProcessPoolExecutor, rows: list[dict], key: str, difficulty: str, sigils: int, seeds: list[int],
+def score(pool: ProcessPoolExecutor, rows: list[dict], key: str, sigils: int, seeds: list[int],
           hp: float, leaders: str) -> list[int]:
-    jobs = [(row, key, difficulty, sigils, seed, hp, leaders) for row in rows for seed in seeds]
+    jobs = [(row, key, sigils, seed, hp, leaders) for row in rows for seed in seeds]
     lives = list(pool.map(lost, *zip(*jobs)))
     return [sum(lives[i * len(seeds):(i + 1) * len(seeds)]) for i in range(len(rows))]
 
 
 def search(args: argparse.Namespace) -> None:
-    key, difficulty = args.location, args.difficulty
-    sigils = args.sigils if args.sigils is not None else 2 * ORDER.index(key)
+    key = args.location
+    sigils = args.sigils if args.sigils is not None else 3 * ORDER.index(key)
     location = LOCATIONS[key]
     seeds = list(range(args.seeds))
     rng = random.Random(args.rng)
-    rows, row = stored(key, difficulty, sigils)
+    rows, row = stored(key, sigils)
     best = draft(location, sigils) if args.fresh else Plan.of(row)
     evaluated = 0
     started = time.time()
     with ProcessPoolExecutor(args.jobs) as pool:
-        hp = args.hp or statistics.median(pool.map(margin, *zip(*[(best.row(), key, difficulty, sigils, s, args.leaders)
+        hp = args.hp or statistics.median(pool.map(margin, *zip(*[(best.row(), key, sigils, s, args.leaders)
                                                                    for s in seeds])))
-        best_score = score(pool, [best.row()], key, difficulty, sigils, seeds, hp, args.leaders)[0]
-        print(f"{key} {difficulty} sigils {sigils}: start at life x{hp:.2f}, {best_score} lives lost", flush=True)
+        best_score = score(pool, [best.row()], key, sigils, seeds, hp, args.leaders)[0]
+        print(f"{key} sigils {sigils}: start at life x{hp:.2f}, {best_score} lives lost", flush=True)
         for round_ in range(args.rounds):
             while best_score <= args.slack * len(seeds):
                 hp *= RAISE
-                best_score = score(pool, [best.row()], key, difficulty, sigils, seeds, hp, args.leaders)[0]
+                best_score = score(pool, [best.row()], key, sigils, seeds, hp, args.leaders)[0]
                 print(f"  life x{hp:.2f}: {best_score} lives lost", flush=True)
             mutants = [mutate(best, location, sigils, rng) for _ in range(args.width)]
-            scores = score(pool, [m.row() for m in mutants], key, difficulty, sigils, seeds, hp, args.leaders)
+            scores = score(pool, [m.row() for m in mutants], key, sigils, seeds, hp, args.leaders)
             evaluated += len(mutants)
             i = min(range(len(mutants)), key=lambda j: (scores[j], len(mutants[j].steps)))
             if scores[i] <= best_score:
                 if scores[i] < best_score:
                     print(f"  round {round_ + 1}: {best_score} -> {scores[i]} lives lost at x{hp:.2f}", flush=True)
                 best, best_score = mutants[i], scores[i]
-    rows[plan_key(location, DIFFICULTIES[difficulty], sigils)] = best.row() | {
+    rows[plan_key(location, sigils)] = best.row() | {
         "searched": {"leaders": args.leaders, "seeds": f"0-{args.seeds - 1}", "life": round(hp, 3), "lost": best_score,
                      "plans": evaluated}}
     PLANS.parent.mkdir(parents=True, exist_ok=True)
@@ -248,15 +246,15 @@ def search(args: argparse.Namespace) -> None:
 
 def check(args: argparse.Namespace) -> None:
     """Margins against the rollout leaders on held-out training seeds: the stored plan and the draft."""
-    key, difficulty = args.location, args.difficulty
-    sigils = args.sigils if args.sigils is not None else 2 * ORDER.index(key)
-    _, row = stored(key, difficulty, sigils)
+    key = args.location
+    sigils = args.sigils if args.sigils is not None else 3 * ORDER.index(key)
+    _, row = stored(key, sigils)
     rows = {"stored": row, "draft": draft(LOCATIONS[key], sigils).row()}
     seeds = list(range(args.first, args.first + args.seeds))
     with ProcessPoolExecutor(args.jobs) as pool:
         for name, r in rows.items():
-            found = list(pool.map(margin, *zip(*[(r, key, difficulty, sigils, s, "smart") for s in seeds])))
-            print(f"{key} {difficulty} {name:6s} margin median {statistics.median(found):.2f} min {min(found):.2f}  "
+            found = list(pool.map(margin, *zip(*[(r, key, sigils, s, "smart") for s in seeds])))
+            print(f"{key} {name:6s} margin median {statistics.median(found):.2f} min {min(found):.2f}  "
                   f"{' '.join(f'{m:.2f}' for m in found)}", flush=True)
 
 
@@ -266,7 +264,6 @@ def main() -> None:
     for name in ("search", "check"):
         p = sub.add_parser(name)
         p.add_argument("location", choices=list(LOCATIONS))
-        p.add_argument("--difficulty", default="normal", choices=list(DIFFICULTIES))
         p.add_argument("--sigils", type=int)
         p.add_argument("--jobs", type=int, default=5)
     s = sub.choices["search"]

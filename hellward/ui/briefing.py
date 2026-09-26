@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from saga2d import Anchor, Button, Row, Scene
 
 from hellward.art import sprites
-from hellward.sim.campaign import DIFFICULTIES, ORDER, SIGIL_LIVES, Location, LOCATIONS, idle, offers
+from hellward.sim.campaign import ORDER, SIGIL_LIVES, Location, LOCATIONS, idle, offers
 from hellward.sim.content import CURSES, MONSTERS, SPELLS, START_LIVES, TOWERS, Curse
 from hellward.sim.skills import SKILLS
 from hellward.ui import style, widgets
@@ -47,8 +47,6 @@ class BriefingScene(Scene):
 
     def draw(self) -> None:
         location = self.location
-        progress = self.flow.progress
-        difficulty = DIFFICULTIES[progress.difficulty]
         self.spots = []
         self.draw_image(self.floor, 0, 0, 1280, 800, opacity=0.6)   # layer 0, under the veil
         with self.screen_layer(1):
@@ -59,7 +57,7 @@ class BriefingScene(Scene):
                            anchor_y="center")
             self.draw_text(location.name, 640, 44, font_size=50, color=style.GOLD, font=style.TITLE_FONT, anchor_x="center",
                            anchor_y="center")
-            self.draw_text(f"The descent, {index + 1} of {len(ORDER)}  ·  {difficulty.name}  ·  {len(location.waves)} waves", 640, 94,
+            self.draw_text(f"The descent, {index + 1} of {len(ORDER)}  ·  {len(location.waves)} waves", 640, 94,
                            font_size=15, color=style.DIM, anchor_x="center", anchor_y="center")
             widgets.centred(self, location.blurb, 640, 108, 1040, font_size=17, color=style.BONE)
             self._taunt(160)
@@ -90,16 +88,15 @@ class BriefingScene(Scene):
                        anchor_y="center")
 
     def _host(self, y: float) -> None:
-        """A card per monster kind: its figure, life on this difficulty, pace, and what it resists."""
+        """A card per monster kind: its figure, life, pace, and what it resists."""
         self._heading("The host", y)
         kinds = self.location.monsters
         width = min(150, (1100 - 10 * (len(kinds) - 1)) / len(kinds))
         x = 640 - (len(kinds) * width + (len(kinds) - 1) * 10) / 2
-        difficulty = DIFFICULTIES[self.flow.progress.difficulty]
         for key in kinds:
             kind = MONSTERS[key]
             first = next(w for w in self.location.waves if any(g.kind == key for g in w.groups))
-            life = kind.hp * first.hp * self.location.life * difficulty.factor(self.location.key)
+            life = kind.hp * first.hp * self.location.life
             top = y + 26
             leader = kind.leader is not None
             self.draw_rect(x, top, width, 214, (18, 12, 14, 230), border_color=style.CURSE if leader else style.PANEL_EDGE,

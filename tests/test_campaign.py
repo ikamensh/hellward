@@ -2,7 +2,7 @@
 
 import pytest
 
-from hellward.sim.campaign import DIFFICULTIES, LAST, LOCATIONS, ORDER, SIGIL_LIVES, sigils
+from hellward.sim.campaign import LAST, LOCATIONS, ORDER, SIGIL_LIVES, sigils
 from hellward.sim.content import MONSTERS, SPELLS, START_LIVES, TOWERS
 from hellward.sim.level import Tile
 
@@ -39,14 +39,6 @@ def test_the_campaign_goes_down_in_order_and_every_location_opens():
     offered = [set(LOCATIONS[k].arsenal.towers) | set(LOCATIONS[k].arsenal.spells) for k in ORDER]
     for earlier, later in zip(offered, offered[1:]):
         assert earlier <= later   # nothing once taught is taken away further down
-
-
-def test_difficulties_grow_harder_and_each_opens_from_the_one_before():
-    ladder = list(DIFFICULTIES.values())
-    assert ladder[0].requires is None
-    for easier, harder in zip(ladder, ladder[1:]):
-        assert harder.requires == easier.key
-        assert harder.hp > easier.hp and harder.leader_pace < easier.leader_pace
 
 
 def test_sigils_grow_with_the_life_kept_and_a_fall_earns_none():

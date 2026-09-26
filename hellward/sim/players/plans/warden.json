@@ -1,5 +1,5 @@
 {
- "catacombs/normal/6": {
+ "catacombs/6": {
   "early": 0.9,
   "map": "95b4012365af",
   "searched": {
@@ -172,7 +172,7 @@
    ]
   ]
  },
- "cathedral/normal/4": {
+ "cathedral/4": {
   "early": 0.5,
   "map": "9a49011c656f",
   "searched": {
@@ -339,140 +339,7 @@
    ]
   ]
  },
- "caves/hell/36": {
-  "early": 0.9,
-  "map": "c48a642ddee2",
-  "searched": {
-   "leaders": "greedy",
-   "life": 8.044,
-   "lost": 10,
-   "plans": 400,
-   "seeds": "0-3"
-  },
-  "skills": [
-   "blaze",
-   "chain_lightning",
-   "cold_mastery",
-   "contagion",
-   "fire_ball",
-   "fire_mastery",
-   "glacial_spike",
-   "holy_shield",
-   "lightning_mastery",
-   "lower_resist",
-   "poison_mastery",
-   "salvation",
-   "shatter",
-   "soul_harvest",
-   "spell_mastery",
-   "static_field",
-   "thorns",
-   "warmth"
-  ],
-  "steps": [
-   [
-    "build",
-    "frost",
-    5,
-    5
-   ],
-   [
-    "gate",
-    0
-   ],
-   [
-    "up",
-    5,
-    5
-   ],
-   [
-    "build",
-    "frost",
-    4,
-    8
-   ],
-   [
-    "up",
-    4,
-    8
-   ],
-   [
-    "build",
-    "storm",
-    1,
-    8
-   ],
-   [
-    "build",
-    "pyre",
-    4,
-    9
-   ],
-   [
-    "build",
-    "storm",
-    5,
-    9
-   ],
-   [
-    "up",
-    4,
-    8
-   ],
-   [
-    "build",
-    "frost",
-    6,
-    6
-   ],
-   [
-    "up",
-    4,
-    9
-   ],
-   [
-    "build",
-    "storm",
-    2,
-    8
-   ],
-   [
-    "build",
-    "pyre",
-    5,
-    6
-   ],
-   [
-    "up",
-    2,
-    8
-   ],
-   [
-    "build",
-    "frost",
-    22,
-    8
-   ],
-   [
-    "build",
-    "storm",
-    1,
-    7
-   ],
-   [
-    "up",
-    5,
-    5
-   ],
-   [
-    "build",
-    "frost",
-    5,
-    3
-   ]
-  ]
- },
- "caves/normal/8": {
+ "caves/8": {
   "early": 0.7,
   "map": "c48a642ddee2",
   "searched": {
@@ -599,7 +466,7 @@
    ]
   ]
  },
- "graveyard/normal/2": {
+ "graveyard/2": {
   "early": 0.7,
   "map": "29a0cf6ef4b1",
   "searched": {
@@ -716,138 +583,7 @@
    ]
   ]
  },
- "hells_gate/hell/36": {
-  "early": 1.01,
-  "map": "7681ed02cf96",
-  "searched": {
-   "leaders": "greedy",
-   "life": 1.0,
-   "lost": 48,
-   "plans": 300,
-   "seeds": "0-3"
-  },
-  "skills": [
-   "blaze",
-   "chain_lightning",
-   "cold_mastery",
-   "contagion",
-   "fire_ball",
-   "fire_mastery",
-   "glacial_spike",
-   "holy_shield",
-   "lightning_mastery",
-   "lower_resist",
-   "poison_mastery",
-   "salvation",
-   "shatter",
-   "soul_harvest",
-   "spell_mastery",
-   "static_field",
-   "thorns",
-   "warmth"
-  ],
-  "steps": [
-   [
-    "build",
-    "frost",
-    7,
-    10
-   ],
-   [
-    "build",
-    "pyre",
-    7,
-    5
-   ],
-   [
-    "build",
-    "frost",
-    5,
-    6
-   ],
-   [
-    "build",
-    "frost",
-    5,
-    4
-   ],
-   [
-    "build",
-    "pyre",
-    4,
-    4
-   ],
-   [
-    "up",
-    5,
-    4
-   ],
-   [
-    "gate",
-    0
-   ],
-   [
-    "build",
-    "plague",
-    4,
-    7
-   ],
-   [
-    "up",
-    5,
-    4
-   ],
-   [
-    "build",
-    "plague",
-    10,
-    9
-   ],
-   [
-    "up",
-    4,
-    4
-   ],
-   [
-    "build",
-    "pyre",
-    11,
-    5
-   ],
-   [
-    "build",
-    "frost",
-    13,
-    9
-   ],
-   [
-    "up",
-    4,
-    4
-   ],
-   [
-    "up",
-    7,
-    5
-   ],
-   [
-    "gate",
-    1
-   ],
-   [
-    "up",
-    7,
-    5
-   ],
-   [
-    "build",
-    "storm",
-    8,
-    9
-   ]
-  ]
- },
- "hells_gate/normal/10": {
+ "hells_gate/10": {
   "early": 0.5,
   "map": "7681ed02cf96",
   "searched": {
@@ -983,7 +719,7 @@
    ]
   ]
  },
- "tristram/normal/0": {
+ "tristram/0": {
   "early": 0.9,
   "map": "00c8bbaff889",
   "searched": {

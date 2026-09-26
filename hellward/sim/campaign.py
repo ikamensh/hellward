@@ -1,4 +1,4 @@
-"""The campaign: six locations on the way down to hell, the three difficulties, and the sigils a defence earns.
+"""The campaign: six locations on the way down to hell, and the sigils a defence earns.
 
 A :class:`Location` is everything one defence needs: its map, its waves, the gold it starts with and what the
 player may use there (:class:`Arsenal`, fixed by the location's place in the campaign, so a replay is the same
@@ -36,7 +36,7 @@ class Location:
     taunt: str                        # the Bone Priest, who has seen this fight before
     requires: tuple[str, ...] = ()    # the location that must be held first
     life: float = 1.0                 # every monster's life here, and the spells' strength, is multiplied by this: the
-                                      # location's difficulty, tuned by simulation (docs/campaign.md); the waves' own
+                                      # location's tuning, by simulation (docs/campaign.md); the waves' own
                                       # life multipliers give the ramp within it
 
     def __post_init__(self) -> None:
@@ -59,29 +59,6 @@ class Location:
                 seen.setdefault(group.kind, None)
         return tuple(seen)
 
-
-@dataclass(frozen=True)
-class Difficulty:
-    key: str
-    name: str
-    hp: float              # every monster's life is multiplied by this (the spells' strength is not)
-    leader_pace: float     # and every leader's cooldown by this
-    requires: str | None   # the difficulty whose last location must fall first
-    life: tuple[tuple[str, float], ...] = ()   # a location's own factor on top of hp, tuned by simulation
-
-    def factor(self, location: str) -> float:
-        """Every monster's life at a location, as a multiple of what Normal gives it."""
-        for key, value in self.life:
-            if key == location:
-                return self.hp * value
-        return self.hp
-
-
-NORMAL = Difficulty("normal", "Normal", 1.0, 1.0, None)
-HELL = Difficulty("hell", "Hell", 2.2, 0.75, "normal",   # each location set so the strongest player's margin is about 1.4, and
-                  life=(("tristram", 3.5), ("graveyard", 3.85), ("cathedral", 6.9),   # about 1.0 at Hell's Gate
-                        ("catacombs", 2.75), ("caves", 1.5), ("hells_gate", 2.5)))
-DIFFICULTIES: dict[str, Difficulty] = {d.key: d for d in (NORMAL, HELL)}
 
 SIGIL_LIVES = (1, 10, 18)   # sanctuary life to keep for one, two and three sigils (a victory keeps at least one)
 

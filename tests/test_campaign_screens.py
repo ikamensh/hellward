@@ -9,7 +9,7 @@ from saga2d.testing import assert_text_fits
 
 from hellward.__main__ import build
 from hellward.sim import planner
-from hellward.sim.campaign import HELL, LOCATIONS, ORDER
+from hellward.sim.campaign import LOCATIONS, ORDER
 from hellward.sim.content import SPELLS
 from hellward.sim.players.ordinary import Ordinary
 from hellward.ui import menus
@@ -105,7 +105,7 @@ def test_a_fall_earns_nothing_and_again_returns_to_the_intro(game):
 
 def test_the_tree_learns_what_the_free_sigils_pay_for_and_unlearns_for_free(game):
     g, flow = game
-    flow.progress.won["normal"] = {"tristram": 3}
+    flow.progress.won = {"tristram": 3}
     flow.intro(LOCATIONS["graveyard"])
     tick(g)
     press(g, "k")
@@ -135,7 +135,7 @@ def test_the_tree_learns_what_the_free_sigils_pay_for_and_unlearns_for_free(game
 
 def test_the_learned_skills_go_into_the_defence(game):
     g, flow = game
-    flow.progress.won["normal"] = {"tristram": 3}
+    flow.progress.won = {"tristram": 3}
     flow.progress.learn("fire_mastery")
     flow.defend(LOCATIONS["graveyard"])
     tick(g)
@@ -144,7 +144,7 @@ def test_the_learned_skills_go_into_the_defence(game):
 
 def test_q_smites_the_leader_closest_to_cursing_and_no_spell_is_cast_while_paused(game):
     g, flow = game
-    flow.progress.won["normal"] = {"tristram": 1}
+    flow.progress.won = {"tristram": 1}
     flow.defend(LOCATIONS["graveyard"])
     tick(g)
     battle = g.scenes[-1]
@@ -207,16 +207,3 @@ def test_a_won_defence_is_kept_even_when_the_player_leaves_before_the_reckoning(
     battle.to_map()   # the pause menu's To the map, before the reckoning comes
     tick(g)
     assert flow.progress.best("tristram") == 3
-
-
-def test_hell_opens_only_when_hells_gate_holds_on_normal(game):
-    g, flow = game
-    progress = flow.progress
-    assert not progress.difficulty_opened(HELL)
-    progress.won["normal"] = {key: 1 for key in ORDER}
-    assert progress.difficulty_opened(HELL)
-    progress.choose("hell")
-    assert progress.next_location() == LOCATIONS["tristram"]   # Hell begins at the top again
-    flow.world_map()
-    tick(g)
-    assert_text_fits(g)

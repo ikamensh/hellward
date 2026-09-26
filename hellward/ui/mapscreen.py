@@ -2,7 +2,7 @@
 and the lantern that walks down it.
 
 Choosing an open location sends the lantern along the trail (a click skips the walk) and opens its intro. The
-first descent walks straight to Tristram. The bottom bar holds the difficulty, the skill tree and the way back.
+first descent walks straight to Tristram. The bottom bar holds the skill tree and the way back.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 from saga2d import Anchor, Button, Row, Scene
 
 from hellward.art import worldmap
-from hellward.sim.campaign import DIFFICULTIES, LOCATIONS, ORDER
+from hellward.sim.campaign import LOCATIONS, ORDER
 from hellward.ui import style, widgets
 
 if TYPE_CHECKING:
@@ -40,17 +40,9 @@ class MapScene(Scene):
 
     def on_enter(self) -> None:
         bar = Row(Button("Skills", shortcut="K", on_click=self.open_skills, width=200),
-                  *(Button(lambda d=d: self._difficulty_label(d), on_click=lambda d=d: self.choose(d), width=170)
-                    for d in DIFFICULTIES),
                   Button("The title", shortcut="Esc", on_click=self.to_title, width=170),
                   anchor=Anchor.BOTTOM, margin=(0, 14), spacing=12)
         self.ui.add(bar)
-
-    def _difficulty_label(self, key: str) -> str:
-        difficulty = DIFFICULTIES[key]
-        if not self.progress.difficulty_opened(difficulty):
-            return f"{difficulty.name} (locked)"
-        return f"» {difficulty.name} «" if key == self.progress.difficulty else difficulty.name
 
     # -- Commands ---------------------------------------------------------------------------------
 
@@ -59,14 +51,6 @@ class MapScene(Scene):
 
     def to_title(self) -> None:
         self.flow.title()
-
-    def choose(self, key: str) -> None:
-        difficulty = DIFFICULTIES[key]
-        if self.going is not None or not self.progress.difficulty_opened(difficulty):
-            self.flow.sound.play("refuse")
-            return
-        self.progress.choose(key)
-        self.flow.sound.play("click")
 
     def go(self, key: str) -> None:
         """Walk the lantern to a location, then open its intro."""
@@ -145,10 +129,9 @@ class MapScene(Scene):
             self._place(key, mouse)
         with self.screen_layer(4):
             self._lantern()
-            difficulty = DIFFICULTIES[progress.difficulty]
-            won = sum(progress.won[progress.difficulty].values())
+            won = sum(progress.won.values())
             self.draw_text("The Descent", 640, 34, style="banner", anchor_x="center", anchor_y="center")
-            self.draw_text(f"{difficulty.name}: {won} of {3 * len(ORDER)} sigils won. {progress.free} to spend on skills.", 640, 66,
+            self.draw_text(f"{won} of {3 * len(ORDER)} sigils won. {progress.free} to spend on skills.", 640, 66,
                            font_size=15, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
         if mouse is not None:
             spot = widgets.hit(self.spots, *mouse)

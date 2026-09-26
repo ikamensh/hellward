@@ -1,23 +1,22 @@
-"""The campaign's balance table: what the locations and difficulties are tuned against (docs/campaign.md,
+"""The campaign's balance table: what the locations are tuned against (docs/campaign.md,
 "Tuning by simulation").
 
     python3 ~/saga/tools/slot.py -- caffeinate -i uv run python tools/campaign_balance.py --margin --leaders --out DIR
     uv run python tools/campaign_balance.py --players ordinary --seeds 1000-1003 --out DIR     # a quick look
 
-Every scripted player (:data:`hellward.sim.players.PLAYERS`) defends every location in the campaign's order, on
-Normal and then on Hell, over the evaluation seeds, against the smart leaders, through a person's hands
+Every scripted player (:data:`hellward.sim.players.PLAYERS`) defends every location in the campaign's order,
+over the evaluation seeds, against the smart leaders, through a person's hands
 (:func:`hellward.sim.players.hands.defend`). A whole table is thousands of defences: run it through the
 machine's slot queue, as above.
 
-* **Sigils.** Each defence gets the sigils the best player has earned by then: on Normal the sum of B*'s median
-  sigils on the earlier locations, on Hell the Normal total plus B*'s median on the earlier Hell locations. So
-  the locations are played in order, and unless ``--sigils N`` gives every defence the same budget, what is played
-  must start the campaign (Normal, Tristram on).
-* **B\\*** at a location and difficulty is the player with the best median lives; ties go to more wins, then to
+* **Sigils.** Each defence gets the sigils the best player has earned by then: the sum of B*'s median
+  sigils on the earlier locations. So the locations are played in order, and unless ``--sigils N`` gives
+  every defence the same budget, what is played must start the campaign (Tristram on).
+* **B\\*** at a location is the player with the best median lives; ties go to more wins, then to
   more mean lives. The table marks it.
 * ``--margin``: M, the largest factor on every monster's life at which B* still wins, bisected to 2% between
-  0.4 and 4 on each of the first 8 seeds; the table gives the median. The factor is the difficulty's own, so the
-  spells do not grow with it: M is what raising the difficulty's life would give.
+  0.4 and 4 on each of the first 8 seeds; the table gives the median. The factor leaves the spells as they
+  are: M is what raising the location's life would give.
 * ``--leaders``: B* with its skills against the smart leaders and against random ones, the lives uncapped (as
   ``balance.py`` counts them). Leader impact is the lives lost to smart minus those lost to random, and that as a
   share of the lives lost to smart.
@@ -68,9 +67,9 @@ MARGIN_RANGE = (0.4, 4.0)              # taken as a win and a fall without playi
 MARGIN_STEP = 1.02
 LEADERS = {"smart": lambda seed: planner.smart, "random": planner.RandomLeaders}
 EASY = ("tristram", "graveyard")       # they teach, and may be easy
-BELOW = ("catacombs", "caves", "hells_gate")   # the ordinary defender loses at least one of these on Normal
+BELOW = ("catacombs", "caves", "hells_gate")   # the ordinary defender loses at least one of these
 SPELL_LETTERS = {"cleanse": "C", "smite": "S", "meteor": "M", "orb": "O"}
-COLUMNS = ("location", "difficulty", "player", "sigils", "wins/N", "median lives", "fewest", "M", "leader impact",
+COLUMNS = ("location", "player", "sigils", "wins/N", "median lives", "fewest", "M", "leader impact",
            "curse-s/leader", "chants broken", "spells", "mana capped s", "decision p95 ms")
 
 
@@ -98,17 +97,17 @@ def leaders_spawned(world: World) -> int:
     return sum(MONSTERS[k].leader is not None for k in called) - sum(MONSTERS[k].leader is not None for k in waiting)
 
 
-def play(player: str, location: str, difficulty: str, seed: int, sigils: int, *, leaders: str = "smart",
+def play(player: str, location: str, seed: int, sigils: int, *, leaders: str = "smart",
          hp: float = 1.0, lives: int | None = None) -> dict:
     """One defence, and everything the table and the tuning read from it."""
     place = campaign.LOCATIONS[location]
     policy = Timed(LEADERS[leaders](seed))
     started = time.process_time()
-    world, record = defend(place, campaign.DIFFICULTIES[difficulty], PLAYERS[player](seed), seed=seed, sigils=sigils,
-                           planner=policy, hp=hp, lives=lives)
+    world, record = defend(place, PLAYERS[player](seed), seed=seed, sigils=sigils, planner=policy, hp=hp,
+                           lives=lives)
     start_lives = START_LIVES if lives is None else lives
     return {
-        "player": player, "build": BUILD, "location": location, "difficulty": difficulty, "seed": seed,
+        "player": player, "build": BUILD, "location": location, "seed": seed,
         "react": round(react_for(seed), 4), "skills": sorted(record.skills), "leaders": leaders, "hp": hp,
         "sigils": sigils, "start_lives": start_lives, "outcome": world.outcome, "lives": world.lives,
         "lost": start_lives - world.lives,
@@ -123,13 +122,13 @@ def play(player: str, location: str, difficulty: str, seed: int, sigils: int, *,
     }
 
 
-def margin(player: str, location: str, difficulty: str, seed: int, sigils: int) -> tuple[float, list[dict]]:
+def margin(player: str, location: str, seed: int, sigils: int) -> tuple[float, list[dict]]:
     """The largest factor on every monster's life at which the player still wins this seed, to 2%, and its runs."""
     low, high = MARGIN_RANGE
     runs = []
     while high / low > MARGIN_STEP:
         hp = math.sqrt(low * high)
-        run = play(player, location, difficulty, seed, sigils, hp=hp)
+        run = play(player, location, seed, sigils, hp=hp)
         runs.append(run)
         if run["outcome"] == "victory":
             low = hp
@@ -143,10 +142,9 @@ def margin(player: str, location: str, difficulty: str, seed: int, sigils: int) 
 
 @dataclass
 class Stage:
-    """One location on one difficulty: the sigils it was played with, its runs, B*, and B*'s own measures."""
+    """One location: the sigils it was played with, its runs, B*, and B*'s own measures."""
 
     location: str
-    difficulty: str
     sigils: int
     runs: list[dict]
     best: str
@@ -155,8 +153,8 @@ class Stage:
     uncapped: dict[str, list[dict]] = field(default_factory=dict)   # B* against each leader policy, lives uncapped
 
 
-def campaign_order() -> list[tuple[str, str]]:
-    return [(d, loc) for d in campaign.DIFFICULTIES for loc in campaign.ORDER]
+def campaign_order() -> list[str]:
+    return list(campaign.ORDER)
 
 
 def best(runs: list[dict], players: list[str]) -> str:
@@ -168,19 +166,19 @@ def best(runs: list[dict], players: list[str]) -> str:
     return max(players, key=standing)
 
 
-def play_campaign(pool: Executor, players: list[str], stages: list[tuple[str, str]], seeds: list[int],
+def play_campaign(pool: Executor, players: list[str], stages: list[str], seeds: list[int],
                   sigils: int | None) -> list[Stage]:
     """Every player on every stage in order, each with the budget B* has earned before it (or ``sigils``)."""
     done = []
     earned = 0
-    for difficulty, location in stages:
+    for location in stages:
         budget = earned if sigils is None else sigils
         started = time.perf_counter()
-        jobs = [(p, location, difficulty, seed, budget) for p in players for seed in seeds]
+        jobs = [(p, location, seed, budget) for p in players for seed in seeds]
         runs = list(pool.map(play, *zip(*jobs)))
-        stage = Stage(location, difficulty, budget, runs, best(runs, players))
+        stage = Stage(location, budget, runs, best(runs, players))
         earned += statistics.median_low(r["earned"] for r in runs if r["player"] == stage.best)
-        note(f"{difficulty} {location}: {len(runs)} defences with {budget} sigils, B* {stage.best} "
+        note(f"{location}: {len(runs)} defences with {budget} sigils, B* {stage.best} "
              f"({time.perf_counter() - started:.0f} s)")
         done.append(stage)
     return done
@@ -191,10 +189,10 @@ def measure_best(pool: Executor, stages: list[Stage], seeds: list[int], *, margi
     pending = []
     for s in stages:
         if margins:
-            pending += [(s, "margin", pool.submit(margin, s.best, s.location, s.difficulty, seed, s.sigils))
+            pending += [(s, "margin", pool.submit(margin, s.best, s.location, seed, s.sigils))
                         for seed in seeds[:MARGIN_SEEDS]]
         if leaders:
-            pending += [(s, policy, pool.submit(play, s.best, s.location, s.difficulty, seed, s.sigils, leaders=policy,
+            pending += [(s, policy, pool.submit(play, s.best, s.location, seed, s.sigils, leaders=policy,
                                                 lives=UNCAPPED)) for policy in LEADERS for seed in seeds]
     started = time.perf_counter()
     for s, kind, future in pending:
@@ -238,7 +236,7 @@ def rows(stages: list[Stage], players: list[str]) -> list[dict]:
             mine = player == s.best
             held = sum(r["curse_seconds"] for r in runs)
             out.append({
-                "location": s.location, "difficulty": s.difficulty, "player": player, "best": mine,
+                "location": s.location, "player": player, "best": mine,
                 "sigils": s.sigils, "wins": len(won), "n": len(runs), "median": statistics.median(lives),
                 "fewest": min(lives), "lives_in_wins": statistics.median(won) if won else None,
                 "M": statistics.median(s.margins) if mine and s.margins else None,
@@ -278,7 +276,7 @@ def show_impact(impact: tuple[float, float | None] | None) -> str:
 def cells(row: dict) -> list[str]:
     spells = " ".join(f"{SPELL_LETTERS[k]}{n:.1f}" for k, n in row["spells"].items() if n)
     return [
-        row["location"], row["difficulty"], row["player"] + (" B*" if row["best"] else ""), str(row["sigils"]),
+        row["location"], row["player"] + (" B*" if row["best"] else ""), str(row["sigils"]),
         f"{row['wins']}/{row['n']}", f"{row['median']:g}", str(row["fewest"]), show_margin(row["M"]),
         show_impact(row["impact"]), number(row["curse_per_leader"]), percent(row["broken_share"]),
         spells or "—", number(row["mana_capped"], 0), number(row["p95_ms"], 0),
@@ -298,7 +296,7 @@ class Verdict:
     def __init__(self, target: str) -> None:
         self.target = target
         self.played = False
-        self.failed: dict[str, list[str]] = {}   # what failed, by location and difficulty
+        self.failed: dict[str, list[str]] = {}   # what failed, by location
         self.unmeasured: list[str] = []
 
     def check(self, where: str, ok: bool | None, what: str, missing: str = "") -> None:
@@ -324,18 +322,18 @@ def within(value: float | None, low: float, high: float = math.inf) -> bool | No
 
 
 def targets(table: list[dict]) -> list[list[str]]:
-    """Each target of docs/campaign.md: Normal judged on the apprentice's rows (how a person fares), Hell and the
-    leaders on B*'s (the ceiling), and the ordinary defender on its own."""
-    easy = Verdict("Normal, Tristram and the Graveyard: the apprentice wins N/N, median lives ≥ 18")
-    normal = Verdict("Normal, from the Cathedral on: the apprentice wins ≥ 3/4 (its margins: tools/margin.py apprentice)")
-    strong = Verdict("Normal: B* wins N/N")
-    gate = Verdict("Hell, Hell's Gate: B* wins on 20–60% of seeds, median lives in the wins ≤ 9, M 0.97–1.03")
-    hell = Verdict("Hell, every other location: B* wins on at least 80% of seeds")
-    leaders = Verdict("Hell's Gate on Hell, the contested fight, for B*: smart − random lives lost ≥ 3 and ≥ 20%, "
+    """Each target of docs/campaign.md: the apprentice's rows (how a person fares), the leaders on B*'s
+    (the ceiling), and the ordinary defender on its own."""
+    easy = Verdict("Tristram and the Graveyard: the apprentice wins N/N, median lives ≥ 18")
+    normal = Verdict("From the Cathedral on: the apprentice wins ≥ 3/4 (its margins: tools/margin.py apprentice)")
+    strong = Verdict("B* wins N/N except at Hell's Gate")
+    gate = Verdict("Hell's Gate: B* wins on 20–60% of seeds, median lives in the wins ≤ 9, M 0.97–1.03")
+    rest = Verdict("Every other location: B* wins on at least 80% of seeds")
+    leaders = Verdict("Hell's Gate, the contested fight, for B*: smart − random lives lost ≥ 3 and ≥ 20%, "
                       "at most half of the chants broken")
     for row in table:
-        where, wins, n = f"{row['location']} {row['difficulty']}", row["wins"], row["n"]
-        if row["difficulty"] == "normal" and row["player"] == "apprentice":
+        where, wins, n = row["location"], row["wins"], row["n"]
+        if row["player"] == "apprentice":
             if row["location"] in EASY:
                 easy.check(where, wins == n, f"won {wins}/{n}")
                 easy.check(where, row["median"] >= 18, f"median lives {row['median']:g}")
@@ -344,29 +342,28 @@ def targets(table: list[dict]) -> list[list[str]]:
         if not row["best"]:
             continue
         m = row["M"]
-        if row["difficulty"] == "normal":
-            strong.check(where, wins == n, f"won {wins}/{n}")
-        elif row["location"] == "hells_gate":
+        if row["location"] == "hells_gate":
             kept = row["lives_in_wins"]
             gate.check(where, 0.2 * n <= wins <= 0.6 * n, f"won {wins}/{n}")
             gate.check(where, kept is None or kept <= 9, f"median lives in the wins {number(kept)}")
             gate.check(where, within(m, 0.97, 1.03), f"M {show_margin(m)}", "M (--margin)")
         else:
-            hell.check(where, wins >= 0.8 * n, f"won {wins}/{n}")
-        if row["difficulty"] == "hell" and row["location"] == campaign.LAST:   # elsewhere B* loses no life to either
+            rest.check(where, wins >= 0.8 * n, f"won {wins}/{n}")
+            strong.check(where, wins == n, f"won {wins}/{n}")
+        if row["location"] == campaign.LAST:   # elsewhere B* loses no life to either
             delta = row["impact"]
             mattered = None if delta is None else delta[0] >= 3 and (delta[1] or 0) >= 0.2
             leaders.check(where, mattered, f"leader impact {show_impact(delta)}", "leader impact (--leaders)")
             share = row["broken_share"]
             leaders.check(where, within(share, 0, 0.5), f"chants broken {percent(share)}", "chants broken (none began)")
     sharp = ["The planner stays sharp: share of the best ≥ 0.85 on every location", "—", "tools/curse_quality.py"]
-    return [easy.result(), normal.result(), strong.result(), ordinary_loses(table), gate.result(), hell.result(),
+    return [easy.result(), normal.result(), strong.result(), ordinary_loses(table), gate.result(), rest.result(),
             leaders.result(), sharp]
 
 
 def ordinary_loses(table: list[dict]) -> list[str]:
-    target = "Normal: the ordinary defender loses at least one of the Catacombs, the Caves and Hell's Gate"
-    mine = [r for r in table if r["player"] == "ordinary" and r["difficulty"] == "normal" and r["location"] in BELOW]
+    target = "The ordinary defender loses at least one of the Catacombs, the Caves and Hell's Gate"
+    mine = [r for r in table if r["player"] == "ordinary" and r["location"] in BELOW]
     lost = [f"{r['location']} {r['n'] - r['wins']}/{r['n']}" for r in mine if r["wins"] < r["n"]]
     if lost:
         return [target, "PASS", "lost " + ", ".join(lost)]
@@ -402,7 +399,6 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--players", default=",".join(PLAYERS), help="default: every registered player")
     parser.add_argument("--locations", default=",".join(campaign.ORDER))
-    parser.add_argument("--difficulties", default=",".join(campaign.DIFFICULTIES))
     parser.add_argument("--seeds", default=SEEDS, help=f"default {SEEDS}")
     parser.add_argument("--sigils", type=int, help="every defence gets this many, instead of what B* has earned")
     parser.add_argument("--margin", action="store_true", help="bisect B*'s margin M on every location")
@@ -410,13 +406,13 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--jobs", type=int, default=4)
     parser.add_argument("--out", type=Path, required=True, help="directory for table.md and runs.jsonl")
     args = parser.parse_args(argv)
-    players, locations, difficulties = args.players.split(","), args.locations.split(","), args.difficulties.split(",")
-    for asked, known in ((players, PLAYERS), (locations, campaign.LOCATIONS), (difficulties, campaign.DIFFICULTIES)):
+    players, locations = args.players.split(","), args.locations.split(",")
+    for asked, known in ((players, PLAYERS), (locations, campaign.LOCATIONS)):
         if set(asked) - set(known):
             parser.error(f"unknown: {', '.join(sorted(set(asked) - set(known)))}; known: {', '.join(known)}")
-    stages = [(d, loc) for d, loc in campaign_order() if d in difficulties and loc in locations]
+    stages = [loc for loc in campaign_order() if loc in locations]
     if args.sigils is None and stages != campaign_order()[:len(stages)]:
-        parser.error("the sigils follow the campaign: play it from its start (Normal, Tristram on) or give --sigils N")
+        parser.error("the sigils follow the campaign: play it from its start (Tristram on) or give --sigils N")
     seeds = seed_list(args.seeds)
     head = commit()
     started = time.perf_counter()
@@ -431,7 +427,7 @@ def main(argv: list[str] | None = None) -> None:
         f"{time.perf_counter() - started:.0f} s with {args.jobs} jobs.", "",
         *markdown(list(COLUMNS), [cells(r) for r in table]), "",
         "B* has the best median lives. M: median over the first 8 seeds of the largest life factor B* still wins at "
-        "(the spells do not grow with it, as with the difficulty's life). "
+        "(the spells do not grow with it). "
         "Leader impact: lives lost to smart minus random leaders, uncapped, and its share of those lost to smart. "
         "Chants broken: of all the chants begun. Spells per defence: C Cleanse, S Smite, M Meteor, O Frozen Orb.", "",
         "## Targets", "",

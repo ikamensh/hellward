@@ -16,7 +16,7 @@ from typing import Any, Callable
 from saga2d import Camera, RenderLayer, Scene
 
 from hellward.art.sprites import Art
-from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location, first_offering, offers
+from hellward.sim.campaign import CATHEDRAL, Location, first_offering, offers
 from hellward.sim.content import CURSES, DOOR, MONSTERS, SPELLS
 from hellward.sim.model import SIM_DT, Monster, Refused, Tower, World
 from hellward.sim.players.hands import Hands, Player
@@ -48,7 +48,7 @@ class BattleScene(Scene):
         "q": "spell_smite", "w": "spell_meteor", "e": "spell_orb",
     }
 
-    def __init__(self, art: Art, location: Location = CATHEDRAL, *, difficulty: Difficulty = NORMAL, perks: Perks = NO_PERKS,
+    def __init__(self, art: Art, location: Location = CATHEDRAL, *, perks: Perks = NO_PERKS,
                  seed: int = 0, planner: Callable | None = None, sound: Any = None,
                  autopilot: Player | None = None, on_end: Callable[[World], None] | None = None,
                  on_outcome: Callable[[World], None] | None = None,
@@ -56,7 +56,6 @@ class BattleScene(Scene):
                  to_title: Callable[[], None] | None = None, to_map: Callable[[], None] | None = None) -> None:
         self.art = art
         self.location = location
-        self.difficulty = difficulty
         self.perks = perks
         self.settings = settings
         self.restart = restart
@@ -79,7 +78,7 @@ class BattleScene(Scene):
 
     def on_enter(self) -> None:
         self.camera = Camera((WIDTH, HEIGHT))
-        self.world = World(self.location, difficulty=self.difficulty, perks=self.perks, seed=self.seed, planner=self.planner)
+        self.world = World(self.location, perks=self.perks, seed=self.seed, planner=self.planner)
         self.view = WorldView(self, self.world, self.art)
         self.fx = Effects(self, self.view, self.world)
         self.hud = Hud(self, self.world)

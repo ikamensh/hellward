@@ -4,7 +4,7 @@ A gothic tower defence on Saga2D in which demon leaders curse the player's tower
 curses by simulating the fight ahead. Part of the Saga stack (`~/saga/`, see `../AGENTS.md`).
 Saga2D is a pinned PyPI release (source in `../saga2d`); `../sagaforge` is an editable path
 dependency. `docs/design.md` is one defence; `docs/campaign.md` is the campaign around it (six
-locations, the skill tree, the spells, the world map, and how difficulty is tuned).
+locations, the skill tree, the spells, the world map, and how it is tuned).
 
 ## Commands
 
@@ -30,7 +30,7 @@ uv run python tools/intro.py STEP OUT        # the story intro as film and as co
 ## Layout
 
 - `hellward/sim/` — the rules, with no saga2d: `content.py` (monsters, towers, curses, spells),
-  `campaign.py` (the six locations with their maps, waves and arsenal; the difficulties; sigils),
+  `campaign.py` (the six locations with their maps, waves and arsenal; sigils),
   `skills.py` (the tree and the `Perks` it bakes into a defence), `level.py` (the map, the path as
   one coordinate `s`, reach as intervals of `s`), `model.py` (the fixed-step `World`, cheap to
   clone), `planner.py` (the leaders' curse choice), `players/` (scripted players, which act

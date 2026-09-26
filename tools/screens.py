@@ -43,7 +43,7 @@ def main() -> None:
                 asset_path=cache, save_dir=args.out / "saves")
     art = build(game, cache)
     progress = Progress.load(game)
-    progress.won["normal"] = {"tristram": 3, "graveyard": 2, "cathedral": 1}
+    progress.won = {"tristram": 3, "graveyard": 2, "cathedral": 1}
     progress.learned = frozenset({"fire_mastery", "fire_ball", "holy_shield", "warmth"})
     progress.at = "cathedral"
     flow = Flow(game, art, sound=Silent(), planner=planner.smart, settings=None,
@@ -81,7 +81,7 @@ def main() -> None:
 
     def make_battle(key: str):
         def battle() -> None:
-            progress.won["normal"] = {k: 1 for k in LOCATIONS}   # the whole descent open, whatever the map frame showed
+            progress.won = {k: 1 for k in LOCATIONS}   # the whole descent open, whatever the map frame showed
             flow.defend(LOCATIONS[key])
             scene = game.scenes[-1]
             scene.autopilot = Ordinary()

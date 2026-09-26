@@ -39,7 +39,7 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from hellward.sim.campaign import Difficulty, Location
+from hellward.sim.campaign import Location
 from hellward.sim.content import (
     CURSES, DOOR, MONSTERS, SPELLS, TOWERS, Curse, Element, MonsterKind, TowerLevel,
 )
@@ -214,11 +214,11 @@ class Adaptive:
 
     # -- Skills --------------------------------------------------------------------------------------
 
-    def skills(self, location: Location, difficulty: Difficulty, sigils: int) -> frozenset[str]:
+    def skills(self, location: Location, sigils: int) -> frozenset[str]:
         order = self.order
         if not order:
             plans = json.loads(PLANS.read_text()) if PLANS.exists() else {}
-            order = plans.get(difficulty.key, {}).get(location.key, DEFAULT_ORDER)
+            order = plans.get(location.key, DEFAULT_ORDER)
         return learn(location, sigils, ORDERS[order])
 
     # -- Every step ----------------------------------------------------------------------------------

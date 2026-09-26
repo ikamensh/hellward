@@ -1,9 +1,7 @@
 {
-  "normal": {
-    "catacombs": "mixed",
-    "cathedral": "mixed",
-    "caves": "mixed",
-    "graveyard": "warden",
-    "hells_gate": "mixed"
-  }
+  "catacombs": "mixed",
+  "cathedral": "mixed",
+  "caves": "mixed",
+  "graveyard": "warden",
+  "hells_gate": "mixed"
 }

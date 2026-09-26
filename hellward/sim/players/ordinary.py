@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from hellward.sim.campaign import Difficulty, Location
+from hellward.sim.campaign import Location
 from hellward.sim.content import DOOR, WAVE_BREAK
 from hellward.sim.model import DOOR_STOP, JOSTLE, Refused, Tower, World
 from hellward.sim.players.hands import Hands
@@ -52,7 +52,7 @@ class Ordinary:
         rotation = [kind for kind in ROTATION if kind in world.location.arsenal.towers]
         self.planned = [(rotation[(i + self.shift) % len(rotation)], tile) for i, tile in enumerate(tiles[:self.towers])]
 
-    def skills(self, location: Location, difficulty: Difficulty, sigils: int) -> frozenset[str]:
+    def skills(self, location: Location, sigils: int) -> frozenset[str]:
         return frozenset()
 
     def act(self, hands: Hands) -> None:

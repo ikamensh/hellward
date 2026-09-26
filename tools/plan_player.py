@@ -1,8 +1,8 @@
-"""Find the planned player's build for each location and difficulty by playing whole defences.
+"""Find the planned player's build for each location by playing whole defences.
 
-    uv run python tools/plan_player.py plan tristram graveyard --difficulty normal
-    uv run python tools/plan_player.py plan all --difficulty normal --generations 50
-    uv run python tools/plan_player.py plan hells_gate --difficulty hell --resume   # climb on from the stored plan
+    uv run python tools/plan_player.py plan tristram graveyard
+    uv run python tools/plan_player.py plan all --generations 50
+    uv run python tools/plan_player.py plan hells_gate --resume   # climb on from the stored plan
     uv run python tools/plan_player.py table                     # the evaluation table, against the ordinary player
 
 ``plan`` is how a person who has replayed a location many times comes to know it, done by a machine. It starts
@@ -19,8 +19,7 @@ so a resumed climb cannot lose what it had. While a build holds with most of its
 life is raised, so the climb keeps finding a difference to climb on: a build that holds at more life holds with
 more to spare at the real one.
 
-``table`` plays every location on Normal with ``2 * i`` sigils (``i`` its place in the campaign), and Hell's
-Gate and the Caves on Hell with the whole tree, on the evaluation seeds 1000 on, against the smart leaders.
+``table`` plays every location with ``3 * i`` sigils (``i`` its place in the campaign), on the evaluation seeds 1000 on, against the smart leaders.
 Run heavy jobs through ``~/saga/tools/slot.py`` with ``caffeinate -i``.
 """
 
@@ -39,13 +38,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim import planner  # noqa: E402
-from hellward.sim.campaign import DIFFICULTIES, LOCATIONS, ORDER, Location  # noqa: E402
+from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import MONSTERS, TOWERS  # noqa: E402
 from hellward.sim.model import DOOR_STOP, JOSTLE, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.hands import defend  # noqa: E402
 from hellward.sim.players.planned import Plan, Planned, load, plan_path  # noqa: E402
-from hellward.sim.skills import SKILLS, TREE_COST  # noqa: E402
+from hellward.sim.skills import SKILLS  # noqa: E402
 
 
 
@@ -69,8 +68,8 @@ FIRST_TOWERS = 12             # towers in a first build
 # -- Playing ------------------------------------------------------------------------------------------
 
 
-def sigils_for(location: str, difficulty: str) -> int:
-    return 2 * ORDER.index(location) if difficulty == "normal" else TREE_COST
+def sigils_for(location: str) -> int:
+    return 3 * ORDER.index(location)
 
 
 def score(world: World) -> float:
@@ -81,17 +80,17 @@ def score(world: World) -> float:
     return 20.0 * world.kills / total
 
 
-def play(plan: dict, location: str, difficulty: str, sigils: int, seed: int, hp: float, leaders: str) -> float:
-    world, _ = defend(LOCATIONS[location], DIFFICULTIES[difficulty], Planned(plan=Plan.from_json(plan)), seed=seed,
-                      sigils=sigils, planner=LEADERS[leaders], hp=hp)
+def play(plan: dict, location: str, sigils: int, seed: int, hp: float, leaders: str) -> float:
+    world, _ = defend(LOCATIONS[location], Planned(plan=Plan.from_json(plan)), seed=seed, sigils=sigils,
+                      planner=LEADERS[leaders], hp=hp)
     return score(world)
 
 
-def evaluate(pool: ProcessPoolExecutor, plans: list[Plan], location: str, difficulty: str, seeds: list[int], hp: float,
+def evaluate(pool: ProcessPoolExecutor, plans: list[Plan], location: str, seeds: list[int], hp: float,
              leaders: str) -> list[float]:
     """Each plan's mean score over the same seeds."""
-    sigils = sigils_for(location, difficulty)
-    jobs = [(p.to_json(), location, difficulty, sigils, s, hp, leaders) for p in plans for s in seeds]
+    sigils = sigils_for(location)
+    jobs = [(p.to_json(), location, sigils, s, hp, leaders) for p in plans for s in seeds]
     results = list(pool.map(play, *zip(*jobs)))
     n = len(seeds)
     return [statistics.mean(results[i * n:(i + 1) * n]) for i in range(len(plans))]
@@ -351,7 +350,7 @@ CHANGES = (move_tower, move_tower, move_tower, change_kind, change_kind, move_st
 # -- The climb ----------------------------------------------------------------------------------------
 
 
-def first_build(pool: ProcessPoolExecutor, location_key: str, difficulty: str, offset: int,
+def first_build(pool: ProcessPoolExecutor, location_key: str, offset: int,
                 log) -> tuple[Plan, float, int]:
     """The best of the first builds, the monsters' life at which it stops holding with room to spare, and the
     defences it took to find them."""
@@ -359,7 +358,7 @@ def first_build(pool: ProcessPoolExecutor, location_key: str, difficulty: str, o
     screen = [(offset + 90 + j) % TRAINING for j in range(4)]
     hp, defences = 1.0, 0
     while True:
-        scores = evaluate(pool, candidates, location_key, difficulty, screen, hp, SEARCH)
+        scores = evaluate(pool, candidates, location_key, screen, hp, SEARCH)
         defences += len(candidates) * len(screen)
         best = max(range(len(candidates)), key=lambda i: scores[i])
         log(f"  first builds at life x{hp:.2f}: {' '.join(f'{s:.1f}' for s in scores)}")
@@ -368,27 +367,27 @@ def first_build(pool: ProcessPoolExecutor, location_key: str, difficulty: str, o
         hp *= 1.2
 
 
-def climb(pool: ProcessPoolExecutor, location_key: str, difficulty: str, generations: int, children: int, per: int,
+def climb(pool: ProcessPoolExecutor, location_key: str, generations: int, children: int, per: int,
           confirm: int, resume: bool, log) -> Plan:
-    """The climb for one location and difficulty, from the first builds or, with ``resume``, from the plan the
+    """The climb for one location, from the first builds or, with ``resume``, from the plan the
     player holds now (and at the life it was found at)."""
     location = LOCATIONS[location_key]
-    before = load(location_key, difficulty).trained if resume else {}
+    before = load(location_key).trained if resume else {}
     done = before.get("generations", 0)
-    rng = random.Random(f"{location_key}-{difficulty}-{done}")
+    rng = random.Random(f"{location_key}-{done}")
     tiles = ranked_tiles(location, 3.0, 3.0)[:TOP_TILES]
     start = time.time()
-    offset = ORDER.index(location_key) * 17 + (0 if difficulty == "normal" else 50)
+    offset = ORDER.index(location_key) * 17
     seeds = lambda g: [(offset + (done + g) * per + j) % TRAINING for j in range(per)]   # noqa: E731
 
     if resume:
-        parent, hp, defences = load(location_key, difficulty), before.get("life", 1.0), 0
+        parent, hp, defences = load(location_key), before.get("life", 1.0), 0
     else:
-        parent, hp, defences = first_build(pool, location_key, difficulty, offset, log)
+        parent, hp, defences = first_build(pool, location_key, offset, log)
     trail = [parent]
     for g in range(generations):
         kids = [mutate(parent, location, rng, tiles) for _ in range(children)]
-        scores = evaluate(pool, [parent] + kids, location_key, difficulty, seeds(g), hp, SEARCH)
+        scores = evaluate(pool, [parent] + kids, location_key, seeds(g), hp, SEARCH)
         defences += (1 + children) * per
         parent_score = scores[0]
         k = max(range(children), key=lambda i: (scores[1 + i], -i))
@@ -407,10 +406,10 @@ def climb(pool: ProcessPoolExecutor, location_key: str, difficulty: str, generat
     trail.append(parent)
     finalists = list({json.dumps(p.to_json(), sort_keys=True): p for p in trail[:1] + trail[-4:]}.values())
     finals = [(offset + 60 + j) % TRAINING for j in range(confirm)]
-    smart = evaluate(pool, finalists, location_key, difficulty, finals, hp, "smart")
+    smart = evaluate(pool, finalists, location_key, finals, hp, "smart")
     defences += len(finalists) * len(finals)
     chosen = finalists[max(range(len(finalists)), key=lambda i: smart[i])]
-    at_one = evaluate(pool, [chosen], location_key, difficulty, finals, 1.0, "smart")[0]
+    at_one = evaluate(pool, [chosen], location_key, finals, 1.0, "smart")[0]
     defences += len(finals)
     log(f"  finalists against smart leaders at life x{hp:.2f}: {' '.join(f'{s:.1f}' for s in smart)}; "
         f"chosen at x1: {at_one:.1f}")
@@ -424,26 +423,26 @@ def climb(pool: ProcessPoolExecutor, location_key: str, difficulty: str, generat
 # -- The table ----------------------------------------------------------------------------------------
 
 
-def table_row(player: str, location: str, difficulty: str, sigils: int, seed: int) -> dict:
-    world, record = defend(LOCATIONS[location], DIFFICULTIES[difficulty], PLAYERS[player](seed), seed=seed,
-                           sigils=sigils, planner=planner.smart)
-    return {"player": player, "location": location, "difficulty": difficulty, "seed": seed, "outcome": world.outcome,
+def table_row(player: str, location: str, sigils: int, seed: int) -> dict:
+    world, record = defend(LOCATIONS[location], PLAYERS[player](seed), seed=seed, sigils=sigils,
+                           planner=planner.smart)
+    return {"player": player, "location": location, "seed": seed, "outcome": world.outcome,
             "lives": world.lives, "spells": dict(record.spells), "landed": record.landed, "broken": record.broken}
 
 
 def table(pool: ProcessPoolExecutor, players: list[str], seeds: list[int]) -> None:
-    runs = [(loc, "normal", 2 * i) for i, loc in enumerate(ORDER)] + [(loc, "hell", TREE_COST) for loc in ("caves", "hells_gate")]
-    jobs = [(p, loc, d, sig, s) for loc, d, sig in runs for p in players for s in seeds]
+    runs = [(loc, 3 * i) for i, loc in enumerate(ORDER)]
+    jobs = [(p, loc, sig, s) for loc, sig in runs for p in players for s in seeds]
     rows = list(pool.map(table_row, *zip(*jobs)))
-    for loc, d, sig in runs:
+    for loc, sig in runs:
         for p in players:
-            mine = [r for r in rows if r["player"] == p and r["location"] == loc and r["difficulty"] == d]
+            mine = [r for r in rows if r["player"] == p and r["location"] == loc]
             lives = [r["lives"] for r in mine]
             wins = sum(r["outcome"] == "victory" for r in mine)
             spells = sum((r["spells"].get(k, 0) for r in mine for k in r["spells"]), 0) / len(mine)
             landed = statistics.mean(r["landed"] for r in mine)
             broken = statistics.mean(r["broken"] for r in mine)
-            print(f"{loc:11s} {d:6s} sigils {sig:2d}  {p:9s} wins {wins}/{len(mine)}  lives median "
+            print(f"{loc:11s} sigils {sig:2d}  {p:9s} wins {wins}/{len(mine)}  lives median "
                   f"{statistics.median(lives):4.1f} fewest {min(lives):2d}  curses landed {landed:4.1f} broken {broken:4.1f}  "
                   f"spells {spells:4.1f}", flush=True)
 
@@ -460,7 +459,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("what", choices=("plan", "table"))
     parser.add_argument("locations", nargs="*", default=["all"])
-    parser.add_argument("--difficulty", default="normal", choices=list(DIFFICULTIES))
     parser.add_argument("--generations", type=int, default=40)
     parser.add_argument("--children", type=int, default=7)
     parser.add_argument("--per", type=int, default=3, help="training seeds each build plays per generation")
@@ -476,10 +474,10 @@ def main() -> None:
             return
         keys = list(ORDER) if args.locations == ["all"] else args.locations
         for key in keys:
-            print(f"{key} on {args.difficulty}:", flush=True)
-            plan = climb(pool, key, args.difficulty, args.generations, args.children, args.per, args.confirm, args.resume,
+            print(f"{key}:", flush=True)
+            plan = climb(pool, key, args.generations, args.children, args.per, args.confirm, args.resume,
                          lambda line: print(line, flush=True))
-            path = plan_path(key, args.difficulty)
+            path = plan_path(key)
             path.parent.mkdir(exist_ok=True)
             path.write_text(dumps(plan))
             print(f"  wrote {path.relative_to(Path.cwd()) if path.is_relative_to(Path.cwd()) else path} "

@@ -40,7 +40,7 @@ def flow_of(g: Game, art) -> Flow:
 def fight(g: Game, art) -> BattleScene:
     """A defence the way the game starts one: settings in hand, ways to start again, to the map and to the title."""
     flow = flow_of(g, art)
-    flow.progress.won["normal"] = {"tristram": 1, "graveyard": 1}   # the way down to the Cathedral is open
+    flow.progress.won = {"tristram": 1, "graveyard": 1}   # the way down to the Cathedral is open
     flow.defend(CATHEDRAL)
     g.tick(1 / 30)
     return g.scenes[-1]

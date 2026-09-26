@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from hellward.sim import planner
-from hellward.sim.campaign import DIFFICULTIES, LOCATIONS, NORMAL, g
+from hellward.sim.campaign import LOCATIONS, g
 from hellward.sim.content import Wave
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.players import PLAYERS
@@ -25,7 +25,7 @@ import plan_player  # noqa: E402
 @pytest.mark.parametrize("key", list(LOCATIONS))
 def test_the_ordinary_player_defends_every_location_to_its_end_against_smart_leaders(key):
     location = LOCATIONS[key]
-    world, record = defend(location, NORMAL, PLAYERS["ordinary"](1), seed=1, sigils=0, planner=planner.smart)
+    world, record = defend(location, PLAYERS["ordinary"](1), seed=1, sigils=0, planner=planner.smart)
     assert world.outcome in ("victory", "defeat")
     assert world.outcome == "defeat" or world.wave == len(location.waves) - 1
     assert world.kills > 0
@@ -33,7 +33,7 @@ def test_the_ordinary_player_defends_every_location_to_its_end_against_smart_lea
 
 
 def test_the_warden_holds_tristram_with_every_life():
-    world, record = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["warden"](1), seed=1, sigils=0, planner=planner.smart)
+    world, record = defend(LOCATIONS["tristram"], PLAYERS["warden"](1), seed=1, sigils=0, planner=planner.smart)
     assert world.outcome == "victory"
     assert world.lives == 20
     assert record.landed > 0
@@ -42,7 +42,7 @@ def test_the_warden_holds_tristram_with_every_life():
 def test_every_stored_warden_plan_is_for_todays_map_and_its_sigils():
     """A plan searched on a map that has changed since is not played: search it again (tools/warden_plans.py)."""
     for key, plan in load_plans().items():
-        name, _, sigils = key.split("/")
+        name, sigils = key.split("/")
         location = LOCATIONS[name]
         assert plan.map == fingerprint(location), key
         assert cost(plan.skills) <= int(sigils), key
@@ -104,7 +104,7 @@ def test_the_record_tells_a_broken_chant_from_a_broken_pondering():
 
 def test_a_defence_still_undecided_at_the_limit_is_an_error():
     with pytest.raises(RuntimeError, match="undecided"):
-        defend(LOCATIONS["tristram"], NORMAL, PLAYERS["ordinary"](1), seed=1, sigils=0, planner=None, limit=5.0)
+        defend(LOCATIONS["tristram"], PLAYERS["ordinary"](1), seed=1, sigils=0, planner=None, limit=5.0)
 
 
 FORBIDDEN = (".asking", ".ask_left", ".chant_", ".cooldown", "planner", ".clone(", ".forced", ".rng", "decide(", "rollout(")
@@ -121,19 +121,19 @@ def test_a_player_reads_no_leaders_mind_and_no_future(path):
 
 
 def test_the_planned_player_holds_tristram_with_its_searched_build():
-    world, _ = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["planned"](1), seed=1, sigils=0, planner=planner.smart)
+    world, _ = defend(LOCATIONS["tristram"], PLAYERS["planned"](1), seed=1, sigils=0, planner=planner.smart)
     assert world.outcome == "victory"
     assert world.lives >= 18
 
 
 def test_the_adaptive_player_holds_tristram():
-    world, record = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["adaptive"](1), seed=1, sigils=0, planner=planner.smart)
+    world, record = defend(LOCATIONS["tristram"], PLAYERS["adaptive"](1), seed=1, sigils=0, planner=planner.smart)
     assert world.outcome == "victory"
     assert world.lives >= 18
 
 
 def test_the_apprentice_holds_tristram():
-    world, _ = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["apprentice"](1), seed=1, sigils=0, planner=planner.smart)
+    world, _ = defend(LOCATIONS["tristram"], PLAYERS["apprentice"](1), seed=1, sigils=0, planner=planner.smart)
     assert world.outcome == "victory"
 
 
@@ -155,12 +155,12 @@ def assert_fits(plan, location):
             assert location.arsenal.gates and 0 <= step[1] < len(location.level.doors)
 
 
-@pytest.mark.parametrize("path", sorted(PLANS.glob("*-*.json")), ids=lambda p: p.stem)   # the planned player's own
+@pytest.mark.parametrize("path", sorted(PLANS.glob("*.json")), ids=lambda p: p.stem)
 def test_every_stored_plan_fits_its_location(path):
     """A plan found for an older map or arsenal would build nowhere; the player would stand idle."""
-    key, difficulty = path.stem.split("-")
-    assert difficulty in DIFFICULTIES
-    assert_fits(load(key, difficulty), LOCATIONS[key])
+    if path.name in ("warden.json", "adaptive.json"):
+        return
+    assert_fits(load(path.stem), LOCATIONS[path.stem])
 
 
 @pytest.mark.parametrize("key", list(LOCATIONS))
@@ -179,9 +179,8 @@ def test_the_adaptive_player_learns_within_its_sigils_and_the_tree(order):
     """Every themed order, and the planned one (empty), buys a set the tree allows, and leaves no sigil it could
     still spend, at every budget and place."""
     for location in LOCATIONS.values():
-        for difficulty in DIFFICULTIES.values():
-            for sigils in range(0, 37):
-                learned = Adaptive(order).skills(location, difficulty, sigils)
-                check(learned)
-                assert cost(learned) <= sigils
-                assert not [key for key in SKILLS if can_learn(learned, key, sigils)]   # nothing left it could buy
+        for sigils in range(0, 37):
+            learned = Adaptive(order).skills(location, sigils)
+            check(learned)
+            assert cost(learned) <= sigils
+            assert not [key for key in SKILLS if can_learn(learned, key, sigils)]   # nothing left it could buy

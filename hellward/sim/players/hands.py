@@ -19,10 +19,10 @@ from __future__ import annotations
 import random
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from typing import Protocol
 
-from hellward.sim.campaign import Difficulty, Location
+from hellward.sim.campaign import Location
 from hellward.sim.content import Curse
 from hellward.sim.model import SIM_DT, Planner, Refused, World
 from hellward.sim.skills import cost, perks
@@ -35,7 +35,7 @@ AIM_GAP = 0.5         # seconds between two aimed spells
 class Player(Protocol):
     name: str
 
-    def skills(self, location: Location, difficulty: Difficulty, sigils: int) -> frozenset[str]:
+    def skills(self, location: Location, sigils: int) -> frozenset[str]:
         """The skills it learns for this defence, costing at most ``sigils`` (unlearning is free)."""
 
     def act(self, hands: Hands) -> None:
@@ -171,18 +171,17 @@ class Hands:
         self.record.spells[spell] += 1
 
 
-def defend(location: Location, difficulty: Difficulty, player: Player, *, seed: int, sigils: int,
+def defend(location: Location, player: Player, *, seed: int, sigils: int,
            planner: Planner | None, hp: float = 1.0, lives: int | None = None, limit: float = 3000.0,
            watch: Callable[[World], None] | None = None) -> tuple[World, Record]:
-    """One defence played to its end by a player. ``hp`` scales every monster's life as the difficulty's own factor
-    does, leaving the spells as they are (the balance tools' margin); ``lives`` replaces the sanctuary's (the
-    balance tools set it huge to count every life lost); *watch* sees the world after every step, with that step's
-    events. A defence still undecided after ``limit`` seconds is a bug."""
-    learned = player.skills(location, difficulty, sigils)
+    """One defence played to its end by a player. ``hp`` scales every monster's life, leaving the spells as
+    they are (the balance tools' margin); ``lives`` replaces the sanctuary's (the balance tools set it huge
+    to count every life lost); *watch* sees the world after every step, with that step's events. A defence
+    still undecided after ``limit`` seconds is a bug."""
+    learned = player.skills(location, sigils)
     if cost(learned) > sigils:
         raise ValueError(f"{player.name} learned {cost(learned)} sigils' worth of skills with {sigils}")
-    world = World(location, difficulty=replace(difficulty, hp=difficulty.hp * hp), perks=perks(learned), seed=seed,
-                  planner=planner)
+    world = World(location, hardness=hp, perks=perks(learned), seed=seed, planner=planner)
     world.record = True
     if lives is not None:
         world.lives = lives
@@ -196,7 +195,7 @@ def defend(location: Location, difficulty: Difficulty, player: Player, *, seed: 
         hands.observe(world.events)
         world.events.clear()
     if world.outcome is None:
-        where = f"{location.key} ({difficulty.key}), seed {seed}"
+        where = f"{location.key}, seed {seed}"
         raise RuntimeError(f"{player.name} on {where}: undecided after {world.time:.0f} s")
     return world, hands.record
 

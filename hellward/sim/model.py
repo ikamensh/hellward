@@ -5,7 +5,7 @@ the clones at a coarser ``dt`` to look ahead, so a step must be cheap, determini
 the clone does not carry. Randomness only decides where in the corridor a monster walks (``lane``) and how
 far back from a door it queues (``jostle``); it comes from the world's own seeded stream.
 
-A world is one :class:`~hellward.sim.campaign.Location` at one difficulty, with the player's learned skills
+A world is one :class:`~hellward.sim.campaign.Location`, with the player's learned skills
 (:class:`~hellward.sim.skills.Perks`) baked in when it begins.
 
 Events for the view are appended to :attr:`World.events` when ``record`` is on; clones switch it off.
@@ -22,7 +22,7 @@ import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Final
 
-from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location
+from hellward.sim.campaign import CATHEDRAL, Location
 from hellward.sim.content import (
     BURN_RADIUS, CONTAGION_REACH, CURSES, DOOR, EARLY_CALL_GOLD, MANA_START, MAX_POISON_STACKS, MONSTERS, SELL_REFUND,
     SHATTER_RADIUS, SHATTER_SHARE, SOUL, SPELLS, START_LIVES, THORNS, TOWERS, WARD, WAVE_BREAK, Curse, Element,
@@ -247,15 +247,14 @@ Planner = Callable[["World", int], Any]   # returns a handle with .result() -> D
 
 
 class World:
-    def __init__(self, location: Location = CATHEDRAL, *, difficulty: Difficulty = NORMAL, perks: Perks = NO_PERKS,
+    def __init__(self, location: Location = CATHEDRAL, *, hardness: float = 1.0, perks: Perks = NO_PERKS,
                  seed: int = 0, planner: Planner | None = None, record: bool = True) -> None:
         self.location = location
         self.level = location.level
         self.waves = location.waves
-        self.difficulty = difficulty
         self.perks = perks
         self.tower_levels = baked(perks)
-        self.hardness = difficulty.factor(location.key)   # the difficulty's factor on every monster's life here
+        self.hardness = hardness   # every monster's life is multiplied by this; the spells are not
         self.rng = random.Random(seed)
         self.planner = planner
         self.record = record
@@ -291,7 +290,7 @@ class World:
 
     def clone(self) -> World:
         """A private copy to look ahead in: no events, no planner, its own random stream."""
-        w = World(self.location, difficulty=self.difficulty, perks=self.perks, record=False)
+        w = World(self.location, hardness=self.hardness, perks=self.perks, record=False)
         w.rng.setstate(self.rng.getstate())
         w.time, w.gold, w.lives, w.mana = self.time, self.gold, self.lives, self.mana
         w.towers = {i: t.copy() for i, t in self.towers.items()}
@@ -569,7 +568,7 @@ class World:
         while self.schedule and self.schedule[-1][0] <= self.wave_time:
             _, key = self.schedule.pop()
             kind = MONSTERS[key]
-            cooldown = kind.leader.first_cast * self.difficulty.leader_pace if kind.leader is not None else 0.0
+            cooldown = kind.leader.first_cast if kind.leader is not None else 0.0
             m = Monster(self._id(), kind, self.wave, self.rng.uniform(-0.28, 0.28), self.rng.uniform(0.0, JOSTLE),
                         kind.hp * self.waves[self.wave].hp * self.location.life * self.hardness, cooldown)
             self.monsters.append(m)
@@ -603,7 +602,7 @@ class World:
                         m.cooldown = decision.retry
                     else:
                         m.chant_curse, m.chant_tower, m.chant_left = decision.cast.curse, decision.cast.tower, spec.channel
-                        m.cooldown = spec.cooldown * self.difficulty.leader_pace
+                        m.cooldown = spec.cooldown
                         self._emit("chant", m.id, decision.cast.curse, decision.cast.tower)
                 continue
             m.cooldown -= dt
@@ -619,7 +618,7 @@ class World:
         m.asking, m.ask_left = None, 0.0
         spec = m.kind.leader
         if spec is not None:
-            m.cooldown = spec.cooldown * self.difficulty.leader_pace
+            m.cooldown = spec.cooldown
         self.chants_broken += 1
         self._emit("broken", m.id, tower)
 

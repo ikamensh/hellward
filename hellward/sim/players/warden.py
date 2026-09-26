@@ -24,7 +24,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from hellward.sim.campaign import Difficulty, Location
+from hellward.sim.campaign import Location
 from hellward.sim.content import CURSES, DOOR, MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Curse, Element
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, ready
@@ -86,8 +86,8 @@ class Plan:
         return Plan(frozenset(row["skills"]), tuple(Step.of(r) for r in row["steps"]), row["early"], row["map"])
 
 
-def plan_key(location: Location, difficulty: Difficulty, sigils: int) -> str:
-    return f"{location.key}/{difficulty.key}/{sigils}"
+def plan_key(location: Location, sigils: int) -> str:
+    return f"{location.key}/{sigils}"
 
 
 def fingerprint(location: Location) -> str:
@@ -244,17 +244,17 @@ class Warden:
     last_aim: float = -1e9
     work: dict[int, float] = field(default_factory=dict)   # per tower: what it has had in reach, summed over time
 
-    def choose(self, location: Location, difficulty: Difficulty, sigils: int) -> Plan:
+    def choose(self, location: Location, sigils: int) -> Plan:
         if self.plan is not None:
             return self.plan
-        stored = self.plans.get(plan_key(location, difficulty, sigils))
+        stored = self.plans.get(plan_key(location, sigils))
         if stored is not None and stored.map == fingerprint(location):
             return stored
         learned = draft_skills(location, sigils)
         return Plan(learned, draft_build(location, learned))
 
-    def skills(self, location: Location, difficulty: Difficulty, sigils: int) -> frozenset[str]:
-        self.chosen = self.choose(location, difficulty, sigils)
+    def skills(self, location: Location, sigils: int) -> frozenset[str]:
+        self.chosen = self.choose(location, sigils)
         return self.chosen.skills
 
     def act(self, hands: Hands) -> None:

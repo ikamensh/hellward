@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from hellward.sim.campaign import Difficulty, Location, idle
+from hellward.sim.campaign import Location, idle
 from hellward.sim.model import Refused
 from hellward.sim.players.hands import Hands
 from hellward.sim.players.ordinary import Ordinary
@@ -27,7 +27,7 @@ METEOR_SPARE = 95.0  # a Meteor (60) only when a Smite (35) stays in hand
 class Apprentice(Ordinary):
     name: str = "apprentice"
 
-    def skills(self, location: Location, difficulty: Difficulty, sigils: int) -> frozenset[str]:
+    def skills(self, location: Location, sigils: int) -> frozenset[str]:
         order = [*FIRST, *(key for key in SKILLS if key not in FIRST)]
         learned: set[str] = set()
         for key in order:

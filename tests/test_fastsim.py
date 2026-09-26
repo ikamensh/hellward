@@ -19,7 +19,7 @@ from pathlib import Path
 import pytest
 
 from hellward.sim import fastsim, planner
-from hellward.sim.campaign import HELL, LOCATIONS
+from hellward.sim.campaign import LOCATIONS
 from hellward.sim.content import Curse
 from hellward.sim.model import World
 from hellward.sim.players.hands import Hands
@@ -40,12 +40,12 @@ fastsim.attach({build!r})
 import sim_bench
 from test_fastsim import full_fight
 from hellward.sim import planner
-from hellward.sim.campaign import CATHEDRAL, LOCATIONS, NORMAL
+from hellward.sim.campaign import CATHEDRAL, LOCATIONS
 from hellward.sim.model import World
 from hellward.sim.players.hands import Hands
 from hellward.sim.players.ordinary import Ordinary
 
-world = World(CATHEDRAL, difficulty=NORMAL, seed=2, planner=planner.smart)   # a hundred seconds into a defence
+world = World(CATHEDRAL, seed=2, planner=planner.smart)   # a hundred seconds into a defence
 player, hands = Ordinary(), Hands(world, react=0.6)
 while world.time < 100.0:
     player.act(hands)
@@ -97,13 +97,13 @@ def test_a_compiled_world_survives_pickling(compiled: dict) -> None:
 
 
 def busy_world() -> World:
-    """Hell's Gate on Hell with the whole skill tree, at a moment when its fight is full: towers of every kind,
+    """Hell's Gate with the whole skill tree, at a moment when its fight is full: towers of every kind,
     gates under blows, venom and frost on the monsters, bolts in flight and burning floor, two waves on the map and
     one still coming. Then a meteor is cast (in the air), a frozen orb (monsters frozen) and a smite, and a warded
     tower, two cursed ones and a leader chanting are set by hand. Like a clone, it has no planner and no leader
     waiting for one."""
-    world = World(LOCATIONS["hells_gate"], difficulty=HELL, perks=perks(SKILLS), seed=5, planner=planner.smart)
-    world.lives = 10_000   # the ordinary player would fall on Hell long before the fight fills
+    world = World(LOCATIONS["hells_gate"], perks=perks(SKILLS), seed=5, planner=planner.smart)
+    world.lives = 10_000   # the ordinary player would fall long before the fight fills
     player, hands = Ordinary(), Hands(world, react=0.6)
 
     def full() -> bool:

@@ -1,11 +1,10 @@
 """The planned player: a person who has replayed each location many times and knows its build by heart.
 
-Its build for a location and difficulty is a :class:`Plan`, found offline by ``tools/plan_player.py`` (which
+Its build for a location is a :class:`Plan`, found offline by ``tools/plan_player.py`` (which
 plays whole defences on the training seeds 0-99 and keeps what held best) and stored as JSON in ``plans/``: the
 skills to learn first, which towers to raise on which tiles and in what order, when to ward the arches and which
 towers to raise in rank, and how full the mana orb should be before each wave is called. The player follows it
-step by step as the gold comes in. A difficulty with no plan of its own is played with the location's Normal
-plan.
+step by step as the gold comes in.
 
 The spells it casts as it sees the fight, since no plan knows where a leader will chant or a queue will stand:
 Smite on a chant aimed at a tower worth saving (Frozen Orb when the chanting leader stands in a crowd), Frozen
@@ -20,7 +19,7 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from hellward.sim.campaign import Difficulty, Location
+from hellward.sim.campaign import Location
 from hellward.sim.content import CURSES, DOOR, SPELLS, Curse, Element
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, ready
@@ -40,7 +39,7 @@ FROST_WEAKENED = 0.2
 
 @dataclass
 class Plan:
-    """One location's build on one difficulty. Tiles are tuples here and lists in the JSON."""
+    """One location's build. Tiles are tuples here and lists in the JSON."""
 
     skills: list[str]          # learned in this order while the sigils last (a skill waits for the one above it)
     steps: list[tuple]         # ("build", kind, tile), ("rank", tile) or ("gate", door index), done in order
@@ -84,15 +83,12 @@ def _step(step: list) -> tuple:
     return "gate", step[1]
 
 
-def plan_path(location: str, difficulty: str) -> Path:
-    return PLANS / f"{location}-{difficulty}.json"
+def plan_path(location: str) -> Path:
+    return PLANS / f"{location}.json"
 
 
-def load(location: str, difficulty: str) -> Plan:
-    path = plan_path(location, difficulty)
-    if not path.exists():
-        path = plan_path(location, "normal")
-    return Plan.from_json(json.loads(path.read_text()))
+def load(location: str) -> Plan:
+    return Plan.from_json(json.loads(plan_path(location).read_text()))
 
 
 @dataclass
@@ -105,15 +101,15 @@ class Planned:
     look: float = 0.0
     last_aim: float = -1e9
 
-    def skills(self, location: Location, difficulty: Difficulty, sigils: int) -> frozenset[str]:
+    def skills(self, location: Location, sigils: int) -> frozenset[str]:
         if self.plan is None:
-            self.plan = load(location.key, difficulty.key)
+            self.plan = load(location.key)
         return self.plan.learn(sigils)
 
     def act(self, hands: Hands) -> None:
         world = hands.world
         if self.plan is None:
-            self.plan = load(world.location.key, world.difficulty.key)
+            self.plan = load(world.location.key)
         self._answer(hands)
         if world.time >= self.look:
             self.look = world.time + LOOK
