@@ -1,5 +1,7 @@
 """Whole defences, played by the scripted players through a person's hands."""
 
+import random
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -13,6 +15,9 @@ from hellward.sim.players import PLAYERS
 from hellward.sim.players.hands import Hands, defend
 from hellward.sim.players.planned import PLANS, load
 from hellward.sim.skills import SKILLS
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+import plan_player  # noqa: E402
 
 
 @pytest.mark.parametrize("key", list(LOCATIONS))
@@ -67,13 +72,7 @@ def test_the_planned_player_holds_tristram_with_its_searched_build():
     assert world.lives >= 18
 
 
-@pytest.mark.parametrize("path", sorted(PLANS.glob("*.json")), ids=lambda p: p.stem)
-def test_every_stored_plan_fits_its_location(path):
-    """A plan found for an older map or arsenal would build nowhere; the player would stand idle."""
-    key, difficulty = path.stem.split("-")
-    location = LOCATIONS[key]
-    plan = load(key, difficulty)
-    assert difficulty in DIFFICULTIES
+def assert_fits(plan, location):
     assert set(plan.skills) <= set(SKILLS)
     assert len(plan.calls) == len(location.waves)
     built = set()
@@ -86,3 +85,22 @@ def test_every_stored_plan_fits_its_location(path):
             assert step[1] in built
         else:
             assert location.arsenal.gates and 0 <= step[1] < len(location.level.doors)
+
+
+@pytest.mark.parametrize("path", sorted(PLANS.glob("*.json")), ids=lambda p: p.stem)
+def test_every_stored_plan_fits_its_location(path):
+    """A plan found for an older map or arsenal would build nowhere; the player would stand idle."""
+    key, difficulty = path.stem.split("-")
+    assert difficulty in DIFFICULTIES
+    assert_fits(load(key, difficulty), LOCATIONS[key])
+
+
+@pytest.mark.parametrize("key", list(LOCATIONS))
+def test_the_plan_search_only_ever_makes_plans_that_fit(key):
+    location = LOCATIONS[key]
+    rng = random.Random(key)
+    tiles = plan_player.ranked_tiles(location, 3.0, 3.0)[:plan_player.TOP_TILES]
+    for plan in plan_player.first_plans(location):
+        for _ in range(60):
+            plan = plan_player.mutate(plan, location, rng, tiles)
+            assert_fits(plan, location)

@@ -388,7 +388,7 @@ def climb(pool: ProcessPoolExecutor, location_key: str, difficulty: str, generat
     defences += len(finals)
     log(f"  finalists against smart leaders at life x{hp:.2f}: {' '.join(f'{s:.1f}' for s in smart)}; "
         f"chosen at x1: {at_one:.1f}")
-    chosen.trained = {"seeds": f"training {min(finals)}-{max(finals)} of 0-{TRAINING - 1}", "life": round(hp, 3),
+    chosen.trained = {"confirmed_on": finals, "life": round(hp, 3),
                       "smart_score": round(max(smart), 2), "smart_score_at_1": round(at_one, 2), "defences": defences,
                       "minutes": round((time.time() - start) / 60, 1), "generations": generations}
     return chosen
@@ -419,6 +419,14 @@ def table(pool: ProcessPoolExecutor, players: list[str], seeds: list[int]) -> No
                   f"broken {statistics.mean(r['broken'] for r in mine):4.1f}  spells {spells:4.1f}", flush=True)
 
 
+def dumps(plan: Plan) -> str:
+    """The plan as JSON a person can read: one field a line, one step a line."""
+    data = plan.to_json()
+    steps = ",\n  ".join(json.dumps(step) for step in data.pop("steps"))
+    lines = [f" {json.dumps(key)}: {json.dumps(value)}" for key, value in data.items()]
+    return "{\n" + ",\n".join(lines) + f',\n "steps": [\n  {steps}\n ]\n}}\n'
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("what", choices=("plan", "table"))
@@ -443,7 +451,7 @@ def main() -> None:
                          lambda line: print(line, flush=True))
             path = plan_path(key, args.difficulty)
             path.parent.mkdir(exist_ok=True)
-            path.write_text(json.dumps(plan.to_json(), indent=1) + "\n")
+            path.write_text(dumps(plan))
             print(f"  wrote {path.relative_to(Path.cwd()) if path.is_relative_to(Path.cwd()) else path} "
                   f"({plan.trained})", flush=True)
 
