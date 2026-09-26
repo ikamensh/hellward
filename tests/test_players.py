@@ -46,6 +46,37 @@ def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():
         assert seen >= signed_at[key] + 0.6 - 1e-6
 
 
+def test_the_record_tells_a_broken_chant_from_a_broken_pondering():
+    """Chants broken are counted among the chants begun: a pondering a spell breaks never became one."""
+    pack = Wave((g("priest", 2, 3.0),), 10)
+    world = World(replace(LOCATIONS["catacombs"], waves=(pack,), wave_names=("pack",)), seed=3, planner=planner.smart)
+    hands = Hands(world, react=0.6)
+    world.gold = 1000
+    world.build("pyre", (5, 5))
+    world.call_wave()
+    smitten: dict[str, int] = {}
+    while len(smitten) < 2:
+        world.step(SIM_DT)
+        signs = [(e[0], e[1]) for e in world.events if e[0] in ("ponder", "chant")]
+        hands.observe(world.events)
+        world.events.clear()
+        for kind, leader in signs:
+            if kind not in smitten and leader not in smitten.values():
+                world.mana = 100
+                world.smite(leader)
+                smitten[kind] = leader
+        assert world.time < 60
+    world.step(SIM_DT)
+    hands.observe(world.events)
+    assert hands.record.broken == 2
+    assert hands.record.broken_chants == 1 <= hands.record.chants
+
+
+def test_a_defence_still_undecided_at_the_limit_is_an_error():
+    with pytest.raises(RuntimeError, match="undecided"):
+        defend(LOCATIONS["tristram"], NORMAL, PLAYERS["ordinary"](1), seed=1, sigils=0, planner=None, limit=5.0)
+
+
 FORBIDDEN = (".asking", ".ask_left", ".chant_", ".cooldown", "planner", ".clone(", ".forced", ".rng", "decide(", "rollout(")
 
 
