@@ -19,6 +19,7 @@ uv run python tools/pieces.py refresh        # regenerate changed foley pieces (
 uv run python tools/restyle.py refresh DIR   # repaint the stand-ins (Codex; --provider openrouter), install the cut
 uv run python tools/restyle.py ground DIR    # paint the floors not yet painted over their stand-ins; worldmap: the map
 uv run python tools/showcase.py OUT          # a clip with its soundtrack through the real renderer (caffeinate -u)
+uv run python tools/screens.py OUT           # PNG frames of every screen through the real renderer (caffeinate -u)
 uv run python tools/intro.py STEP OUT        # the story intro as film and as comic (docs/intro.md)
 ```
 
