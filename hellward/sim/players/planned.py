@@ -141,6 +141,9 @@ class Planned:
                 tower = world.tower_at(step[1])
                 price = world.upgrade_cost(tower) if tower is not None else None
                 if price is not None:
+                    if tower is not None and world.rank_needs(tower) is not None:
+                        self.next += 1
+                        continue
                     if world.gold < price:
                         return
                     world.upgrade(tower.id)
@@ -157,7 +160,8 @@ class Planned:
     def _spare(self, world: World) -> None:
         """Gold the plan did not foresee (it is all done): ranks for the towers, the lowest first."""
         while True:
-            ranked = [t for t in world.towers.values() if world.upgrade_cost(t) is not None]
+            ranked = [t for t in world.towers.values()
+                      if world.upgrade_cost(t) is not None and world.rank_needs(t) is None]
             if not ranked:
                 return
             tower = min(ranked, key=lambda t: (t.level, -t.spent, t.id))

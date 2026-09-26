@@ -127,7 +127,7 @@ def test_under_salvation_a_cleansed_tower_is_warded_and_no_leader_can_curse_it()
 
 def test_a_clone_with_spells_in_the_air_plays_on_like_its_original():
     world = world_of(g("overlord", 4, 0.5), g("skeleton", 6, 0.4), g("priest", 1, start=2.0),
-                     perks=perks({"fire_mastery", "fire_ball", "blaze"}))
+                     perks=perks({"adept_fire", "fire_ball", "master_fire", "blaze"}))
     world.gold = 2000
     world.build("pyre", (5, 5))
     world.build("frost", (9, 5))

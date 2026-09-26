@@ -140,7 +140,8 @@ def test_commands_refuse_what_the_rules_forbid():
 
 
 def test_selling_refunds_most_of_what_was_spent():
-    world = World()
+    from hellward.sim.skills import perks
+    world = World(perks=perks({"adept_lightning"}))
     tower = world.build("storm", (4, 3))
     world.upgrade(tower.id)
     spent = campaign.CATHEDRAL.start_gold - world.gold

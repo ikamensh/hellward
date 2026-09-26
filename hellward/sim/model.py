@@ -28,7 +28,7 @@ from hellward.sim.content import (
     SHATTER_RADIUS, SHATTER_SHARE, SOUL, SPELLS, START_LIVES, THORNS, TOWERS, WARD, WAVE_BREAK, Curse, Element,
     MonsterKind, TowerKind, TowerLevel,
 )
-from hellward.sim.skills import NO_PERKS, Perks, baked
+from hellward.sim.skills import NO_PERKS, RANK_SKILL, SKILLS, Perks, baked
 
 if TYPE_CHECKING:
     from hellward.sim.planner import Decision
@@ -393,11 +393,26 @@ class World:
             return None
         return tower.levels[tower.level + 1].cost
 
+    def rank_needs(self, tower: Tower) -> str | None:
+        """The skill that would allow the tower's next rank, or None when it may be bought (or is at its top)."""
+        nxt = tower.level + 1
+        if nxt >= len(tower.levels):
+            return None
+        if nxt <= self.perks.top(tower.kind.key):
+            return None
+        pair = RANK_SKILL.get(tower.kind.key)
+        if pair is None:
+            return None
+        return pair[0] if nxt <= 1 else pair[1]
+
     def upgrade(self, tower_id: int) -> None:
         tower = self.towers[tower_id]
         cost = self.upgrade_cost(tower)
         if cost is None:
             raise Refused(f"{tower.kind.name} is at its highest rank.")
+        need = self.rank_needs(tower)
+        if need is not None:
+            raise Refused(f"Learn {SKILLS[need].name} in the skill tree (K).")
         if self.gold < cost:
             raise Refused(f"The next rank costs {cost} gold.")
         self.gold -= cost

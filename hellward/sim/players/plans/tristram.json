@@ -1,5 +1,5 @@
 {
- "skills": ["fire_mastery", "cold_mastery", "warmth", "lightning_mastery", "poison_mastery", "holy_shield", "fire_ball", "glacial_spike", "soul_harvest", "chain_lightning", "contagion", "salvation", "blaze", "shatter", "spell_mastery", "static_field", "lower_resist", "thorns"],
+ "skills": ["adept_fire", "adept_cold", "warmth", "adept_lightning", "adept_poison", "holy_shield", "fire_ball", "glacial_spike", "soul_harvest", "chain_lightning", "contagion", "salvation", "blaze", "shatter", "spell_mastery", "static_field", "lower_resist", "thorns"],
  "calls": [70.0, 0.0, 70.0, 0.0, 125.0],
  "rebuild": "break",
  "smite_worth": 40.0,

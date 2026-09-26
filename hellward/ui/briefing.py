@@ -14,7 +14,7 @@ from saga2d import Anchor, Button, Row, Scene
 from hellward.art import sprites
 from hellward.sim.campaign import ORDER, SIGIL_LIVES, Location, LOCATIONS, idle, offers
 from hellward.sim.content import CURSES, MONSTERS, SPELLS, START_LIVES, TOWERS, Curse
-from hellward.sim.skills import SKILLS
+from hellward.sim.skills import SKILLS, perks
 from hellward.ui import style, widgets
 from hellward.ui.hud import monster_notes
 
@@ -153,6 +153,7 @@ class BriefingScene(Scene):
         self._heading("Your arsenal", y)
         index = ORDER.index(self.location.key)
         before = LOCATIONS[ORDER[index - 1]] if index > 0 else None
+        learned = perks(self.flow.progress.learned)
         x = 96
         for thing in ARSENAL:
             if not offers(self.location, thing):
@@ -163,6 +164,13 @@ class BriefingScene(Scene):
             if thing in TOWERS:
                 self.draw_image(f"tower/{thing}/0", x + 10, y + 14, 36, 36 * 150 / 72)
                 name, tip = TOWERS[thing].name, TOWERS[thing].blurb
+                top = learned.top(thing) + 1
+                for k in range(3):
+                    px = x + 28 + (k - 1) * 13
+                    if k < top:
+                        self.draw_circle(px, y + 88, 4.0, (230, 184, 90, 255))
+                    else:
+                        self.draw_circle(px, y + 88, 4.0, (70, 60, 52, 255))
             elif thing == "gate":
                 self.draw_image("gate/intact", x + 8, y + 30, 40, 40 * 80 / 60)
                 name, tip = "Warded Gate", "Bars an arch: walkers must break it; flyers pass over."
@@ -170,7 +178,7 @@ class BriefingScene(Scene):
                 self.draw_image(f"ui/spell/{thing}", x + 6, y + 32, 44, 44)
                 name, tip = SPELLS[thing].name, SPELLS[thing].blurb
             if new:
-                self.draw_text("New", x + 28, y + 94, font_size=12, color=style.GOLD, anchor_x="center", anchor_y="center")
+                self.draw_text("New", x + 28, y + 94 if thing not in TOWERS else y + 104, font_size=12, color=style.GOLD, anchor_x="center", anchor_y="center")
             self.spots.append(widgets.Hotspot(thing, (x, y + 26, 56, 56), True, f"{name}\n{tip}"))
             x += 64
 

@@ -119,11 +119,11 @@ def test_the_tree_learns_what_the_free_sigils_pay_for_and_unlearns_for_free(game
         g.backend.inject_click(x + w / 2, y + h / 2)
         tick(g)
 
-    click("fire_ball")        # needs Fire Mastery first
+    click("fire_ball")        # needs Adept of Fire first
     assert not flow.progress.learned
-    click("fire_mastery")
+    click("adept_fire")
     click("fire_ball")
-    assert flow.progress.learned == {"fire_mastery", "fire_ball"} and flow.progress.free == 0
+    assert flow.progress.learned == {"adept_fire", "fire_ball"} and flow.progress.free == 0
     click("warmth")           # no sigils left
     assert "warmth" not in flow.progress.learned
     assert_text_fits(g)
@@ -136,10 +136,10 @@ def test_the_tree_learns_what_the_free_sigils_pay_for_and_unlearns_for_free(game
 def test_the_learned_skills_go_into_the_defence(game):
     g, flow = game
     flow.progress.won = {"tristram": 3}
-    flow.progress.learn("fire_mastery")
+    flow.progress.learn("adept_fire")
     flow.defend(LOCATIONS["graveyard"])
     tick(g)
-    assert g.scenes[-1].world.perks.fire_damage > 1
+    assert g.scenes[-1].world.perks.top("pyre") == 1
 
 
 def test_q_smites_the_leader_closest_to_cursing_and_no_spell_is_cast_while_paused(game):
