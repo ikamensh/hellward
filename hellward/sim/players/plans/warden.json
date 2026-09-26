@@ -717,13 +717,13 @@
   ]
  },
  "hells_gate/hell/36": {
-  "early": 0.9,
+  "early": 0.7,
   "map": "7681ed02cf96",
   "searched": {
    "leaders": "greedy",
-   "life": 9.163,
-   "lost": 21,
-   "plans": 400,
+   "life": 1.276,
+   "lost": 4,
+   "plans": 300,
    "seeds": "0-3"
   },
   "skills": [
@@ -748,10 +748,6 @@
   ],
   "steps": [
    [
-    "gate",
-    0
-   ],
-   [
     "build",
     "frost",
     9,
@@ -759,9 +755,9 @@
    ],
    [
     "build",
-    "plague",
-    8,
-    8
+    "pyre",
+    7,
+    5
    ],
    [
     "build",
@@ -776,31 +772,24 @@
    ],
    [
     "build",
-    "plague",
+    "frost",
     5,
     6
    ],
    [
-    "up",
-    5,
-    4
-   ],
-   [
-    "up",
-    5,
-    6
+    "gate",
+    0
    ],
    [
     "build",
-    "storm",
+    "plague",
     4,
     7
    ],
    [
-    "build",
-    "storm",
-    8,
-    10
+    "up",
+    5,
+    4
    ],
    [
     "build",
@@ -810,20 +799,52 @@
    ],
    [
     "build",
-    "pyre",
-    7,
-    5
+    "plague",
+    10,
+    9
    ],
    [
     "build",
     "storm",
-    4,
-    5
+    14,
+    8
    ],
    [
     "up",
     4,
-    5
+    4
+   ],
+   [
+    "build",
+    "frost",
+    13,
+    9
+   ],
+   [
+    "up",
+    4,
+    4
+   ],
+   [
+    "up",
+    14,
+    8
+   ],
+   [
+    "gate",
+    1
+   ],
+   [
+    "build",
+    "storm",
+    5,
+    9
+   ],
+   [
+    "build",
+    "storm",
+    16,
+    3
    ],
    [
     "up",
@@ -831,25 +852,8 @@
     6
    ],
    [
-    "build",
-    "pyre",
-    5,
-    5
-   ],
-   [
     "up",
-    8,
-    10
-   ],
-   [
-    "up",
-    7,
-    5
-   ],
-   [
-    "build",
-    "frost",
-    7,
+    13,
     9
    ]
   ]
