@@ -152,7 +152,7 @@ def test_q_smites_the_leader_closest_to_cursing_and_no_spell_is_cast_while_pause
     world.gold = 2000
     world.build("pyre", (7, 4))
     world.call_wave()
-    while world.wave < 2:   # the Bone Priest walks in the third wave
+    while world.wave < 2:   # the Bone Acolyte walks in the third wave
         world.break_left = 0.0 if world.break_left is not None else None
         tick(g, 1)
         assert world.time < 400

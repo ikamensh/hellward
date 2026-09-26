@@ -35,13 +35,15 @@ person on a first descent. He plays far better than it does. The strong scripted
 that was the true measure of a good player. Four changes answer it:
 
 1. **Curses strike an area.** A curse lands on a tower and on every tower near it. Towers bunched at a corner, as
-   his were, share one curse. Spreading them costs coverage, which is the trade the game needed.
+   his were, share one curse. Spreading them costs coverage, which is the trade the game needed. Frost's slow now
+   follows each monster's cold resistance, so frost on every corner stops being the answer to everything.
 2. **A tower's second and third ranks are learned in the tree.** Gold still pays for a rank in the fight, but only
    the ranks the tree allows can be bought. Sigils become scarce, and a player chooses which two or three towers to
    master.
-3. **Tuned against the strong players.** The strong players set every location's difficulty. The first two
-   locations stay gentle, and each act's last fight is won on only some of their tries. The apprentice becomes the
-   check that the start is gentle, not the target.
+3. **Tuned against a veteran.** A strong scripted player with a person's reaction time sets every location's
+   difficulty. The first two locations stay gentle, and each act's end is near its limit. The strongest bots
+   check that the game is hard for them too, and a bot playing Ilya's own opening checks that it no longer wins
+   untouched.
 4. **Acts, not difficulties.** Hell is gone. Act II is a new place with new monsters, two new towers, new leader
    tricks and its own map. Replaying Act I harder would only have repeated it.
 
@@ -62,97 +64,120 @@ part of it.
 
 ## Curses strike an area
 
-Every curse has a **radius**. It lands on the tower the leader chose and on every tower whose centre lies within
-the radius of that tower's centre. Towers stand on whole tiles, so these distances count:
+Every curse has a **radius**. When a leader begins its chant it marks a **spot**: the tile of the tower it chose.
+When the curse lands, it falls on every tower standing within the radius of that tile, whichever towers stand there
+then. Selling the tower under the mark does not stop it, and **a cursed tower cannot be sold** ("The curse holds
+it"). A chant fizzles only if its leader dies, is broken by a spell, or has walked out of reach of the spot.
+Distances count whole tiles:
 
-- 1.0 reaches the four towers edge to edge with the target;
+- 1.0 reaches the four towers edge to edge with the spot;
 - 1.5 also reaches the diagonal ones;
-- 2.1 reaches two tiles out in a straight line as well.
+- 2.3 reaches a knight's move away as well.
 
 | Curse | Leader | Lasts | Radius | Reaches | Does |
 |---|---|---|---|---|---|
-| Weaken | Fallen Shaman, Blood Witch | 8 s | 1.5 | a 3×3 block | a third of the damage |
+| Weaken | Fallen Shaman, Blood Witch, Inquisitor | 8 s | 1.5 | a 3×3 block | a third of the damage |
 | Decrepify | Blood Witch | 8 s | 1.5 | a 3×3 block | 40% attack speed |
-| Dim Vision | Bone Priest, Inquisitor | 8 s | 2.1 | a 3×3 block and a tile beyond each side | 55% of the reach |
-| Bone Prison | Bone Priest | 4.5 s | 1.0 | a cross of five | caged: no attack |
-| **Blight** (Act II) | Inquisitor | 8 s | 1.5 | a 3×3 block | fights one rank lower; a first-rank tower at 60% damage and speed |
+| Dim Vision | Bone Acolyte, Inquisitor | 8 s | 2.3 | 21 tiles | 55% of the reach |
+| Bone Prison | Bone Acolyte | 4.5 s | 1.0 | a cross of five | caged: no attack |
 
-A warded tower (Salvation) inside the area is spared; the others are not. **Cleanse still clears one tower.**
-Answering a curse that caught four towers takes four casts, or a Smite before it lands. The chant's rune circle is
-drawn at the curse's radius, so the player sees which towers it will catch before it lands. On landing, every
-caught tower gets the slam and the curse's lasting look.
+The Bone Priest's own curses (the last fight) are 1.0 wider.
 
-The planner already rolls out every candidate, so it sees what an area curse catches without new rules. Its quick
-estimate adds up the damage every tower in the area would stop dealing, so that bunched towers reach the rollouts.
-The candidates stay (curse, target tower) pairs. A chant fizzles if its target tower is sold or out of reach when
-it ends. Otherwise the curse falls on the area around the target, whichever towers stand there then.
+**Why these radii:**
+
+- **No single spacing beats all of them.** Towers a knight's move apart dodge a 1.5 curse but not Dim Vision, so the
+  safe spacing depends on which leaders a location sends.
+- **The player can plan for them.** The intro's leader cards print each curse's radius, so the spacing is chosen
+  before the fight.
+- **Clustering still has a price after the curse lands.** A warded tower (Salvation) inside the area is spared.
+  Cleanse still clears **one** tower, so a curse that caught four needs four casts, or a Smite before it lands.
+- **The player sees exactly what is coming.** The chant's rune circle is drawn at the curse's radius on the marked
+  spot. When the curse lands, every caught tower gets the slam and the curse's lasting look. The world emits one
+  `cursed` event per curse, carrying every tower it caught.
+
+**Chill follows cold resistance.** A frost nova's slow, and the weaker blows on gates that come with it, are scaled by
+how much cold the monster takes: a quarter shallower on a Skeleton, half on the Drowned, and none at all on the
+cold-immune. Frost at every corner was Ilya's winning opening, and nothing answered it.
+
+**The planner.** Candidates stay (curse, spot) pairs, one spot per tower in reach.
+
+- The quick estimate works out every monster's walk once per decision.
+- It prices each tower's loss once per curse.
+- It adds up the loss over the unwarded towers each spot catches.
+- A support tower's loss is what it lends: an aura's bonus on the towers under it, or the altar's amplification on
+  the damage dealt in its reach.
+- Spots that would catch the same towers with the same curse are one candidate.
+- The rollouts do the rest as before.
 
 ## The skill tree
 
-Eight columns. The four towers of Act I and the two of Act II each have a column of four skills. Warding and
-Sorcery have three each. A skill needs the one above it. Unlearning stays free (Akara's blessing). The tree greys
-columns whose tower the location does not offer.
+Eight columns. The four towers of Act I and the two of Act II each have a column of four skills, costing 1, 2, 2 and
+3 sigils. Warding and Sorcery have three, costing 1, 2 and 3. A skill needs the one above it. Unlearning stays free
+(Akara's blessing). The tree greys columns whose tower the location does not offer.
 
-| Column | 1 (1 sigil) | 2 (2 sigils) | 3 (2 sigils) | 4 (3 sigils) |
+| Column | 1 | 2 | 3 | 4 |
 |---|---|---|---|---|
 | **Fire** (Pyre) | Adept of Fire: the second rank | Fire Ball: the first rank bursts too, every blast 0.3 wider | Master of Fire: the third rank | Blaze: fireballs leave the floor burning for 2 s |
 | **Lightning** (Storm Obelisk) | Adept of Lightning | Chain Lightning: one more leap at every rank, leaps keep 95% | Master of Lightning | Static Field: strikes leaders first, and leaps to them first |
 | **Cold** (Frost Shrine) | Adept of Cold | Glacial Spike: novas reach 0.4 further and hit 50% harder | Master of Cold | Shatter: a monster that dies chilled bursts for a tenth of its life |
 | **Poison** (Plague Totem) | Adept of Poison | Contagion: venom leaps to a neighbour when its monster dies | Master of Poison | Lower Resist: a poisoned monster resists everything 25 points less |
-| **Bone** (Bone Altar, Act II) | Adept of Bone | Corpse Explosion: a monster that dies amplified bursts for 15% of its life, unresisted | Master of Bone | Life Tap: a monster that dies amplified gives 2 mana (a leader, 10) |
-| **Nature** (Druid Grove, Act II) | Adept of Nature | Hurricane: monsters inside a grove's aura are chilled 20% | Master of Nature | Twister: every 4 s the grove throws the monster nearest the sanctuary in its aura 1.5 tiles back |
-| **Warding** | Holy Shield: gates 50% stronger, mend fully between waves | Salvation: Cleanse costs 25 and wards for 8 s | Thorns: a gate returns half of each blow | |
+| **Bone** (Bone Altar, Act II) | Adept of Bone | Corpse Explosion: a monster that dies amplified bursts for 15% of its life, unresisted, within 1.2 | Master of Bone | Life Tap: a monster that dies amplified gives a fifth of its bounty in mana |
+| **Nature** (Druid Grove, Act II) | Adept of Nature | Hurricane: walkers within 2.5 tiles of a grove move 20% slower | Master of Nature | Twister: every 4 s the grove roots the walker nearest the sanctuary within 2.5 tiles for 1.5 s |
+| **Warding** | Holy Shield: gates 50% stronger, mend fully between waves | Salvation: Cleanse costs 25, wards for 8 s, and may be cast on an uncursed tower to ward it | Thorns: a gate returns half of each blow | |
 | **Sorcery** | Warmth: mana 40% faster, 25 more at most | Soul Harvest: a slain leader gives 10 mana | Spell Mastery: spells cost 25% less and strike 30% harder | |
 
-A tower column costs 8 sigils, Warding and Sorcery 6 each, the whole tree 60. The old +25% masteries are gone; the
-ranks carry that power now. A tower whose next rank is not learned shows a padlock on its upgrade button:
-"Learn Adept of Fire in the skill tree (K)". The intro's arsenal shows each tower's highest learnable rank as pips,
-so the tree can be reshaped before the fight.
+A tower column costs 8 sigils, and Warding and Sorcery cost 6 each, so the whole tree costs 60. The old +25%
+masteries are gone; the ranks carry that power now.
 
-Twister and Hurricane leave flyers alone. Twister leaves a boss alone too, and never throws a monster back past
-the portal.
+- **Buying a rank:** a tower whose next rank is not learned shows a padlock on its upgrade button, with the tip
+  "Learn Adept of Fire in the skill tree (K)".
+- **Planning for it:** the intro's arsenal shows each tower's highest learnable rank as pips.
+- **Old saves:** a save's learned skills that the new tree no longer has are forgotten, and their sigils come back.
+
+Bursts from Shatter and Corpse Explosion never set off another burst. Twister roots neither flyers nor anything worth
+two or more lives (Overlords, Hulks, leaders, the Bone Priest).
 
 ## The Act II towers
 
-**Bone Altar** (the necromancer's; element *bone*). It curses the monsters back. Every few seconds it lays
-**Amplify Damage** on the thickest knot of monsters in its reach, and those take more damage from everything while
-it lasts. It deals no damage of its own. It belongs where the other towers' reaches overlap, not beside them. The
-leaders see its worth in their rollouts and curse it first.
+Both are ordinary towers whose ranks use the same numbers as every other tower. Their **damage** is the bonus they
+give, their **rate** is how often they act and their **range** is their reach. Every curse therefore acts on them
+through the rules that already exist, and needs no new ones.
+
+**Bone Altar** (the necromancer's). It curses the monsters back: it lays **Amplify Damage** on the thickest knot of
+monsters in its reach, and they take more damage from everything while it lasts. It pulses, with a gap between
+casts, so where it stands against the other towers' fire matters. It deals no damage of its own.
 
 | Rank | Gold | Every | Reach | Amplify | Knot radius | Lasts |
 |---|---|---|---|---|---|---|
-| I | 90 | 3.0 s | 3.0 | +30% | 1.0 | 3.0 s |
-| II | 100 | 2.8 s | 3.2 | +45% | 1.2 | 3.5 s |
-| III | 160 | 2.5 s | 3.4 | +60% | 1.4 | 4.0 s |
+| I | 90 | 4.0 s | 3.0 | +30% | 1.0 | 2.0 s |
+| II | 100 | 3.6 s | 3.2 | +45% | 1.2 | 2.2 s |
+| III | 160 | 3.2 s | 3.4 | +60% | 1.4 | 2.5 s |
 
 - **Choosing the knot:** the altar centres on the monster, not yet amplified, whose circle holds the most such
   monsters' life. Amplify does not stack, and an immunity stays an immunity.
 - **Curses on an altar:**
-  - Weaken scales the amplification by its damage factor.
-  - Decrepify slows its casting.
+  - Weaken scales the amplification.
+  - Decrepify slows its pulse.
   - Dim Vision shrinks its reach.
   - Bone Prison stops it.
-  - Blight drops it a rank.
 
-**Druid Grove** (the druid's; element *nature*). It deals no damage. Its **aura** makes every tower within its
-radius strike harder:
+**Druid Grove** (the druid's). It deals no damage. Its **aura** makes every tower within its radius strike harder.
 
 | Rank | Gold | Aura | Radius |
 |---|---|---|---|
 | I | 100 | +20% | 1.5 |
 | II | 110 | +30% | 1.5 |
-| III | 170 | +40% | 2.1 |
+| III | 170 | +40% | 2.3 |
 
 - **Stacking:** groves do not stack; a tower takes the best aura on it.
-- **Against the curses:** the grove pulls towers together, and the area curses push them apart. It is the one piece
-  that makes a bunch worth its risk. The aura's radius equals the commonest curse radius, so a player reads the
-  trade at a glance: everything the grove helps, one curse on the grove catches.
+- **The tension:** the grove pulls towers together, and the area curses push them apart. The aura's radius equals
+  the commonest curse radius, so everything the grove helps, one curse on the grove catches.
 - **Curses on a grove:**
   - Weaken scales its bonus.
-  - Dim Vision shrinks its radius.
   - Bone Prison switches it off.
-  - Blight drops it a rank.
   - Decrepify does nothing to it.
+  - Dim Vision does nothing either, since an aura is not a reach.
+- **Computed live:** the aura is worked out when a tower attacks, not kept on the world, so a clone never shares it.
 
 ## The Act II monsters and leaders
 
@@ -165,128 +190,161 @@ radius strike harder:
 | Thorned Hulk | 760 | 0.55 | 30 | 2 | immune to poison, cold 25, fire −25 | breaks a gate in seconds (70 a second) |
 | The Drowned | 320 | 0.7 | 14 | 1 | cold 50, poison 50, lightning −25 | slow, and deaf to cold and venom |
 
-The Act II leaders bring new ways of cursing, not only new curses:
+The Act II leaders bring new ways of cursing:
 
-- **Fetish Shaman** (Flayers'): Weaken, chanted as usual. Every 7 s it also **raises** up to three Flayers that
-  fell within 3 tiles of it in the last 5 s, at half their life. This is a green burst, and a raised Flayer pays no
-  gold again. A Flayer burst by Corpse Explosion or Shatter leaves nothing to raise.
-- **Zakarum Inquisitor** (the zealots'): Blight and Dim Vision, **without a chant**. The curse lands the moment it
-  has pondered (the half-second dots). Smite during the dots still breaks it, but with a person's reaction time
-  that is rare, so the answers are wards (Salvation), Cleanse, spreading out, and killing inquisitors first. Its
-  cooldown is 12 s, longer than a chanting leader's.
-- **The Bone Priest, unbound**, the last fight's boss. The narrator fights at last.
+- **Fetish Shaman** (the Flayers'): Weaken, chanted as usual.
+  - **Raising:** a Flayer that dies within 3 tiles of a living Fetish Shaman rises once, where it fell, at half its
+    life, after lying still for a second. It keeps its place in its wave, and its gold is paid only once.
+  - **Leaving nothing to raise:** a Flayer burst by Corpse Explosion or Shatter stays dead.
+- **Zakarum Inquisitor** (the zealots'): Weaken and Dim Vision, **marked, not chanted**.
+  - **The mark:** when it has chosen, its rune circle burns on the floor for 1.5 s, and then the curse lands. Nothing
+    breaks a mark, not even Smite or Frozen Orb.
+  - **The answers:** ward the marked towers (Salvation's Cleanse on an uncursed tower), move nothing into the circle,
+    or kill the inquisitor before the mark runs out.
+  - **Cooldown:** 12 s.
+- **The Bone Priest**, the last fight's boss: the narrator fights at last.
   - **Numbers:** 6000 life, pace 0.45, resists 25 (poison: immune), 20 lives if he reaches the sanctuary.
-  - **Curses:** Bone Prison, Blight, Weaken and Decrepify, chanted, every 6 s, from 6 tiles, each with its radius
-    0.6 wider.
-  - **Mana:** every curse of his that lands burns 15 of the player's mana.
-  - **Look:** the Bone Priest's painted sheet at 1.6 times the size, with a violet glow.
+  - **Curses:** Bone Prison, Weaken, Decrepify and Dim Vision, chanted, every 8 s, from 6 tiles, each 1.0 wider than
+    usual.
+  - **Mana:** each curse of his that lands burns 5 mana for every tower it caught.
+  - **Look:** the prologue's crowned priest at 1.6 times a monster's size, with a violet glow.
+- **The Bone Acolyte:** the Act I leader that was called "Bone Priest" is now his acolyte. It casts the curses his
+  bones chose, and it loses the crown and the green orb, which are his alone.
 
 ## Locations
 
 Every location is one 25 × 14 map with its own path, look and wave list, and brings one new thing. Arches stand
-only on the path's vertical legs.
+only on the path's vertical legs. The intro shows a location's **lesson** as a line of advice, in place of its blurb.
+The blurb stays in the map's hover tip.
 
 **Act I, The Descent**
 
-| # | Location | Monsters | Leaders | New | What it teaches |
+| # | Location | Monsters | Leaders | New | Lesson |
 |---|---|---|---|---|---|
-| 1 | **Tristram** | Fallen, Zombie | Shaman | Pyre, Frost; Cleanse | Fire and frost; a curse that catches two towers |
-| 2 | **The Graveyard** | Skeleton, Zombie | Bone Priest | Storm, gates; Smite | Gate queues; Smite on the sign |
-| 3 | **The Cathedral** | Fallen, Goatman, Skeleton | Shaman, Witch | Plague; Meteor | Resistances decide the mix |
-| 4 | **The Catacombs** | Skeleton, Zombie, Overlord | Priest, Witch | Frozen Orb | Gate-breakers, four arches |
-| 5 | **The Caves** | Goatman, Gargoyle, Fallen | Witch, Shaman | the lava floor | Flyers ignore gates; few places to build |
-| 6 | **Hell's Gate** | everything, Azazel | all three | — | The council of curses |
+| 1 | **Tristram** | Fallen, Zombie | Shaman | Pyre, Frost; Cleanse | His curses fall on a tower and the towers beside it: spread your fire and frost. |
+| 2 | **The Graveyard** | Skeleton, Zombie | Acolyte | Storm, gates; Smite | A gate holds the dead in a queue, and Smite on the sign stops a curse before it comes. |
+| 3 | **The Cathedral** | Fallen, Goatman, Skeleton | Shaman, Witch | Plague; Meteor | Goatmen shrug off lightning and skeletons venom: mix your towers by what comes. |
+| 4 | **The Catacombs** | Skeleton, Zombie, Overlord | Acolyte, Witch | Frozen Orb | Overlords break gates in seconds; frost weakens their blows and venom seeks the biggest. |
+| 5 | **The Caves** | Goatman, Gargoyle, Fallen | Witch, Shaman | the lava floor | Wings ignore gates, and the lava leaves few places to build. |
+| 6 | **Hell's Gate** | everything, Azazel | all three | — | Every curse at once, and Azazel will not burn. |
 
 **Act II, The Drowned Temples**
 
-| # | Location | Monsters | Leaders | New | What it teaches |
+| # | Location | Monsters | Leaders | New | Lesson |
 |---|---|---|---|---|---|
-| 1 | **Kurast Docks** | Flayer, Zealot | Fetish Shaman | Bone Altar | Amplify where the reaches cross; kill the shaman or burst the dead |
-| 2 | **The Spider Forest** | Spider, Blood Bat, Flayer | Fetish Shaman | Druid Grove | Poison is useless; the grove's bunch against the curses' reach |
-| 3 | **The Flayer Jungle** | Flayer, Zealot, Spider | Inquisitor, Fetish Shaman | the silent curse | Wards and spreading, since the curse gives no warning |
-| 4 | **The Drowned City** | The Drowned, Thorned Hulk, Blood Bat | Inquisitor, Blood Witch | Thorned Hulks | Fire and lightning against the deaf-to-cold; gates fall fast; water everywhere |
-| 5 | **Travincal** | Zealot, Hulk, Flayer, Bat | the High Council: all five leader kinds | — | Curses from every side |
-| 6 | **The Temple of Light** | the Drowned, Zealot, Bat, the Bone Priest unbound | Inquisitor, Priest, and him | the boss | The narrator himself |
+| 1 | **Kurast Docks** | Flayer, Zealot | Fetish Shaman | Bone Altar | Amplify where your towers' reaches cross; kill the shaman, or burst the dead so they stay down. |
+| 2 | **The Spider Forest** | Spider, Blood Bat, Flayer | Fetish Shaman, Blood Witch | Druid Grove | Poison is useless here. A grove makes a bunch worth its risk. |
+| 3 | **The Flayer Jungle** | Flayer, Zealot, Spider | Inquisitor, Fetish Shaman | the mark | The inquisitors curse without a chant: ward the marked towers, and kill them first. |
+| 4 | **The Drowned City** | The Drowned, Thorned Hulk, Blood Bat | Inquisitor, Blood Witch | Thorned Hulks | Frost barely slows the drowned; fire and lightning must. Gates fall fast. |
+| 5 | **Travincal** | Zealot, Hulk, Flayer, Bat | the High Council: all five leader kinds | — | Curses from every side. |
+| 6 | **The Temple of Light** | the Drowned, Zealot, Bat, the Bone Priest | Inquisitor, Acolyte, and him | the boss | Each curse of his that lands burns your mana for every tower it catches. |
 
 - **Where the new things are offered:** Act II offers every Act I tower, gate and spell from its first location. The
   Bone Altar arrives at the Docks and the Grove in the Spider Forest.
+- **The Spider Forest's curses:** it sends a Blood Witch from its third wave, so the grove's bunch is cursed often
+  enough to cost something.
 - **The maps:**
   - Docks: piers over black water, so few tiles to build on.
   - Spider Forest: a winding path between web-choked trees.
   - Flayer Jungle: long straight legs, where lanes of towers tempt.
   - Drowned City: canals everywhere, with two arches on bridges.
   - Travincal: a terrace that folds three times under the council.
-  - Temple of Light: a short path, three arches, and the lamp hanging over the sanctuary.
+  - Temple of Light: a short path, three arches, and the mother lamp over the sanctuary.
 - **The look:** the Act II floors are painted in greens, black water, moss, gilt and torchlight, the opposite of Act
   I's reds and browns.
+- **The last two locations of each act** end with a large fast group worth one life each, after the gate-breakers.
+  A defence slightly short of the bar then loses a few lives and earns one or two sigils, instead of falling.
 
 ## The story
 
-Every location tells its part twice:
+[Story](story.md) has the cast, the rules the words keep and the panel bible. `hellward/story.py` holds every page.
 
-- **Before the fight:** a painted panel and a few lines on a story page. It opens the first time the lantern
-  arrives, and the intro's **Story** button (S) replays it.
-- **After the first victory:** a second page, after the reckoning.
+**Who speaks:**
 
-The campaign opens with the prologue, the intro comic, which is already painted and voiced. It plays on the first
-Descend, and **Prologue** on the title replays it. Each act ends with two or three ending pages after its last
-fight. The script, and who speaks where, is [story](story.md). The Bone Priest's taunt stays on each intro screen.
-Akara narrates what lies ahead. The necromancer and the eldest druid join as the Act II towers arrive. The
-narration is written, not spoken; the prologue keeps its recorded voice.
+- **The Bone Priest:** the prologue's voice. He taunts on every intro; the twelve taunts carry his arc from certain
+  to afraid.
+- **Akara:** tells you what lies ahead in Act I.
+- **The necromancer and the eldest druid:** join in Act II, as their towers arrive.
+
+**The pages:**
+
+- **The prologue:** the painted intro comic, with its recorded voice and music. It plays on the first Descend.
+- **Before a fight:** a location's before page plays the first time the lantern arrives there. The intro's
+  **Story** button (S) replays it.
+- **After a fight:** its after page plays after its first victory, when the player leaves the reckoning by either
+  button, and then goes where that button pointed.
+- **Act endings:** each act's last fight has no after page; the act's ending takes its place. After the ending the
+  map opens on the next act, and the lantern walks to its first location.
+
+**What gets remembered:**
+
+- **Seen pages:** the progress remembers every page that has opened; skipping one counts as seeing it.
+- **Due pages:** when the map opens, it first plays any after page or ending that is due and unseen. That covers a
+  player who quit at the reckoning, and a save that already holds Hell's Gate.
+- **The Chronicle:** the title's **Chronicle** shows the prologue and then every page whose moment has come
+  (a location opened, a location held, an act finished), grouped by act. So a player who won Act I before the story
+  existed can read it.
 
 A story page is:
 
-- the painted panel, full screen, in the prologue's heavy-ink style (Gemini 3 Pro Image, with the game's sprites
-  as references);
-- the text fading in line by line over a dark band at the bottom;
-- **Continue** (Enter or a click);
-- **Skip** (Esc).
+- the painted panel, full screen, in the prologue's heavy-ink style;
+- the text fading in over a dark band at the bottom;
+- **Enter or a click:** the first shows all the text and the second continues;
+- **Esc:** skips.
+
+The screen after a story page ignores keys pressed before it opened, so a held Enter never starts a fight unread.
 
 ## Tuning by simulation
 
-The method stays; the targets change.
+The method stays; the yardstick changes. The bots that beat the old Normal hardest hold two to nine times the
+monsters' life a first-descent player holds. Tuned to their ceiling, the game would be unwinnable for people. It is
+therefore tuned to a **veteran**: a strong player with a person's hands. The strongest bots are a check that the
+game stays hard for them too.
 
 - **What a player may do.** A player sees what a human sees: the intro's roster, the map, the gold, the mana, the
-  leaders' chants. It chooses its skills for the location, places and upgrades towers, builds gates and casts every
-  spell. It may plan a location's build by simulating it offline, as a player who has replayed the location many
-  times has in effect done.
-- **A human's hands** (`players/hands.py`): a leader's sign seen 0.5–0.8 s late, aim where the leader stood when the
-  reaction began, one aimed spell each half second, never paused, no view of a leader's mind before it speaks.
-- **Seeds:** offline planning uses training seeds 0–99; the tables use evaluation seeds 1000–1019.
-- **The margin M:** the largest factor on every monster's life at which a player still wins, bisected to 2%, the
-  median over 8 seeds.
-- **B\*:** the strong player with the best margin at a location.
-- **The players:** warden, planned and adaptive (the strong ones); apprentice (a thoughtful first descent); ordinary
-  (the demo's defender, no skills).
-  - All of them learn tower ranks from the tree.
-  - All of them place towers knowing that a curse strikes an area.
-  - All of them use the Act II towers.
-  - The warden's and the planned player's builds are searched again after the rules change.
-- **Sigils in hand:** a player at location i of an act holds three sigils for every location before it (Act II
-  adds Act I's 18). That is the pace Ilya kept.
+  leaders' chants and marks. It chooses its skills, places and upgrades towers, builds gates and casts every spell.
+- **A human's hands** (`players/hands.py`): a leader's sign seen late, aim where the leader stood when the reaction
+  began, never paused, no view of a leader's mind before it speaks. The strong players react in 0.5–0.8 s and cast an
+  aimed spell each half second at most.
+- **The players:**
+  - **veteran:** the warden's rules drafting its build from the intro, with no stored or searched plan. It reacts in
+    0.8–1.2 s and casts one aimed spell a second at most. This is the target.
+  - **corner:** Ilya's stated opening: frost on every path corner, mixed towers packed round it, every coin spent. It
+    checks that the area curses and chill-by-resistance took away the answer that won the old Normal.
+  - **warden, planned, adaptive:** the strong players, with builds drafted or searched offline.
+  - **apprentice:** a thoughtful first descent.
+  - **ordinary:** the demo's defender.
 
-**Targets** (B*'s margin, with those sigils, against the smart leaders):
+  All of them learn ranks from the tree, space their towers knowing the curse radii, and use the Act II towers. The
+  searched builds are searched again once the rules land, against leaders that roll out as the game's do.
+- **Seeds:** offline planning uses training seeds 0–99; the tables use evaluation seeds 1000–1019.
+- **Sigils in hand:** three for every earlier location (Act II adds Act I's 18). That is the pace Ilya kept.
+- **The margin M:** how far a location's life factor could grow and still be won, `tools/margin.py` bisecting
+  `Location.life` itself, spells and all. It is found to 2%, as the median over 8 seeds.
+
+**Targets:**
 
 | | 1 | 2 | 3 | 4 | 5 | 6 |
 |---|---|---|---|---|---|---|
-| Act I | ≈1.8 | ≈1.5 | ≈1.35 | ≈1.25 | ≈1.2 | ≈1.1 |
-| Act II | ≈1.3 | ≈1.25 | ≈1.2 | ≈1.15 | ≈1.1 | ≈1.0, won on about half the seeds |
+| veteran's M, Act I | ≈1.5 | ≈1.4 | ≈1.3 | ≈1.2 | ≈1.15 | ≈1.1 |
+| veteran's M, Act II | ≈1.25 | ≈1.2 | ≈1.15 | ≈1.1 | ≈1.07 | ≈1.05 |
 
-- **The first two locations** also stay winnable by the apprentice. From the Cathedral on it may fall, since a person
-  on a first descent should have to learn.
-- **The leaders matter:**
-  - the lives B* loses against the smart leaders, minus those against random curses, are at least 20% of what it
-    loses;
-  - at most half of all curses are broken before they land;
-  - the planner keeps at least 0.85 of the best curse's value (`tools/curse_quality.py`).
-- **The knobs:**
-  - each location's life factor, its waves and its starting gold;
-  - the leaders' cooldowns;
-  - the curse radii (one table for the whole game).
-
-  `tools/margin.py` sets the life factors, and `tools/campaign_balance.py` prints the table and records every run.
-- **Speed:** the tools run the simulation compiled with mypyc (`sim/fastsim.py`, about 10× faster, bit-identical to
-  the source), and heavy runs go through `~/saga/tools/slot.py`.
+- **Winning:** at the tuned factor (M's 1.0) the veteran wins every seed. At each act's end it keeps a median of 10–17
+  lives, shaped by the last waves.
+- **The strongest bot's M, B\*:** at least 1.2 everywhere. Where the strong players' margins differ by more than 1.5
+  times, the reason is found before that location is tuned: an outlier is a bot exploit until shown otherwise.
+- **The apprentice** wins the first two locations of each act.
+- **The corner player:** its M falls at least 20% when the curse radii go from zero to the table's, and it sits below
+  the veteran's.
+- **The leaders matter:** from each act's third location on, the veteran's M against random curses is at least
+  1.10 times its M against the smart leaders. A landed curse catches about two of the veteran's towers on average.
+- **The planner stays sharp:** `tools/curse_quality.py` keeps at least 0.85 of the best curse's value, at the
+  Cathedral, Hell's Gate, the Docks, Travincal and the Temple.
+- **Decision time:** at most 100 ms per decision at Travincal and the Temple on the build the game runs. The game's
+  leaders think on the compiled simulation when it is built (`tools/sim_bench.py` measures it).
+- **Ilya's own play:** from this build on, every defence a person plays is logged (location, seed, skills, every
+  command with its game time) in `~/.hellward/replays/`. A ghost player can replay his build, so the veteran's targets
+  can move to where his margin really sits.
 
 **What the first tuning taught** stays true of the rules:
 
@@ -298,11 +356,12 @@ The method stays; the targets change.
 
 ## Screens
 
-Title → Prologue (first time) → world map (act tabs) ↔ skill tree → the lantern travels → story page (first
+Title → prologue (first time) → world map (act tabs) ↔ skill tree → the lantern travels → story page (first
 arrival) → intro → defence → reckoning → story page (first victory) → world map; after an act's last fight, its
-ending pages.
+ending.
 
-- **The intro:** its buttons are Defend (Enter), Skills (K), Story (S) and Back to the map (Esc).
+- **The intro:** its buttons are Defend (Enter), Skills (K), Story (S) and Back to the map (Esc). It shows the
+  lesson line and the leaders' curse radii.
 - **The reckoning:** Again (Enter) returns to the intro; To the map is Esc.
-- **The title:** Descend, Prologue, Watch the leaders at work, Settings, Leave.
+- **The title:** Descend, Chronicle, Watch the leaders at work, Settings, Leave.
 - **The panel:** unchanged: spells at the right (Q W E), gold in the centre row, Pace and Menu at the top right.

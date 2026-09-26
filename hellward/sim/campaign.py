@@ -34,6 +34,7 @@ class Location:
     theme: str                        # the floor's look, for art/mapart.py
     blurb: str                        # what the place is, one or two sentences
     taunt: str                        # the Bone Priest, who has seen this fight before
+    lesson: str                       # the intro's one line of advice: what this place teaches
     requires: tuple[str, ...] = ()    # the location that must be held first
     life: float = 1.0                 # every monster's life here, and the spells' strength, is multiplied by this: the
                                       # location's tuning, by simulation (docs/campaign.md); the waves' own
@@ -104,8 +105,8 @@ TRISTRAM = Location(
     theme="village",
     blurb="The village under the cathedral burns. The Fallen swarm through its lanes, the village dead walk behind "
           "them, and a shaman sings them on.",
-    taunt="Every one of them has died before. My shaman sings them up again. When he looks at your fire, "
-          "it will falter.",
+    taunt="Huddle your towers together, if it comforts you. When my shaman's curse falls, it falls on all of them.",
+    lesson="His curses fall on a tower and the towers beside it: spread your fire and frost.",
 )
 
 GRAVEYARD = Location(
@@ -133,8 +134,9 @@ GRAVEYARD = Location(
     theme="graveyard",
     blurb="The dead of Tristram's churchyard have left their graves. The crypt arches still stand, if someone "
           "wards them.",
-    taunt="I buried every one of them, and they still come when I call. Build your gates. I will cage the fire "
-          "behind them.",
+    taunt="I buried every one of them, and they still come when I call. Build your gates. My acolytes will cage "
+          "the fire behind them.",
+    lesson="A gate holds the dead in a queue, and Smite on the sign stops a curse before it comes.",
     requires=("tristram",),
     life=1.15,
 )
@@ -165,8 +167,9 @@ CATHEDRAL = Location(
     theme="cathedral",
     blurb="The nave where the lamp hangs. A torn carpet runs from the portal to the sanctuary gate, past three "
           "arches.",
-    taunt="This was my house before it was yours. The witch will make your towers old, and the goatmen do not "
-          "fear your thunder.",
+    taunt="Two nights you have kept my lamp. It changes nothing. The witch will make your towers old, and the "
+          "goatmen do not fear your thunder.",
+    lesson="Goatmen shrug off lightning and skeletons venom: mix your towers by what comes.",
     requires=("graveyard",),
     life=0.8,
 )
@@ -197,8 +200,9 @@ CATACOMBS = Location(
     start_gold=380,
     theme="catacombs",
     blurb="Under the nave the bone halls run straight and narrow, arch after arch. Overlords break doors for a living.",
-    taunt="Four doors between you and the dark. An Overlord needs a few breaths for each, and my priest will "
-          "blind whatever watches them.",
+    taunt="Four doors between you and the dark. I have watched the Overlords break every one of them. Why are you "
+          "still here?",
+    lesson="Overlords break gates in seconds; frost weakens their blows and venom seeks the biggest.",
     requires=("cathedral",),
     life=1.5,
 )
@@ -229,7 +233,8 @@ CAVES = Location(
     start_gold=380,
     theme="caves",
     blurb="Below the catacombs the caves open onto lava. Gargoyles nest in the vault and fly where they please.",
-    taunt="Walls mean nothing to wings. Look up.",
+    taunt="Walls mean nothing to wings. Look up. And tell me, keeper: why do my bones never show your face?",
+    lesson="Wings ignore gates, and the lava leaves few places to build.",
     requires=("catacombs",),
     life=1.9,
 )
@@ -263,7 +268,8 @@ HELLS_GATE = Location(
     start_gold=450,
     theme="hell",
     blurb="The door your saints built the cathedral on. Azazel the Flayer waits behind it with the council of curses.",
-    taunt="I have watched this fight more times than you have drawn breath. In every one of them, the lamp goes out.",
+    taunt="In every night I have seen, the lamp goes out. I have begun to wonder what I have not seen.",
+    lesson="Every curse at once, and Azazel will not burn.",
     requires=("caves",),
     life=1.2,
 )

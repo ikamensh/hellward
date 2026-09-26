@@ -27,7 +27,7 @@ def events(world: World, kind: str) -> list[tuple]:
 
 
 def chanting_leader(**kwargs) -> tuple[World, int]:
-    """A Bone Priest mid-chant at the only tower, a Pyre by its path."""
+    """A Bone Acolyte mid-chant at the only tower, a Pyre by its path."""
     world = world_of(g("priest", 1), planner=planner.smart, **kwargs)
     world.gold = 1000
     world.build("pyre", (5, 5))

@@ -83,7 +83,7 @@ MONSTERS: Final[dict[str, MonsterKind]] = {m.key: m for m in (
                 resist={F: 1.0, L: 0.25, C: 0.25, P: 0.25}, size=1.6),
     MonsterKind("shaman", "Fallen Shaman", hp=130, speed=1.0, bounty=30, lives=2, door_dps=4, resist={F: 0.25},
                 leader=LeaderSpec((Curse.WEAKEN,)), size=0.65),
-    MonsterKind("priest", "Bone Priest", hp=210, speed=0.9, bounty=40, lives=2, door_dps=6, resist={P: 1.0, C: 0.25},
+    MonsterKind("priest", "Bone Acolyte", hp=210, speed=0.9, bounty=40, lives=2, door_dps=6, resist={P: 1.0, C: 0.25},
                 leader=LeaderSpec((Curse.BONE_PRISON, Curse.DIM_VISION), cooldown=10.0), size=0.85),
     MonsterKind("witch", "Blood Witch", hp=260, speed=0.95, bounty=45, lives=2, door_dps=6, resist={F: 0.25, L: 0.25},
                 leader=LeaderSpec((Curse.DECREPIFY, Curse.WEAKEN), cooldown=8.5), size=0.85),

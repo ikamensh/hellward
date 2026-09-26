@@ -56,8 +56,8 @@ MONSTER_SUBJECTS = {
                 "swinging a spiked wooden club",
     "azazel": "Azazel the Flayer, the demon lord: a towering demon in black spiked armour over crimson hide, great curved ram horns, "
               "huge dark red bat wings, blazing orange eyes and a molten rune glowing on the chest, wielding a flaming greatsword",
-    "priest": "a Bone Priest: a skeletal priest in a hooded, tattered ash-brown robe with a crimson stole and a small gold crown, "
-              "carrying a bone staff topped with a glowing green orb",
+    "priest": "a Bone Acolyte: a skeletal priest in a hooded, tattered ash-brown robe with a crimson stole, bareheaded, "
+              "carrying a plain bone staff",
     "witch": "a Blood Witch: a slender sorceress with pale skin, long black hair and two small dark horns, in a long crimson gown with "
              "a high dark collar and a gold clasp, carrying a black staff topped with a red crystal",
 }
