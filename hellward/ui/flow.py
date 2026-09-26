@@ -10,6 +10,7 @@ from typing import Any, Callable
 from saga2d import Game, Scene
 
 from hellward.art.sprites import Art
+from hellward.audio.music import track_for
 from hellward.sim.campaign import CATHEDRAL, DIFFICULTIES, Location
 from hellward.sim.model import World
 from hellward.sim.players.hands import Player
@@ -51,6 +52,7 @@ class Flow:
     def intro(self, location: Location) -> None:
         self.progress.move(location.key)
         self.game.clear_and_push(BriefingScene(self, location))
+        self.sound.music(track_for(location.key))
 
     def skills(self, location: Location | None = None) -> None:
         self.game.push(SkillTreeScene(self, location))

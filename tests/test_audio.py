@@ -1,6 +1,6 @@
 """Hellward's audio: the cue set the scene plays, the rendered files, the bank's rules and the music loops.
 
-The cache is prepared once for the module (effects and all three tracks), the way the game does
+The cache is prepared once for the module (effects and all eight tracks), the way the game does
 before its first frame; every test reads what the game would play.
 """
 
@@ -260,10 +260,10 @@ def test_music_starts_and_crossfades(game: Game):
     assert all(bank.ready(name) for name in PIECES)
     bank.music("title")
     assert game.audio.music_name == "title"
-    bank.music("battle")
-    assert game.audio.music_name == "battle"
+    bank.music("battle_cathedral")
+    assert game.audio.music_name == "battle_cathedral"
     assert len(game.backend.music_players) == 2, "the title fades out under the battle"
-    bank.music("battle")
+    bank.music("battle_cathedral")
     assert len(game.backend.music_players) == 2, "asking again changes nothing"
     bank.stop_music(0.5)
     assert game.audio.music_name is None
@@ -296,7 +296,26 @@ class _Alive:
 # -- The music -----------------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("name, low, high", [("title", 40, 50), ("battle", 75, 90), ("boss", 45, 60)])
+def test_every_location_has_its_own_battle_track():
+    from hellward.audio.music import BATTLE_FOR, track_for
+    from hellward.sim.campaign import LOCATIONS
+
+    assert set(BATTLE_FOR) == set(LOCATIONS)
+    assert len(set(BATTLE_FOR.values())) == len(LOCATIONS), "every dungeon sounds different"
+    for key in LOCATIONS:
+        assert track_for(key) in PIECES
+
+
+@pytest.mark.parametrize("name, low, high", [
+    ("title", 40, 50),
+    ("battle_tristram", 50, 62),
+    ("battle_graveyard", 43, 53),
+    ("battle_cathedral", 48, 58),
+    ("battle_catacombs", 38, 48),
+    ("battle_caves", 36, 46),
+    ("battle_hells_gate", 40, 50),
+    ("boss", 45, 60),
+])
 def test_music_is_a_seamless_stereo_loop(cache: Path, name: str, low: float, high: float):
     clip = read_wav(cache / "music" / f"{name}.wav")
     assert clip.ndim == 2 and clip.shape[1] == 2

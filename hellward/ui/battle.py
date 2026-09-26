@@ -16,6 +16,7 @@ from typing import Any, Callable
 from saga2d import Camera, RenderLayer, Scene
 
 from hellward.art.sprites import Art
+from hellward.audio.music import track_for
 from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location, first_offering, offers
 from hellward.sim.content import CURSES, DOOR, MONSTERS, SPELLS
 from hellward.sim.model import SIM_DT, Monster, Refused, Tower, World
@@ -88,7 +89,7 @@ class BattleScene(Scene):
         if self.settings is not None:
             self.fx.show_thoughts = self.settings["minds"]
         self.hud.banner(self.location.name, "Hold the sanctuary. The first wave comes soon.", life=4.5)
-        self.sound.music("battle")
+        self.sound.music(track_for(self.location.key))
 
     def on_background(self) -> None:
         """A player who looks away comes back to the pause menu, whose Resume resumes."""
