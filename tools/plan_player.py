@@ -185,30 +185,34 @@ def first_plans(location: Location) -> list[Plan]:
 # -- Changes ------------------------------------------------------------------------------------------
 
 
-def repaired(plan: Plan, location: Location) -> Plan:
+def repaired(plan: Plan) -> Plan:
     """The plan with every rank after its tower's build, at most two ranks a tower, one build a tile, one step a
     gate."""
     built: set[tuple[int, int]] = set()
     ranks: dict[tuple[int, int], int] = {}
     gates: set[int] = set()
     steps: list[tuple] = []
-    late: list[tuple] = []
+    early: list[tuple] = []    # ranks that came before their tower's build: they follow it
+
+    def rank(step: tuple) -> None:
+        if ranks.get(step[1], 0) < 2:
+            ranks[step[1]] = ranks.get(step[1], 0) + 1
+            steps.append(step)
+
     for step in plan.steps:
         if step[0] == "build":
             if step[2] in built:
                 continue
             built.add(step[2])
             steps.append(step)
-            waiting = [s for s in late if s[1] == step[2]]
-            late = [s for s in late if s[1] != step[2]]
-            steps.extend(waiting)
+            for waiting in [s for s in early if s[1] == step[2]]:
+                rank(waiting)
+            early = [s for s in early if s[1] != step[2]]
         elif step[0] == "rank":
             if step[1] in built:
-                if ranks.get(step[1], 0) < 2:
-                    ranks[step[1]] = ranks.get(step[1], 0) + 1
-                    steps.append(step)
+                rank(step)
             else:
-                late.append(step)
+                early.append(step)
         elif step[1] not in gates:
             gates.add(step[1])
             steps.append(step)
@@ -222,7 +226,7 @@ def mutate(plan: Plan, location: Location, rng: random.Random, tiles: list[tuple
     child.trained = {}
     for _ in range(rng.choice((1, 1, 2, 3))):
         rng.choice(CHANGES)(child, location, rng, tiles)
-    return repaired(child, location)
+    return repaired(child)
 
 
 def _builds(plan: Plan) -> list[int]:

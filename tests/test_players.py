@@ -76,6 +76,7 @@ def assert_fits(plan, location):
     assert set(plan.skills) <= set(SKILLS)
     assert len(plan.calls) == len(location.waves)
     built = set()
+    ranks = {}
     for step in plan.steps:
         if step[0] == "build":
             assert step[1] in location.arsenal.towers
@@ -83,6 +84,8 @@ def assert_fits(plan, location):
             built.add(step[2])
         elif step[0] == "rank":
             assert step[1] in built
+            ranks[step[1]] = ranks.get(step[1], 0) + 1
+            assert ranks[step[1]] <= 2
         else:
             assert location.arsenal.gates and 0 <= step[1] < len(location.level.doors)
 
