@@ -122,8 +122,9 @@ telegraph, and a player can give it at a glance. Aimed spells are **not cast whi
 the leaders' moves are answered in the fight's time, or with Cleanse after they land. Towers can
 still be built and upgraded while paused.
 
-Spell damage grows with the wave's life multiplier, so a spell keeps its worth through a
-location. The damage is sized so that a spell dents a queue rather than erasing it. Cleanse
+Spell damage grows with the location's monsters (its waves' ramp and its life factor), so a spell
+keeps its worth through the descent; it does not grow with the difficulty, so on Hell the spells are
+as outmatched as the towers. The damage is sized so that a spell dents a queue rather than erasing it. Cleanse
 answers a curse after it lands; Smite and Frozen Orb stop one before it lands.
 
 ## Leaders against the new tools
