@@ -1,9 +1,12 @@
 # Hellward — design
 
-A tower defence in a desecrated gothic cathedral. Demons walk a torn crimson carpet from a hell
-portal to the sanctuary gate; the player builds towers of four kinds of magic beside it and bars
-the arches with warded gates. What is new: some monsters are **leaders**, and a leader curses the
-player's towers, choosing which tower and which curse by playing the fight ahead in its head.
+A tower defence under a desecrated gothic cathedral. Demons walk from a hell portal to the
+sanctuary; the player builds towers of four kinds of magic beside their way and bars the arches
+with warded gates. What is new: some monsters are **leaders**, and a leader curses the player's
+towers, choosing which tower and which curse by playing the fight ahead in its head.
+
+This page is the rules of one defence and how a leader chooses. Around it is a campaign of six
+locations with a skill tree, spells and a world map: [campaign](campaign.md).
 
 The brief (Ilya, 2026-09-24): "a TD game where enemy has leaders who curse your towers
 strategically ... either fast simulation or smart heuristics to make their curses almost optimal,
@@ -18,8 +21,9 @@ loop goes here when he has played it.
 
 ## The loop
 
-- **One map, ten waves.** The path is 56 tiles long and folds back on itself twice, so a tower in a
-  fold covers three stretches of it. Three **door sockets** sit in arches on the path.
+- **One map at a time, five to eight waves** ([campaign](campaign.md) has the six). The Cathedral's
+  path is 56 tiles long and folds back on itself twice, so a tower in a fold covers three stretches of
+  it. Three **door sockets** sit in arches on the path.
 - **Towers** (`sim/content.py`), three ranks each:
   - **Pyre** (fire): firebolts; fireballs with a blast from the second rank.
   - **Storm Obelisk** (lightning): chain lightning that leaps two to five times.
@@ -38,8 +42,9 @@ loop goes here when he has played it.
   - the **Blood Witch** casts Decrepify (40% attack speed) or Weaken.
 
   A curse lasts 8 s, 4.5 s for Bone Prison.
-- **Counterplay:** the blue orb is mana, and **Cleanse** (35 mana) burns every curse off one tower.
-  Killing a leader during its one-second chant makes the curse fizzle.
+- **Counterplay:** the blue orb is mana. **Cleanse** (35 mana) burns every curse off one tower;
+  **Smite** and **Frozen Orb** break a leader's pondering or chant, so the curse never comes; killing a
+  leader mid-chant makes it fizzle too. The spells are in [campaign](campaign.md).
 
 ## How a leader chooses (`sim/planner.py`)
 
