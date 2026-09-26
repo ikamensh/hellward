@@ -30,7 +30,9 @@ T = TILE
 Z = PROJECTION.z_scale        # logical pixels per tile of height
 TOWER_SCALE = 1.3             # towers stand taller than their stand-ins: the painted ones were cut to the stand-ins' height
 ELEMENT_LIGHT = {"pyre": ELEMENT_COLORS["fire"], "storm": ELEMENT_COLORS["lightning"], "frost": ELEMENT_COLORS["cold"],
-                 "plague": ELEMENT_COLORS["poison"]}
+                 "plague": ELEMENT_COLORS["poison"], "altar": (214, 204, 176), "grove": ELEMENT_COLORS["poison"]}
+ELEMENT_OF_VIEW = {"pyre": "fire", "storm": "lightning", "frost": "cold", "plague": "poison", "altar": "curse",
+                   "grove": "poison"}
 CURSE_TINT = {Curse.WEAKEN: (0.9, 0.55, 0.55), Curse.DECREPIFY: (0.8, 0.72, 0.55), Curse.DIM_VISION: (0.55, 0.5, 0.75),
               Curse.BONE_PRISON: (0.6, 0.6, 0.6)}
 TORCH = (255, 150, 60)
@@ -195,16 +197,23 @@ class WorldView:
 
     def build(self, tower: Tower) -> None:
         cx, cy = px(tower.tile[0] + 0.5, tower.tile[1] + 0.5)
-        sprite = self.scene.add_sprite(placed(f"tower/{tower.kind.key}/{tower.level}", self.art.tower, cx, cy + 0.25 * T,
-                                              scale=TOWER_SCALE))
-        element = {"pyre": "fire", "storm": "lightning", "frost": "cold", "plague": "poison"}[tower.kind.key]
+        if self.scene.game.assets.has_image(f"tower/{tower.kind.key}/{tower.level}"):
+            sprite = self.scene.add_sprite(placed(f"tower/{tower.kind.key}/{tower.level}", self.art.tower, cx, cy + 0.25 * T,
+                                                  scale=TOWER_SCALE))
+        else:   # no sprite for the kind yet: a coloured rune disc on its tile
+            color = (214, 204, 176) if tower.kind.key == "altar" else (120, 230, 60)
+            sprite = self.scene.add_sprite(Sprite("fx/soft/holy", position=(cx, cy), size=(T, T),
+                                                  layer=RenderLayer.UNITS, y_sort=True, ground=T * 0.25))
+            sprite.tint = tuple(c / 255 for c in color)
+        element = ELEMENT_OF_VIEW[tower.kind.key]
         glow = self.scene.add_sprite(Sprite(f"fx/glow/{element}", position=self.tower_top(tower), size=(30, 30),
                                             layer=RenderLayer.EFFECTS, opacity=200))
         self.towers[tower.id] = Standing(tower, sprite, glow, {})
 
     def rebuild(self, tower: Tower) -> None:
         standing = self.towers[tower.id]
-        standing.sprite.image = f"tower/{tower.kind.key}/{tower.level}"
+        if self.scene.game.assets.has_image(f"tower/{tower.kind.key}/{tower.level}"):
+            standing.sprite.image = f"tower/{tower.kind.key}/{tower.level}"
         standing.glow.position = self.tower_top(tower)
 
     def raze(self, tower_id: int) -> None:
@@ -298,6 +307,9 @@ class WorldView:
             tint = (1.0, 1.0, 1.0)
             for curse in tower.curses:
                 tint = tuple(a * b for a, b in zip(tint, CURSE_TINT[curse]))
+            if standing.sprite.image == "fx/soft/holy":   # a rune disc for a kind with no sprite yet
+                base = (214 / 255, 204 / 255, 176 / 255) if tower.kind.key == "altar" else (120 / 255, 230 / 255, 60 / 255)
+                tint = tuple(a * b for a, b in zip(tint, base))
             standing.sprite.tint = tint
             standing.pulse = max(0.0, standing.pulse - dt * 3)
             flicker = 0.85 + 0.15 * math.sin(self.clock * 11 + tower.id * 1.7) * math.sin(self.clock * 7.3 + tower.id)

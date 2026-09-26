@@ -30,7 +30,7 @@ class Skill:
 
 
 COLUMNS: dict[str, str] = {"fire": "Fire", "lightning": "Lightning", "cold": "Cold", "poison": "Poison",
-                           "warding": "Warding", "sorcery": "Sorcery"}
+                           "bone": "Bone", "nature": "Nature", "warding": "Warding", "sorcery": "Sorcery"}
 
 SKILLS: dict[str, Skill] = {s.key: s for s in (
     Skill("adept_fire", "Adept of Fire", "fire", 1, 1, "Pyres can be raised to the second rank.", ("pyre",)),
@@ -49,6 +49,14 @@ SKILLS: dict[str, Skill] = {s.key: s for s in (
     Skill("contagion", "Contagion", "poison", 2, 2, "When a poisoned monster dies, its venom leaps to the nearest monster.", ("plague",)),
     Skill("master_poison", "Master of Poison", "poison", 3, 2, "Plague Totems can be raised to the third rank.", ("plague",)),
     Skill("lower_resist", "Lower Resist", "poison", 4, 3, "A poisoned monster resists everything 25 points less. Immunities hold.", ("plague",)),
+    Skill("adept_bone", "Adept of Bone", "bone", 1, 1, "Bone Altars can be raised to the second rank.", ("altar",)),
+    Skill("corpse_explosion", "Corpse Explosion", "bone", 2, 2, "A monster that dies amplified bursts for 15% of its life, unresisted, within 1.2.", ("altar",)),
+    Skill("master_bone", "Master of Bone", "bone", 3, 2, "Bone Altars can be raised to the third rank.", ("altar",)),
+    Skill("life_tap", "Life Tap", "bone", 4, 3, "A monster that dies amplified gives a fifth of its bounty in mana.", ("altar",)),
+    Skill("adept_nature", "Adept of Nature", "nature", 1, 1, "Druid Groves can be raised to the second rank.", ("grove",)),
+    Skill("hurricane", "Hurricane", "nature", 2, 2, "Walkers within 2.5 tiles of a grove move 20% slower.", ("grove",)),
+    Skill("master_nature", "Master of Nature", "nature", 3, 2, "Druid Groves can be raised to the third rank.", ("grove",)),
+    Skill("twister", "Twister", "nature", 4, 3, "Every 4 s the grove roots the walker nearest the sanctuary within 2.5 tiles for 1.5 s.", ("grove",)),
     Skill("holy_shield", "Holy Shield", "warding", 1, 1, "Warded gates have 50% more life and mend fully between waves.", ("gate",)),
     Skill("salvation", "Salvation", "warding", 2, 2, "Cleanse costs 25 mana and wards the tower against curses for 8 seconds.", ("cleanse",)),
     Skill("thorns", "Thorns", "warding", 3, 3, "A gate returns half of each blow to the monster that strikes it, frost or no frost.", ("gate",)),
@@ -91,6 +99,8 @@ RANK_SKILL: Final[dict[str, tuple[str, str]]] = {
     "storm": ("adept_lightning", "master_lightning"),
     "frost": ("adept_cold", "master_cold"),
     "plague": ("adept_poison", "master_poison"),
+    "altar": ("adept_bone", "master_bone"),
+    "grove": ("adept_nature", "master_nature"),
 }
 
 
@@ -109,6 +119,10 @@ class Perks:
     shatter: bool = False
     contagion: bool = False
     lower_resist: bool = False
+    corpse_explosion: bool = False
+    life_tap: bool = False
+    hurricane: bool = False
+    twister: bool = False
     gate_life: float = DOOR.hp
     gate_mend: float = DOOR.repair
     cleanse_cost: float = SPELLS["cleanse"].mana
@@ -159,6 +173,14 @@ def perks(learned: Iterable[str]) -> Perks:
         p = replace(p, contagion=True)
     if "lower_resist" in chosen:
         p = replace(p, lower_resist=True)
+    if "corpse_explosion" in chosen:
+        p = replace(p, corpse_explosion=True)
+    if "life_tap" in chosen:
+        p = replace(p, life_tap=True)
+    if "hurricane" in chosen:
+        p = replace(p, hurricane=True)
+    if "twister" in chosen:
+        p = replace(p, twister=True)
     if "holy_shield" in chosen:
         p = replace(p, gate_life=DOOR.hp * 1.5, gate_mend=1.0)
     if "salvation" in chosen:
@@ -196,6 +218,6 @@ def tower_levels(kind: str, p: Perks) -> tuple[TowerLevel, ...]:
         return tuple(replace(r, chains=r.chains + p.extra_leaps) for r in ranks)
     if kind == "frost":
         return tuple(replace(r, damage=r.damage * p.frost_damage, range=r.range + p.frost_reach) for r in ranks)
-    if kind == "plague":
+    if kind in ("plague", "altar", "grove"):
         return tuple(ranks)
     raise KeyError(kind)

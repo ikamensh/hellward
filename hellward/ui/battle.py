@@ -23,7 +23,7 @@ from hellward.sim.players.hands import Hands, Player
 from hellward.sim.skills import NO_PERKS, SKILLS, Perks
 from hellward.ui import style
 from hellward.ui.effects import Effects
-from hellward.ui.hud import BUILD, Hud
+from hellward.ui.hud import BUILD, NEW_TOWERS, Hud
 from hellward.ui.lighting import Lighting
 from hellward.ui.menus import PauseScene
 from hellward.ui.view import MAP_X, MAP_Y, T, TOWER_SCALE, WorldView, px
@@ -42,7 +42,7 @@ class Silent:
 class BattleScene(Scene):
     background_color = (8, 6, 8, 255)
     controls = {
-        "1": "slot_1", "2": "slot_2", "3": "slot_3", "4": "slot_4", "5": "slot_5",
+        "1": "slot_1", "2": "slot_2", "3": "slot_3", "4": "slot_4", "5": "slot_5", "6": "slot_6", "7": "slot_7",
         "space": "call_wave", "f": "toggle_speed", "p": "toggle_pause", "tab": "toggle_thoughts",
         "u": "upgrade", "s": "sell", "c": "cleanse", "escape": "cancel",
         "q": "spell_smite", "w": "spell_meteor", "e": "spell_orb",
@@ -174,6 +174,12 @@ class BattleScene(Scene):
             sound.play("lightning", volume=0.7)
         elif kind == "nova":
             sound.play("frost", volume=0.7)
+        elif kind == "amplify":
+            sound.play("curse", volume=0.7)
+        elif kind == "twister":
+            sound.play("frost", volume=0.6)
+        elif kind == "corpse_explosion":
+            sound.play("fire_hit", volume=0.8)
         elif kind == "death":
             sound.play(f"death_{e[2]}", volume=0.8)
             if e[5] >= 20:
@@ -263,7 +269,12 @@ class BattleScene(Scene):
 
     def pick(self, key: str) -> None:
         if not offers(self.location, key):
-            self._refuse(f"Not in {self.location.called}: it arrives in {first_offering(key).called}.")
+            try:
+                arrival = first_offering(key).called
+            except KeyError:
+                arrival = None
+            note = f"it arrives in {arrival}." if arrival is not None else "it is not offered yet."
+            self._refuse(f"Not in {self.location.called}: {note}")
             return
         self.selected = None
         self.placing = None if self.placing == key else key
@@ -335,20 +346,35 @@ class BattleScene(Scene):
             return self._try(lambda: world.meteor(x, y))
         return self._try(lambda: world.orb(x, y))
 
+    def slots(self) -> tuple[str, ...]:
+        """The build bar here: the ordinary slots, and the new towers where this location offers them."""
+        return tuple(BUILD) + tuple(key for key in NEW_TOWERS if offers(self.location, key))
+
+    def _slot(self, n: int) -> None:
+        slots = self.slots()
+        if n < len(slots):
+            self.pick(slots[n])
+
     def slot_1(self) -> None:
-        self.pick(BUILD[0])
+        self._slot(0)
 
     def slot_2(self) -> None:
-        self.pick(BUILD[1])
+        self._slot(1)
 
     def slot_3(self) -> None:
-        self.pick(BUILD[2])
+        self._slot(2)
 
     def slot_4(self) -> None:
-        self.pick(BUILD[3])
+        self._slot(3)
 
     def slot_5(self) -> None:
-        self.pick(BUILD[4])
+        self._slot(4)
+
+    def slot_6(self) -> None:
+        self._slot(5)
+
+    def slot_7(self) -> None:
+        self._slot(6)
 
     def call_wave(self) -> None:
         if self.world.can_call_wave:
@@ -510,7 +536,9 @@ class BattleScene(Scene):
             elif self.placing is not None and tile is not None:
                 self._ghost(self.placing, tile)
         if self.selected is not None:
-            self._ring(self.selected.centre, self.selected.reach, (230, 190, 100, 220))
+            # an aura is not a reach: Dim Vision does nothing to it, so the ring shows the aura's own radius
+            reach = self.selected.stats.range if self.selected.kind.key == "grove" else self.selected.reach
+            self._ring(self.selected.centre, reach, (230, 190, 100, 220))
         self._bars()
         self.fx.draw()
         self.hud.draw(placing=self.placing, selected=self.selected, hovered=hovered, speed=self.speed, paused=self.paused,
@@ -554,8 +582,12 @@ class BattleScene(Scene):
         ok = level.buildable(*tile) and self.world.tower_at(tile) is None and self.world.gold >= self.cost(key)
         cx, cy = px(tile[0] + 0.5, tile[1] + 0.5)
         cell, k = self.art.tower, TOWER_SCALE
-        self.draw_image(f"tower/{key}/0", cx - cell.origin[0] * k, cy + 0.25 * T - cell.origin[1] * k, cell.size[0] * k,
-                        cell.size[1] * k, opacity=0.6, space="world", layer=RenderLayer.EFFECTS)
+        if self.game.assets.has_image(f"tower/{key}/0"):
+            self.draw_image(f"tower/{key}/0", cx - cell.origin[0] * k, cy + 0.25 * T - cell.origin[1] * k, cell.size[0] * k,
+                            cell.size[1] * k, opacity=0.6, space="world", layer=RenderLayer.EFFECTS)
+        else:   # no sprite for the kind yet: a coloured rune disc on its tile
+            color = (214, 204, 176, 160) if key == "altar" else (120, 230, 60, 160)
+            self.draw_circle(cx, cy, T * 0.42, color, space="world", layer=RenderLayer.EFFECTS)
         self.draw_rect(MAP_X + tile[0] * T + 2, MAP_Y + tile[1] * T + 2, T - 4, T - 4, (0, 0, 0, 0),
                        border_color=(120, 220, 120, 200) if ok else (230, 60, 60, 220), border_width=2, space="world",
                        layer=RenderLayer.EFFECTS)

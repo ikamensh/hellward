@@ -18,9 +18,10 @@ if TYPE_CHECKING:
     from hellward.ui.flow import Flow
 
 ICONS = {"fire": ("tower/pyre/2", 150 / 72), "lightning": ("tower/storm/2", 150 / 72), "cold": ("tower/frost/2", 150 / 72),
-         "poison": ("tower/plague/2", 150 / 72), "warding": ("gate/intact", 80 / 60), "sorcery": ("ui/orb/mana/30", 1.0)}
+         "poison": ("tower/plague/2", 150 / 72), "bone": ("tower/altar/2", 150 / 72), "nature": ("tower/grove/2", 150 / 72),
+         "warding": ("gate/intact", 80 / 60), "sorcery": ("ui/orb/mana/30", 1.0)}
 COLOURS = {"fire": (255, 130, 50), "lightning": (140, 190, 255), "cold": (160, 225, 255), "poison": (130, 230, 70),
-           "warding": (255, 222, 140), "sorcery": (120, 150, 255)}
+           "bone": (214, 204, 176), "nature": (120, 230, 60), "warding": (255, 222, 140), "sorcery": (120, 150, 255)}
 TIER_Y = (196, 336, 476, 616)
 NODE_H = 128
 
@@ -71,13 +72,17 @@ class SkillTreeScene(Scene):
                        color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
         columns = list(COLUMNS.items())
         n = len(columns)
-        gap = min(200.0, 1160.0 / max(1, n - 1)) if n > 1 else 200.0
-        node_w = min(176.0, gap - 24.0)
+        node_w = min(176.0, 1160.0 / max(1, n))
+        gap = (1160.0 - node_w) / max(1, n - 1) if n > 1 else 200.0
         for i, (column, name) in enumerate(columns):
             cx = 640 - (n - 1) * gap / 2 + i * gap
             image, aspect = ICONS[column]
             height = 30 * aspect if aspect > 1 else 30
-            self.draw_image(image, cx - 15, 158 - height, 30, height)   # every icon stands on one line
+            if self.game.assets.has_image(image):
+                self.draw_image(image, cx - 15, 158 - height, 30, height)   # every icon stands on one line
+            else:   # no sprite for the kind yet: a coloured rune disc
+                color = {"bone": (214, 204, 176, 255), "nature": (120, 230, 60, 255)}.get(column, (200, 200, 200, 255))
+                self.draw_circle(cx, 158 - height / 2, 13, color)
             skills = sorted((s for s in SKILLS.values() if s.column == column), key=lambda s: s.tier)
             self.draw_text(name, cx, 176, style="heading", color=COLOURS[column] + (255,), anchor_x="center", anchor_y="center")
             for skill in skills:
@@ -130,4 +135,5 @@ class SkillTreeScene(Scene):
 
 
 def _glow(column: str) -> str:
-    return {"fire": "fire", "lightning": "lightning", "cold": "cold", "poison": "poison", "warding": "holy", "sorcery": "curse"}[column]
+    return {"fire": "fire", "lightning": "lightning", "cold": "cold", "poison": "poison", "bone": "curse",
+            "nature": "poison", "warding": "holy", "sorcery": "curse"}[column]

@@ -14,6 +14,7 @@ import random
 import subprocess
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -102,7 +103,10 @@ def busy_world() -> World:
     one still coming. Then a meteor is cast (in the air), a frozen orb (monsters frozen) and a smite, and a warded
     tower, two cursed ones and a leader chanting are set by hand. Like a clone, it has no planner and no leader
     waiting for one."""
-    world = World(LOCATIONS["hells_gate"], perks=perks(SKILLS), seed=5, planner=planner.smart)
+    arsenal = replace(LOCATIONS["hells_gate"].arsenal,
+                      towers=LOCATIONS["hells_gate"].arsenal.towers + ("altar", "grove"))
+    place = replace(LOCATIONS["hells_gate"], arsenal=arsenal)
+    world = World(place, perks=perks(SKILLS), seed=5, planner=planner.smart)
     world.lives = 10_000   # the ordinary player would fall long before the fight fills
     player, hands = Ordinary(), Hands(world, react=0.6)
 
@@ -133,6 +137,14 @@ def busy_world() -> World:
     towers[2].ward = 4.0
     leader = world.leaders()[0]
     leader.chant_curse, leader.chant_spot, leader.chant_left = Curse.WEAKEN, towers[3].tile, 0.8
+    world.gold = 10000
+    free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
+            if world.level.buildable(x, y) and world.tower_at((x, y)) is None]
+    altar = world.build("altar", free[0])
+    grove = world.build("grove", free[1])
+    grove.timer = 3.5   # its twister about to root
+    for m in world.monsters[:3]:
+        m.amplified, m.amplify = 2.0, 0.3
     return world
 
 

@@ -20,7 +20,8 @@ from hellward.ui import style
 from hellward.ui.lighting import Light
 from hellward.ui.view import T, WorldView, px
 
-ELEMENT_OF = {"pyre": "fire", "storm": "lightning", "frost": "cold", "plague": "poison"}
+ELEMENT_OF = {"pyre": "fire", "storm": "lightning", "frost": "cold", "plague": "poison", "altar": "curse",
+              "grove": "poison"}
 BLOOD = {"skeleton": "fx/dust", "gargoyle": "fx/dust", "zombie": "fx/ichor"}
 
 
@@ -189,7 +190,7 @@ class Effects:
         self.light(x, y, 90, (255, 70, 30), 0.8, 0.4)
 
     def on_bolt(self, bolt: Bolt) -> None:
-        element = ELEMENT_OF[bolt.kind]
+        element = ELEMENT_OF.get(bolt.kind, "holy")
         tower = self.world.towers.get(bolt.tower)
         origin = self.view.tower_top(tower) if tower is not None else px(*bolt.origin)
         size = 22 if element == "fire" else 16
@@ -257,6 +258,37 @@ class Effects:
         if standing is not None:
             standing.pulse = 1.0
 
+    def on_amplify(self, tower_id: int, where: tuple[float, float], struck: tuple) -> None:
+        """Amplify Damage: a sickly violet-green skull mote over each amplified monster for the lasting."""
+        tower = self.world.towers.get(tower_id)
+        lasting = tower.stats.lasting if tower is not None else 2.0
+        for monster_id in struck:
+            m = self.world.monster(monster_id)
+            x, y = self.view.chest(m) if m is not None else px(*where)
+            self.bloom("fx/soft/curse", x, y, 12, 44, lasting, opacity=200)
+            self.bloom("fx/soft/poison", x, y, 8, 30, lasting, opacity=160)
+            self.light(x, y, 70, (150, 220, 130), 0.8, min(0.6, lasting))
+        if tower is not None:
+            standing = self.view.towers.get(tower_id)
+            if standing is not None:
+                standing.pulse = 1.0
+
+    def on_twister(self, grove_id: int, monster_id: int) -> None:
+        """Twister: a small grey-green whirl where the walker is rooted."""
+        m = self.world.monster(monster_id)
+        x, y = self.view.chest(m) if m is not None else px(*self.world.level.point(0.0))
+        self.bloom("fx/soft/poison", x, y, 10, 60, 0.8, opacity=200, spin=300)
+        self.burst("fx/shard", x, y, 8, speed=(40, 110), life=(0.3, 0.6), size=(7, 7), shrink=False)
+        self.light(x, y, 80, (150, 200, 140), 0.8, 0.5)
+
+    def on_corpse_explosion(self, x: float, y: float) -> None:
+        """Corpse Explosion: a burst of bone shards where the amplified monster fell."""
+        cx, cy = px(x, y)
+        self.burst("fx/shard", cx, cy - 10, 22, speed=(70, 200), life=(0.3, 0.6), size=(8, 8), shrink=False)
+        self.burst("fx/dust", cx, cy - 6, 8, speed=(20, 70), life=(0.5, 0.9), size=(12, 12))
+        self.bloom("fx/soft/holy", cx, cy - 10, 16, 70, 0.4, opacity=180)
+        self.light(cx, cy, 130, (220, 210, 180), 1.0, 0.4)
+
     def on_hit(self, monster_id: int, element) -> None:
         self.view.hit(monster_id, element.value if element is not None else "holy")
 
@@ -311,7 +343,7 @@ class Effects:
         self.view.rebuild(tower)
         self._raise_dust(tower)
         x, y = self.view.tower_top(tower)
-        self.bloom(f"fx/glow/{ELEMENT_OF[tower.kind.key]}", x, y, 20, 90, 0.6)
+        self.bloom(f"fx/glow/{ELEMENT_OF.get(tower.kind.key, 'holy')}", x, y, 20, 90, 0.6)
 
     def _raise_dust(self, tower) -> None:
         cx, cy = px(tower.tile[0] + 0.5, tower.tile[1] + 0.5)
@@ -669,6 +701,9 @@ class Effects:
         for tower in world.towers.values():
             x, y = self.view.tower_top(tower)
             bx, by = self.view.tower_base(tower)
+            if tower.kind.key == "grove" and tower.id == self.selected and not tower.silenced:
+                # a faint green ring around the aura's radius: what it lends to
+                self._dashed_ring(bx, by - 0.25 * T, tower.stats.range * T, (120, 230, 60, 140))
             if tower.ward > 0:   # a dome of holy light no curse passes
                 pulse = 0.8 + 0.2 * math.sin(clock * 5 + tower.id)
                 fade = min(1.0, tower.ward / 1.0)

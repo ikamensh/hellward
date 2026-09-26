@@ -22,11 +22,14 @@ from hellward.ui import style, widgets
 TOP = 672
 SLOT = 68
 BUILD = ("pyre", "storm", "frost", "plague", "gate")
+NEW_TOWERS = ("altar", "grove")   # drawn after the gate, but only where a location offers them
 SLOT_X = 146
 SPELL_BAR = ("smite", "meteor", "orb")       # Cleanse is C, and the button on a selected tower
 SPELL_KEYS = {"smite": "Q", "meteor": "W", "orb": "E"}
 SPELL_X = 918
-ELEMENT_NAMES = {Element.FIRE: "Fire", Element.LIGHTNING: "Lightning", Element.COLD: "Cold", Element.POISON: "Poison"}
+ELEMENT_NAMES = {Element.FIRE: "Fire", Element.LIGHTNING: "Lightning", Element.COLD: "Cold", Element.POISON: "Poison",
+                 Element.BONE: "Bone", Element.NATURE: "Nature"}
+DISC = {"altar": (214, 204, 176, 255), "grove": (120, 230, 60, 255)}   # a coloured rune disc while a kind has no sprite
 
 
 def monster_notes(kind: MonsterKind) -> list[str]:
@@ -124,7 +127,8 @@ class Hud:
         self._orb("life", 14, TOP + 8, world.lives / START_LIVES, f"{world.lives}", "Life")
         self._orb("mana", 1154, TOP + 8, world.mana / world.mana_max, f"{int(world.mana)}", "Mana")
         location = world.location
-        for i, key in enumerate(BUILD):
+        slots = list(BUILD) + [key for key in NEW_TOWERS if offers(location, key)]
+        for i, key in enumerate(slots):
             x = SLOT_X + i * (SLOT + 10)
             y = TOP + 16
             if key == "gate":
@@ -141,8 +145,10 @@ class Hud:
                 shown = 1.0 if affordable else 0.4 if offered else 0.12
                 if key == "gate":
                     scene.draw_image("gate/intact", x + 12, y + 2, 44, 44 * 80 / 60, opacity=shown)
-                else:
+                elif scene.game.assets.has_image(f"tower/{key}/0"):
                     scene.draw_image(f"tower/{key}/0", x + 12, y - 16, 44, 44 * 150 / 72, opacity=shown)
+                else:
+                    scene.draw_circle(x + SLOT / 2, y + SLOT / 2, 20, DISC[key][:3] + (int(shown * 255),))
                 self._keycap(x, y, str(i + 1))
                 if not offered:
                     self._padlock(x + SLOT / 2, y + SLOT / 2)
@@ -150,6 +156,13 @@ class Hud:
                 scene.draw_text(f"{cost}", x + SLOT / 2, y + SLOT + 16, font_size=14, color=style.GOLD if affordable else style.DIM,
                                 anchor_x="center", anchor_y="center")
                 self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), affordable, f"{name} — {cost} gold\n{tip}"))
+            elif key in TOWERS:
+                try:
+                    arrival = first_offering(key).called
+                except KeyError:
+                    arrival = None
+                note = f"It arrives in {arrival}." if arrival is not None else "It is not offered yet."
+                self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), False, f"{name}\nNot here. {note}"))
             else:
                 self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), False,
                                              f"{name}\nNot here. It arrives in {first_offering(key).called}."))
@@ -238,16 +251,25 @@ class Hud:
             stats = selected.stats
             scene.draw_text(scene.fit_text(f"{kind.name} {'I' * (selected.level + 1)}", 250, style="heading"), x0, y0 + 14,
                             style="heading", anchor_y="center")
-            parts = [f"{stats.damage * selected.damage_mult():.0f} {ELEMENT_NAMES[kind.element].lower()}",
-                     f"{stats.rate * selected.rate_mult():.2f}/s", f"reach {selected.reach:.1f}"]
-            if stats.splash:
-                parts.append(f"blast {stats.splash:.1f}")
-            if stats.chains:
-                parts.append(f"{stats.chains} leaps")
-            if stats.chill:
-                parts.append(f"chills {stats.chill:.0%}")
-            if stats.poison:
-                parts.append(f"venom {stats.poison:.0f}/s")
+            if kind.key == "altar":
+                parts = [f"amplify +{stats.damage * selected.damage_mult():.0%}", f"every {1 / stats.rate:.1f}s",
+                         f"reach {selected.reach:.1f}", f"knot {stats.splash:.1f}", f"lasts {stats.lasting:.1f}s"]
+            elif kind.key == "grove":
+                parts = [f"aura +{stats.damage * selected.damage_mult():.0%}",
+                         f"radius {stats.range:.1f}"]
+                if selected.silenced:
+                    parts.append("switched off")
+            else:
+                parts = [f"{stats.damage * selected.damage_mult():.0f} {ELEMENT_NAMES[kind.element].lower()}",
+                         f"{stats.rate * selected.rate_mult():.2f}/s", f"reach {selected.reach:.1f}"]
+                if stats.splash:
+                    parts.append(f"blast {stats.splash:.1f}")
+                if stats.chains:
+                    parts.append(f"{stats.chains} leaps")
+                if stats.chill:
+                    parts.append(f"chills {stats.chill:.0%}")
+                if stats.poison:
+                    parts.append(f"venom {stats.poison:.0f}/s")
             scene.draw_text("  ·  ".join(parts), x0, y0 + 38, font_size=13, color=style.BONE, anchor_y="center")
             if selected.curses:
                 text = ", ".join(f"{CURSES[c].name} ({left:.0f}s): {CURSES[c].blurb}" for c, left in selected.curses.items())
@@ -264,8 +286,12 @@ class Hud:
                              tip="[U] The next rank: more damage and reach, and a finer look.")
             self._button("sell", x0 + 118, by, 100, 28, f"Sell +{int(selected.spent * SELL_REFUND)}", tip="[S] Tear it down for most of its cost.")
             cleanse = world.spell_cost("cleanse")
-            self._button("cleanse", x0 + 224, by, 116, 28, f"Cleanse {cleanse:.0f}", enabled=bool(selected.curses) and world.mana >= cleanse,
-                         tip="[C] Burn every curse off this tower with holy light. Costs mana.", accent=style.HOLY)
+            may_ward = world.perks.salvation and not selected.curses
+            self._button("cleanse", x0 + 224, by, 116, 28, f"Cleanse {cleanse:.0f}",
+                         enabled=(bool(selected.curses) or may_ward) and world.mana >= cleanse,
+                         tip="[C] Burn every curse off this tower with holy light. Costs mana." +
+                         (" Under Salvation it also wards an uncursed tower." if may_ward else ""),
+                         accent=style.HOLY)
             return
         names = world.location.wave_names
         title = world.location.name if world.wave < 0 else names[world.wave]

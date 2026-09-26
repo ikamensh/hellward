@@ -21,7 +21,7 @@ from hellward.ui.hud import monster_notes
 if TYPE_CHECKING:
     from hellward.ui.flow import Flow
 
-ARSENAL = ("pyre", "storm", "frost", "plague", "gate", "cleanse", "smite", "meteor", "orb")
+ARSENAL = ("pyre", "storm", "frost", "plague", "altar", "grove", "gate", "cleanse", "smite", "meteor", "orb")
 
 
 class BriefingScene(Scene):
@@ -162,7 +162,11 @@ class BriefingScene(Scene):
             self.draw_rect(x, y + 26, 56, 56, (18, 12, 14, 230), border_color=style.GOLD if new else style.PANEL_EDGE,
                            border_width=2 if new else 1.2, radius=5)
             if thing in TOWERS:
-                self.draw_image(f"tower/{thing}/0", x + 10, y + 14, 36, 36 * 150 / 72)
+                if self.game.assets.has_image(f"tower/{thing}/0"):
+                    self.draw_image(f"tower/{thing}/0", x + 10, y + 14, 36, 36 * 150 / 72)
+                else:   # no sprite for the kind yet: a coloured rune disc
+                    color = (214, 204, 176, 255) if thing == "altar" else (120, 230, 60, 255)
+                    self.draw_circle(x + 28, y + 48, 16, color)
                 name, tip = TOWERS[thing].name, TOWERS[thing].blurb
                 top = learned.top(thing) + 1
                 for k in range(3):
