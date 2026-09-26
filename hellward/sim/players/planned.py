@@ -131,7 +131,7 @@ class Planned:
         if plan.rebuild == "now" or (plan.rebuild == "break" and world.break_left is not None):
             for index in sorted(self.gates):
                 door = world.doors[index]
-                if not door.built and world.gold >= DOOR.cost and _arch_clear(world, index):
+                if not door.built and not door.rubble and world.gold >= DOOR.cost and _arch_clear(world, index):
                     world.build_door(index)
         steps = plan.steps
         while self.next < len(steps):
@@ -150,7 +150,7 @@ class Planned:
                     world.upgrade(tower.id)
             else:
                 door = world.doors[step[1]]
-                if not door.built:
+                if not door.built and not door.rubble:   # a rubbled arch waits for the wave's end
                     if world.gold < DOOR.cost or not _arch_clear(world, step[1]):
                         return
                     world.build_door(step[1])

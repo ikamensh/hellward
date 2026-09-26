@@ -66,7 +66,7 @@ class Ordinary:
             self._cleanse(hands)
         if self.doors and world.location.arsenal.gates and world.wave >= 1:
             for door in world.doors:
-                if not door.built and world.gold >= DOOR.cost + 20:
+                if not door.built and not door.rubble and world.gold >= DOOR.cost + 20:
                     try:
                         world.build_door(door.index)
                     except Refused:

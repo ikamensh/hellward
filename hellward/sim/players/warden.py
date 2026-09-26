@@ -285,7 +285,7 @@ class Warden:
         """Set a broken gate again once no walker stands in its arch, if the build has set it before."""
         steps = self.chosen.steps
         for door in world.doors:
-            if door.built or world.gold < DOOR.cost or Step("gate", door=door.index) not in steps[:self.done]:
+            if door.built or door.rubble or world.gold < DOOR.cost or Step("gate", door=door.index) not in steps[:self.done]:
                 continue
             if _clear(world, door.s):
                 world.build_door(door.index)
@@ -296,7 +296,7 @@ class Warden:
             step = steps[self.done]
             if step.what == "gate":
                 door = world.doors[step.door]
-                if not door.built:
+                if not door.built and not door.rubble:   # a rubbled arch waits for the wave's end (_gates)
                     if world.gold < DOOR.cost or not _clear(world, door.s):
                         return
                     world.build_door(step.door)

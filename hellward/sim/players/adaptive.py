@@ -570,7 +570,7 @@ class Adaptive:
         if not world.location.arsenal.gates or world.gold < DOOR.cost:
             return
         for d in world.doors:
-            if not d.built and self._guarded(d.index) and world.gold >= DOOR.cost:
+            if not d.built and not d.rubble and self._guarded(d.index) and world.gold >= DOOR.cost:
                 try:
                     world.build_door(d.index)
                 except Refused:   # monsters stand in the arch: it goes up once they have passed
