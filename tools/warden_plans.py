@@ -7,9 +7,10 @@
 A plan (``hellward/sim/players/warden.py``: the skills, and a list of steps the warden takes as the gold comes) is
 played with every monster's life raised until it starts to lose lives. The search mutates it (a tower's kind or
 tile, the order of the steps, a step more or fewer, the skills, when to call waves early), keeps a mutant that
-loses no more lives over the training seeds, and raises the life again once the best plan loses none. The best
-is stored in ``hellward/sim/players/plans/warden.json`` with how it was found. ``--leaders greedy`` screens
-against the cheap estimate-only leaders; ``check`` measures the margin against the rollout leaders.
+loses no more lives over the training seeds, and raises the life again once the best plan loses none (or no
+more than ``--slack`` a seed). The best is stored in ``hellward/sim/players/plans/warden.json`` with how it was
+found. ``--leaders greedy`` (the default) screens against the cheap estimate-only leaders; ``check`` measures the
+margin against the rollout leaders.
 
 Every seed played here is a training seed (0-99): the evaluation seeds (1000 and up) are never seen.
 """
@@ -219,7 +220,7 @@ def search(args: argparse.Namespace) -> None:
         best_score = score(pool, [best.row()], key, difficulty, sigils, seeds, hp, args.leaders)[0]
         print(f"{key} {difficulty} sigils {sigils}: start at life x{hp:.2f}, {best_score} lives lost", flush=True)
         for round_ in range(args.rounds):
-            while best_score == 0:
+            while best_score <= args.slack * len(seeds):
                 hp *= RAISE
                 best_score = score(pool, [best.row()], key, difficulty, sigils, seeds, hp, args.leaders)[0]
                 print(f"  life x{hp:.2f}: {best_score} lives lost", flush=True)
@@ -269,6 +270,8 @@ def main() -> None:
     s.add_argument("--leaders", default="greedy", choices=list(LEADERS))
     s.add_argument("--hp", type=float, help="the life to start at (default: the plan's margin)")
     s.add_argument("--fresh", action="store_true", help="start from the draft, not the stored plan")
+    s.add_argument("--slack", type=int, default=0,
+                   help="lives a seed may lose before the life is raised: for a location that always leaks a little")
     s.add_argument("--rng", type=int, default=1)
     c = sub.choices["check"]
     c.add_argument("--first", type=int, default=10, help="the first held-out training seed")
