@@ -7,7 +7,7 @@
  "meteor_worth": 3.84,
  "orb_worth": 7.5,
  "reserve": 20.0,
- "trained": {"confirmed_on": [28, 29, 30, 31, 32, 33, 34, 35], "life": 5.428, "smart_score": 33.88, "smart_score_at_1": 40.0, "defences": 1252, "minutes": 8.0, "generations": 40},
+ "trained": {"confirmed_on": [28, 29, 30, 31, 32, 33, 34, 35], "life": 5.428, "smart_score": 33.88, "smart_score_at_1": 40.0, "defences": 2260, "minutes": 12.9, "generations": 80},
  "steps": [
   ["build", "pyre", [2, 5]],
   ["gate", 0],
