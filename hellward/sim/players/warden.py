@@ -380,27 +380,6 @@ class Warden:
         hands.smite(target.id)
         self.last_aim = world.time
 
-    def tower_value(self, world: World, tower: Tower) -> float:
-        """How much a tower is about to do: its strength times the monsters in or coming into its reach."""
-        stats = tower.stats
-        spans = world.level.coverage(tower.tile, stats.range)
-        widened = tuple((a - ARRIVING, b) for a, b in spans)
-        element = tower.kind.element
-        load = 0.0
-        for m in world.monsters:
-            if _inside(m.s, widened):
-                load += max(0.0, m.kind.taken(element))
-        attack = tower.kind.attack
-        if attack == "nova":
-            cap = 8.0
-        elif attack == "chain":
-            cap = 1.0 + stats.chains
-        elif attack == "bolt":
-            cap = 3.0 if stats.splash > 0 else 1.0
-        else:
-            cap = 1.5
-        return stats.damage * stats.rate * min(load, cap)
-
     def _cleanse(self, hands: Hands) -> None:
         world = hands.world
         if world.mana < world.spell_cost("cleanse"):
@@ -412,7 +391,7 @@ class Warden:
             left = max(t.curses.values())
             if left < 2.0:
                 continue
-            value = self.tower_value(world, t) * left * max(SEVERITY[c] for c in t.curses)
+            value = _tower_value(world, t) * left * max(SEVERITY[c] for c in t.curses)
             if value > best_value:
                 best, best_value = t, value
         full = world.mana / world.mana_max
@@ -434,9 +413,9 @@ class Warden:
                 tower = world.towers.get(sign.tower)
                 if tower is None or tower.ward > 0:
                     continue
-                value = self.tower_value(world, tower) * CURSES[sign.curse].duration * SEVERITY[sign.curse]
+                value = _tower_value(world, tower) * CURSES[sign.curse].duration * SEVERITY[sign.curse]
             else:
-                value = max((self.tower_value(world, t) for t in world.towers.values()), default=0.0) * 4.0
+                value = max((_tower_value(world, t) for t in world.towers.values()), default=0.0) * 4.0
             if value > best_value:
                 best, best_value = leader, value
         if best is None:
@@ -530,6 +509,28 @@ class Warden:
         hands.meteor(*best)
         self.last_aim = world.time
         return True
+
+
+def _tower_value(world: World, tower: Tower) -> float:
+    """How much a tower is about to do: its strength times the monsters in or coming into its reach."""
+    stats = tower.stats
+    spans = world.level.coverage(tower.tile, stats.range)
+    widened = tuple((a - ARRIVING, b) for a, b in spans)
+    element = tower.kind.element
+    load = 0.0
+    for m in world.monsters:
+        if _inside(m.s, widened):
+            load += max(0.0, m.kind.taken(element))
+    attack = tower.kind.attack
+    if attack == "nova":
+        cap = 8.0
+    elif attack == "chain":
+        cap = 1.0 + stats.chains
+    elif attack == "bolt":
+        cap = 3.0 if stats.splash > 0 else 1.0
+    else:
+        cap = 1.5
+    return stats.damage * stats.rate * min(load, cap)
 
 
 def _clear(world: World, s: float) -> bool:
