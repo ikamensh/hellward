@@ -16,16 +16,17 @@ machine's slot queue, as above.
 * **B\\*** at a location and difficulty is the player with the best median lives; ties go to more wins, then to
   more mean lives. The table marks it.
 * ``--margin``: M, the largest factor on every monster's life at which B* still wins, bisected to 2% between
-  0.4 and 4 on each of the first 8 seeds; the table gives the median.
+  0.4 and 4 on each of the first 8 seeds; the table gives the median. The spells' damage grows with the factor, as
+  it does with the knobs M stands for (the waves' and the difficulty's life), so M is what those knobs would give.
 * ``--leaders``: B* with its skills against the smart leaders and against random ones, the lives uncapped (as
   ``balance.py`` counts them). Leader impact is the lives lost to smart minus those lost to random, and that as a
   share of the lives lost to smart.
 
 The other columns: wins of N and the median and fewest lives kept; curse-seconds held on towers per leader
-spawned; chants broken, the share of the leaders' curses that a spell broke (ponderings included, as the harness
-counts them) among those that came to an end; spells cast per defence (C Cleanse, S Smite, M Meteor, O Frozen
-Orb); seconds per defence the mana orb sat full; the 95th percentile of the leaders' decision time. Under the
-table every target of the design is PASS, FAIL or open (nothing failed, something unmeasured).
+spawned; chants broken, the share of all the chants the leaders began that a spell broke (a broken pondering is
+not a chant); spells cast per defence (C Cleanse, S Smite, M Meteor, O Frozen Orb); seconds per defence the mana
+orb sat full; the 95th percentile of the leaders' decision time. Under the table every target of the design is
+PASS, FAIL or open (nothing failed, something unmeasured).
 ``--out DIR`` keeps the table as ``table.md`` and every defence as a JSON line in ``runs.jsonl``.
 """
 
@@ -114,9 +115,9 @@ def play(player: str, location: str, difficulty: str, seed: int, sigils: int, *,
         "waves": world.wave + 1, "game_seconds": round(world.time, 2),
         "leaks": [record.leaks[w] for w in range(len(place.waves))],
         "spells": dict(record.spells), "mana_capped": round(record.mana_capped, 2),
-        "chants": record.chants, "broken": record.broken, "landed": record.landed, "warded": record.warded,
-        "fizzled": record.fizzled, "curse_seconds": round(record.curse_seconds, 2),
-        "leaders_spawned": leaders_spawned(world),
+        "chants": record.chants, "broken": record.broken, "broken_chants": record.broken_chants,
+        "landed": record.landed, "warded": record.warded, "fizzled": record.fizzled,
+        "curse_seconds": round(record.curse_seconds, 2), "leaders_spawned": leaders_spawned(world),
         "decide_ms": [round(ms, 3) for ms in policy.ms], "cpu_seconds": round(time.process_time() - started, 3),
     }
 
@@ -234,7 +235,6 @@ def rows(stages: list[Stage], players: list[str]) -> list[dict]:
             lives = [r["lives"] for r in runs]
             won = [r["lives"] for r in runs if r["outcome"] == "victory"]
             mine = player == s.best
-            ended = sum(r["broken"] + r["landed"] + r["warded"] + r["fizzled"] for r in runs)
             held = sum(r["curse_seconds"] for r in runs)
             out.append({
                 "location": s.location, "difficulty": s.difficulty, "player": player, "best": mine,
@@ -243,7 +243,7 @@ def rows(stages: list[Stage], players: list[str]) -> list[dict]:
                 "M": statistics.median(s.margins) if mine and s.margins else None,
                 "impact": impact(s) if mine and s.uncapped else None,
                 "curse_per_leader": ratio(held, sum(r["leaders_spawned"] for r in runs)),
-                "broken_share": ratio(sum(r["broken"] for r in runs), ended),
+                "broken_share": ratio(sum(r["broken_chants"] for r in runs), sum(r["chants"] for r in runs)),
                 "spells": {k: sum(r["spells"].get(k, 0) for r in runs) / len(runs) for k in SPELL_LETTERS},
                 "mana_capped": statistics.mean(r["mana_capped"] for r in runs),
                 "p95_ms": p95([ms for r in runs for ms in r["decide_ms"]]),
@@ -357,7 +357,7 @@ def targets(table: list[dict]) -> list[list[str]]:
             leaders.check(where, within(per, 3), f"curse-seconds per leader {number(per)}",
                           "curse-seconds (no leader came)")
             share = row["broken_share"]
-            leaders.check(where, within(share, 0, 0.5), f"chants broken {percent(share)}", "chants broken (none ended)")
+            leaders.check(where, within(share, 0, 0.5), f"chants broken {percent(share)}", "chants broken (none began)")
     sharp = ["The planner stays sharp: share of the best ≥ 0.85 on every location", "—", "tools/curse_quality.py"]
     return [easy.result(), normal.result(), ordinary_loses(table), gate.result(), hell.result(), leaders.result(),
             sharp]
@@ -429,9 +429,10 @@ def main(argv: list[str] | None = None) -> None:
         f"sigils {'fixed at ' + str(args.sigils) if args.sigils is not None else 'as B* earns them'}; "
         f"{time.perf_counter() - started:.0f} s with {args.jobs} jobs.", "",
         *markdown(list(COLUMNS), [cells(r) for r in table]), "",
-        "B* has the best median lives. M: median over the first 8 seeds of the largest life factor B* still wins at. "
+        "B* has the best median lives. M: median over the first 8 seeds of the largest life factor B* still wins at "
+        "(the spells' damage grows with it, as with the knobs). "
         "Leader impact: lives lost to smart minus random leaders, uncapped, and its share of those lost to smart. "
-        "Chants broken: broken of all that ended. Spells per defence: C Cleanse, S Smite, M Meteor, O Frozen Orb.", "",
+        "Chants broken: of all the chants begun. Spells per defence: C Cleanse, S Smite, M Meteor, O Frozen Orb.", "",
         "## Targets", "",
         *markdown(["target", "result", "detail"], targets(table)),
     ]
