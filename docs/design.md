@@ -32,7 +32,7 @@ loop goes here when he has played it.
   - **Plague Totem** (poison): venom that seeks the strongest monster, stacking up to four times.
 - **Monsters** carry Diablo-style resistances. Skeletons are immune to poison. Zombies burn easily
   and shrug off poison. Goatmen resist lightning. Gargoyles fly over gates. Overlords break gates
-  fast. Azazel the Flayer, the last wave's boss, is immune to fire.
+  fast. Azazel the Flayer, the boss of Hell's Gate, is immune to fire.
 - **Warded gates** (60 gold, 650 life) stop walkers at the arch. Walkers queue and batter the gate
   until it breaks, which is where fireballs, novas and chain lightning pay off. A gate that stands
   mends by half when a wave is cleared; a broken one can be rebuilt.
