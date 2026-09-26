@@ -14,6 +14,7 @@ uv run hellward                              # play
 uv run pytest -q                             # the suite
 uv run python tools/balance.py --location caves      # every leader policy against eight ordinary defenders
 uv run python tools/curse_quality.py --location caves  # how close the leaders' curses are to the best possible
+uv run python tools/campaign_balance.py --out DIR   # the campaign's tuning table (heavy: through ~/saga/tools/slot.py)
 uv run python tools/sampler.py DIR --music   # every sound cue back to back, and the music, to listen to
 uv run python tools/pieces.py refresh        # regenerate changed foley pieces (Stable Audio 3, docs/audio.md)
 uv run python tools/restyle.py refresh DIR   # repaint the stand-ins (Codex; --provider openrouter), install the cut

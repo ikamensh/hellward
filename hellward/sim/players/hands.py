@@ -54,13 +54,15 @@ class Record:
 
     chants: int = 0               # curses the leaders began to chant
     broken: int = 0               # ponderings and chants a spell broke
+    broken_chants: int = 0        # of those, the chants
     landed: int = 0
     warded: int = 0               # curses that broke on a ward
-    fizzled: int = 0              # chants whose leader died or walked out of reach
+    fizzled: int = 0              # chants that ended with their tower gone or their leader out of reach
     curse_seconds: float = 0.0    # seconds of curses held on towers, summed over towers
     mana_capped: float = 0.0      # seconds the mana orb sat full
     spells: Counter = field(default_factory=Counter)
     leaks: Counter = field(default_factory=Counter)   # lives lost by wave
+    skills: frozenset[str] = frozenset()              # what the player learned for it
 
 
 def react_for(seed: int) -> float:
@@ -91,6 +93,7 @@ class Hands:
             elif kind == "broken":
                 self._signs.pop(e[1], None)
                 record.broken += 1
+                record.broken_chants += e[2] != -1   # a broken pondering has no tower yet
             elif kind == "cursed":
                 self._signs.pop(e[1], None)
                 record.landed += 1
@@ -153,19 +156,28 @@ class Hands:
 
 
 def defend(location: Location, difficulty: Difficulty, player: Player, *, seed: int, sigils: int,
-           planner: Planner | None, hp: float = 1.0, limit: float = 3000.0) -> tuple[World, Record]:
-    """One defence played to its end by a player; ``hp`` scales every monster's life (the balance tools' margin)."""
+           planner: Planner | None, hp: float = 1.0, lives: int | None = None,
+           limit: float = 3000.0) -> tuple[World, Record]:
+    """One defence played to its end by a player. ``hp`` scales every monster's life, and with it the spells' damage,
+    as the difficulty's own life factor does (the balance tools' margin); ``lives`` replaces the sanctuary's (the
+    balance tools set it huge to count every life lost). A defence still undecided after ``limit`` seconds is a bug."""
     learned = player.skills(location, difficulty, sigils)
     if cost(learned) > sigils:
         raise ValueError(f"{player.name} learned {cost(learned)} sigils' worth of skills with {sigils}")
     world = World(location, difficulty=replace(difficulty, hp=difficulty.hp * hp), perks=perks(learned), seed=seed,
                   planner=planner)
     world.record = True
+    if lives is not None:
+        world.lives = lives
     hands = Hands(world, react_for(seed))
+    hands.record.skills = learned
     while world.outcome is None and world.time < limit:
         player.act(hands)
         world.step(SIM_DT)
         hands.observe(world.events)
         world.events.clear()
+    if world.outcome is None:
+        where = f"{location.key} ({difficulty.key}), seed {seed}"
+        raise RuntimeError(f"{player.name} on {where}: undecided after {world.time:.0f} s")
     return world, hands.record
 
