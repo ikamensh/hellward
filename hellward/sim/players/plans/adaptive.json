@@ -1,0 +1,9 @@
+{
+  "normal": {
+    "catacombs": "mixed",
+    "cathedral": "fire",
+    "caves": "frost",
+    "graveyard": "warden",
+    "hells_gate": "mixed"
+  }
+}

@@ -49,7 +49,8 @@ GUESS = 3.0            # monsters of each kind the first guess is worth against 
 NOW = 2.0              # what a monster of this wave, on the map or still to come, weighs against one seen before
 FADE = 0.75            # what an older wave's monsters still weigh when a new wave starts
 QUEUE_GUESS = 4.0      # seconds a monster is guessed to wait at a standing gate, before any is seen
-URGENCY = 0.4          # how much more a bin near the sanctuary is worth than one at the portal
+QUEUE_WAIT = 4.0       # seconds a monster is reckoned to wait at each standing gate ahead, asking who gets through
+URGENCY = 1.2          # how much more a bin by the sanctuary is worth than one at the portal (found on training seeds)
 LEAKY = 4.0            # how much more damage to a kind is worth when all of it leaks
 LEADER = 1.5           # how much more damage to a leader is worth
 SPLASH_HIT = 0.6       # a fireball's share on the monsters around its target (the rules' number)
@@ -108,8 +109,8 @@ def useful(location: Location, key: str) -> bool:
 def learn(location: Location, sigils: int, order: tuple[str, ...]) -> frozenset[str]:
     """The skills an order buys with these sigils: its own useful ones first, then the rest of the tree."""
     learned: frozenset[str] = frozenset()
-    rest = [k for k in SKILLS if k not in order]
-    for key in [k for k in (*order, *rest) if useful(location, k)] + [k for k in (*order, *rest) if not useful(location, k)]:
+    every = [*order, *(k for k in SKILLS if k not in order)]
+    for key in sorted(every, key=lambda k: not useful(location, k)):   # a stable sort: the useful first, in order
         if can_learn(learned, key, sigils):
             learned |= {key}
     return learned
@@ -302,8 +303,8 @@ class Adaptive:
                 for b in range(bins):
                     walking += starts[b]
                     here[b] += NOW * walking * usual[b]
-            value = (1.0 + LEAKY * picture.leaked.get(key, 0.0) / came if came > 0 else 1.0)
-            value *= LEADER if kind.leader is not None else 1.0
+            leaked = picture.leaked.get(key, 0.0) / came if came > 0 else 0.0
+            value = (1.0 + LEAKY * leaked) * (LEADER if kind.leader is not None else 1.0)
             size = kind.hp ** 3
             poison = _taken(kind, Element.POISON)
             for b in range(bins):
@@ -423,7 +424,8 @@ class Adaptive:
             stats = world.tower_levels[kind][0]
             for tile in study.tiles:
                 if tile not in standing:
-                    prices[("build", kind, tile)] = self.worth(kind, 0, stats, tile, self.chilled, self.darts) / stats.cost
+                    worth = self.worth(kind, 0, stats, tile, self.chilled, self.darts)
+                    prices[("build", kind, tile)] = worth / stats.cost
         self.prices = prices
         self.cheapest = min((self._cost(world, k) for k in prices), default=0)
 
@@ -463,7 +465,7 @@ class Adaptive:
             dwell = [1.0 / kind.speed] * bins
             if not kind.flying:
                 for d in gates:
-                    dwell[study.queue_bins[d.index]] += QUEUE_GUESS
+                    dwell[study.queue_bins[d.index]] += QUEUE_WAIT
             total = 0.0
             ahead = [0.0] * bins
             for b in range(bins - 1, -1, -1):
@@ -656,7 +658,7 @@ class Adaptive:
         return True
 
     def _crowd(self, world: World, radius: float, delay: float, blow: float, element: Element, weight) -> tuple:
-        """Where a spell falling ``delay`` from now would do the most weighted damage: (where, weighted damage, damage)."""
+        """Where a spell falling ``delay`` from now does the most weighted damage: (where, weighted damage, damage)."""
         ahead = [(m, world.level.point(_landing(m, delay))) for m in world.monsters]
         best, best_raw, best_at = 0.0, 0.0, None
         for _, at in ahead:
