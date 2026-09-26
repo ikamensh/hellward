@@ -71,6 +71,7 @@ def main() -> None:
 
     def make_intro(key: str):
         def intro() -> None:
+            flow.progress.see(f"{key}/before")   # the intro itself, not the story page a first arrival shows
             flow.intro(LOCATIONS[key])
             ticks(4)
             shot(f"intro-{key}")
@@ -143,7 +144,7 @@ def main() -> None:
 
     def story_page() -> None:
         game.clear_and_push(StoryScene(flow, STORIES["tristram/before"].pages, then=lambda: None))
-        ticks(60)
+        ticks(90)   # both paragraphs faded in
         shot("story-tristram-before")
 
     def make_prologue(name: str, seconds: float):

@@ -106,7 +106,7 @@ class StoryScene(Scene):
     background_color = (6, 4, 6, 255)
     controls = {("return", "enter"): "advance", ("escape", "esc"): "skip"}
 
-    BAND = 230          # the dark band over the bottom holding the paragraphs
+    BAND = 280          # the dark band over the bottom holding the paragraphs
     FADE = 0.8          # seconds each paragraph fades in over, one after another
 
     def __init__(self, flow: Flow, pages: tuple[Page, ...], then: Callable[[], None]) -> None:
@@ -153,17 +153,18 @@ class StoryScene(Scene):
         page = self.pages[self.index]
         zoom = 1.0 + 0.04 * min(1.0, self.clock / 12.0)
         draw_cover(self, story_image(self.game, page.key), zoom=zoom)
-        self.draw_rect(0, HEIGHT - self.BAND, WIDTH, self.BAND, (0, 0, 0, 200))
-        self.draw_rect(0, HEIGHT - self.BAND, WIDTH, 2, (92, 76, 58, 200))
-        y = HEIGHT - self.BAND + 26
-        for i, paragraph in enumerate(page.text):
-            alpha = 255 if self.revealed else int(255 * min(1.0, max(0.0, (self.clock - i * self.FADE) / self.FADE)))
-            if alpha <= 0:
-                break
-            y += self.draw_paragraph(paragraph, 140, y, 1000, font_size=20,
-                                     color=style.BONE[:3] + (alpha,)) + 12
-        self.draw_text("Enter: continue  ·  Esc: skip", WIDTH / 2, HEIGHT - 22, font_size=13, color=style.DIM,
-                       anchor_x="center", anchor_y="center")
+        with self.screen_layer(1):   # over the picture: within one layer, shapes sit under images
+            self.draw_rect(0, HEIGHT - self.BAND, WIDTH, self.BAND, (0, 0, 0, 200))
+            self.draw_rect(0, HEIGHT - self.BAND, WIDTH, 2, (92, 76, 58, 200))
+            y = HEIGHT - self.BAND + 22
+            for i, paragraph in enumerate(page.text):
+                alpha = 255 if self.revealed else int(255 * min(1.0, max(0.0, (self.clock - i * self.FADE) / self.FADE)))
+                if alpha <= 0:
+                    break
+                y += self.draw_paragraph(paragraph, 140, y, 1000, font_size=18,
+                                         color=style.BONE[:3] + (alpha,)) + 12
+            self.draw_text("Enter: continue  ·  Esc: skip", WIDTH / 2, HEIGHT - 14, font_size=12, color=style.DIM,
+                           anchor_x="center", anchor_y="center")
 
 
 class PrologueScene(Scene):
@@ -292,10 +293,11 @@ class PrologueScene(Scene):
             self.draw_image("title", 0, 0, WIDTH, HEIGHT)
         else:
             draw_gradient(self)
-        self.draw_rect(0, HEIGHT - 190, WIDTH, 190, (0, 0, 0, 200))
-        self.draw_text("HELLWARD", WIDTH / 2, HEIGHT - 130, style="title", anchor_x="center", anchor_y="center")
-        self.draw_text("Keep it burning.", WIDTH / 2, HEIGHT - 62, font_size=22, color=style.PALE_GOLD,
-                       anchor_x="center", anchor_y="center")
+        with self.screen_layer(1):
+            self.draw_rect(0, HEIGHT - 190, WIDTH, 190, (0, 0, 0, 200))
+            self.draw_text("HELLWARD", WIDTH / 2, HEIGHT - 130, style="title", anchor_x="center", anchor_y="center")
+            self.draw_text("Keep it burning.", WIDTH / 2, HEIGHT - 62, font_size=22, color=style.PALE_GOLD,
+                           anchor_x="center", anchor_y="center")
 
     def _caption(self) -> None:
         text = ""
@@ -304,9 +306,10 @@ class PrologueScene(Scene):
                 text = word["text"]
         if not text:
             return
-        self.draw_rect(0, HEIGHT - 116, WIDTH, 116, (0, 0, 0, 200))
-        self.draw_text(text, WIDTH / 2, HEIGHT - 58, font_size=20, color=style.BONE, anchor_x="center",
-                       anchor_y="center")
+        with self.screen_layer(1):
+            self.draw_rect(0, HEIGHT - 116, WIDTH, 116, (0, 0, 0, 200))
+            self.draw_text(text, WIDTH / 2, HEIGHT - 58, font_size=20, color=style.BONE, anchor_x="center",
+                           anchor_y="center")
 
 
 class ChronicleScene(Scene):
