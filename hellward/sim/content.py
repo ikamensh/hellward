@@ -134,7 +134,7 @@ TOWERS: dict[str, TowerKind] = {t.key: t for t in (
         TowerLevel(80, 6, 0.8, 3.0, poison=14, poison_time=4.0),
         TowerLevel(95, 10, 0.85, 3.2, poison=24, poison_time=4.0),
         TowerLevel(160, 16, 0.9, 3.4, poison=40, poison_time=4.5),
-    ), "Venom seeks the strongest monster; poison stacks up to four times.", bolt_speed=7.0),
+    ), "Venom seeks the strongest monster it can poison; poison stacks up to four times.", bolt_speed=7.0),
 )}
 
 MAX_POISON_STACKS = 4
@@ -182,12 +182,12 @@ class SpellSpec:
 
 SPELLS: dict[str, SpellSpec] = {s.key: s for s in (
     SpellSpec("cleanse", "Cleanse", 35, "tower", "Burns every curse off one tower."),
-    SpellSpec("smite", "Smite", 40, "monster", "Holy lightning strikes one monster, and no resistance softens it. "
-              "A chanting leader's curse fizzles.", damage=150),
-    SpellSpec("meteor", "Meteor", 60, "floor", "Falls a moment after the cast and leaves the floor burning.", damage=180,
-              radius=1.4, delay=1.2, lasting=3.0, burn=30),
-    SpellSpec("orb", "Frozen Orb", 50, "floor", "Freezes everything near it: no walking, no battering, and chants break.",
-              damage=50, radius=1.8, lasting=2.5),
+    SpellSpec("smite", "Smite", 30, "monster", "Holy lightning strikes one monster, and no resistance softens it. "
+              "A leader it strikes while pondering or chanting loses its curse.", damage=100),
+    SpellSpec("meteor", "Meteor", 60, "floor", "Falls a moment after the cast and leaves the floor burning.", damage=110,
+              radius=1.4, delay=1.2, lasting=3.0, burn=12),
+    SpellSpec("orb", "Frozen Orb", 50, "floor", "Freezes everything near it: no walking, no battering, and a leader's "
+              "curse breaks.", damage=50, radius=1.8, lasting=2.5),
 )}
 
 START_LIVES = 20
@@ -198,8 +198,8 @@ WAVE_BREAK = 25.0          # seconds between a cleared wave and the next, unless
 EARLY_CALL_GOLD = 1.0      # gold per second of break skipped
 BURN_RADIUS = 1.1          # the burning floor a meteor leaves
 SHATTER_RADIUS = 1.2
-SHATTER_SHARE = 0.25       # of a shattered monster's full life
+SHATTER_SHARE = 0.1        # of a shattered monster's full life
 CONTAGION_REACH = 1.5
-THORNS = 2.0               # a gate under Thorns returns this many times each blow
-SOUL = 20.0                # mana a slain leader gives under Soul Harvest
+THORNS = 0.5               # a gate under Thorns returns this share of each blow, as it would land unchilled
+SOUL = 10.0                # mana a slain leader gives under Soul Harvest
 WARD = 8.0                 # seconds a cleansed tower is warded under Salvation

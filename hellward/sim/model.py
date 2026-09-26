@@ -430,7 +430,7 @@ class World:
             raise Refused("There is nothing there to smite.")
         self._spend("smite")
         self._emit("smite", m.id, self.level.point(m.s))
-        if m.chant_curse is not None:
+        if m.chant_curse is not None or m.asking is not None:
             self._break(m)
         self._hurt(m, SPELLS["smite"].damage * self.power(), None)
 
@@ -452,7 +452,7 @@ class World:
         for m in struck:
             m.frozen = max(m.frozen, spec.lasting)
             m.door = -1
-            if m.chant_curse is not None:
+            if m.chant_curse is not None or m.asking is not None:
                 self._break(m)
         for m in struck:
             self._hurt(m, damage, Element.COLD)
@@ -570,9 +570,10 @@ class World:
                 self._emit("ponder", m.id)
 
     def _break(self, m: Monster) -> None:
-        """A leader's chant broken by a spell: the curse fizzles and its whole cooldown starts again."""
+        """A leader's pondering or chant broken by a spell: the curse never comes, and its whole cooldown starts again."""
         tower = m.chant_tower
         m.chant_curse, m.chant_tower, m.chant_left = None, -1, 0.0
+        m.asking, m.ask_left = None, 0.0
         spec = m.kind.leader
         if spec is not None:
             m.cooldown = spec.cooldown * self.difficulty.leader_pace
@@ -647,7 +648,7 @@ class World:
                     blow *= 1.0 - m.chill
                 d.hp -= blow
                 if thorns:
-                    self._hurt(m, blow * THORNS, None, quiet=True)
+                    self._hurt(m, m.kind.door_dps * dt * THORNS, None, quiet=True)
                 if d.hp <= 0 and d.built:
                     d.built, d.hp = False, 0.0
                     self._emit("door_broken", d.index)
@@ -677,10 +678,10 @@ class World:
             attack = t.kind.attack
             if attack == "nova":
                 hit = [m for m in monsters if m.hp > 0 and _inside(m.s, spans)]
-            elif attack == "venom":
+            elif attack == "venom":   # the strongest it can poison
                 best = None
                 for m in monsters:
-                    if m.hp > 0 and (best is None or m.hp > best.hp) and _inside(m.s, spans):
+                    if m.hp > 0 and (best is None or m.hp > best.hp) and m.kind.taken(Element.POISON) > 0 and _inside(m.s, spans):
                         best = m
                 hit = [best] if best is not None else []
             else:
@@ -748,10 +749,7 @@ class World:
         self._emit("chain", tower.id, [m.id for m in struck], where)
         keeps = self.perks.leap_keeps
         for i, m in enumerate(struck):
-            strike = damage * keeps ** i
-            if static and m.kind.leader is not None:
-                strike *= 2.0
-            self._hurt(m, strike, Element.LIGHTNING)
+            self._hurt(m, damage * keeps ** i, Element.LIGHTNING)
 
     def _bolts(self, dt: float) -> None:
         if not self.bolts:
@@ -834,16 +832,16 @@ class World:
             resist -= 0.25
         return 1.0 - resist
 
-    def _hurt(self, m: Monster, amount: float, element: Element | None, *, quiet: bool = False) -> None:
+    def _hurt(self, m: Monster, amount: float, element: Element | None, *, quiet: bool = False, bursts: bool = True) -> None:
         if m.hp <= 0:
             return
         m.hp -= amount * self.taken(m, element)
         if not quiet:
             self._emit("hit", m.id, element)
         if m.hp <= 0:
-            self._died(m, element)
+            self._died(m, element, bursts)
 
-    def _died(self, m: Monster, element: Element | None) -> None:
+    def _died(self, m: Monster, element: Element | None, bursts: bool) -> None:
         self.gold += m.kind.bounty
         self.kills += 1
         where = self.level.point(m.s)
@@ -852,11 +850,11 @@ class World:
             self.mana = min(self.perks.mana_max, self.mana + SOUL)
         if self.perks.contagion and m.poison:
             self._spread(m, where)
-        if self.perks.shatter and m.chill_left > 0:
+        if bursts and self.perks.shatter and m.chill_left > 0:
             around = [o for o in self._around(where[0], where[1], SHATTER_RADIUS, flyers=True) if o is not m]
             self._emit("shatter", m.id, where)
-            for o in around:
-                self._hurt(o, m.max_hp * SHATTER_SHARE, Element.COLD, quiet=True)
+            for o in around:   # a monster a burst kills does not burst in turn
+                self._hurt(o, m.max_hp * SHATTER_SHARE, Element.COLD, quiet=True, bursts=False)
 
     def _spread(self, m: Monster, where: tuple[float, float]) -> None:
         """Contagion: a dead monster's venom goes to the nearest living monster it can poison."""

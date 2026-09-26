@@ -35,7 +35,7 @@ def test_the_campaign_goes_down_in_order_and_every_location_opens():
     for i, key in enumerate(ORDER):
         assert all(ORDER.index(need) < i for need in LOCATIONS[key].requires)
     assert ORDER[-1] == LAST
-    assert set(LOCATIONS[LAST].requires) == {"catacombs", "caves"}
+    assert all(LOCATIONS[key].requires == (before,) for before, key in zip(ORDER, ORDER[1:]))   # one way down
     offered = [set(LOCATIONS[k].arsenal.towers) | set(LOCATIONS[k].arsenal.spells) for k in ORDER]
     for earlier, later in zip(offered, offered[1:]):
         assert earlier <= later   # nothing once taught is taken away further down

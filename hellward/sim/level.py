@@ -39,9 +39,11 @@ class Level:
             if x0 != x1 and y0 != y1:
                 raise ValueError(f"path leg {(x0, y0)}->{(x1, y1)} is not straight")
         path = set(self.path_tiles)
-        for door in self.doors:
-            if door not in path:
-                raise ValueError(f"door socket {door} is not on the path")
+        for x, y in self.doors:
+            if (x, y) not in path:
+                raise ValueError(f"door socket {(x, y)} is not on the path")
+            if (x, y - 1) not in path or (x, y + 1) not in path:
+                raise ValueError(f"door socket {(x, y)} is not on a vertical leg: an arch is drawn facing the camera")
 
     # -- Tiles -------------------------------------------------------------------------
 

@@ -5,8 +5,9 @@ from dataclasses import replace
 import pytest
 
 from hellward.sim import campaign
+from hellward.sim.autoplay import tile_scores
 from hellward.sim.campaign import g
-from hellward.sim.content import Element, Wave
+from hellward.sim.content import SOUL, Element, Wave
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.skills import SKILLS, TREE_COST, can_learn, check, perks
 
@@ -16,6 +17,11 @@ def world_of(*groups, learned=(), **kwargs) -> World:
     world = World(location, perks=perks(learned), **kwargs)
     world.gold = 5000
     return world
+
+
+def best(world: World, n: int) -> list[tuple[int, int]]:
+    """The n floor tiles that watch the most path: where any player builds first."""
+    return [tile for _, tile in tile_scores(world)[:n]]
 
 
 def run(world: World, seconds: float) -> None:
@@ -42,8 +48,8 @@ def test_a_towers_skills_make_it_kill_more(kind, column):
     """Property: every tower skill leaves fewer monsters alive, or fewer lives lost, than none."""
     def result(learned):
         world = world_of(g("zombie", 6, 0.6), g("fallen", 8, 0.4, start=2.0), learned=learned)
-        world.build(kind, (5, 5))
-        world.build(kind, (11, 6))
+        for tile in best(world, 2):
+            world.build(kind, tile)
         world.call_wave()
         run(world, 40)
         return (world.lives, world.kills, -sum(m.hp for m in world.monsters))
@@ -67,7 +73,7 @@ def test_holy_shield_and_thorns_make_a_gate_hold_longer_and_hurt_its_batterers()
 def test_static_field_draws_the_lightning_to_a_leader():
     def leader_hp(learned):
         world = world_of(g("skeleton", 6, 0.3), g("priest", 1, start=1.0), learned=learned)
-        world.build("storm", (4, 5))
+        world.build("storm", best(world, 1)[0])
         world.call_wave()
         run(world, 9)
         priest = next((m for m in world.monsters if m.kind.key == "priest"), None)
@@ -78,8 +84,9 @@ def test_static_field_draws_the_lightning_to_a_leader():
 def test_shatter_hurts_the_neighbours_of_a_monster_that_dies_chilled():
     def hurt_around(learned):
         world = world_of(g("fallen", 6, 0.2), learned=learned)
-        world.build("frost", (5, 5))
-        world.build("pyre", (4, 5))   # kills them while the frost holds them
+        frost, pyre = best(world, 2)
+        world.build("frost", frost)
+        world.build("pyre", pyre)   # kills them while the frost holds them
         world.call_wave()
         run(world, 12)
         return sum(1 for e in world.events if e[0] == "shatter")
@@ -90,8 +97,9 @@ def test_shatter_hurts_the_neighbours_of_a_monster_that_dies_chilled():
 def test_contagion_carries_venom_to_the_next_monster_and_lower_resist_opens_it_up():
     learned = ("poison_mastery", "contagion", "lower_resist")
     world = world_of(g("goatman", 4, 0.3), learned=learned)
-    world.build("plague", (5, 5))
-    world.build("pyre", (4, 5))   # kills them while the venom is in them
+    plague, pyre = best(world, 2)
+    world.build("plague", plague)
+    world.build("pyre", pyre)   # kills them while the venom is in them
     world.call_wave()
     run(world, 25)
     assert any(e[0] == "contagion" for e in world.events)
@@ -125,5 +133,7 @@ def test_soul_harvest_pays_mana_for_a_slain_leader():
     world.call_wave()
     run(world, 1)
     world.mana = world.spell_cost("smite")
-    world.smite(world.monsters[0].id)   # a shaman's life is less than one smite
-    assert world.mana == pytest.approx(20)
+    shaman = world.monsters[0]
+    shaman.hp = shaman.max_hp * 0.5   # wounded: one smite finishes it
+    world.smite(shaman.id)
+    assert world.mana == pytest.approx(SOUL)

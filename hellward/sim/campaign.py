@@ -33,7 +33,7 @@ class Location:
     theme: str                        # the floor's look, for art/mapart.py
     blurb: str                        # what the place is, one or two sentences
     taunt: str                        # the Bone Priest, who has seen this fight before
-    requires: tuple[str, ...] = ()    # locations that must be held first
+    requires: tuple[str, ...] = ()    # the location that must be held first
     at: tuple[float, float] = (0.5, 0.5)   # where it lies on the world map, as shares of its width and height
 
     def __post_init__(self) -> None:
@@ -62,9 +62,8 @@ class Difficulty:
 
 
 NORMAL = Difficulty("normal", "Normal", 1.0, 1.0, None)
-NIGHTMARE = Difficulty("nightmare", "Nightmare", 1.7, 0.85, "normal")
-HELL = Difficulty("hell", "Hell", 2.6, 0.7, "nightmare")
-DIFFICULTIES: dict[str, Difficulty] = {d.key: d for d in (NORMAL, NIGHTMARE, HELL)}
+HELL = Difficulty("hell", "Hell", 2.2, 0.75, "normal")
+DIFFICULTIES: dict[str, Difficulty] = {d.key: d for d in (NORMAL, HELL)}
 
 SIGIL_LIVES = (1, 10, 18)   # sanctuary life to keep for one, two and three sigils (a victory keeps at least one)
 
@@ -99,16 +98,17 @@ TRISTRAM = Location(
     ),
     waves=_waves(
         ((g("fallen", 8, 1.2),), 30, 1.0),
-        ((g("fallen", 12, 0.9),), 40, 1.1),
-        ((g("fallen", 10, 0.8), g("shaman", 1, start=5.0)), 50, 1.2),
-        ((g("fallen", 16, 0.6), g("shaman", 2, 6.0, start=3.0)), 60, 1.35),
-        ((g("fallen", 22, 0.5), g("shaman", 3, 5.0, start=2.0)), 0, 1.5),
+        ((g("fallen", 10, 0.9), g("zombie", 2, 3.0, start=4.0)), 40, 1.1),
+        ((g("fallen", 10, 0.8), g("zombie", 3, 2.5, start=2.0), g("shaman", 1, start=5.0)), 50, 1.2),
+        ((g("fallen", 16, 0.6), g("zombie", 4, 2.0, start=3.0), g("shaman", 2, 6.0, start=3.0)), 60, 1.35),
+        ((g("fallen", 22, 0.5), g("zombie", 6, 1.8, start=4.0), g("shaman", 3, 5.0, start=2.0)), 0, 1.5),
     ),
-    wave_names=("The Fallen Swarm", "Torches in the Square", "The Shaman Sings", "Red Knives", "The Burning of Tristram"),
+    wave_names=("The Fallen Swarm", "The Village Dead", "The Shaman Sings", "Red Knives", "The Burning of Tristram"),
     arsenal=Arsenal(("pyre", "frost"), gates=False, spells=("cleanse",)),
     start_gold=220,
     theme="village",
-    blurb="The village under the cathedral burns. The Fallen swarm through its lanes, and a shaman sings them on.",
+    blurb="The village under the cathedral burns. The Fallen swarm through its lanes, the village dead walk behind "
+          "them, and a shaman sings them on.",
     taunt="Every one of them has died before. My shaman sings them up again. When he looks at your fire, "
           "it will falter.",
     at=(0.2, 0.16),
@@ -157,10 +157,10 @@ CATHEDRAL = Location(
     waves=_waves(
         ((g("fallen", 14, 0.8),), 40, 1.0),
         ((g("goatman", 8, 1.2), g("shaman", 1, start=6.0)), 50, 1.1),
-        ((g("fallen", 16, 0.6), g("goatman", 6, 1.0, start=4.0), g("shaman", 1, start=5.0)), 60, 1.25),
+        ((g("fallen", 16, 0.6), g("goatman", 6, 1.0, start=4.0), g("shaman", 1, start=5.0), g("skeleton", 6, 1.0, start=8.0)), 60, 1.25),
         ((g("goatman", 10, 1.0), g("witch", 1, start=5.0)), 70, 1.4),
         ((g("fallen", 20, 0.5), g("goatman", 8, 0.9, start=3.0), g("witch", 1, start=4.0), g("shaman", 1, start=9.0)), 80, 1.55),
-        ((g("goatman", 14, 0.8), g("shaman", 2, 6.0, start=3.0), g("witch", 1, start=6.0)), 90, 1.7),
+        ((g("goatman", 14, 0.8), g("skeleton", 8, 0.8, start=2.0), g("shaman", 2, 6.0, start=3.0), g("witch", 1, start=6.0)), 90, 1.7),
         ((g("fallen", 24, 0.45), g("goatman", 14, 0.8, start=4.0), g("witch", 2, 8.0, start=3.0),
           g("shaman", 2, 7.0, start=6.0)), 0, 1.9),
     ),
@@ -182,10 +182,10 @@ CATACOMBS = Location(
     name="The Catacombs",
     level=Level(
         name="The Catacombs", width=25, height=14,
-        waypoints=((0, 3), (21, 3), (21, 9), (0, 9)),
-        doors=((6, 3), (12, 3), (18, 3), (11, 9)),
-        obstacles=frozenset({(3, 12), (9, 12), (16, 12), (23, 11), (4, 1), (15, 1), (23, 1)}),
-        pools=frozenset({(9, 6), (15, 6)}),
+        waypoints=((4, 0), (4, 11), (12, 11), (12, 2), (20, 2), (20, 13)),
+        doors=((4, 4), (4, 8), (12, 6), (20, 8)),
+        obstacles=frozenset({(8, 6), (16, 8), (1, 12), (23, 1), (16, 4), (8, 1), (1, 3), (23, 11)}),
+        pools=frozenset({(8, 9), (16, 11), (1, 7)}),
     ),
     waves=_waves(
         ((g("skeleton", 12, 0.9),), 50, 1.3),
@@ -236,7 +236,7 @@ CAVES = Location(
     theme="caves",
     blurb="Below the catacombs the caves open onto lava. Gargoyles nest in the vault and fly where they please.",
     taunt="Walls mean nothing to wings. Look up.",
-    requires=("cathedral",),
+    requires=("catacombs",),
     at=(0.73, 0.55),
 )
 
@@ -270,7 +270,7 @@ HELLS_GATE = Location(
     theme="hell",
     blurb="The door your saints built the cathedral on. Azazel the Flayer waits behind it with the council of curses.",
     taunt="I have watched this fight more times than you have drawn breath. In every one of them, the lamp goes out.",
-    requires=("catacombs", "caves"),
+    requires=("caves",),
     at=(0.5, 0.85),
 )
 

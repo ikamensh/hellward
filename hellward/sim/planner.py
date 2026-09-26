@@ -98,10 +98,10 @@ def _trajectory(world: World, m: Monster, times: list[float]) -> list[float]:
             if d.built and d.s > m.s:
                 stop = d.s - DOOR_STOP - m.jostle
                 break
-    speed = m.speed
+    speed = m.kind.speed * (1.0 - m.chill) if m.chill_left > 0 else m.kind.speed
     out = []
     for t in times:
-        s = m.s + speed * t
+        s = m.s + speed * max(0.0, t - m.frozen)
         if stop is not None and s > stop:
             s = max(stop, m.s)
         out.append(s)
@@ -117,7 +117,8 @@ def _damage_in(tower: Tower, reach: float, world: World, tracks: list[tuple[Mons
         s = track[index]
         for a, b in spans:
             if a <= s <= b:
-                taken.append(m.kind.taken(element))
+                if tower.kind.attack != "venom" or m.kind.taken(element) > 0:   # venom seeks only what it can poison
+                    taken.append(m.kind.taken(element))
                 break
     if not taken:
         return 0.0
@@ -128,7 +129,8 @@ def _damage_in(tower: Tower, reach: float, world: World, tracks: list[tuple[Mons
         return dps * sum(taken)
     taken.sort(reverse=True)
     if attack == "chain":
-        return dps * sum(v * 0.85 ** i for i, v in enumerate(taken[: 1 + stats.chains]))
+        keeps = world.perks.leap_keeps
+        return dps * sum(v * keeps ** i for i, v in enumerate(taken[: 1 + stats.chains]))
     if attack == "venom":
         return (dps + stats.poison * min(4, stats.poison_time * stats.rate)) * taken[0]
     splash = 1.0 + 0.6 * min(3, len(taken) - 1) if stats.splash > 0 else 1.0
