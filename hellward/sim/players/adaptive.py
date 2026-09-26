@@ -58,9 +58,7 @@ LEADER = 1.5           # how much more damage to a leader is worth
 SPLASH_HIT = 0.6       # a fireball's share on the monsters around its target (the rules' number)
 VENOM_ROOM = 1.0       # venom darts a second one monster can take: four stacks that last four seconds
 VENOM_TRUST = 0.6      # how far the estimate of a plague totem is trusted, and a frost nova's: both found by
-NOVA_TRUST = 1.3       # playing training seeds, where totems proved worth less and novas more than estimated
-STORM_TRUST = 1.0
-FIRE_TRUST = 1.0
+NOVA_TRUST = 1.45      # playing training seeds, where totems proved worth less and novas more than estimated
 SETTLE = 0.8           # an affordable buy this close to the best is taken instead of saving for the best
 IDLE = 5.0             # a tower is sold when its gold would buy this many times what it does
 CALL_MANA = 0.92       # share of a full orb an early call needs in hand
@@ -376,10 +374,10 @@ class Adaptive:
         if attack == "chain":
             reached = min(1.0 + stats.chains, around)
             keeps = world.perks.leap_keeps
-            return STORM_TRUST * dps * busy * sum(keeps ** i * min(1.0, reached - i) for i in range(math.ceil(reached)))
+            return dps * busy * sum(keeps ** i * min(1.0, reached - i) for i in range(math.ceil(reached)))
         if stats.splash > 0:
-            return FIRE_TRUST * dps * busy * (1.0 + SPLASH_HIT * min(3.0, (view.near[b] - 1.0) * min(1.0, stats.splash / 1.2)))
-        return FIRE_TRUST * dps * busy
+            return dps * busy * (1.0 + SPLASH_HIT * min(3.0, (view.near[b] - 1.0) * min(1.0, stats.splash / 1.2)))
+        return dps * busy
 
     def worth(self, kind: str, level: int, stats: TowerLevel, tile: tuple[int, int], chilled: list[float],
               darts: list[float]) -> float:
