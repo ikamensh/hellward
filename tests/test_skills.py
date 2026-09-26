@@ -58,15 +58,18 @@ def test_a_towers_skills_make_it_kill_more(kind, column):
 
 def test_holy_shield_and_thorns_make_a_gate_hold_longer_and_hurt_its_batterers():
     def gate(learned):
+        """How long the first gate held against three zombies, and the life they had left when it fell."""
         world = world_of(g("zombie", 3, 0.3), learned=learned)
         world.build_door(0)
         world.call_wave()
-        run(world, 30)
-        return world.doors[0].hp, sum(m.hp for m in world.monsters)
-    plain_gate, plain_life = gate(())
-    shield_gate, _ = gate(("holy_shield",))
-    thorn_gate, thorn_life = gate(("holy_shield", "salvation", "thorns"))
-    assert shield_gate > plain_gate
+        while world.doors[0].built:
+            run(world, 0.5)
+            assert world.time < 300
+        return world.time, sum(m.hp for m in world.monsters)
+    plain_held, plain_life = gate(())
+    shield_held, _ = gate(("holy_shield",))
+    thorn_held, thorn_life = gate(("holy_shield", "salvation", "thorns"))
+    assert shield_held > plain_held
     assert thorn_life < plain_life
 
 

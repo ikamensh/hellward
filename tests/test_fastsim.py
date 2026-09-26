@@ -103,6 +103,7 @@ def busy_world() -> World:
     tower, two cursed ones and a leader chanting are set by hand. Like a clone, it has no planner and no leader
     waiting for one."""
     world = World(LOCATIONS["hells_gate"], difficulty=HELL, perks=perks(SKILLS), seed=5, planner=planner.smart)
+    world.lives = 10_000   # the ordinary player would fall on Hell long before the fight fills
     player, hands = Ordinary(), Hands(world, react=0.6)
 
     def full() -> bool:

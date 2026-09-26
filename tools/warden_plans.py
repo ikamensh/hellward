@@ -78,7 +78,9 @@ def won(row: dict, key: str, difficulty: str, sigils: int, seed: int, hp: float,
 
 
 def margin(row: dict, key: str, difficulty: str, sigils: int, seed: int, leaders: str, hi: float = 16.0) -> float:
-    """The largest factor on every monster's life at which the plan still wins, bisected to 2%."""
+    """The largest factor on every monster's life at which the plan still wins, bisected to 2% (0 when it loses at 1)."""
+    if not won(row, key, difficulty, sigils, seed, 1.0, leaders):
+        return 0.0
     lo = 1.0
     while hi / lo > 1.02:
         mid = (lo * hi) ** 0.5

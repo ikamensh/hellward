@@ -20,7 +20,7 @@ FIRST = ("fire_mastery", "warmth", "cold_mastery", "lightning_mastery", "holy_sh
 
 METEOR_CROWD = 4     # others within METEOR_REACH of the aimed monster that make a Meteor worth it
 METEOR_REACH = 1.4   # tiles around the aimed monster
-METEOR_SPARE = 90.0  # mana kept in hand for Smite before a Meteor is cast
+METEOR_SPARE = 95.0  # a Meteor (60) only when a Smite (35) stays in hand
 
 
 @dataclass

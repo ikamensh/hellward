@@ -174,8 +174,8 @@ class Hands:
 def defend(location: Location, difficulty: Difficulty, player: Player, *, seed: int, sigils: int,
            planner: Planner | None, hp: float = 1.0, lives: int | None = None, limit: float = 3000.0,
            watch: Callable[[World], None] | None = None) -> tuple[World, Record]:
-    """One defence played to its end by a player. ``hp`` scales every monster's life, and with it the spells' damage,
-    as the difficulty's own life factor does (the balance tools' margin); ``lives`` replaces the sanctuary's (the
+    """One defence played to its end by a player. ``hp`` scales every monster's life as the difficulty's own factor
+    does, leaving the spells as they are (the balance tools' margin); ``lives`` replaces the sanctuary's (the
     balance tools set it huge to count every life lost); *watch* sees the world after every step, with that step's
     events. A defence still undecided after ``limit`` seconds is a bug."""
     learned = player.skills(location, difficulty, sigils)

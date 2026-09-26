@@ -404,7 +404,7 @@ class Warden:
         """Smite the leader whose chant would cost the most, or freeze it when other chants or a crowd stand by."""
         world = hands.world
         chanting: list[Monster] = []
-        best, best_value = None, 0.0
+        best, best_value, seen = None, 0.0, (0.0, 0.0)
         for sign in hands.threats():
             leader = world.monster(sign.leader)
             if leader is None:
@@ -418,11 +418,11 @@ class Warden:
             else:
                 value = max((_tower_value(world, t) for t in world.towers.values()), default=0.0) * 4.0
             if value > best_value:
-                best, best_value = leader, value
+                best, best_value, seen = leader, value, sign.at
         if best is None:
             return False
         if ready(world, "orb"):
-            x, y = world.level.point(best.s)
+            x, y = seen   # where the leader stood when its sign appeared: a person aims where they saw it
             caught = _near(world, x, y, SPELLS["orb"].radius)
             if sum(1 for m in caught if m in chanting) >= 2 or sum(m.hp for m in caught) >= ORB_CROWD * world.power():
                 hands.orb(x, y)
@@ -553,7 +553,7 @@ def _ahead(world: World, m: Monster, seconds: float) -> tuple[float, float]:
     s = m.s + (m.kind.speed * (1.0 - m.chill) if m.chill_left > 0 else m.kind.speed) * walking
     if not m.kind.flying:
         for d in world.doors:
-            if d.built and d.s > m.s:
-                s = min(s, max(m.s, d.s - DOOR_STOP - m.jostle))
+            if d.built and d.s > m.s:   # a queue's depth is unseen until it forms: its middle
+                s = min(s, max(m.s, d.s - DOOR_STOP - JOSTLE / 2))
                 break
     return world.level.point(s)

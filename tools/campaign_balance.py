@@ -16,8 +16,8 @@ machine's slot queue, as above.
 * **B\\*** at a location and difficulty is the player with the best median lives; ties go to more wins, then to
   more mean lives. The table marks it.
 * ``--margin``: M, the largest factor on every monster's life at which B* still wins, bisected to 2% between
-  0.4 and 4 on each of the first 8 seeds; the table gives the median. The spells' damage grows with the factor, as
-  it does with the knobs M stands for (the waves' and the difficulty's life), so M is what those knobs would give.
+  0.4 and 4 on each of the first 8 seeds; the table gives the median. The factor is the difficulty's own, so the
+  spells do not grow with it: M is what raising the difficulty's life would give.
 * ``--leaders``: B* with its skills against the smart leaders and against random ones, the lives uncapped (as
   ``balance.py`` counts them). Leader impact is the lives lost to smart minus those lost to random, and that as a
   share of the lives lost to smart.
@@ -431,7 +431,7 @@ def main(argv: list[str] | None = None) -> None:
         f"{time.perf_counter() - started:.0f} s with {args.jobs} jobs.", "",
         *markdown(list(COLUMNS), [cells(r) for r in table]), "",
         "B* has the best median lives. M: median over the first 8 seeds of the largest life factor B* still wins at "
-        "(the spells' damage grows with it, as with the knobs). "
+        "(the spells do not grow with it, as with the difficulty's life). "
         "Leader impact: lives lost to smart minus random leaders, uncapped, and its share of those lost to smart. "
         "Chants broken: of all the chants begun. Spells per defence: C Cleanse, S Smite, M Meteor, O Frozen Orb.", "",
         "## Targets", "",
