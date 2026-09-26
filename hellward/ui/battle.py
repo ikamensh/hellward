@@ -160,7 +160,8 @@ class BattleScene(Scene):
                 sound.music("boss")
         elif kind == "cleared":
             if e[2]:
-                self.hud.banner("The wave is broken", f"+{e[2]} gold. Gates mend by half.", life=2.4)
+                mend = "" if not world.doors else " Gates mend fully." if world.perks.gate_mend >= 1 else " Gates mend by half."
+                self.hud.banner("The wave is broken", f"+{e[2]} gold.{mend}", life=2.4)
             sound.play("cleared")
         elif kind == "bolt":
             sound.play("fire_cast" if e[1].kind == "pyre" else "venom_cast", volume=0.6)
@@ -274,6 +275,10 @@ class BattleScene(Scene):
             return
         if not offers(self.location, key):
             self._refuse(f"{SPELLS[key].name} is not yet yours: you learn it for {first_offering(key).called}.")
+            return
+        cost = self.world.spell_cost(key)
+        if self.world.mana < cost:
+            self._refuse(f"{SPELLS[key].name} takes {cost:.0f} mana.")
             return
         if key == "smite":
             leader = self.threat()
@@ -454,16 +459,15 @@ class BattleScene(Scene):
         return False
 
     def _control(self, name: str, enabled: bool) -> None:
-        if not enabled:
-            if name.startswith(("build:", "spell:")):
-                getattr(self, "pick" if name.startswith("build:") else "spell")(name.split(":")[1])   # says why not
-            else:
-                self.sound.play("refuse")
-            return
-        if name.startswith("build:"):
-            self.pick(name.split(":")[1])
-        elif name.startswith("spell:"):
-            self.spell(name.split(":")[1])
+        kind, _, key = name.partition(":")
+        if kind == "spell":
+            self.spell(key)   # it says why when it cannot
+        elif kind == "build" and not offers(self.location, key):
+            self.pick(key)    # it says where the slot's tower arrives
+        elif not enabled:
+            self.sound.play("refuse")
+        elif kind == "build":
+            self.pick(key)
         elif name == "call":
             self.call_wave()
         elif name == "speed":
