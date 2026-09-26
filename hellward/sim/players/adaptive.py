@@ -551,8 +551,8 @@ class Adaptive:
         if not self.endgame or not world.monsters:
             return
         rear = min(m.s for m in world.monsters)
-        behind = [t for t in world.towers.values()
-                  if max(b for b, _ in self.study.cover(t.tile, t.stats.range)) + 1 < rear]
+        behind = [t for t in world.towers.values()   # a cursed tower cannot be sold
+                  if not t.curses and max(b for b, _ in self.study.cover(t.tile, t.stats.range)) + 1 < rear]
         for t in behind:
             world.sell(t.id)
         if behind:
