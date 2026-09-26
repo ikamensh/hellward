@@ -48,7 +48,7 @@ from typing import Any
 PACKAGE = Path(__file__).resolve().parents[1]   # hellward/, whose subpackages hold the modules
 BUILDS = PACKAGE.parent / "build" / "fastsim"
 MODULES = ("sim.sums", "sim.content", "sim.level", "sim.campaign", "sim.skills", "sim.model", "sim.planner",
-           "sim.players.hands", "sim.players.ordinary")
+           "sim.players.hands", "sim.players.ordinary", "sim.players.apprentice")
 FLAGS = () if sys.platform == "win32" else ("-ffp-contract=off",)   # every float operation rounds on its own, as Python's
 ENV = "HELLWARD_FASTSIM"          # the build a process activated, for the worker processes it starts
 OPT_OUT = "HELLWARD_INTERPRETED"
