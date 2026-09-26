@@ -1,0 +1,142 @@
+{
+ "shots": [
+  {
+   "key": "glass",
+   "start": 0.0,
+   "length": 4.125
+  },
+  {
+   "key": "lamp",
+   "start": 4.125,
+   "length": 7.036
+  },
+  {
+   "key": "breach",
+   "start": 11.161,
+   "length": 3.5
+  },
+  {
+   "key": "wake",
+   "start": 14.661,
+   "length": 3.951
+  },
+  {
+   "key": "fire",
+   "start": 18.612,
+   "length": 1.7
+  },
+  {
+   "key": "thunder",
+   "start": 20.312,
+   "length": 1.7
+  },
+  {
+   "key": "frost",
+   "start": 22.012,
+   "length": 1.7
+  },
+  {
+   "key": "dead",
+   "start": 23.712,
+   "length": 2.2
+  },
+  {
+   "key": "priest",
+   "start": 25.912,
+   "length": 4.835
+  },
+  {
+   "key": "bones",
+   "start": 30.747,
+   "length": 7.707
+  },
+  {
+   "key": "curse",
+   "start": 38.454,
+   "length": 3.546
+  },
+  {
+   "key": "ember",
+   "start": 42.0,
+   "length": 5.884
+  },
+  {
+   "key": "title",
+   "start": 47.884,
+   "length": 5.5
+  }
+ ],
+ "words": [
+  {
+   "text": "Your saints built this cathedral on the door to hell...",
+   "at": 0.3,
+   "voice": "glass",
+   "length": 3.236
+  },
+  {
+   "text": "and lit a lamp, to keep it shut.",
+   "at": 4.125,
+   "length": 1.783
+  },
+  {
+   "text": "Nine hundred years, it burned. Tonight... it gutters.",
+   "at": 6.208,
+   "voice": "lamp",
+   "length": 4.503
+  },
+  {
+   "text": "So you wake what the old house still holds.",
+   "at": 14.961,
+   "voice": "wake",
+   "length": 3.201
+  },
+  {
+   "text": "Its fire.",
+   "at": 18.712,
+   "voice": "fire",
+   "length": 0.83
+  },
+  {
+   "text": "Its thunder.",
+   "at": 20.412,
+   "voice": "thunder",
+   "length": 0.884
+  },
+  {
+   "text": "Its frost.",
+   "at": 22.112,
+   "voice": "frost",
+   "length": 0.886
+  },
+  {
+   "text": "And its dead.",
+   "at": 23.862,
+   "voice": "dead",
+   "length": 1.067
+  },
+  {
+   "text": "I know this house. I kept its lamp, once.",
+   "at": 26.712,
+   "voice": "priest",
+   "length": 3.535
+  },
+  {
+   "text": "Now I cast the bones... and watch the fight a hundred times, before it begins.",
+   "at": 31.047,
+   "voice": "bones",
+   "length": 6.957
+  },
+  {
+   "text": "I know which tower to break. And when.",
+   "at": 38.754,
+   "voice": "curse",
+   "length": 2.796
+  },
+  {
+   "text": "In every night I have seen... the lamp goes out.",
+   "at": 42.3,
+   "voice": "ember",
+   "length": 4.184
+  }
+ ]
+}
