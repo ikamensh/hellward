@@ -6,11 +6,13 @@ from pathlib import Path
 import pytest
 
 from hellward.sim import planner
-from hellward.sim.campaign import LOCATIONS, NORMAL, g
+from hellward.sim.campaign import DIFFICULTIES, LOCATIONS, NORMAL, g
 from hellward.sim.content import Wave
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.players import PLAYERS
+from hellward.sim.players.adaptive import ORDERS, Adaptive
 from hellward.sim.players.hands import Hands, defend
+from hellward.sim.skills import SKILLS, can_learn, check, cost
 
 
 @pytest.mark.parametrize("key", list(LOCATIONS))
@@ -63,3 +65,16 @@ def test_the_adaptive_player_holds_tristram():
     world, record = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["adaptive"](1), seed=1, sigils=0, planner=planner.smart)
     assert world.outcome == "victory"
     assert world.lives >= 18
+
+
+@pytest.mark.parametrize("order", ["", *ORDERS])
+def test_the_adaptive_player_learns_within_its_sigils_and_the_tree(order):
+    """Every themed order, and the planned one (empty), buys a set the tree allows, and leaves no sigil it could
+    still spend, at every budget and place."""
+    for location in LOCATIONS.values():
+        for difficulty in DIFFICULTIES.values():
+            for sigils in range(0, 37):
+                learned = Adaptive(order).skills(location, difficulty, sigils)
+                check(learned)
+                assert cost(learned) <= sigils
+                assert not [key for key in SKILLS if can_learn(learned, key, sigils)]   # nothing left it could buy

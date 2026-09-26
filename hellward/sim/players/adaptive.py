@@ -59,6 +59,8 @@ SPLASH_HIT = 0.6       # a fireball's share on the monsters around its target (t
 VENOM_ROOM = 1.0       # venom darts a second one monster can take: four stacks that last four seconds
 VENOM_TRUST = 0.6      # how far the estimate of a plague totem is trusted, and a frost nova's: both found by
 NOVA_TRUST = 1.3       # playing training seeds, where totems proved worth less and novas more than estimated
+STORM_TRUST = 1.0
+FIRE_TRUST = 1.0
 SETTLE = 0.8           # an affordable buy this close to the best is taken instead of saving for the best
 IDLE = 5.0             # a tower is sold when its gold would buy this many times what it does
 CALL_MANA = 0.92       # share of a full orb an early call needs in hand
@@ -109,13 +111,18 @@ def useful(location: Location, key: str) -> bool:
 
 
 def learn(location: Location, sigils: int, order: tuple[str, ...]) -> frozenset[str]:
-    """The skills an order buys with these sigils: its own useful ones first, then the rest of the tree."""
-    learned: frozenset[str] = frozenset()
+    """The skills an order buys with these sigils: its own useful ones first, then the rest of the tree, going
+    through the list again while something new has become learnable."""
     every = [*order, *(k for k in SKILLS if k not in order)]
-    for key in sorted(every, key=lambda k: not useful(location, k)):   # a stable sort: the useful first, in order
-        if can_learn(learned, key, sigils):
-            learned |= {key}
-    return learned
+    every.sort(key=lambda k: not useful(location, k))   # a stable sort: the useful first, each in its order
+    learned: frozenset[str] = frozenset()
+    while True:
+        before = learned
+        for key in every:
+            if can_learn(learned, key, sigils):
+                learned |= {key}
+        if learned == before:
+            return learned
 
 
 @dataclass
@@ -369,10 +376,10 @@ class Adaptive:
         if attack == "chain":
             reached = min(1.0 + stats.chains, around)
             keeps = world.perks.leap_keeps
-            return dps * busy * sum(keeps ** i * min(1.0, reached - i) for i in range(math.ceil(reached)))
+            return STORM_TRUST * dps * busy * sum(keeps ** i * min(1.0, reached - i) for i in range(math.ceil(reached)))
         if stats.splash > 0:
-            return dps * busy * (1.0 + SPLASH_HIT * min(3.0, (view.near[b] - 1.0) * min(1.0, stats.splash / 1.2)))
-        return dps * busy
+            return FIRE_TRUST * dps * busy * (1.0 + SPLASH_HIT * min(3.0, (view.near[b] - 1.0) * min(1.0, stats.splash / 1.2)))
+        return FIRE_TRUST * dps * busy
 
     def worth(self, kind: str, level: int, stats: TowerLevel, tile: tuple[int, int], chilled: list[float],
               darts: list[float]) -> float:
