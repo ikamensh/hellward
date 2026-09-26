@@ -19,6 +19,7 @@ class Progress:
     won: dict[str, int] = field(default_factory=dict)   # location → sigils
     learned: frozenset[str] = frozenset()
     at: str = ORDER[0]              # the location the lantern stands at
+    seen: frozenset[str] = frozenset()   # story keys shown: "prologue", "tristram/before", ...
     game: Game | None = field(default=None, repr=False, compare=False)
 
     # -- Saving -----------------------------------------------------------------------------------
@@ -30,15 +31,20 @@ class Progress:
             return cls(game=game)
         state = data["state"]
         won = state["won"]["normal"] if "difficulty" in state else state["won"]   # a save from before the acts
-        learned = frozenset(k for k in state["learned"] if k in SKILLS)
-        progress = cls(won=dict(won), learned=learned, at=state["at"], game=game)
+        learned = frozenset(k for k in state["learned"] if k in SKILLS)   # the tree may have lost some since
+        progress = cls(won=dict(won), learned=learned, at=state["at"], seen=frozenset(state.get("seen", ())), game=game)
         check(progress.learned)
         return progress
 
     def save(self) -> None:
         if self.game is not None:
-            state = {"won": self.won, "learned": sorted(self.learned), "at": self.at}
+            state = {"won": self.won, "learned": sorted(self.learned), "at": self.at, "seen": sorted(self.seen)}
             self.game.save_manager.save(SLOT, state, "Progress", summary={"sigils": self.sigils, "at": self.at})
+
+    def see(self, key: str) -> None:
+        """Remember a story key as shown (opening counts, even when skipped) and save."""
+        self.seen = self.seen | {key}
+        self.save()
 
     # -- Sigils -----------------------------------------------------------------------------------
 

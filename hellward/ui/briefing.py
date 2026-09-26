@@ -17,6 +17,7 @@ from hellward.sim.content import CURSES, MONSTERS, SPELLS, START_LIVES, TOWERS, 
 from hellward.sim.skills import SKILLS, perks
 from hellward.ui import style, widgets
 from hellward.ui.hud import monster_notes
+from hellward.ui.story import INPUT_GUARD, image_size, story_image
 
 if TYPE_CHECKING:
     from hellward.ui.flow import Flow
@@ -32,16 +33,29 @@ class BriefingScene(Scene):
         self.location = location
         self.clock = 0.0
         self.spots: list[widgets.Hotspot] = []
+        self._guarded: tuple | None = None
 
     def on_enter(self) -> None:
         self.floor = sprites.ground(self.game, self.location)
-        self.ui.add(Row(Button("Defend", shortcut="Enter", on_click=lambda: self.flow.defend(self.location), width=220),
+        defend = Button("Defend", shortcut="Enter", on_click=lambda: self.flow.defend(self.location), width=220)
+        story = Button("Story", shortcut="S", on_click=lambda: self.flow.story(self.location), width=170)
+        # Right after a story page a held Enter or Esc must not start the fight or leave unread: Defend and
+        # Back stay deaf for a breath while Skills and Story answer at once.
+        defend.enabled = False
+        back = Button("Back to the map", shortcut="Esc", on_click=self.flow.world_map, width=220)
+        back.enabled = False
+        self._guarded = (defend, back)
+        self.ui.add(Row(defend,
                         Button("Skills", shortcut="K", on_click=lambda: self.flow.skills(self.location), width=170),
-                        Button("Back to the map", shortcut="Esc", on_click=self.flow.world_map, width=220),
+                        story, back,
                         anchor=Anchor.BOTTOM, margin=(0, 16), spacing=14))
 
     def update(self, dt: float) -> None:
         self.clock += dt
+        if self._guarded is not None and self.clock >= INPUT_GUARD:
+            for button in self._guarded:
+                button.enabled = True
+            self._guarded = None
 
     # -- Drawing ----------------------------------------------------------------------------------
 
@@ -59,7 +73,8 @@ class BriefingScene(Scene):
                            anchor_y="center")
             self.draw_text(f"The descent, {index + 1} of {len(ORDER)}  ·  {len(location.waves)} waves", 640, 94,
                            font_size=15, color=style.DIM, anchor_x="center", anchor_y="center")
-            widgets.centred(self, location.blurb, 640, 108, 1040, font_size=17, color=style.BONE)
+            self.draw_text(location.lesson, 640, 118, font_size=17, color=style.BONE, anchor_x="center",
+                           anchor_y="center")
             self._taunt(160)
             self._host(242)
             self._curses(496)
@@ -77,10 +92,16 @@ class BriefingScene(Scene):
         self.draw_line(90, y + 16, 1190, y + 16, (92, 76, 58, 200), 1.2)
 
     def _taunt(self, y: float) -> None:
-        cell = self.flow.art.monster["priest"]
         h = 58
-        w = h * cell.size[0] / cell.size[1]
-        self.draw_image("mon/priest/front/chant", 150 - w / 2, y - 8, w, h)
+        name = story_image(self.game, "priest")
+        if name is not None:
+            iw, ih = image_size(self.game, name)
+            w = h * iw / ih
+            self.draw_image(name, 150 - w / 2, y - 8, w, h)
+        else:
+            cell = self.flow.art.monster["priest"]
+            w = h * cell.size[0] / cell.size[1]
+            self.draw_image("mon/priest/front/chant", 150 - w / 2, y - 8, w, h)
         glow = 0.75 + 0.25 * math.sin(self.clock * 2)
         height = self.draw_paragraph(f"“{self.location.taunt}”", 200, y + 4, 960, font_size=16,
                                      color=style.CURSE[:3] + (int(255 * glow),), max_lines=2)

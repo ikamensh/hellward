@@ -10,15 +10,17 @@ from typing import Any, Callable
 from saga2d import Game, Scene
 
 from hellward.art.sprites import Art
-from hellward.sim.campaign import CATHEDRAL, Location
+from hellward.sim.campaign import CATHEDRAL, LAST, ORDER, Location
 from hellward.sim.model import World
 from hellward.sim.players.hands import Player
 from hellward.sim.skills import perks
+from hellward.story import STORIES
 from hellward.ui.battle import BattleScene
 from hellward.ui.briefing import BriefingScene
 from hellward.ui.mapscreen import MapScene
 from hellward.ui.progress import Progress
 from hellward.ui.skilltree import SkillTreeScene
+from hellward.ui.story import ChronicleScene, PrologueScene, StoryScene
 from hellward.ui.title import ReckoningScene, TitleScene
 
 
@@ -40,17 +42,66 @@ class Flow:
         self.sound.music("title")
 
     def world_map(self) -> None:
+        """Before the map shows, play one due and unseen story: the act ending when the last location is held
+        (first, and instead of the after pages), else the first held location's after page in campaign order."""
+        if self.progress.held(LAST):
+            story = STORIES.get("act1/end")
+            if story is not None and story.key not in self.progress.seen:
+                self.progress.see(story.key)
+                self.game.clear_and_push(StoryScene(self, story.pages, then=self._open_map))
+                return
+            self._open_map()
+            return
+        for key in ORDER:
+            page = f"{key}/after"
+            if page in STORIES and page not in self.progress.seen and self.progress.held(key):
+                self.progress.see(page)
+                self.game.clear_and_push(StoryScene(self, STORIES[page].pages, then=self._open_map))
+                return
+        self._open_map()
+
+    def _open_map(self) -> None:
         self.game.clear_and_push(MapScene(self))
         self.sound.music("title")
 
     def descend(self) -> None:
-        """The title's Descend: the map, and on a new campaign the lantern walks straight on to Tristram."""
+        """The title's Descend: the prologue on a new campaign, then the map, the lantern walking straight on
+        to Tristram when nothing is won yet."""
+        if "prologue" not in self.progress.seen:
+            self.progress.see("prologue")
+            self.game.clear_and_push(PrologueScene(self, then=self._descend))
+        else:
+            self._descend()
+
+    def _descend(self) -> None:
         self.game.clear_and_push(MapScene(self, first=self.progress.sigils == 0))
         self.sound.music("title")
 
     def intro(self, location: Location) -> None:
+        """A location's before page on the first arrival, then its intro."""
+        key = f"{location.key}/before"
+        story = STORIES.get(key)
+        if story is not None and key not in self.progress.seen:
+            self.progress.see(key)
+            self.game.clear_and_push(StoryScene(self, story.pages, then=lambda: self._open_intro(location)))
+        else:
+            self._open_intro(location)
+
+    def _open_intro(self, location: Location) -> None:
         self.progress.move(location.key)
         self.game.clear_and_push(BriefingScene(self, location))
+
+    def story(self, location: Location) -> None:
+        """Replay a location's before page from its intro, back to the intro."""
+        tale = STORIES.get(f"{location.key}/before")
+        if tale is None:
+            self._open_intro(location)
+            return
+        self.progress.see(tale.key)
+        self.game.clear_and_push(StoryScene(self, tale.pages, then=lambda: self._open_intro(location)))
+
+    def chronicle(self) -> None:
+        self.game.clear_and_push(ChronicleScene(self, then=self.title))
 
     def skills(self, location: Location | None = None) -> None:
         self.game.push(SkillTreeScene(self, location))
@@ -79,3 +130,19 @@ class Flow:
 
     def reckon(self, world: World) -> None:
         self.game.push(ReckoningScene(self, world, self.gained))
+
+    def leave_reckoning(self, world: World, *, again: bool) -> None:
+        """Leave the reckoning by either button: after a victory the act ending (at the last location) or the
+        location's after page plays first when unseen, then the button's way."""
+        if world.outcome == "victory":
+            key = "act1/end" if world.location.key == LAST else f"{world.location.key}/after"
+            story = STORIES.get(key)
+            if story is not None and key not in self.progress.seen:
+                self.progress.see(key)
+                dest = (lambda: self.intro(world.location)) if again else self.world_map
+                self.game.clear_and_push(StoryScene(self, story.pages, then=dest))
+                return
+        if again:
+            self.intro(world.location)
+        else:
+            self.world_map()

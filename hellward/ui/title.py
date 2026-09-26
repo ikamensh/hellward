@@ -43,6 +43,7 @@ class TitleScene(Scene):
         self.art = self.game.assets.has_image("title")
         menu = Column(
             Button("Descend", shortcut="Enter", on_click=self.flow.descend, width=320),
+            Button("Chronicle", shortcut="C", on_click=self.flow.chronicle, width=320),
             Button("Watch the leaders at work", shortcut="D", on_click=self.flow.demo, width=320),
             Button("Settings", hotkey="S", on_click=self.open_settings, width=320),
             Button("Leave", shortcut="Q", on_click=self.game.quit, width=320),
@@ -92,9 +93,10 @@ class ReckoningScene(Scene):
             flow.progress.opened(after) and not flow.progress.held(after.key) else None
 
     def on_enter(self) -> None:
-        location = self.world.location
-        self.ui.add(Row(Button("Again", shortcut="Enter", on_click=lambda: self.flow.intro(location), width=220),
-                        Button("To the map", shortcut="Esc", on_click=self.flow.world_map, width=220),
+        self.ui.add(Row(Button("Again", shortcut="Enter", on_click=lambda: self.flow.leave_reckoning(self.world, again=True),
+                               width=220),
+                        Button("To the map", shortcut="Esc", on_click=lambda: self.flow.leave_reckoning(self.world, again=False),
+                               width=220),
                         anchor=Anchor.BOTTOM, margin=(0, 150), spacing=16))
 
     def update(self, dt: float) -> None:

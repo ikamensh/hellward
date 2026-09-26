@@ -19,6 +19,7 @@ from hellward.ui.flow import Flow
 from hellward.ui.mapscreen import MapScene
 from hellward.ui.progress import Progress
 from hellward.ui.skilltree import SkillTreeScene
+from hellward.ui.story import PrologueScene, StoryScene
 from hellward.ui.title import ReckoningScene, TitleScene
 
 
@@ -57,11 +58,18 @@ def test_a_first_descent_walks_the_lantern_to_tristram_and_its_intro_names_its_h
     g.push(TitleScene(flow))
     tick(g)
     press(g, "return")
+    assert isinstance(g.scenes[-1], PrologueScene)   # a new campaign opens on the prologue
+    press(g, "escape")
     assert isinstance(g.scenes[-1], MapScene)
     tick(g, 4)   # the lantern walks on by itself
+    page = g.scenes[-1]
+    assert isinstance(page, StoryScene)   # the first arrival tells Tristram's before page
+    press(g, "return")   # reveal
+    press(g, "return")   # on to the intro
     intro = g.scenes[-1]
     assert isinstance(intro, BriefingScene) and intro.location.key == "tristram"
     assert_text_fits(g)
+    tick(g, 0.5)   # past the story page's input guard
     press(g, "return")
     battle = g.scenes[-1]
     assert isinstance(battle, BattleScene) and battle.world.location.key == "tristram"
@@ -82,6 +90,9 @@ def test_a_won_defence_earns_sigils_that_open_the_way_and_last_to_the_next_sessi
     assert reckoning.lit == 3
     assert_text_fits(g)
     press(g, "escape")
+    assert isinstance(g.scenes[-1], StoryScene)   # leaving the reckoning tells the after page once
+    press(g, "return")
+    press(g, "return")
     assert isinstance(g.scenes[-1], MapScene)
     assert flow.progress.opened(LOCATIONS["graveyard"]) and not flow.progress.opened(LOCATIONS["cathedral"])
     g.close()
@@ -100,6 +111,9 @@ def test_a_fall_earns_nothing_and_again_returns_to_the_intro(game):
     assert isinstance(reckoning, ReckoningScene) and reckoning.gained == 0
     assert flow.progress.sigils == 0
     press(g, "return")
+    assert isinstance(g.scenes[-1], StoryScene)   # Again returns through the unseen before page
+    press(g, "return")
+    press(g, "return")
     assert isinstance(g.scenes[-1], BriefingScene)
 
 
@@ -108,6 +122,10 @@ def test_the_tree_learns_what_the_free_sigils_pay_for_and_unlearns_for_free(game
     flow.progress.won = {"tristram": 3}
     flow.intro(LOCATIONS["graveyard"])
     tick(g)
+    assert isinstance(g.scenes[-1], StoryScene)   # the first arrival tells the before page
+    press(g, "return")
+    press(g, "return")
+    assert isinstance(g.scenes[-1], BriefingScene)
     press(g, "k")
     tree = g.scenes[-1]
     assert isinstance(tree, SkillTreeScene)
