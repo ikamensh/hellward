@@ -2,6 +2,7 @@
 
     uv run python tools/plan_player.py plan tristram graveyard --difficulty normal
     uv run python tools/plan_player.py plan all --difficulty normal --generations 50
+    uv run python tools/plan_player.py plan hells_gate --difficulty hell --resume   # climb on from the stored plan
     uv run python tools/plan_player.py table                     # the evaluation table, against the ordinary player
 
 ``plan`` is how a person who has replayed a location many times comes to know it, done by a machine. It starts
@@ -42,7 +43,7 @@ from hellward.sim.content import MONSTERS, TOWERS  # noqa: E402
 from hellward.sim.model import DOOR_STOP, JOSTLE, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.hands import defend  # noqa: E402
-from hellward.sim.players.planned import Plan, Planned, plan_path  # noqa: E402
+from hellward.sim.players.planned import Plan, Planned, load, plan_path  # noqa: E402
 from hellward.sim.skills import SKILLS, TREE_COST  # noqa: E402
 
 
@@ -336,28 +337,40 @@ CHANGES = (move_tower, move_tower, move_tower, change_kind, change_kind, move_st
 # -- The climb ----------------------------------------------------------------------------------------
 
 
-def climb(pool: ProcessPoolExecutor, location_key: str, difficulty: str, generations: int, children: int, per: int,
-          confirm: int, log) -> Plan:
-    location = LOCATIONS[location_key]
-    rng = random.Random(f"{location_key}-{difficulty}")
-    tiles = ranked_tiles(location, 3.0, 3.0)[:TOP_TILES]
-    start = time.time()
-    defences = 0
-    offset = ORDER.index(location_key) * 17 + (0 if difficulty == "normal" else 50)
-    seeds = lambda g: [(offset + g * per + j) % TRAINING for j in range(per)]   # noqa: E731
-
-    candidates = first_plans(location)
-    hp = 1.0
+def first_build(pool: ProcessPoolExecutor, location_key: str, difficulty: str, offset: int,
+                log) -> tuple[Plan, float, int]:
+    """The best of the first builds, the monsters' life at which it stops holding with room to spare, and the
+    defences it took to find them."""
+    candidates = first_plans(LOCATIONS[location_key])
     screen = [(offset + 90 + j) % TRAINING for j in range(4)]
+    hp, defences = 1.0, 0
     while True:
         scores = evaluate(pool, candidates, location_key, difficulty, screen, hp, SEARCH)
         defences += len(candidates) * len(screen)
         best = max(range(len(candidates)), key=lambda i: scores[i])
         log(f"  first builds at life x{hp:.2f}: {' '.join(f'{s:.1f}' for s in scores)}")
         if scores[best] < HOLD or hp > 4.0:
-            break
+            return candidates[best], hp, defences
         hp *= 1.2
-    parent, parent_score = candidates[best], scores[best]
+
+
+def climb(pool: ProcessPoolExecutor, location_key: str, difficulty: str, generations: int, children: int, per: int,
+          confirm: int, resume: bool, log) -> Plan:
+    """The climb for one location and difficulty, from the first builds or, with ``resume``, from the plan the
+    player holds now (and at the life it was found at)."""
+    location = LOCATIONS[location_key]
+    before = load(location_key, difficulty).trained if resume else {}
+    done = before.get("generations", 0)
+    rng = random.Random(f"{location_key}-{difficulty}-{done}")
+    tiles = ranked_tiles(location, 3.0, 3.0)[:TOP_TILES]
+    start = time.time()
+    offset = ORDER.index(location_key) * 17 + (0 if difficulty == "normal" else 50)
+    seeds = lambda g: [(offset + (done + g) * per + j) % TRAINING for j in range(per)]   # noqa: E731
+
+    if resume:
+        parent, hp, defences = load(location_key, difficulty), before.get("life", 1.0), 0
+    else:
+        parent, hp, defences = first_build(pool, location_key, difficulty, offset, log)
     trail = [parent]
     for g in range(generations):
         kids = [mutate(parent, location, rng, tiles) for _ in range(children)]
@@ -387,9 +400,10 @@ def climb(pool: ProcessPoolExecutor, location_key: str, difficulty: str, generat
     defences += len(finals)
     log(f"  finalists against smart leaders at life x{hp:.2f}: {' '.join(f'{s:.1f}' for s in smart)}; "
         f"chosen at x1: {at_one:.1f}")
-    chosen.trained = {"confirmed_on": finals, "life": round(hp, 3),
-                      "smart_score": round(max(smart), 2), "smart_score_at_1": round(at_one, 2), "defences": defences,
-                      "minutes": round((time.time() - start) / 60, 1), "generations": generations}
+    chosen.trained = {"confirmed_on": finals, "life": round(hp, 3), "smart_score": round(max(smart), 2),
+                      "smart_score_at_1": round(at_one, 2), "defences": before.get("defences", 0) + defences,
+                      "minutes": round(before.get("minutes", 0) + (time.time() - start) / 60, 1),
+                      "generations": done + generations}
     return chosen
 
 
@@ -437,6 +451,7 @@ def main() -> None:
     parser.add_argument("--children", type=int, default=7)
     parser.add_argument("--per", type=int, default=3, help="training seeds each build plays per generation")
     parser.add_argument("--confirm", type=int, default=8, help="training seeds the finalists play against smart leaders")
+    parser.add_argument("--resume", action="store_true", help="climb on from the stored plans instead of the first builds")
     parser.add_argument("--players", default="planned,ordinary")
     parser.add_argument("--seeds", type=int, default=8, help="evaluation seeds for the table, from 1000")
     parser.add_argument("--jobs", type=int, default=5)
@@ -448,7 +463,7 @@ def main() -> None:
         keys = list(ORDER) if args.locations == ["all"] else args.locations
         for key in keys:
             print(f"{key} on {args.difficulty}:", flush=True)
-            plan = climb(pool, key, args.difficulty, args.generations, args.children, args.per, args.confirm,
+            plan = climb(pool, key, args.difficulty, args.generations, args.children, args.per, args.confirm, args.resume,
                          lambda line: print(line, flush=True))
             path = plan_path(key, args.difficulty)
             path.parent.mkdir(exist_ok=True)
