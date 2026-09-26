@@ -28,54 +28,41 @@ from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 STORY_DIR = ROOT / "hellward" / "assets" / "story"
 REFS_DIR = STORY_DIR / "refs"
 PROLOGUE_DIR = STORY_DIR / "prologue"
-PAINTED_DIR = ROOT / "hellward" / "assets" / "painted"
 
 ACT1_REFS = ("you", "akara", "priest", "lamp", "seal")
 ACT2_REFS = ("necromancer", "druid", "mother_lamp")
 
 REPAINT_PREFIX = "Repaint this picture, keeping its framing and composition: "
-FLOOR_SENTENCE = ("The last picture is the painted floor of this place, seen from above: "
-                  "match its architecture and materials.")
 
 
 def prompt(page: Page, act: int) -> str:
     """The painter's prompt for a page: the act's style, what the panel shows, each named
     reference's design to keep, and the panel rules."""
-    keeps = [f"Keep this design: {REFERENCES[name]}." for name in page.refs if not name.startswith("floor:")]
+    keeps = [f"Keep this design: {REFERENCES[name]}." for name in page.refs]
     return " ".join([STYLES[act], page.panel, *keeps, FRAMING, RULES])
 
 
 def pictures(page: Page) -> list[Path]:
     """The pictures the painter gets with a page: first the prologue panel it edits (when
-    page.base is set), then each named reference's portrait, then the location's painted
-    floor. Only files that exist."""
+    page.base is set), then each named reference's portrait. Only files that exist."""
     pics = []
     if page.base:
         base = PROLOGUE_DIR / f"{page.base}.jpg"
         if base.exists():
             pics.append(base)
     for name in page.refs:
-        if name.startswith("floor:"):
-            continue
         ref = REFS_DIR / f"{name}.jpg"
         if ref.exists():
             pics.append(ref)
-    for name in page.refs:
-        if name.startswith("floor:"):
-            floor = PAINTED_DIR / f"ground-{name.split(':', 1)[1]}.png"
-            if floor.exists():
-                pics.append(floor)
     return pics
 
 
 def page_prompt(page: Page, act: int) -> tuple[str, list[Path]]:
-    """A page's prompt and pictures, with the repaint prefix and the floor sentence."""
+    """A page's prompt and pictures, with the repaint prefix when it edits a prologue panel."""
     pics = pictures(page)
     text = prompt(page, act)
     if page.base and pics[:1] == [PROLOGUE_DIR / f"{page.base}.jpg"]:
         text = REPAINT_PREFIX + text
-    if any(p.name.startswith("ground-") for p in pics):
-        text = f"{text} {FLOOR_SENTENCE}"
     return text, pics
 
 
@@ -134,7 +121,35 @@ def all_pages() -> list[tuple[int, Page]]:
     return [(story.act, page) for story in STORIES.values() for page in story.pages]
 
 
-def paint_all(only: set[str]) -> int:
+STYLE_ANCHOR = PROLOGUE_DIR / "curse.jpg"   # the prologue's ink style, shown to a painter that did not paint it
+
+
+def paint_codex(prompt: str, refs: list[Path], out: Path, aspect: str) -> None:
+    """Paint with Codex's image tool on the ChatGPT plan (no API credit): the references go along as attached images,
+    and a prologue panel shows the style. With a base picture first, the base is edited instead."""
+    import subprocess
+
+    shown = [*refs, STYLE_ANCHOR]
+    roles = "; ".join(f"image {i + 1} is {'the style to paint in' if p == STYLE_ANCHOR else 'a reference: ' + p.stem}"
+                      for i, p in enumerate(shown))
+    shape = "landscape 3:2 or wider" if aspect == "16:9" else "square"
+    mode = "edit mode on the first attached image" if refs and refs[0].parent == PROLOGUE_DIR else "generate mode"
+    task = (f"{prompt}\n\nThe attached images: {roles}. Use the built-in image_gen tool in {mode}, {shape}, with the "
+            f"specification above, then copy the generated PNG to {out} (it is saved under $CODEX_HOME/generated_images). "
+            f"Do not modify anything else; finish by printing the path you copied from.")
+    images = [arg for p in shown for arg in ("-i", str(p))]
+    result = subprocess.run(["codex", "exec", "--skip-git-repo-check", "--sandbox", "workspace-write", "-m", "gpt-5.5",
+                             "-c", "model_reasoning_effort=low", "-C", str(out.parent), *images, "-"],
+                            input=task, capture_output=True, text=True, timeout=900)
+    if not out.exists():
+        raise RuntimeError(f"codex did not write {out}:\n{(result.stdout + result.stderr)[-2000:]}")
+    print(f"painted {out.name} (codex)", flush=True)
+
+
+PAINTERS = {"codex": paint_codex, "openrouter": paint}
+
+
+def paint_all(only: set[str], painter=paint_codex) -> int:
     """Paint each missing page picture (or only the --only keys among them). Keeps going
     past failures and reports them at the end; returns 1 if any page failed."""
     failures = []
@@ -147,7 +162,7 @@ def paint_all(only: set[str]) -> int:
         text, pics = page_prompt(page, act)
         tmp = out.parent / f"{out.stem}.tmp.png"
         try:
-            paint(text, pics, tmp, "16:9")
+            painter(text, pics, tmp, "16:9")
         except Exception as error:  # noqa: BLE001
             print(f"failed {page.key}: {error}", flush=True)
             if tmp.exists():
@@ -203,6 +218,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("refs", help="paint each missing reference portrait")
     paint_parser = sub.add_parser("paint", help="paint each missing page picture")
     paint_parser.add_argument("--only", default="", help="comma-separated page keys")
+    paint_parser.add_argument("--painter", choices=sorted(PAINTERS), default="codex",
+                              help="codex (the ChatGPT plan, default) or openrouter (Gemini 3 Pro Image, API credit)")
     sheet_parser = sub.add_parser("sheet", help="a contact sheet of every page picture that exists")
     sheet_parser.add_argument("out", type=Path)
     args = parser.parse_args(argv)
@@ -210,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         refs_all()
         return 0
     if args.command == "paint":
-        return paint_all({k for k in args.only.split(",") if k})
+        return paint_all({k for k in args.only.split(",") if k}, PAINTERS[args.painter])
     return sheet(args.out)
 
 

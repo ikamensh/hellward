@@ -50,7 +50,7 @@ class Page:
     key: str                     # its panel's picture, hellward/assets/story/<key>.jpg
     panel: str                   # what the panel shows, for the painter
     text: tuple[str, ...]        # the paragraphs
-    refs: tuple[str, ...] = ()   # names in REFERENCES, and "floor:<location>" for a location's painted floor
+    refs: tuple[str, ...] = ()   # names in REFERENCES: the figures and objects it shows
     base: str = ""               # a prologue panel to paint this one as an edit of, keeping its framing
 
 
@@ -75,7 +75,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "torches, and behind them walk the village dead, still in their Sunday clothes.",
         "Akara finds you at the well. \"The old towers answer whoever keeps the lamp,\" she says. \"Keep it tonight. "
         "Ask me your questions at dawn.\"",
-        refs=("you", "floor:tristram"))),
+        refs=("you",))),
     Story("tristram/after", 1, _page(
         "tristram-after",
         "Grey dawn over the ashes of the village; in the upper middle of the frame, a hand holds up a small finger bone "
@@ -90,7 +90,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "the headstones stands the Bone Priest, still, watching; hooded acolytes raise their hands over the graves.",
         "The churchyard gate stands open and every grave is empty. The Bone Priest stands among the stones while his "
         "acolytes call the buried by name. He christened most of them. He buried all of them.",
-        refs=("priest", "floor:graveyard"))),
+        refs=("priest",))),
     Story("graveyard/after", 1, _page(
         "graveyard-after",
         "A crypt wall covered from floor to vault in scratched tally marks, row on row, and beside each mark a tiny "
@@ -107,7 +107,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "The nave is as you dreamed it: the torn carpet, the three arches, the lamp high above. But the goatmen have "
         "come down from the hills to kneel in the pews, and a Blood Witch sings vespers from the pulpit.",
         "The priest has invited guests.",
-        refs=("lamp", "floor:cathedral"))),
+        refs=("lamp",))),
     Story("cathedral/after", 1, _page(
         "cathedral-after",
         "Behind a stone altar, a narrow stair goes down into darkness; on its first step, a guttering candle stub.",
@@ -122,7 +122,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "unstacking themselves.",
         "The Overlords came up from somewhere deeper. The priest opened the old doors for them, and taught them to "
         "break the new ones.",
-        refs=("floor:catacombs",))),
+        refs=())),
     Story("catacombs/after", 1, _page(
         "catacombs-after",
         "A bare stone cell with a cot and a cold lamp; on the floor, violet-glowing bones laid end to end as a long "
@@ -138,7 +138,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "vault, waiting for the heat to lift them.",
         "Akara will go no further. \"Someone must keep the lamp while you are below,\" she says. \"Past the lava is "
         "the door the saints built on, and he is waiting at it.\"",
-        refs=("akara", "floor:caves"))),
+        refs=("akara",))),
     Story("caves/after", 1, _page(
         "caves-after",
         "Steps cut into black rock at the edge of a lava flow, each step worn into a deep hollow by feet; red light "
@@ -155,7 +155,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "Azazel the Flayer.",
         "The Bone Priest waits at the threshold. \"Nine hundred years I kept your saints' lamp,\" he says. \"Tonight "
         "I let it go out.\"",
-        refs=("priest", "floor:hells_gate"))),
+        refs=("priest",))),
     Story("act1/end", 1, (
         Page("act1-end-1",
              "The Bone Priest kneels on a threshold casting violet-glowing bones onto the stone, again and again; "
@@ -189,7 +189,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "piers the Flayers are waiting, and their shaman is already singing.",
         "A pale man in bone armour watches you land. \"I am a priest of Rathma,\" he says. \"Your enemy stole our "
         "art. Let me lend it back to you.\"",
-        refs=("necromancer", "floor:docks"))),
+        refs=("necromancer",))),
     Story("docks/after", 2, _page(
         "docks-after",
         "The necromancer kneels on a wet pier among small dead jungle fiends, closing their eyes with two fingers.",
@@ -205,7 +205,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "dusk the bats pour out of them.",
         "In a clearing stands a ring of oaks older than Kurast. \"The trees remember the saints who lit the lamps,\" "
         "says the eldest druid. \"They will stand with you, if you stand close to them.\"",
-        refs=("druid", "floor:spider_forest"))),
+        refs=("druid",))),
     Story("spider_forest/after", 2, _page(
         "spider_forest-after",
         "The oak ring at dawn, roots closing over the bodies of giant spiders; the eldest druid points east toward black "
@@ -222,7 +222,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "inquisitors curse without a word of prayer.",
         "There will be no chant to warn you. When the ground burns violet under your towers, it is already too late "
         "to strike first. Keep your wards ready.",
-        refs=("floor:jungle",))),
+        refs=())),
     Story("jungle/after", 2, _page(
         "jungle-after",
         "A gloved hand holds a folded letter; its wax seal, stamped with the cathedral's seal, is broken.",
@@ -237,7 +237,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "Half of Kurast has sunk into the swamp. Its streets are canals and its temples islands, and something huge "
         "walks the flooded avenues: the Thorned Hulks, grown out of the drowned.",
         "They go through a warded gate the way a man goes through a curtain.",
-        refs=("floor:drowned_city",))),
+        refs=())),
     Story("drowned_city/after", 2, _page(
         "drowned_city-after",
         "A flooded shrine; the water glows warm red; the necromancer lifts wet fingers to his lips.",
@@ -253,7 +253,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "The High Council meets on the temple terrace under the mother lamp: a row of elders in gold, and every one of "
         "them curses.",
         "They have waited for you. The Bone Priest has told them how this night ends. He told Azazel the same.",
-        refs=("mother_lamp", "floor:travincal"))),
+        refs=("mother_lamp",))),
     Story("travincal/after", 2, _page(
         "travincal-after",
         "Great temple doors swinging shut on their own; through the narrowing gap, the dim mother lamp and the glint "
@@ -270,7 +270,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "\"Ten thousand times since Tristram I have cast these bones,\" he says. \"They show me every stone of this "
         "temple, every demon in it, every tower you will build. They have never shown me you. So I have come to "
         "look.\"",
-        refs=("priest", "mother_lamp", "floor:temple"))),
+        refs=("priest", "mother_lamp"))),
     Story("act2/end", 2, (
         Page("act2-end-1",
              "Violet bones scattered across a gold floor; above them a ghostly vision in gold light: a shadow with a "

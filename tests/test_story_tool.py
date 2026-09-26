@@ -35,8 +35,6 @@ def test_prompt_carries_the_style_the_rules_and_every_named_reference():
         assert page.panel in text
         assert RULES in text
         for name in page.refs:
-            if name.startswith("floor:"):
-                continue
             assert REFERENCES[name] in text
             assert "Keep this design:" in text
 
@@ -44,15 +42,10 @@ def test_prompt_carries_the_style_the_rules_and_every_named_reference():
 def test_pictures_lists_only_existing_files(monkeypatch, tmp_path):
     monkeypatch.setattr(story_tool, "REFS_DIR", tmp_path / "refs")
     monkeypatch.setattr(story_tool, "PROLOGUE_DIR", tmp_path / "prologue")
-    monkeypatch.setattr(story_tool, "PAINTED_DIR", tmp_path / "painted")
     (tmp_path / "refs").mkdir()
-    (tmp_path / "painted").mkdir()
-    (tmp_path / "refs" / "you.jpg").write_bytes(b"you")
-    (tmp_path / "painted" / "ground-tristram.png").write_bytes(b"floor")
     (page,) = [page for _, page in pages() if page.key == "tristram-before"]
-    assert story_tool.pictures(page) == [tmp_path / "refs" / "you.jpg",
-                                         tmp_path / "painted" / "ground-tristram.png"]
-    (tmp_path / "painted" / "ground-tristram.png").unlink()
+    assert story_tool.pictures(page) == []
+    (tmp_path / "refs" / "you.jpg").write_bytes(b"you")
     assert story_tool.pictures(page) == [tmp_path / "refs" / "you.jpg"]
 
 
@@ -60,15 +53,13 @@ def test_pictures_lists_only_existing_files(monkeypatch, tmp_path):
 def test_pictures_puts_the_base_prologue_panel_first(monkeypatch, tmp_path, key, base):
     monkeypatch.setattr(story_tool, "REFS_DIR", tmp_path / "refs")
     monkeypatch.setattr(story_tool, "PROLOGUE_DIR", tmp_path / "prologue")
-    monkeypatch.setattr(story_tool, "PAINTED_DIR", tmp_path / "painted")
     (tmp_path / "refs").mkdir()
     (tmp_path / "prologue").mkdir()
     (page,) = [page for _, page in pages() if page.key == key]
     for name in page.refs:
-        if not name.startswith("floor:"):
-            (tmp_path / "refs" / f"{name}.jpg").write_bytes(b"ref")
+        (tmp_path / "refs" / f"{name}.jpg").write_bytes(b"ref")
     assert all(p.name != f"{base}.jpg" for p in story_tool.pictures(page))
     (tmp_path / "prologue" / f"{base}.jpg").write_bytes(b"base")
     pics = story_tool.pictures(page)
     assert pics[0] == tmp_path / "prologue" / f"{base}.jpg"
-    assert len(pics) == 1 + sum(1 for name in page.refs if not name.startswith("floor:"))
+    assert len(pics) == 1 + len(page.refs)
