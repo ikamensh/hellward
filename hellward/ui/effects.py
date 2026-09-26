@@ -455,7 +455,7 @@ class Effects:
             self.bloom("fx/soft/holy", x, cy - i * 22, 16, 60, 0.7 + i * 0.05, opacity=220)
         self.burst("fx/spark", x, y, 30, speed=(40, 140), size=(7, 7))
         self.light(cx, cy, 180, (255, 230, 150), 1.5, 0.8)
-        self.say("Cleansed", x - 34, y - 30, style.HOLY, size=16, font=style.TITLE_FONT)
+        self.say("Cleansed", x, y - 70, style.HOLY, size=17, font=style.TITLE_FONT)
 
     # -- Every frame ------------------------------------------------------------------------------
 
