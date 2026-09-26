@@ -131,6 +131,11 @@ def test_the_adaptive_player_holds_tristram():
     assert world.lives >= 18
 
 
+def test_the_apprentice_holds_tristram():
+    world, _ = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["apprentice"](1), seed=1, sigils=0, planner=planner.smart)
+    assert world.outcome == "victory"
+
+
 def assert_fits(plan, location):
     assert set(plan.skills) <= set(SKILLS)
     assert len(plan.calls) == len(location.waves)
