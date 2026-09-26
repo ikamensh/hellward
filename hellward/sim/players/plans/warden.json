@@ -4,8 +4,8 @@
   "map": "95b4012365af",
   "searched": {
    "leaders": "greedy",
-   "life": 6.922,
-   "lost": 18,
+   "life": 9.619,
+   "lost": 2,
    "plans": 400,
    "seeds": "0-3"
   },
@@ -34,9 +34,8 @@
     5
    ],
    [
-    "build",
-    "pyre",
-    6,
+    "up",
+    5,
     5
    ],
    [
@@ -44,6 +43,12 @@
     "pyre",
     3,
     6
+   ],
+   [
+    "build",
+    "pyre",
+    6,
+    5
    ],
    [
     "build",
@@ -52,35 +57,27 @@
     2
    ],
    [
-    "gate",
-    3
-   ],
-   [
-    "build",
-    "pyre",
-    2,
-    5
-   ],
-   [
     "build",
     "pyre",
     5,
     6
    ],
    [
-    "up",
-    3,
-    5
+    "build",
+    "pyre",
+    6,
+    4
+   ],
+   [
+    "build",
+    "pyre",
+    5,
+    3
    ],
    [
     "up",
     3,
     6
-   ],
-   [
-    "up",
-    2,
-    5
    ],
    [
     "up",
@@ -95,27 +92,27 @@
    ],
    [
     "up",
-    3,
-    6
-   ],
-   [
-    "gate",
-    2
-   ],
-   [
-    "build",
-    "pyre",
-    6,
-    9
-   ],
-   [
-    "up",
     5,
     6
    ],
    [
+    "build",
+    "pyre",
+    2,
+    5
+   ],
+   [
+    "up",
+    3,
+    5
+   ],
+   [
     "gate",
     1
+   ],
+   [
+    "gate",
+    2
    ],
    [
     "build",
@@ -124,6 +121,18 @@
     7
    ],
    [
+    "build",
+    "frost",
+    19,
+    9
+   ],
+   [
+    "build",
+    "storm",
+    2,
+    3
+   ],
+   [
     "up",
     5,
     6
@@ -131,44 +140,45 @@
    [
     "build",
     "pyre",
-    7,
-    4
+    6,
+    10
+   ],
+   [
+    "build",
+    "pyre",
+    3,
+    10
+   ],
+   [
+    "gate",
+    3
    ],
    [
     "up",
-    2,
-    5
+    5,
+    10
    ],
    [
     "build",
     "storm",
-    1,
-    4
+    21,
+    5
    ],
    [
-    "up",
-    1,
-    4
-   ],
-   [
-    "up",
-    3,
-    7
-   ],
-   [
-    "up",
-    1,
-    4
+    "build",
+    "pyre",
+    5,
+    2
    ]
   ]
  },
  "cathedral/normal/4": {
-  "early": 0.7,
+  "early": 0.5,
   "map": "9a49011c656f",
   "searched": {
    "leaders": "greedy",
-   "life": 12.273,
-   "lost": 96,
+   "life": 19.147,
+   "lost": 8,
    "plans": 400,
    "seeds": "0-3"
   },
@@ -181,100 +191,71 @@
   "steps": [
    [
     "build",
-    "plague",
-    10,
-    5
+    "frost",
+    4,
+    7
+   ],
+   [
+    "build",
+    "pyre",
+    2,
+    7
+   ],
+   [
+    "up",
+    4,
+    7
    ],
    [
     "gate",
     0
    ],
    [
-    "build",
-    "pyre",
-    1,
-    8
-   ],
-   [
-    "gate",
-    1
-   ],
-   [
     "up",
-    1,
-    8
-   ],
-   [
-    "build",
-    "frost",
-    4,
-    7
-   ],
-   [
-    "build",
-    "pyre",
-    6,
-    8
-   ],
-   [
-    "up",
-    1,
-    8
-   ],
-   [
-    "up",
-    6,
-    8
-   ],
-   [
-    "build",
-    "pyre",
-    9,
-    7
-   ],
-   [
-    "build",
-    "pyre",
-    6,
-    9
-   ],
-   [
-    "up",
-    6,
-    9
-   ],
-   [
-    "build",
-    "plague",
     2,
     7
    ],
    [
+    "build",
+    "pyre",
+    5,
+    8
+   ],
+   [
+    "up",
+    5,
+    8
+   ],
+   [
     "up",
     4,
     7
    ],
    [
     "up",
-    4,
-    7
-   ],
-   [
-    "build",
-    "storm",
-    2,
-    10
-   ],
-   [
-    "build",
-    "storm",
-    20,
-    9
+    5,
+    8
    ],
    [
     "build",
     "pyre",
-    11,
+    6,
+    9
+   ],
+   [
+    "up",
+    6,
+    9
+   ],
+   [
+    "up",
+    2,
+    7
+   ],
+   [
+    "build",
+    "pyre",
+    2,
     5
    ],
    [
@@ -284,35 +265,87 @@
    ],
    [
     "build",
-    "frost",
-    13,
-    6
+    "pyre",
+    2,
+    10
    ],
    [
-    "build",
-    "plague",
-    4,
+    "up",
+    2,
     10
    ],
    [
     "build",
-    "frost",
+    "pyre",
+    10,
+    9
+   ],
+   [
+    "build",
+    "plague",
+    6,
+    4
+   ],
+   [
+    "build",
+    "storm",
     13,
     9
    ],
    [
-    "gate",
-    2
+    "build",
+    "pyre",
+    5,
+    5
+   ],
+   [
+    "up",
+    2,
+    10
+   ],
+   [
+    "up",
+    10,
+    9
+   ],
+   [
+    "build",
+    "storm",
+    4,
+    4
+   ],
+   [
+    "build",
+    "frost",
+    14,
+    7
+   ],
+   [
+    "build",
+    "frost",
+    11,
+    10
+   ],
+   [
+    "build",
+    "plague",
+    6,
+    12
+   ],
+   [
+    "up",
+    6,
+    12
    ]
   ]
  },
  "caves/hell/36": {
-  "early": 0.5,
+  "early": 0.9,
   "map": "c48a642ddee2",
   "searched": {
    "leaders": "greedy",
-   "life": 6.079,
-   "lost": 17,
+   "life": 8.044,
+   "lost": 10,
    "plans": 400,
    "seeds": "0-3"
   },
@@ -344,31 +377,8 @@
     5
    ],
    [
-    "build",
-    "frost",
-    4,
-    8
-   ],
-   [
     "gate",
     0
-   ],
-   [
-    "build",
-    "storm",
-    1,
-    8
-   ],
-   [
-    "up",
-    4,
-    8
-   ],
-   [
-    "build",
-    "storm",
-    5,
-    9
    ],
    [
     "up",
@@ -377,8 +387,31 @@
    ],
    [
     "build",
+    "frost",
+    4,
+    8
+   ],
+   [
+    "up",
+    4,
+    8
+   ],
+   [
+    "build",
+    "storm",
+    1,
+    8
+   ],
+   [
+    "build",
     "pyre",
     4,
+    9
+   ],
+   [
+    "build",
+    "storm",
+    5,
     9
    ],
    [
@@ -388,29 +421,18 @@
    ],
    [
     "build",
-    "pyre",
+    "frost",
     6,
     6
    ],
    [
     "up",
-    1,
-    8
-   ],
-   [
-    "build",
-    "plague",
-    19,
-    8
-   ],
-   [
-    "up",
     4,
     9
    ],
    [
     "build",
-    "pyre",
+    "storm",
     2,
     8
    ],
@@ -421,32 +443,42 @@
     6
    ],
    [
-    "build",
-    "pyre",
+    "up",
     2,
-    5
-   ],
-   [
-    "build",
-    "plague",
-    5,
-    7
+    8
    ],
    [
     "build",
     "frost",
-    2,
-    4
+    22,
+    8
+   ],
+   [
+    "build",
+    "storm",
+    1,
+    7
+   ],
+   [
+    "up",
+    5,
+    5
+   ],
+   [
+    "build",
+    "frost",
+    5,
+    3
    ]
   ]
  },
  "caves/normal/8": {
-  "early": 0.9,
+  "early": 0.7,
   "map": "c48a642ddee2",
   "searched": {
    "leaders": "greedy",
-   "life": 7.624,
-   "lost": 17,
+   "life": 7.957,
+   "lost": 12,
    "plans": 400,
    "seeds": "0-3"
   },
@@ -461,8 +493,10 @@
   ],
   "steps": [
    [
-    "gate",
-    0
+    "build",
+    "storm",
+    1,
+    7
    ],
    [
     "build",
@@ -477,16 +511,14 @@
     5
    ],
    [
-    "build",
-    "storm",
-    4,
-    6
+    "gate",
+    0
    ],
    [
     "build",
     "storm",
-    2,
-    8
+    4,
+    6
    ],
    [
     "up",
@@ -506,14 +538,14 @@
    [
     "build",
     "storm",
-    1,
-    7
+    2,
+    5
    ],
    [
     "build",
     "storm",
     2,
-    6
+    8
    ],
    [
     "build",
@@ -524,12 +556,12 @@
    [
     "build",
     "pyre",
-    6,
+    5,
     6
    ],
    [
     "up",
-    6,
+    5,
     6
    ],
    [
@@ -539,31 +571,26 @@
     9
    ],
    [
-    "build",
-    "storm",
-    5,
-    9
+    "up",
+    19,
+    11
    ],
    [
     "build",
     "storm",
     2,
-    5
-   ],
-   [
-    "gate",
-    1
-   ],
-   [
-    "up",
-    6,
     6
    ],
    [
+    "up",
+    2,
+    5
+   ],
+   [
     "build",
-    "pyre",
-    1,
-    8
+    "plague",
+    22,
+    6
    ]
   ]
  },
@@ -572,41 +599,36 @@
   "map": "29a0cf6ef4b1",
   "searched": {
    "leaders": "greedy",
-   "life": 9.038,
-   "lost": 7,
+   "life": 9.567,
+   "lost": 3,
    "plans": 400,
    "seeds": "0-3"
   },
   "skills": [
-   "fire_mastery",
+   "cold_mastery",
    "holy_shield"
   ],
   "steps": [
+   [
+    "build",
+    "frost",
+    11,
+    4
+   ],
    [
     "gate",
     0
    ],
    [
+    "up",
+    11,
+    4
+   ],
+   [
     "build",
     "pyre",
     10,
     5
-   ],
-   [
-    "build",
-    "frost",
-    11,
-    4
-   ],
-   [
-    "up",
-    10,
-    5
-   ],
-   [
-    "up",
-    11,
-    4
    ],
    [
     "up",
@@ -616,8 +638,8 @@
    [
     "build",
     "pyre",
-    11,
-    8
+    13,
+    7
    ],
    [
     "build",
@@ -632,47 +654,71 @@
    ],
    [
     "up",
+    13,
+    7
+   ],
+   [
+    "build",
+    "pyre",
+    18,
+    6
+   ],
+   [
+    "up",
     11,
     4
    ],
    [
     "build",
     "pyre",
-    17,
+    21,
     4
    ],
    [
-    "up",
-    11,
-    8
-   ],
-   [
     "build",
-    "frost",
+    "pyre",
     14,
+    5
+   ],
+   [
+    "build",
+    "frost",
+    20,
     6
    ],
    [
     "build",
-    "storm",
-    10,
+    "frost",
+    11,
+    7
+   ],
+   [
+    "build",
+    "frost",
+    20,
     10
    ],
    [
+    "build",
+    "storm",
+    13,
+    8
+   ],
+   [
     "up",
-    14,
+    18,
     6
    ]
   ]
  },
  "hells_gate/hell/36": {
-  "early": 1.01,
+  "early": 0.9,
   "map": "7681ed02cf96",
   "searched": {
    "leaders": "greedy",
-   "life": 4.919,
-   "lost": 8,
-   "plans": 400,
+   "life": 8.133,
+   "lost": 13,
+   "plans": 600,
    "seeds": "0-3"
   },
   "skills": [
@@ -697,36 +743,64 @@
   ],
   "steps": [
    [
+    "build",
+    "frost",
+    9,
+    10
+   ],
+   [
+    "build",
+    "plague",
+    8,
+    8
+   ],
+   [
     "gate",
     0
    ],
    [
     "build",
-    "plague",
-    7,
-    8
-   ],
-   [
-    "build",
     "frost",
     5,
     4
    ],
    [
+    "up",
+    5,
+    4
+   ],
+   [
     "build",
     "plague",
-    7,
-    9
+    5,
+    6
+   ],
+   [
+    "up",
+    5,
+    4
+   ],
+   [
+    "build",
+    "storm",
+    4,
+    7
+   ],
+   [
+    "up",
+    5,
+    6
    ],
    [
     "build",
     "storm",
     7,
-    4
+    10
    ],
    [
-    "up",
-    5,
+    "build",
+    "pyre",
+    4,
     4
    ],
    [
@@ -736,25 +810,20 @@
     5
    ],
    [
+    "build",
+    "storm",
+    4,
+    5
+   ],
+   [
+    "up",
+    4,
+    5
+   ],
+   [
     "up",
     5,
-    4
-   ],
-   [
-    "up",
-    7,
-    4
-   ],
-   [
-    "up",
-    7,
-    4
-   ],
-   [
-    "build",
-    "frost",
-    8,
-    8
+    6
    ],
    [
     "build",
@@ -763,24 +832,19 @@
     5
    ],
    [
-    "build",
-    "storm",
-    8,
+    "up",
+    7,
     10
    ],
    [
     "up",
     7,
-    9
-   ],
-   [
-    "up",
-    5,
     5
    ],
    [
-    "up",
-    7,
+    "build",
+    "frost",
+    5,
     8
    ]
   ]
@@ -790,9 +854,9 @@
   "map": "7681ed02cf96",
   "searched": {
    "leaders": "greedy",
-   "life": 3.649,
-   "lost": 2,
-   "plans": 400,
+   "life": 4.362,
+   "lost": 83,
+   "plans": 750,
    "seeds": "0-3"
   },
   "skills": [
@@ -819,150 +883,101 @@
    [
     "build",
     "storm",
-    5,
+    4,
+    5
+   ],
+   [
+    "build",
+    "pyre",
+    7,
     4
    ],
    [
     "build",
     "storm",
-    7,
-    9
-   ],
-   [
-    "up",
-    5,
-    4
-   ],
-   [
-    "build",
-    "pyre",
-    7,
-    4
-   ],
-   [
-    "build",
-    "frost",
-    7,
-    5
-   ],
-   [
-    "up",
-    7,
-    9
-   ],
-   [
-    "build",
-    "plague",
-    7,
-    8
-   ],
-   [
-    "up",
-    7,
-    4
-   ],
-   [
-    "build",
-    "pyre",
-    13,
-    8
-   ],
-   [
-    "up",
-    5,
-    5
-   ],
-   [
-    "build",
-    "plague",
-    7,
+    4,
     6
    ],
    [
     "up",
-    7,
-    4
-   ],
-   [
-    "build",
-    "storm",
-    5,
-    9
-   ],
-   [
-    "up",
-    7,
-    5
-   ],
-   [
-    "up",
-    5,
-    5
-   ],
-   [
-    "build",
-    "pyre",
     4,
     5
-   ],
-   [
-    "up",
-    7,
-    9
-   ],
-   [
-    "build",
-    "pyre",
-    10,
-    9
-   ],
-   [
-    "up",
-    5,
-    9
-   ],
-   [
-    "build",
-    "pyre",
-    4,
-    7
-   ],
-   [
-    "build",
-    "plague",
-    11,
-    2
-   ],
-   [
-    "up",
-    7,
-    5
-   ],
-   [
-    "gate",
-    2
    ],
    [
     "build",
     "frost",
-    9,
-    10
+    7,
+    5
    ],
    [
     "up",
-    9,
+    4,
+    5
+   ],
+   [
+    "build",
+    "plague",
+    14,
+    3
+   ],
+   [
+    "up",
+    7,
+    4
+   ],
+   [
+    "up",
+    5,
+    5
+   ],
+   [
+    "up",
+    7,
+    5
+   ],
+   [
+    "up",
+    5,
+    5
+   ],
+   [
+    "up",
+    4,
+    6
+   ],
+   [
+    "build",
+    "frost",
+    4,
     10
+   ],
+   [
+    "build",
+    "plague",
+    5,
+    6
+   ],
+   [
+    "build",
+    "frost",
+    17,
+    3
+   ],
+   [
+    "up",
+    5,
+    6
    ]
   ]
  },
  "tristram/normal/0": {
-  "early": 0.5,
+  "early": 0.9,
   "map": "00c8bbaff889",
   "searched": {
    "leaders": "greedy",
-   "life": 2.622,
+   "life": 2.738,
    "lost": 24,
-   "plans": 400,
+   "plans": 750,
    "seeds": "0-3"
   },
   "skills": [],
@@ -975,31 +990,25 @@
    ],
    [
     "build",
-    "frost",
-    10,
+    "pyre",
+    14,
     9
    ],
    [
     "build",
     "pyre",
-    15,
-    8
+    16,
+    9
    ],
    [
     "build",
-    "pyre",
-    19,
-    7
+    "frost",
+    10,
+    9
    ],
    [
     "up",
     11,
-    8
-   ],
-   [
-    "build",
-    "pyre",
-    16,
     8
    ],
    [
@@ -1008,72 +1017,38 @@
     9
    ],
    [
-    "build",
-    "frost",
-    18,
-    6
-   ],
-   [
     "up",
-    15,
-    8
+    14,
+    9
    ],
    [
     "build",
     "pyre",
     19,
-    6
-   ],
-   [
-    "up",
-    18,
-    6
+    8
    ],
    [
     "build",
     "pyre",
-    8,
-    6
-   ],
-   [
-    "build",
-    "pyre",
-    16,
-    7
-   ],
-   [
-    "build",
-    "pyre",
-    5,
-    5
-   ],
-   [
-    "up",
-    18,
-    6
-   ],
-   [
-    "build",
-    "pyre",
-    4,
+    6,
     5
    ],
    [
     "build",
     "frost",
-    7,
-    3
-   ],
-   [
-    "build",
-    "pyre",
-    18,
-    7
+    12,
+    11
    ],
    [
     "up",
     11,
     8
+   ],
+   [
+    "build",
+    "frost",
+    21,
+    4
    ]
   ]
  }
