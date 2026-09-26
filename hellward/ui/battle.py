@@ -276,6 +276,10 @@ class BattleScene(Scene):
         if not offers(self.location, key):
             self._refuse(f"{SPELLS[key].name} is not yet yours: you learn it for {first_offering(key).called}.")
             return
+        left = self.world.recharge.get(key, 0.0)
+        if left > 0:
+            self._refuse(f"{SPELLS[key].name} gathers itself again: {math.ceil(left)} s.")
+            return
         cost = self.world.spell_cost(key)
         if self.world.mana < cost:
             self._refuse(f"{SPELLS[key].name} takes {cost:.0f} mana.")

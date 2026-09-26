@@ -178,19 +178,27 @@ class Hud:
             x, y = SPELL_X + i * (SLOT + 9), TOP + 16
             offered = offers(world.location, key)
             cost = world.spell_cost(key)
-            ready = offered and world.mana >= cost and not paused
+            left = world.recharge.get(key, 0.0)
+            ready = offered and world.mana >= cost and not paused and left <= 0
             scene.draw_image("ui/slot_lit" if placing == f"spell:{key}" else "ui/slot", x, y, SLOT, SLOT)
             with scene.screen_layer(2):
                 scene.draw_image(f"ui/spell/{key}", x + 6, y + 6, SLOT - 12, SLOT - 12, opacity=1.0 if ready else 0.45 if offered else 0.12)
                 self._keycap(x, y, SPELL_KEYS[key])
                 if not offered:
                     self._padlock(x + SLOT / 2, y + SLOT / 2)
+            if left > 0:   # still gathering itself: a veil that lifts from the top, and the seconds
+                with scene.screen_layer(3):
+                    share = left / spec.recharge
+                    scene.draw_rect(x + 4, y + 4 + (SLOT - 8) * (1 - share), SLOT - 8, (SLOT - 8) * share, (0, 0, 0, 170), radius=4)
+                    scene.draw_text(f"{math.ceil(left)}", x + SLOT / 2, y + SLOT / 2, font_size=20, color=style.PALE_GOLD,
+                                    font=style.TITLE_FONT, anchor_x="center", anchor_y="center")
             if offered:
                 scene.draw_text(f"{cost:.0f}", x + SLOT / 2, y + SLOT + 16, font_size=14,
                                 color=style.MANA if world.mana >= cost else style.DIM, anchor_x="center", anchor_y="center")
                 how = ("Q with a leader pondering or chanting smites the one closest to cursing. " if key == "smite" else "")
                 self.controls.append(Control(f"spell:{key}", (x, y, SLOT, SLOT), ready,
-                                             f"{spec.name} — {cost:.0f} mana\n{spec.blurb} {how}Not while paused."))
+                                             f"{spec.name} — {cost:.0f} mana, then {spec.recharge:.0f} s to gather itself\n"
+                                             f"{spec.blurb} {how}Not while paused."))
             else:
                 self.controls.append(Control(f"spell:{key}", (x, y, SLOT, SLOT), False,
                                              f"{spec.name}\nNot yet yours. You learn it for {first_offering(key).called}."))

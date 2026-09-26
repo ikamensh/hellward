@@ -160,7 +160,7 @@ class Tower:
 
 
 class Door:
-    __slots__ = ("index", "tile", "s", "hp", "built")
+    __slots__ = ("index", "tile", "s", "hp", "built", "rubble")
 
     def __init__(self, index: int, tile: tuple[int, int], s: float) -> None:
         self.index = index
@@ -168,10 +168,11 @@ class Door:
         self.s = s
         self.hp = 0.0
         self.built = False
+        self.rubble = False    # broken this wave: it cannot be warded again until a wave is cleared
 
     def copy(self) -> Door:
         d = Door(self.index, self.tile, self.s)
-        d.hp, d.built = self.hp, self.built
+        d.hp, d.built, d.rubble = self.hp, self.built, self.rubble
         return d
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -282,6 +283,7 @@ class World:
         self.cleanses = 0
         self.spells_cast = 0
         self.chants_broken = 0
+        self.recharge: dict[str, float] = {}  # seconds each spell still gathers itself after a cast
         self._next_id = 1
 
     # -- Copies for the planner ---------------------------------------------------------
@@ -297,6 +299,7 @@ class World:
         w.bolts = list(self.bolts)       # bolts and meteors are never changed in place
         w.meteors = list(self.meteors)
         w.hazards = [h.copy() for h in self.hazards]
+        w.recharge = dict(self.recharge)
         w.wave, w.schedule, w.wave_time, w.break_left = self.wave, list(self.schedule), self.wave_time, self.break_left
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
         w.leaked_life, w.forced, w.outcome, w.kills, w._next_id = self.leaked_life, [], self.outcome, self.kills, self._next_id
@@ -415,6 +418,8 @@ class World:
         door = self.doors[index]
         if door.built:
             raise Refused("The gate already stands.")
+        if door.rubble:
+            raise Refused("The arch lies in rubble until this wave is broken.")
         if self.gold < DOOR.cost:
             raise Refused(f"A warded gate costs {DOOR.cost} gold.")
         for m in self.monsters:
@@ -427,11 +432,16 @@ class World:
     def _spend(self, key: str) -> None:
         if key not in self.location.arsenal.spells:
             raise Refused(f"{SPELLS[key].name} is not yours to cast in {self.location.called}.")
+        left = self.recharge.get(key, 0.0)
+        if left > 0:
+            raise Refused(f"{SPELLS[key].name} gathers itself again: {math.ceil(left)} s.")
         cost = self.spell_cost(key)
         if self.mana < cost:
             raise Refused(f"{SPELLS[key].name} takes {cost:.0f} mana.")
         self.mana -= cost
         self.spells_cast += 1
+        if SPELLS[key].recharge > 0:
+            self.recharge[key] = SPELLS[key].recharge
 
     def cleanse(self, tower_id: int) -> None:
         tower = self.towers[tower_id]
@@ -522,6 +532,13 @@ class World:
             return
         self.time += dt
         self.mana = min(self.perks.mana_max, self.mana + self.perks.mana_regen * dt)
+        if self.recharge:
+            for key in list(self.recharge):
+                left = self.recharge[key] - dt
+                if left <= 0:
+                    del self.recharge[key]
+                else:
+                    self.recharge[key] = left
         self._spawn(dt)
         self._leaders(dt)
         self._move(dt)
@@ -680,7 +697,7 @@ class World:
                 if thorns:
                     self._hurt(m, m.kind.door_dps * dt * THORNS, None, quiet=True)
                 if d.hp <= 0 and d.built:
-                    d.built, d.hp = False, 0.0
+                    d.built, d.hp, d.rubble = False, 0.0, True
                     self._emit("door_broken", d.index)
                     doors = [x for x in doors if x.built]
 
@@ -954,6 +971,7 @@ class World:
                 bonus = self.waves[w].bonus
                 self.gold += bonus
                 for d in self.doors:
+                    d.rubble = False
                     if d.built:
                         d.hp += (self.gate_life - d.hp) * self.perks.gate_mend
                 self._emit("cleared", w, bonus)

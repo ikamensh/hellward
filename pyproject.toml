@@ -29,3 +29,4 @@ testpaths = ["tests"]
 
 [tool.mypy]
 files = ["hellward/sim"]   # the simulation that hellward/sim/fastsim.py compiles must type-check
+exclude = ["hellward/sim/players/(adaptive|planned|warden)\\.py"]   # the strong players run interpreted, for now

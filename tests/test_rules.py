@@ -189,3 +189,21 @@ def test_each_cleared_wave_pays_its_bonus_once_even_when_called_early():
     bounties = sum(e[5] for e in kills if e[0] == "death")
     assert world.gold >= gold + bounties + 11 + 13 + 17 - 1   # early-call gold may add to it
     assert world.outcome == "victory"
+
+
+def test_a_broken_gate_lies_in_rubble_until_its_wave_is_cleared():
+    world = World(wave_of("zombie", count=2, interval=0.3))
+    world.gold = 1000
+    world.build_door(0)
+    started(world)
+    while world.doors[0].built:
+        run(world, 1)
+        assert world.time < 300
+    run(world, 2)   # the zombies have walked on out of the arch
+    with pytest.raises(Refused, match="rubble"):
+        world.build_door(0)
+    while world.unpaid:   # the wave's last monster falls or gets through
+        run(world, 1)
+        assert world.time < 600
+    world.build_door(0)
+    assert world.doors[0].built

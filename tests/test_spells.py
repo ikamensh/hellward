@@ -141,3 +141,16 @@ def test_a_clone_with_spells_in_the_air_plays_on_like_its_original():
     run(twin, 8)
     assert [(m.id, m.s, m.hp) for m in world.monsters] == [(m.id, m.s, m.hp) for m in twin.monsters]
     assert (world.gold, world.lives, world.mana, world.kills) == (twin.gold, twin.lives, twin.mana, twin.kills)
+
+
+def test_a_spell_gathers_itself_after_a_cast_before_it_can_be_cast_again():
+    world = world_of(g("overlord", 3, 0.5))
+    world.call_wave()
+    run(world, 3)
+    world.mana = 400
+    world.smite(world.monsters[0].id)
+    with pytest.raises(Refused, match="gathers itself"):
+        world.smite(world.monsters[0].id)
+    world.meteor(*world.level.point(world.monsters[0].s))   # another spell is not held back
+    run(world, SPELLS["smite"].recharge + SIM_DT)
+    world.smite(world.monsters[0].id)

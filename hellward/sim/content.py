@@ -179,16 +179,17 @@ class SpellSpec:
     delay: float = 0.0    # seconds between the cast and the strike
     lasting: float = 0.0  # seconds the ground burns, or the monsters stay frozen
     burn: float = 0.0     # damage per second of the burning ground
+    recharge: float = 0.0 # seconds after a cast before it can be cast again
 
 
 SPELLS: Final[dict[str, SpellSpec]] = {s.key: s for s in (
     SpellSpec("cleanse", "Cleanse", 35, "tower", "Burns every curse off one tower."),
-    SpellSpec("smite", "Smite", 30, "monster", "Holy lightning strikes one monster, and no resistance softens it. "
-              "A leader it strikes while pondering or chanting loses its curse.", damage=100),
+    SpellSpec("smite", "Smite", 35, "monster", "Holy lightning strikes one monster, and no resistance softens it. "
+              "A leader it strikes while pondering or chanting loses its curse.", damage=100, recharge=8.0),
     SpellSpec("meteor", "Meteor", 60, "floor", "Falls a moment after the cast and leaves the floor burning.", damage=110,
-              radius=1.4, delay=1.2, lasting=3.0, burn=12),
+              radius=1.4, delay=1.2, lasting=3.0, burn=12, recharge=10.0),
     SpellSpec("orb", "Frozen Orb", 50, "floor", "Freezes everything near it: no walking, no battering, and a leader's "
-              "curse breaks.", damage=50, radius=1.8, lasting=2.5),
+              "curse breaks.", damage=50, radius=1.8, lasting=2.5, recharge=12.0),
 )}
 
 START_LIVES: Final = 20
