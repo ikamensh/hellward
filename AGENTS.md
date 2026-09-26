@@ -17,6 +17,7 @@ uv run python tools/curse_quality.py --location caves  # how close the leaders' 
 uv run python tools/campaign_balance.py --out DIR   # the campaign's tuning table (heavy: through ~/saga/tools/slot.py)
 uv run python tools/sim_bench.py             # a defence per location, source against compiled: time and digests
 uv run python tools/warden_plans.py search   # the warden's build for a location, searched on training seeds
+uv run python tools/plan_player.py plan all   # search the planned player's builds (slot.py; after a rules change)
 uv run python tools/sampler.py DIR --music   # every sound cue back to back, and the music, to listen to
 uv run python tools/pieces.py refresh        # regenerate changed foley pieces (Stable Audio 3, docs/audio.md)
 uv run python tools/restyle.py refresh DIR   # repaint the stand-ins (Codex; --provider openrouter), install the cut

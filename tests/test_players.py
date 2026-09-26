@@ -1,18 +1,24 @@
 """Whole defences, played by the scripted players through a person's hands."""
 
+import random
+import sys
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from hellward.sim import planner
-from hellward.sim.campaign import LOCATIONS, NORMAL, g
+from hellward.sim.campaign import DIFFICULTIES, LOCATIONS, NORMAL, g
 from hellward.sim.content import Wave
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.hands import Hands, defend
+from hellward.sim.players.planned import PLANS, load
 from hellward.sim.players.warden import fingerprint, load_plans
-from hellward.sim.skills import cost
+from hellward.sim.skills import SKILLS, cost
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+import plan_player  # noqa: E402
 
 
 @pytest.mark.parametrize("key", list(LOCATIONS))
@@ -107,3 +113,46 @@ def test_a_player_reads_no_leaders_mind_and_no_future(path):
         return   # the harness itself reads the events a person would see
     source = path.read_text()
     assert not [word for word in FORBIDDEN if word in source]
+
+
+def test_the_planned_player_holds_tristram_with_its_searched_build():
+    world, _ = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["planned"](1), seed=1, sigils=0, planner=planner.smart)
+    assert world.outcome == "victory"
+    assert world.lives >= 18
+
+
+def assert_fits(plan, location):
+    assert set(plan.skills) <= set(SKILLS)
+    assert len(plan.calls) == len(location.waves)
+    built = set()
+    ranks = {}
+    for step in plan.steps:
+        if step[0] == "build":
+            assert step[1] in location.arsenal.towers
+            assert location.level.buildable(*step[2]) and step[2] not in built
+            built.add(step[2])
+        elif step[0] == "rank":
+            assert step[1] in built
+            ranks[step[1]] = ranks.get(step[1], 0) + 1
+            assert ranks[step[1]] <= 2
+        else:
+            assert location.arsenal.gates and 0 <= step[1] < len(location.level.doors)
+
+
+@pytest.mark.parametrize("path", sorted(PLANS.glob("*.json")), ids=lambda p: p.stem)
+def test_every_stored_plan_fits_its_location(path):
+    """A plan found for an older map or arsenal would build nowhere; the player would stand idle."""
+    key, difficulty = path.stem.split("-")
+    assert difficulty in DIFFICULTIES
+    assert_fits(load(key, difficulty), LOCATIONS[key])
+
+
+@pytest.mark.parametrize("key", list(LOCATIONS))
+def test_the_plan_search_only_ever_makes_plans_that_fit(key):
+    location = LOCATIONS[key]
+    rng = random.Random(key)
+    tiles = plan_player.ranked_tiles(location, 3.0, 3.0)[:plan_player.TOP_TILES]
+    for plan in plan_player.first_plans(location):
+        for _ in range(60):
+            plan = plan_player.mutate(plan, location, rng, tiles)
+            assert_fits(plan, location)
