@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
+from typing import Final
 
 from hellward.sim.content import DOOR, MANA_MAX, MANA_REGEN, SPELLS, TOWERS, TowerLevel
 from hellward.sim.sums import int_sum
@@ -111,7 +112,7 @@ class Perks:
     spell_power: float = 1.0
 
 
-NO_PERKS = Perks()
+NO_PERKS: Final = Perks()
 
 
 def perks(learned: Iterable[str]) -> Perks:
@@ -157,7 +158,7 @@ def perks(learned: Iterable[str]) -> Perks:
     return p
 
 
-_BAKED: dict[Perks, dict[str, tuple[TowerLevel, ...]]] = {}
+_BAKED: Final[dict[Perks, dict[str, tuple[TowerLevel, ...]]]] = {}
 
 
 def baked(p: Perks) -> dict[str, tuple[TowerLevel, ...]]:

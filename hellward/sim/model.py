@@ -21,7 +21,7 @@ import math
 import random
 from dataclasses import dataclass
 from operator import attrgetter
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Final
 
 from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location
 from hellward.sim.content import (
@@ -34,18 +34,18 @@ from hellward.sim.skills import NO_PERKS, Perks, baked
 if TYPE_CHECKING:
     from hellward.sim.planner import Decision
 
-SIM_DT = 0.05
-DOOR_STOP = 0.45         # how far before a door's centre the front of a queue stands
-JOSTLE = 0.6             # the queue behind a door is this deep
-CHAIN_JUMP = 1.7         # how far chain lightning leaps
-DECIDE_DELAY = 0.5       # a leader ponders this long between asking its planner and starting to chant
-HOLD_RETRY = 1.0         # a leader that holds its curse thinks again after this long
-CAST_SLACK = 1.0         # a curse lands if the tower is within reach + slack when the chant ends
-FIRST_WAVE_BREAK = 30.0
-LEAK_WEIGHT = 2.0        # a monster through the sanctuary gate is worth twice its life to its side
-BLAZE_TIME = 2.0         # seconds the floor burns where a fireball lands, under Blaze
+SIM_DT: Final = 0.05
+DOOR_STOP: Final = 0.45         # how far before a door's centre the front of a queue stands
+JOSTLE: Final = 0.6             # the queue behind a door is this deep
+CHAIN_JUMP: Final = 1.7         # how far chain lightning leaps
+DECIDE_DELAY: Final = 0.5       # a leader ponders this long between asking its planner and starting to chant
+HOLD_RETRY: Final = 1.0         # a leader that holds its curse thinks again after this long
+CAST_SLACK: Final = 1.0         # a curse lands if the tower is within reach + slack when the chant ends
+FIRST_WAVE_BREAK: Final = 30.0
+LEAK_WEIGHT: Final = 2.0        # a monster through the sanctuary gate is worth twice its life to its side
+BLAZE_TIME: Final = 2.0         # seconds the floor burns where a fireball lands, under Blaze
 
-_by_s = attrgetter("s")
+_by_s: Final = attrgetter("s")
 
 
 class Refused(Exception):
@@ -181,22 +181,34 @@ class Door:
         return Door, (self.index, self.tile, self.s), self.__getstate__()
 
 
-@dataclass
 class Bolt:
-    """A firebolt or a venom dart in flight; it lands on its monster, or where that monster fell."""
+    """A firebolt or a venom dart in flight; it lands on its monster, or where that monster fell.
 
-    id: int
-    tower: int
-    kind: str          # the tower kind's key
-    target: int
-    left: float        # seconds to impact
-    damage: float
-    element: Element
-    splash: float
-    poison: float
-    poison_time: float
-    origin: tuple[float, float]
-    last: tuple[float, float]   # the target's last known position
+    A bolt is never changed: each step makes a flying bolt anew, so clones and the view keep the ones they were
+    given. It is a class of its own rather than a dataclass, whose ``__init__`` runs interpreted when compiled."""
+
+    __slots__ = ("id", "tower", "kind", "target", "left", "damage", "element", "splash", "poison", "poison_time",
+                 "origin", "last")
+
+    def __init__(self, id: int, tower: int, kind: str, target: int, left: float, damage: float, element: Element,
+                 splash: float, poison: float, poison_time: float, origin: tuple[float, float],
+                 last: tuple[float, float]) -> None:
+        self.id = id
+        self.tower = tower
+        self.kind = kind                # the tower kind's key
+        self.target = target
+        self.left = left                # seconds to impact
+        self.damage = damage
+        self.element = element
+        self.splash = splash
+        self.poison = poison
+        self.poison_time = poison_time
+        self.origin = origin
+        self.last = last                # the target's last known position
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return Bolt, (self.id, self.tower, self.kind, self.target, self.left, self.damage, self.element, self.splash,
+                      self.poison, self.poison_time, self.origin, self.last)
 
 
 @dataclass(frozen=True)
@@ -951,7 +963,7 @@ class World:
             self.break_left = WAVE_BREAK
 
 
-_ASK = object()   # a leader that has decided to ask, for the end of this step
+_ASK: Final = object()   # a leader that has decided to ask, for the end of this step
 
 
 def _inside(s: float, spans: tuple[tuple[float, float], ...]) -> bool:

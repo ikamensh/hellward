@@ -26,7 +26,7 @@ def float_sum(values: Iterable[float]) -> float:
         else:
             error += (value - added) + total
         total = added
-    if error != 0.0 and math.isfinite(error):
+    if error != 0.0 and not (math.isinf(error) or math.isnan(error)):   # math.isfinite, in primitives mypyc has
         total += error
     return total
 

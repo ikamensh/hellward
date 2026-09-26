@@ -20,21 +20,22 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
+from typing import Final
 
 from hellward.sim.content import CURSES, Curse, LeaderSpec
 from hellward.sim.model import CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, ForcedCurse, Monster, Tower, World
 from hellward.sim.sums import float_sum
 
-ROLLOUT_DT = 0.1
-HORIZON_PAD = 3.0      # seconds a rollout runs past the curse's end, to see what it changed
-SHORTLIST = 10         # (curse, tower) pairs that get a rollout
-DELAYS = (2.0, 4.0)    # later moments tried for the best targets
-LATER_TRIED = 3
-LATER_MARGIN = 1.2     # waiting must beat casting now by this factor ...
-MIN_GAIN = 5.0         # ... and by this much life; a curse is free but for its cooldown, so only noise is not cast
-QUIET_RETRY = 1.5      # when nothing is worth cursing
-SAMPLE = 0.5           # the estimate's time step
-LASTING = 0.5          # the weight of the pack's average life over the look-ahead in a rollout's score
+ROLLOUT_DT: Final = 0.1
+HORIZON_PAD: Final = 3.0      # seconds a rollout runs past the curse's end, to see what it changed
+SHORTLIST: Final = 10         # (curse, tower) pairs that get a rollout
+DELAYS: Final = (2.0, 4.0)    # later moments tried for the best targets
+LATER_TRIED: Final = 3
+LATER_MARGIN: Final = 1.2     # waiting must beat casting now by this factor ...
+MIN_GAIN: Final = 5.0         # ... and by this much life; a curse is free but for its cooldown, so only noise is not cast
+QUIET_RETRY: Final = 1.5      # when nothing is worth cursing
+SAMPLE: Final = 0.5           # the estimate's time step
+LASTING: Final = 0.5          # the weight of the pack's average life over the look-ahead in a rollout's score
 
 
 @dataclass(frozen=True)

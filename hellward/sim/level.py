@@ -38,6 +38,9 @@ class Level:
     door_s: tuple[float, ...] = field(init=False, repr=False, compare=False)
     _starts: tuple[float, ...] = field(init=False, repr=False, compare=False)            # s at each waypoint
     _points: tuple[tuple[float, float], ...] = field(init=False, repr=False, compare=False)   # each waypoint's centre
+    _xs: tuple[float, ...] = field(init=False, repr=False, compare=False)       # the same, x and y apart
+    _ys: tuple[float, ...] = field(init=False, repr=False, compare=False)
+    _leg_at: tuple[int, ...] = field(init=False, repr=False, compare=False)     # the leg under each whole s
     _coverage: dict[tuple[tuple[int, int], float], tuple[tuple[float, float], ...]] = field(
         init=False, repr=False, compare=False)
 
@@ -56,6 +59,11 @@ class Level:
         starts, points = self._measure()
         object.__setattr__(self, "_starts", starts)
         object.__setattr__(self, "_points", points)
+        object.__setattr__(self, "_xs", tuple(x for x, _ in points))
+        object.__setattr__(self, "_ys", tuple(y for _, y in points))
+        # Every leg runs straight from one tile centre to another, so every leg starts at a whole s, and the leg
+        # under s is the leg under int(s).
+        object.__setattr__(self, "_leg_at", tuple(bisect_right(starts, k) - 1 for k in range(int(starts[-1]) + 1)))
         object.__setattr__(self, "door_s", tuple(self.s_of(d) for d in self.doors))
         object.__setattr__(self, "_coverage", {})
 
@@ -121,15 +129,14 @@ class Level:
 
     def point(self, s: float) -> tuple[float, float]:
         """Where on the map a monster ``s`` tiles along the path stands."""
-        starts, points = self._starts, self._points
+        xs, ys, starts = self._xs, self._ys, self._starts
         if s <= 0:
-            return points[0]
+            return xs[0], ys[0]
         if s >= starts[-1]:
-            return points[-1]
-        i = bisect_right(starts, s) - 1
-        (x0, y0), (x1, y1) = points[i], points[i + 1]
+            return xs[-1], ys[-1]
+        i = self._leg_at[int(s)]
         t = (s - starts[i]) / (starts[i + 1] - starts[i])
-        return x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+        return xs[i] + (xs[i + 1] - xs[i]) * t, ys[i] + (ys[i + 1] - ys[i]) * t
 
     def heading(self, s: float) -> tuple[float, float]:
         """The unit direction of travel at ``s``."""
