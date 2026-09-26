@@ -127,7 +127,8 @@ class Hud:
             x = SLOT_X + i * (SLOT + 10)
             y = TOP + 16
             if key == "gate":
-                name, tip = "Warded Gate", f"Bar an arch on the path. Walkers must break it ({world.gate_life:.0f} life); flyers pass over."
+                name, tip = "Warded Gate", (f"Bar an arch on the path. Walkers must break it ({world.gate_life:.0f} life); flyers pass "
+                                            "over. A broken gate lies in rubble until the wave is cleared.")
             else:
                 kind = TOWERS[key]
                 name, tip = kind.name, f"{ELEMENT_NAMES[kind.element]}. {kind.blurb}"

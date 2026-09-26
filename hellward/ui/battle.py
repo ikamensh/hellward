@@ -555,6 +555,8 @@ class BattleScene(Scene):
             color = (255, 220, 120, 255) if i == hovered else (200, 160, 80, 160)
             if door.built:
                 color = (120, 110, 100, 120)
+            elif door.rubble:   # broken this wave: it takes a gate again once the wave is cleared
+                color = (220, 70, 60, 220)
             self.draw_rect(MAP_X + x * T + 1, MAP_Y + y * T + 1, T - 2, T - 2, (255, 220, 120, 40 if i == hovered else 0),
                            border_color=color, border_width=2.5, space="world", layer=RenderLayer.EFFECTS)
 
