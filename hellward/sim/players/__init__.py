@@ -7,7 +7,9 @@ from collections.abc import Callable
 
 from hellward.sim.players.hands import Player
 from hellward.sim.players.ordinary import Ordinary
+from hellward.sim.players.planned import Planned
 
 PLAYERS: dict[str, Callable[[int], Player]] = {
     "ordinary": lambda seed: Ordinary(),
+    "planned": lambda seed: Planned(),
 }

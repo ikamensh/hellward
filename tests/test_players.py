@@ -6,11 +6,13 @@ from pathlib import Path
 import pytest
 
 from hellward.sim import planner
-from hellward.sim.campaign import LOCATIONS, NORMAL, g
+from hellward.sim.campaign import DIFFICULTIES, LOCATIONS, NORMAL, g
 from hellward.sim.content import Wave
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.hands import Hands, defend
+from hellward.sim.players.planned import PLANS, load
+from hellward.sim.skills import SKILLS
 
 
 @pytest.mark.parametrize("key", list(LOCATIONS))
@@ -57,3 +59,30 @@ def test_a_player_reads_no_leaders_mind_and_no_future(path):
         return   # the harness itself reads the events a person would see
     source = path.read_text()
     assert not [word for word in FORBIDDEN if word in source]
+
+
+def test_the_planned_player_holds_tristram_with_its_searched_build():
+    world, _ = defend(LOCATIONS["tristram"], NORMAL, PLAYERS["planned"](1), seed=1, sigils=0, planner=planner.smart)
+    assert world.outcome == "victory"
+    assert world.lives >= 18
+
+
+@pytest.mark.parametrize("path", sorted(PLANS.glob("*.json")), ids=lambda p: p.stem)
+def test_every_stored_plan_fits_its_location(path):
+    """A plan found for an older map or arsenal would build nowhere; the player would stand idle."""
+    key, difficulty = path.stem.split("-")
+    location = LOCATIONS[key]
+    plan = load(key, difficulty)
+    assert difficulty in DIFFICULTIES
+    assert set(plan.skills) <= set(SKILLS)
+    assert len(plan.calls) == len(location.waves)
+    built = set()
+    for step in plan.steps:
+        if step[0] == "build":
+            assert step[1] in location.arsenal.towers
+            assert location.level.buildable(*step[2]) and step[2] not in built
+            built.add(step[2])
+        elif step[0] == "rank":
+            assert step[1] in built
+        else:
+            assert location.arsenal.gates and 0 <= step[1] < len(location.level.doors)
