@@ -9,7 +9,7 @@ from hellward.sim.players.ordinary import tile_scores
 from hellward.sim.campaign import g
 from hellward.sim.content import SOUL, Element, Wave
 from hellward.sim.model import SIM_DT, World
-from hellward.sim.skills import SKILLS, TREE_COST, can_learn, check, perks
+from hellward.sim.skills import TREE_COST, can_learn, check, perks
 
 
 def world_of(*groups, learned=(), **kwargs) -> World:
