@@ -44,7 +44,7 @@ from hellward.sim.content import (
     CURSES, DOOR, MONSTERS, SPELLS, TOWERS, Curse, Element, MonsterKind, TowerLevel,
 )
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Refused, Tower, World
-from hellward.sim.players.hands import AIM_GAP, Hands
+from hellward.sim.players.hands import AIM_GAP, Hands, ready
 from hellward.sim.skills import SKILLS, can_learn
 
 SAMPLE = 0.25          # seconds between two looks at where the monsters are
@@ -607,7 +607,7 @@ class Adaptive:
         return self.tower_worth.get(tower_id, 0.0) / total
 
     def _can(self, world: World, spell: str) -> bool:
-        return spell in world.location.arsenal.spells and world.mana >= world.spell_cost(spell)
+        return ready(world, spell)
 
     def _answer(self, hands: Hands) -> bool:
         """The leaders first: a Frozen Orb on two chants at once, a Smite on a chant at a tower that matters, a Smite

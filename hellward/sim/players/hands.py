@@ -69,6 +69,13 @@ class Record:
     skills: frozenset[str] = frozenset()              # what the player learned for it
 
 
+def ready(world: World, spell: str, spare: float = 0.0) -> bool:
+    """Whether a spell can be cast now, as its slot on the panel shows: offered here, gathered again after its last
+    cast, and paid for with ``spare`` mana still in hand."""
+    return (spell in world.location.arsenal.spells and world.recharge.get(spell, 0.0) <= 0
+            and world.mana - spare >= world.spell_cost(spell))
+
+
 def react_for(seed: int) -> float:
     return REACT[0] + (REACT[1] - REACT[0]) * random.Random(seed * 7919 + 17).random()
 

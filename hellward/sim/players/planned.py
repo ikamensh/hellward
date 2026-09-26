@@ -23,7 +23,7 @@ from pathlib import Path
 from hellward.sim.campaign import Difficulty, Location
 from hellward.sim.content import CURSES, DOOR, SPELLS, Curse, Element
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
-from hellward.sim.players.hands import AIM_GAP, Hands
+from hellward.sim.players.hands import AIM_GAP, Hands, ready
 from hellward.sim.skills import can_learn
 
 PLANS = Path(__file__).parent / "plans"
@@ -182,7 +182,7 @@ class Planned:
         return world.time - self.last_aim >= AIM_GAP - 1e-9
 
     def _can(self, world: World, spell: str, spare: float = 0.0) -> bool:
-        return spell in world.location.arsenal.spells and world.mana - spare >= world.spell_cost(spell)
+        return ready(world, spell, spare)
 
     def _answer(self, hands: Hands) -> None:
         """A chant seen: smite its leader when the tower it aims at is worth it, or freeze it with its crowd."""

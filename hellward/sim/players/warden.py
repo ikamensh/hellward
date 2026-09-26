@@ -27,7 +27,7 @@ from pathlib import Path
 from hellward.sim.campaign import Difficulty, Location
 from hellward.sim.content import CURSES, DOOR, MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Curse, Element
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
-from hellward.sim.players.hands import AIM_GAP, Hands
+from hellward.sim.players.hands import AIM_GAP, Hands, ready
 from hellward.sim.skills import SKILLS, can_learn, perks, tower_levels
 
 PLANS = Path(__file__).parent / "plans" / "warden.json"
@@ -375,7 +375,7 @@ class Warden:
         spells = world.location.arsenal.spells
         if "meteor" in spells and self._meteor(hands, FULL_BITE):
             return
-        if "smite" not in spells or world.mana < world.spell_cost("smite"):
+        if not ready(world, "smite"):
             return
         damage = SPELLS["smite"].damage * world.power()
         target = max(world.monsters, key=lambda m: (m.kind.leader is not None, min(m.hp, damage), m.s))
@@ -422,14 +422,14 @@ class Warden:
                 best, best_value = leader, value
         if best is None:
             return False
-        if "orb" in spells and world.mana >= world.spell_cost("orb"):
+        if ready(world, "orb"):
             x, y = world.level.point(best.s)
             caught = _near(world, x, y, SPELLS["orb"].radius)
             if sum(1 for m in caught if m in chanting) >= 2 or sum(m.hp for m in caught) >= ORB_CROWD * world.power():
                 hands.orb(x, y)
                 self.last_aim = world.time
                 return True
-        if "smite" in spells and world.mana >= world.spell_cost("smite"):
+        if ready(world, "smite"):
             hands.smite(best.id)
             self.last_aim = world.time
             return True
@@ -438,7 +438,7 @@ class Warden:
     def _smite_leaker(self, hands: Hands) -> bool:
         """A monster a step or two from the sanctuary that one Smite would kill."""
         world = hands.world
-        if world.mana < world.spell_cost("smite"):
+        if not ready(world, "smite"):
             return False
         damage = SPELLS["smite"].damage * world.power()
         end = world.level.length
@@ -454,8 +454,7 @@ class Warden:
     def _smite_boss(self, hands: Hands) -> bool:
         """A monster that would cost many lives at the sanctuary: every Smite not kept for a chant goes to it."""
         world = hands.world
-        cost = world.spell_cost("smite")
-        if world.mana < 2 * cost:
+        if not ready(world, "smite", spare=world.spell_cost("smite")):
             return False
         bosses = [m for m in world.monsters if m.kind.lives >= BOSS]
         if not bosses:
@@ -467,7 +466,7 @@ class Warden:
     def _hold_gate(self, hands: Hands) -> bool:
         """A Frozen Orb on the queue at a gate about to break, when the queue is worth holding."""
         world = hands.world
-        if world.mana < world.spell_cost("orb"):
+        if not ready(world, "orb"):
             return False
         for door in world.doors:
             if not door.built:
@@ -492,7 +491,7 @@ class Warden:
         world = hands.world
         cost = world.spell_cost("meteor")
         reserve = world.spell_cost("smite") if "smite" in world.location.arsenal.spells else 0.0
-        if world.mana < cost or (world.mana < cost + reserve and world.mana < world.mana_max - FULL):
+        if not ready(world, "meteor") or (world.mana < cost + reserve and world.mana < world.mana_max - FULL):
             return False
         spec = SPELLS["meteor"]
         damage = spec.damage * world.power()
