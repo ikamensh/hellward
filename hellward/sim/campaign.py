@@ -35,6 +35,9 @@ class Location:
     blurb: str                        # what the place is, one or two sentences
     taunt: str                        # the Bone Priest, who has seen this fight before
     requires: tuple[str, ...] = ()    # the location that must be held first
+    life: float = 1.0                 # every monster's life here, and the spells' strength, is multiplied by this: the
+                                      # location's difficulty, tuned by simulation (docs/campaign.md); the waves' own
+                                      # life multipliers give the ramp within it
 
     def __post_init__(self) -> None:
         if len(self.wave_names) != len(self.waves):

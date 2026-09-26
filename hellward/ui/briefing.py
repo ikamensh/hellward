@@ -98,7 +98,7 @@ class BriefingScene(Scene):
         for key in kinds:
             kind = MONSTERS[key]
             first = next(w for w in self.location.waves if any(g.kind == key for g in w.groups))
-            life = kind.hp * first.hp * difficulty.hp
+            life = kind.hp * first.hp * self.location.life * difficulty.hp
             top = y + 26
             leader = kind.leader is not None
             self.draw_rect(x, top, width, 222, (18, 12, 14, 230), border_color=style.CURSE if leader else style.PANEL_EDGE,
