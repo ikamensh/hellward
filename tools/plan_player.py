@@ -14,7 +14,8 @@ seeds, and keeps the best (or, when it is only as good, the change, so the climb
 rotate through 0-99 so a build cannot learn one seed by heart. Most defences are played against *lite* leaders:
 the smart leaders' own look-ahead at a coarser step with fewer rollouts, several times cheaper and much closer
 to them than the greedy estimate alone. The last builds climbed through are played against the smart leaders to
-choose the one written to ``hellward/sim/players/plans/``. While a build holds with most of its life, every monster's
+choose the one written to ``hellward/sim/players/plans/``; the build the climb began from is always among them,
+so a resumed climb cannot lose what it had. While a build holds with most of its life, every monster's
 life is raised, so the climb keeps finding a difference to climb on: a build that holds at more life holds with
 more to spare at the real one.
 
@@ -391,7 +392,7 @@ def climb(pool: ProcessPoolExecutor, location_key: str, difficulty: str, generat
             hp /= 1.06
 
     trail.append(parent)
-    finalists = list({json.dumps(p.to_json(), sort_keys=True): p for p in trail[-5:]}.values())
+    finalists = list({json.dumps(p.to_json(), sort_keys=True): p for p in trail[:1] + trail[-4:]}.values())
     finals = [(offset + 60 + j) % TRAINING for j in range(confirm)]
     smart = evaluate(pool, finalists, location_key, difficulty, finals, hp, "smart")
     defences += len(finalists) * len(finals)
