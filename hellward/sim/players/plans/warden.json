@@ -717,12 +717,12 @@
   ]
  },
  "hells_gate/hell/36": {
-  "early": 0.7,
+  "early": 1.01,
   "map": "7681ed02cf96",
   "searched": {
    "leaders": "greedy",
-   "life": 1.276,
-   "lost": 4,
+   "life": 1.0,
+   "lost": 48,
    "plans": 300,
    "seeds": "0-3"
   },
@@ -750,7 +750,7 @@
    [
     "build",
     "frost",
-    9,
+    7,
     10
    ],
    [
@@ -763,18 +763,24 @@
     "build",
     "frost",
     5,
+    6
+   ],
+   [
+    "build",
+    "frost",
+    5,
+    4
+   ],
+   [
+    "build",
+    "pyre",
+    4,
     4
    ],
    [
     "up",
     5,
     4
-   ],
-   [
-    "build",
-    "frost",
-    5,
-    6
    ],
    [
     "gate",
@@ -793,26 +799,20 @@
    ],
    [
     "build",
-    "pyre",
-    4,
-    4
-   ],
-   [
-    "build",
     "plague",
     10,
     9
    ],
    [
-    "build",
-    "storm",
-    14,
-    8
-   ],
-   [
     "up",
     4,
     4
+   ],
+   [
+    "build",
+    "pyre",
+    11,
+    5
    ],
    [
     "build",
@@ -827,33 +827,22 @@
    ],
    [
     "up",
-    14,
-    8
+    7,
+    5
    ],
    [
     "gate",
     1
    ],
    [
+    "up",
+    7,
+    5
+   ],
+   [
     "build",
     "storm",
-    5,
-    9
-   ],
-   [
-    "build",
-    "storm",
-    16,
-    3
-   ],
-   [
-    "up",
-    5,
-    6
-   ],
-   [
-    "up",
-    13,
+    8,
     9
    ]
   ]
