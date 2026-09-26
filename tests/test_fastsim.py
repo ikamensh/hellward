@@ -213,3 +213,68 @@ def test_a_new_build_prunes_what_no_process_has_started_on_for_days(tmp_path: Pa
     fastsim.prune(keep=new)
     assert sorted(p.name for p in tmp_path.iterdir()) == sorted(p.name for p in (recent, running, new))
     assert not any(p.exists() for p in (old, interrupted, half_pruned))
+
+
+SPAWN_ROUND_TRIP = """
+import json, multiprocessing, sys
+sys.path.insert(0, {root!r})
+from concurrent.futures import ProcessPoolExecutor
+
+
+def _init() -> None:
+    from hellward.sim import fastsim
+    fastsim.activate()   # the parent's build, through HELLWARD_FASTSIM
+
+
+def _decide(world, leader_id):
+    from hellward.sim import fastsim, planner
+    return planner.decide(world, leader_id), fastsim.compiled()
+
+
+def main() -> None:
+    from hellward.sim import fastsim
+    fastsim.attach({build!r})   # the compiled parent, before the simulation is imported
+    from hellward.sim import planner
+    from hellward.sim.campaign import CATHEDRAL
+    from hellward.sim.model import World
+    from hellward.sim.players.hands import Hands
+    from hellward.sim.players.ordinary import Ordinary
+    world = World(CATHEDRAL, seed=2, planner=planner.smart)   # a hundred seconds into a defence
+    player, hands = Ordinary(), Hands(world, react=0.6)
+    while world.time < 100.0 or not world.leaders():
+        assert world.outcome is None
+        player.act(hands)
+        world.step()
+        hands.observe(world.events)
+        world.events.clear()
+    probe = world.clone()   # what the game sends its workers
+    leader = probe.leaders()[0].id
+    inline = planner.decide(probe, leader)
+    ctx = multiprocessing.get_context("spawn")
+    with ProcessPoolExecutor(1, mp_context=ctx, initializer=_init) as pool:
+        back, worker_compiled = pool.submit(_decide, probe, leader).result(timeout=600)
+    print(json.dumps({{"parent": fastsim.compiled(), "worker": worker_compiled, "same": back == inline}}))
+
+
+if __name__ == "__main__":
+    main()
+"""
+
+
+def test_a_spawned_worker_decides_as_its_compiled_parent(tmp_path: Path) -> None:
+    """A world the compiled simulation built round-trips to a fresh spawn worker on the same build: pickled by
+    the compiled parent, unpickled by the compiled worker (which activated the parent's build through
+    ``HELLWARD_FASTSIM``), the planner decides there exactly what it decides inline."""
+    try:
+        build = fastsim.build()
+    except fastsim.NoToolchain as missing:
+        pytest.skip(f"this machine cannot compile the simulation: {missing}")
+    env = {k: v for k, v in os.environ.items() if k not in (fastsim.ENV, fastsim.OPT_OUT)}
+    driver = tmp_path / "spawn_decide.py"
+    driver.write_text(SPAWN_ROUND_TRIP.format(root=str(ROOT), build=str(build)), encoding="utf-8")
+    done = subprocess.run([sys.executable, str(driver)], cwd=ROOT, env=env, capture_output=True, text=True,
+                          timeout=900)
+    assert done.returncode == 0, done.stderr
+    report = json.loads(done.stdout)
+    assert report["parent"] and report["worker"]
+    assert report["same"]

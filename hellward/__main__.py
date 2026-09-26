@@ -4,25 +4,27 @@ the queues)."""
 from __future__ import annotations
 
 import argparse
+import os
 import signal
+import sys
+import threading
 from pathlib import Path
 
 from saga2d import Game
 
-from hellward.art import fx, sprites
-from hellward.audio.bank import SoundBank
-from hellward.sim.players.adaptive import Adaptive
-from hellward.ui import menus, style
-from hellward.ui.battle import HEIGHT, WIDTH
-from hellward.ui.flow import Flow
-from hellward.ui.progress import Progress
-from hellward.ui.thinking import Thinker
-from hellward.ui.title import LoadingScene, TitleScene
+from hellward.sim import fastsim
+from hellward.ui import style
+from hellward.ui.loading import LoadingScene
 
 DATA = Path.home() / ".hellward"
 
+COMPILE_MESSAGE = "Compiling the leaders' minds (first launch only)..."
+
 
 def build(game: Game, cache: Path):
+    from hellward.art import fx, sprites
+    from hellward.audio.bank import SoundBank
+
     style.load_fonts(game)
     game.theme = style.theme()
     loading = LoadingScene()
@@ -35,6 +37,53 @@ def build(game: Game, cache: Path):
     return art
 
 
+def _needs_build() -> bool:
+    """Whether activation would have to compile: no opt-out, no inherited build, and none on disk yet."""
+    if os.environ.get(fastsim.OPT_OUT) or os.environ.get(fastsim.ENV):
+        return False
+    return not (fastsim.BUILDS / fastsim.key()).is_dir()
+
+
+def _activate(game: Game) -> None:
+    """Run the compiled simulation, building it first when the sources changed.
+
+    A build already on disk attaches instantly. A first launch compiles (up to a minute) in a background
+    thread while the window keeps ticking the loading scene; anything else failing raises, but a machine
+    without a toolchain just runs the source and says so once.
+    """
+    if not _needs_build():
+        try:
+            fastsim.activate()
+        except fastsim.NoToolchain as missing:
+            print(f"hellward: {missing}; running the source simulation", file=sys.stderr, flush=True)
+        return
+    style.load_fonts(game)
+    game.theme = style.theme()
+    game.push(LoadingScene(COMPILE_MESSAGE))
+    game.tick(1 / 60)
+    outcome: dict = {}
+
+    def _compile() -> None:
+        try:
+            outcome["path"] = fastsim.build()
+        except Exception as failed:   # re-raised below, in this thread
+            outcome["error"] = failed
+
+    worker = threading.Thread(target=_compile, name="hellward-fastsim-build", daemon=True)
+    worker.start()
+    while worker.is_alive():
+        game.tick(1 / 60)
+    worker.join()
+    game.pop()
+    failed = outcome.get("error")
+    if failed is not None:
+        if isinstance(failed, fastsim.NoToolchain):
+            print(f"hellward: {failed}; running the source simulation", file=sys.stderr, flush=True)
+            return
+        raise failed
+    fastsim.attach(outcome["path"])
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Hellward — a gothic tower defence where demon leaders curse your towers")
     parser.add_argument("--seed", type=int, default=0)
@@ -43,10 +92,20 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     cache = DATA / "cache"
     cache.mkdir(parents=True, exist_ok=True)
-    game = Game("Hellward", resolution=(WIDTH, HEIGHT), fullscreen=args.fullscreen, asset_path=cache,
+    # 1280x800 mirrors hellward.ui.battle.WIDTH/HEIGHT, which cannot be imported before the simulation is activated
+    game = Game("Hellward", resolution=(1280, 800), fullscreen=args.fullscreen, asset_path=cache,
                 save_dir=DATA / "saves")
     # pyglet's Cocoa loop makes Ctrl-C end the process on the spot; Python's own handler lets it unwind instead
     signal.signal(signal.SIGINT, signal.default_int_handler)
+    _activate(game)
+    from hellward.audio.bank import SoundBank
+    from hellward.sim.players.adaptive import Adaptive
+    from hellward.ui import menus
+    from hellward.ui.flow import Flow
+    from hellward.ui.progress import Progress
+    from hellward.ui.thinking import Thinker
+    from hellward.ui.title import TitleScene
+
     art = build(game, cache)
     values = menus.settings(game)
     menus.apply_volumes(game, values)

@@ -22,8 +22,10 @@ process has started on for :data:`STALE_AFTER` (:func:`prune`).
 :func:`activate` is called by ``tools/balance.py``, ``tools/curse_quality.py`` and ``tools/sim_bench.py`` when
 they run as programs, before they import the simulation, and again in the worker processes they spawn, which
 run the same script as ``__mp_main__`` and take the parent's build from :data:`ENV`. A process that imports
-them as a library stays as it was. The game, its planner's worker (:mod:`hellward.ui.thinking`) and the tests
-run the source. ``HELLWARD_INTERPRETED=1`` makes :func:`activate` a no-op.
+them as a library stays as it was. The game runs the compiled build too (``hellward.__main__`` activates it
+on start, showing the loading scene while it compiles, and falls back to the source where no toolchain is
+found); its planner's worker (:mod:`hellward.ui.thinking`) activates the same build in every worker process,
+and the tests run the source. ``HELLWARD_INTERPRETED=1`` makes :func:`activate` a no-op.
 """
 
 from __future__ import annotations

@@ -2,12 +2,16 @@
 
     uv run python tools/sim_bench.py                          # every location, source and compiled, the speed-up
     uv run python tools/sim_bench.py --locations caves --repeat 3
+    uv run python tools/sim_bench.py --decisions               # how long the leaders take to choose, per location
 
 Every location is defended once by the ordinary player (``hands.defend``) against smart leaders, on seed 1.
 Each run is a fresh process: source (``HELLWARD_INTERPRETED=1``) and compiled (:mod:`hellward.sim.fastsim`)
 alternate, so that both meet the same load on a shared machine, and each is timed by the processor time of the
 defence alone (its events are kept, and written out after the clock stops). The fastest of ``--repeat`` runs
 counts.
+
+``--decisions`` plays the same defence inline on the build this tool runs and times every ``planner.decide``
+call instead: per location it prints how many decisions there were and their median, p95 and max.
 
 A run also prints a digest of every event with its time and of the world at the end (:func:`digest`); the source
 and the compiled digests must agree, so a speed change that is only a speed change prints the same digests.
@@ -20,7 +24,9 @@ import argparse
 import dataclasses
 import hashlib
 import json
+import math
 import os
+import statistics
 import subprocess
 import sys
 import time
@@ -36,7 +42,7 @@ if __name__ in ("__main__", "__mp_main__"):   # run as a program, not as a libra
     fastsim.activate()   # the compiled simulation, unless HELLWARD_INTERPRETED is set
 
 from hellward.sim import planner  # noqa: E402
-from hellward.sim.campaign import LOCATIONS  # noqa: E402
+from hellward.sim.campaign import LOCATIONS, ORDER  # noqa: E402
 from hellward.sim.model import World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.hands import defend  # noqa: E402
@@ -133,14 +139,56 @@ def run(key: str, env: dict[str, str]) -> dict[str, Any]:
     return json.loads(done.stdout)
 
 
+def decision_times(key: str, seed: int = SEED) -> list[float]:
+    """Seconds every ``planner.decide`` call took in one defence of a location by the adaptive player (strong enough
+    to meet every wave's leaders) with the campaign's sigils, decided inline on the build this tool runs."""
+    took: list[float] = []
+
+    def timing(world: World, leader_id: int):  # what defend calls as its planner, timed
+        started = time.perf_counter()
+        try:
+            return planner.smart(world, leader_id)
+        finally:
+            took.append(time.perf_counter() - started)
+
+    defend(LOCATIONS[key], PLAYERS["adaptive"](seed), seed=seed, sigils=3 * ORDER.index(key), planner=timing)
+    return took
+
+
+def describe(took: list[float]) -> tuple[int, float, float, float]:
+    """A decision-time sample as count, median, p95 and max, in milliseconds."""
+    ms = sorted(t * 1000 for t in took)
+    median = statistics.median(ms)
+    p95 = ms[min(len(ms) - 1, math.ceil(0.95 * len(ms)) - 1)]
+    return len(ms), median, p95, ms[-1]
+
+
+def decisions(keys: list[str]) -> None:
+    """One inline defence per location, timing every ``planner.decide`` call."""
+    print(f"decisions inline ({'compiled' if fastsim.compiled() else 'source'} simulation)")
+    print(f"{'location':12s} {'decides':>8s} {'median ms':>10s} {'p95 ms':>10s} {'max ms':>10s}")
+    for key in keys:
+        took = decision_times(key)
+        if not took:
+            print(f"{key:12s} {0:8d} {'—':>10s} {'—':>10s} {'—':>10s}", flush=True)
+            continue
+        count, median, p95, maximum = describe(took)
+        print(f"{key:12s} {count:8d} {median:10.1f} {p95:10.1f} {maximum:10.1f}", flush=True)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--locations", default=",".join(LOCATIONS))
     parser.add_argument("--repeat", type=int, default=1, help="runs of each kind per location; the fastest counts")
+    parser.add_argument("--decisions", action="store_true",
+                        help="time every planner.decide call per location instead of the source/compiled bench")
     parser.add_argument("--one", help=argparse.SUPPRESS)   # a single timed run, which the bench starts
     args = parser.parse_args()
     if args.one:
         print(json.dumps(timed(args.one)))
+        return
+    if args.decisions:
+        decisions(args.locations.split(","))
         return
     clean = {k: v for k, v in os.environ.items() if k not in (fastsim.ENV, fastsim.OPT_OUT)}
     kinds = {"source": {**clean, fastsim.OPT_OUT: "1"}, "compiled": {**clean, fastsim.ENV: str(fastsim.build())}}

@@ -17,16 +17,6 @@ if TYPE_CHECKING:
     from hellward.ui.flow import Flow
 
 
-class LoadingScene(Scene):
-    """One frame to look at while the first launch draws its textures and renders its sounds."""
-
-    background_color = (6, 4, 6, 255)
-
-    def draw(self) -> None:
-        self.draw_text("HELLWARD", 640, 360, style="banner", anchor_x="center", anchor_y="center")
-        self.draw_text("Preparing the cathedral...", 640, 410, font_size=16, color=style.DIM, anchor_x="center", anchor_y="center")
-
-
 class TitleScene(Scene):
     background_color = (6, 4, 6, 255)
 
