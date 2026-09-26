@@ -84,7 +84,6 @@ name = "hellward"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "mypy-extensions" },
     { name = "saga2d" },
     { name = "sagaforge" },
 ]
@@ -99,7 +98,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=2.3.1" },
-    { name = "mypy-extensions", specifier = ">=1.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
     { name = "saga2d", specifier = "==0.3.15" },
     { name = "sagaforge", editable = "../sagaforge" },

@@ -10,8 +10,9 @@ A world is one :class:`~hellward.sim.campaign.Location` at one difficulty, with 
 
 Events for the view are appended to :attr:`World.events` when ``record`` is on; clones switch it off.
 
-The mutable classes are ``serializable`` for mypyc (:mod:`hellward.sim.fastsim`): compiled, ``cls.__new__(cls)``
-then makes a blank object, as in Python, instead of calling ``__init__``, and a compiled world can be pickled.
+Compiled by mypyc (:mod:`hellward.sim.fastsim`), a class's ``__new__`` runs its ``__init__``, so there is no blank
+object to fill: copies are made by the constructors, and the classes whose constructor needs arguments say in
+``__reduce__`` how they are pickled.
 """
 
 from __future__ import annotations
@@ -21,8 +22,6 @@ import random
 from dataclasses import dataclass
 from operator import attrgetter
 from typing import TYPE_CHECKING, Any, Callable
-
-from mypy_extensions import mypyc_attr
 
 from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location
 from hellward.sim.content import (
@@ -53,7 +52,6 @@ class Refused(Exception):
     """A command the rules do not allow right now; the message says why, for the player."""
 
 
-@mypyc_attr(serializable=True)
 class Monster:
     __slots__ = ("id", "kind", "hp", "max_hp", "s", "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
                  "cooldown", "asking", "ask_left", "chant_curse", "chant_tower", "chant_left", "door")
@@ -80,13 +78,15 @@ class Monster:
         self.door = -1                        # the door socket it is battering, or -1
 
     def copy(self) -> Monster:
-        m = Monster.__new__(Monster)
-        m.id, m.kind, m.hp, m.max_hp, m.s, m.lane, m.jostle = self.id, self.kind, self.hp, self.max_hp, self.s, self.lane, self.jostle
-        m.chill, m.chill_left, m.frozen, m.wave, m.cooldown = self.chill, self.chill_left, self.frozen, self.wave, self.cooldown
+        """Everything but a leader's pending question to its planner."""
+        m = Monster(self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown)
+        m.max_hp, m.s, m.chill, m.chill_left, m.frozen = self.max_hp, self.s, self.chill, self.chill_left, self.frozen
         m.poison = [stack[:] for stack in self.poison]
-        m.asking, m.ask_left = None, 0.0
         m.chant_curse, m.chant_tower, m.chant_left, m.door = self.chant_curse, self.chant_tower, self.chant_left, self.door
         return m
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return Monster, (self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown), self.__getstate__()
 
     @property
     def speed(self) -> float:
@@ -99,7 +99,6 @@ class Monster:
         return self.chant_curse is not None
 
 
-@mypyc_attr(serializable=True)
 class Tower:
     __slots__ = ("id", "kind", "levels", "level", "tile", "cooldown", "curses", "ward", "spent", "spans", "spans_reach")
 
@@ -117,11 +116,13 @@ class Tower:
         self.spans_reach = -1.0
 
     def copy(self) -> Tower:
-        t = Tower.__new__(Tower)
-        t.id, t.kind, t.levels, t.level, t.tile, t.cooldown = self.id, self.kind, self.levels, self.level, self.tile, self.cooldown
-        t.curses = dict(self.curses)
+        t = Tower(self.id, self.kind, self.levels, self.tile)
+        t.level, t.cooldown, t.curses = self.level, self.cooldown, dict(self.curses)
         t.ward, t.spent, t.spans, t.spans_reach = self.ward, self.spent, self.spans, self.spans_reach
         return t
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return Tower, (self.id, self.kind, self.levels, self.tile), self.__getstate__()
 
     @property
     def stats(self) -> TowerLevel:
@@ -161,7 +162,6 @@ class Tower:
         return self.stats.range * self.range_mult()
 
 
-@mypyc_attr(serializable=True)
 class Door:
     __slots__ = ("index", "tile", "s", "hp", "built")
 
@@ -173,9 +173,12 @@ class Door:
         self.built = False
 
     def copy(self) -> Door:
-        d = Door.__new__(Door)
-        d.index, d.tile, d.s, d.hp, d.built = self.index, self.tile, self.s, self.hp, self.built
+        d = Door(self.index, self.tile, self.s)
+        d.hp, d.built = self.hp, self.built
         return d
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return Door, (self.index, self.tile, self.s), self.__getstate__()
 
 
 @dataclass
@@ -205,7 +208,6 @@ class Meteor:
     burn: float                 # damage per second of the floor it sets burning
 
 
-@mypyc_attr(serializable=True)
 class Hazard:
     """Burning floor: every walker on it takes fire damage each second (flyers pass over)."""
 
@@ -216,6 +218,9 @@ class Hazard:
 
     def copy(self) -> Hazard:
         return Hazard(self.x, self.y, self.radius, self.dps, self.left)
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        return Hazard, (self.x, self.y, self.radius, self.dps, self.left)
 
 
 @dataclass
@@ -231,7 +236,6 @@ class ForcedCurse:
 Planner = Callable[["World", int], Any]   # returns a handle with .result() -> Decision
 
 
-@mypyc_attr(serializable=True)
 class World:
     def __init__(self, location: Location = CATHEDRAL, *, difficulty: Difficulty = NORMAL, perks: Perks = NO_PERKS,
                  seed: int = 0, planner: Planner | None = None, record: bool = True) -> None:

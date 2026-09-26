@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 authors = [{ name = "Ilya Kamenshchikov", email = "ilya.kamenshchikov@gmail.com" }]
-dependencies = ["saga2d==0.3.15", "sagaforge", "mypy-extensions>=1.1"]  # mypyc_attr, for the compiled simulation
+dependencies = ["saga2d==0.3.15", "sagaforge"]
 
 [project.optional-dependencies]
 dev = ["pytest>=9.0.2", "mypy>=2.3.1", "setuptools>=84"]  # mypy brings mypyc, which compiles the simulation (hellward/sim/fastsim.py)
