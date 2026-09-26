@@ -132,7 +132,7 @@ def busy_world() -> World:
     towers[1].curses[Curse.BONE_PRISON] = 3.0
     towers[2].ward = 4.0
     leader = world.leaders()[0]
-    leader.chant_curse, leader.chant_tower, leader.chant_left = Curse.WEAKEN, towers[3].id, 0.8
+    leader.chant_curse, leader.chant_spot, leader.chant_left = Curse.WEAKEN, towers[3].tile, 0.8
     return world
 
 

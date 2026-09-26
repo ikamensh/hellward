@@ -189,7 +189,7 @@ class Planned:
         for sign in hands.threats():
             if sign.kind != "chant" or world.monster(sign.leader) is None:
                 continue
-            loss = curse_loss(world, world.towers.get(sign.tower), sign.curse)
+            loss = sum(curse_loss(world, t, sign.curse) for t in world.caught(sign.spot, sign.radius))
             if loss > best_loss:
                 best, best_loss = sign, loss
         if best is None or best_loss < self.plan.smite_worth:

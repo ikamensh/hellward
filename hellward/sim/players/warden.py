@@ -411,10 +411,10 @@ class Warden:
                 continue
             chanting.append(leader)
             if sign.kind == "chant":
-                tower = world.towers.get(sign.tower)
-                if tower is None or tower.ward > 0:
+                caught = [t for t in world.caught(sign.spot, sign.radius) if t.ward <= 0]
+                if not caught:
                     continue
-                value = _tower_value(world, tower) * CURSES[sign.curse].duration * SEVERITY[sign.curse]
+                value = sum(_tower_value(world, t) for t in caught) * CURSES[sign.curse].duration * SEVERITY[sign.curse]
             else:
                 value = max((_tower_value(world, t) for t in world.towers.values()), default=0.0) * 4.0
             if value > best_value:

@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from saga2d import ParticleEmitter, RenderLayer, Scene, Sprite
 
 from hellward.sim.content import CURSES, MONSTERS, SPELLS, Curse
-from hellward.sim.model import Bolt, World
+from hellward.sim.model import Bolt, World, curse_radius
 from hellward.sim.planner import Decision
 from hellward.ui import style
 from hellward.ui.lighting import Light
@@ -116,10 +116,10 @@ class Falling:
 
 @dataclass
 class Telegraph:
-    """A chant's countdown: a rune circle on the floor under the tower it is aimed at, closing as the chant runs out."""
+    """A chant's countdown: a rune circle on the floor on the marked spot, closing as the chant runs out."""
 
     leader: int
-    tower: int
+    spot: tuple[int, int]
     rune: Sprite
     inner: Sprite
 
@@ -328,24 +328,25 @@ class Effects:
         if decision.options:
             self.thoughts = [Thought(decision, leader_id)]   # one leader's reckoning at a time: two over one tower is noise
 
-    def on_chant(self, leader_id: int, curse, tower_id: int) -> None:
+    def on_chant(self, leader_id: int, curse, spot: tuple[int, int]) -> None:
         m = self.world.monster(leader_id)
         if m is not None:
             x, y = self.view.chest(m)
             self.bloom("fx/soft/curse", x, y, 10, 80, 0.9, opacity=220)
             self.burst([f"fx/miasma/{i}" for i in range(3)], x, y, 8, speed=(20, 50), life=(0.5, 0.9), size=(20, 20), shrink=False)
-        tower = self.world.towers.get(tower_id)
-        if tower is not None:
-            bx, by = self.view.tower_base(tower)
-            rune = self.scene.add_sprite(Sprite("fx/sigil/curse", position=(bx, by), size=(T * 2.4, T * 1.3), layer=RenderLayer.OBJECTS,
-                                                opacity=0))
-            inner = self.scene.add_sprite(Sprite("fx/soft/curse", position=(bx, by), size=(T * 2.0, T * 1.1), layer=RenderLayer.OBJECTS,
-                                                 opacity=0))
-            old = self.telegraphs.pop(leader_id, None)
-            if old is not None:
-                old.rune.remove()
-                old.inner.remove()
-            self.telegraphs[leader_id] = Telegraph(leader_id, tower_id, rune, inner)
+        radius = curse_radius(curse, m.kind if m is not None else None)
+        bx, by = px(spot[0] + 0.5, spot[1] + 0.5)
+        by += 0.25 * T
+        width = 2 * radius * T
+        rune = self.scene.add_sprite(Sprite("fx/sigil/curse", position=(bx, by), size=(width, width * 0.55), layer=RenderLayer.OBJECTS,
+                                            opacity=0))
+        inner = self.scene.add_sprite(Sprite("fx/soft/curse", position=(bx, by), size=(width * 0.83, width * 0.55 * 0.83),
+                                             layer=RenderLayer.OBJECTS, opacity=0))
+        old = self.telegraphs.pop(leader_id, None)
+        if old is not None:
+            old.rune.remove()
+            old.inner.remove()
+        self.telegraphs[leader_id] = Telegraph(leader_id, spot, rune, inner)
 
     def _end_telegraph(self, leader_id: int) -> tuple[float, float] | None:
         telegraph = self.telegraphs.pop(leader_id, None)
@@ -356,24 +357,28 @@ class Effects:
         telegraph.inner.remove()
         return where
 
-    def on_cursed(self, leader_id: int, tower_id: int, curse) -> None:
+    def on_cursed(self, leader_id: int, spot: tuple[int, int], curse, towers: tuple) -> None:
         self._end_telegraph(leader_id)
-        tower = self.world.towers[tower_id]
-        x, y = self.view.tower_top(tower)
-        bx, by = self.view.tower_base(tower)
-        self.bloom("fx/sigil/curse", x, y - 6, 170, 46, 0.35, spin=420)              # the sigil slams down on it
-        self.bloom("fx/ring/curse", bx, by, 20, T * 3.4, 0.55, opacity=240, aspect=0.55)   # and the blow rings out along the floor
-        self.bloom("fx/glow/curse", x, y, 30, 130, 0.5)
-        self.burst([f"fx/miasma/{i}" for i in range(3)], x, y + 20, 16, speed=(30, 90), life=(0.6, 1.3), size=(30, 30), shrink=False)
-        self.burst("fx/spark", x, y, 18, speed=(60, 160), size=(6, 6))
-        self.light(x, y, 190, (170, 40, 220), 1.5, 0.7)
+        caught = [self.world.towers[tid] for tid in towers if tid in self.world.towers]
+        for tower in caught:
+            x, y = self.view.tower_top(tower)
+            bx, by = self.view.tower_base(tower)
+            self.bloom("fx/sigil/curse", x, y - 6, 170, 46, 0.35, spin=420)              # the sigil slams down on it
+            self.bloom("fx/ring/curse", bx, by, 20, T * 3.4, 0.55, opacity=240, aspect=0.55)   # and the blow rings out along the floor
+            self.bloom("fx/glow/curse", x, y, 30, 130, 0.5)
+            self.burst([f"fx/miasma/{i}" for i in range(3)], x, y + 20, 16, speed=(30, 90), life=(0.6, 1.3), size=(30, 30), shrink=False)
+            self.burst("fx/spark", x, y, 18, speed=(60, 160), size=(6, 6))
+            self.light(x, y, 190, (170, 40, 220), 1.5, 0.7)
+        if not caught:
+            return
         if not self.show_thoughts:   # the leaders' minds already name the curse over the tower
-            self.say(CURSES[curse].name, x, y - 46, style.CURSE, size=22, life=2.0, rise=34, font=style.TITLE_FONT)
+            cx, cy = px(spot[0] + 0.5, spot[1] + 0.5)
+            self.say(CURSES[curse].name, cx, cy - 46, style.CURSE, size=22, life=2.0, rise=34, font=style.TITLE_FONT)
         dearest = max(self.world.towers.values(), key=lambda t: (t.spent, -t.id))
-        if tower_id == self.selected or tower is dearest:
+        if self.selected in towers or dearest.id in towers:
             self.edge_flash = 0.6
 
-    def on_broken(self, leader_id: int, tower_id: int) -> None:
+    def on_broken(self, leader_id: int, spot: tuple[int, int]) -> None:
         """A spell broke a leader's pondering or chant: the rune shatters, the curse never comes."""
         where = self._end_telegraph(leader_id)
         if where is not None:
@@ -442,7 +447,7 @@ class Effects:
             x, y = self.view.chest(m)
             self.burst([f"fx/venom/{i}" for i in range(3)], x, y, 8, speed=(10, 40), life=(0.4, 0.8), size=(18, 18))
 
-    def on_fizzle(self, leader_id: int, tower_id: int) -> None:
+    def on_fizzle(self, leader_id: int, spot: tuple[int, int]) -> None:
         self._end_telegraph(leader_id)
         m = self.world.monster(leader_id)
         if m is not None:
@@ -522,16 +527,17 @@ class Effects:
         world = self.world
         for leader_id, telegraph in list(self.telegraphs.items()):
             m = world.monster(leader_id)
-            tower = world.towers.get(telegraph.tower)
-            if m is None or m.chant_curse is None or tower is None:
+            if m is None or m.chant_curse is None:
                 self._end_telegraph(leader_id)
                 continue
+            base = 2 * curse_radius(m.chant_curse, m.kind) * T
             left = max(0.0, m.chant_left / m.kind.leader.channel)
-            closing = 0.9 + 1.5 * left           # the circle closes on the tower as the chant runs out
-            telegraph.rune.size = (T * closing * 1.3, T * closing * 0.72)
+            closing = 0.9 + 1.5 * left           # the circle closes on the spot as the chant runs out
+            scale = closing / 0.9
+            telegraph.rune.size = (base * scale, base * 0.55 * scale)
             telegraph.rune.rotation = (self.view.clock * 140) % 360
             telegraph.rune.opacity = int(255 * min(1.0, (1 - left) * 4 + 0.3))
-            telegraph.inner.size = (T * closing * 1.1, T * closing * 0.6)
+            telegraph.inner.size = (base * 0.83 * scale, base * 0.55 * 0.83 * scale)
             telegraph.inner.opacity = int(120 + 100 * (1 - left))
         for pillar in list(self.pillars):
             pillar.age += dt
@@ -593,10 +599,9 @@ class Effects:
         for leader in self.world.leaders():
             if leader.chant_curse is None:
                 continue
-            tower = self.world.towers.get(leader.chant_tower)
-            if tower is None:
-                continue
-            (x0, y0), (x1, y1) = self.view.chest(leader), self.view.tower_top(tower)
+            sx, sy = leader.chant_spot
+            (x0, y0) = self.view.chest(leader)
+            (x1, y1) = px(sx + 0.5, sy + 0.5)
             spec = leader.kind.leader
             grow = 1 - leader.chant_left / spec.channel
             rng = random.Random(leader.id * 7 + int(self.view.clock / 0.06))
@@ -734,14 +739,16 @@ class Effects:
         fade = min(1.0, (thought.life - thought.age) / 0.6) * min(1.0, thought.age / 0.15)
         chosen = decision.cast
         for option in decision.options:
-            tower = self.world.towers.get(option.tower)
-            if tower is None:
-                continue
-            x, y = self.view.tower_top(tower)
-            picked = chosen is not None and option.tower == chosen.tower and option.curse == chosen.curse
-            others = [o for o in decision.options if o.tower == option.tower]
-            if not picked and any(chosen is not None and o.tower == chosen.tower and o.curse == chosen.curse for o in others):
-                continue   # the chosen curse speaks for its tower
+            marked = self.world.tower_at(option.spot)
+            if marked is not None:
+                x, y = self.view.tower_top(marked)
+            else:
+                x, y = px(option.spot[0] + 0.5, option.spot[1] + 0.5)
+                y -= 40
+            picked = chosen is not None and option.spot == chosen.spot and option.curse == chosen.curse
+            others = [o for o in decision.options if o.spot == option.spot]
+            if not picked and any(chosen is not None and o.spot == chosen.spot and o.curse == chosen.curse for o in others):
+                continue   # the chosen curse speaks for its spot
             best_here = max(others, key=lambda o: o.gain)
             if not picked and option is not best_here:
                 continue

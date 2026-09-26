@@ -51,7 +51,7 @@ class Refused(Exception):
 
 class Monster:
     __slots__ = ("id", "kind", "hp", "max_hp", "s", "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
-                 "cooldown", "asking", "ask_left", "chant_curse", "chant_tower", "chant_left", "door")
+                 "cooldown", "asking", "ask_left", "chant_curse", "chant_spot", "chant_left", "door")
 
     def __init__(self, id: int, kind: MonsterKind, wave: int, lane: float, jostle: float, hp: float, cooldown: float) -> None:
         self.id = id
@@ -70,7 +70,7 @@ class Monster:
         self.asking: Any = None               # the planner's handle while a leader waits for its answer
         self.ask_left = 0.0
         self.chant_curse: Curse | None = None
-        self.chant_tower = -1
+        self.chant_spot: tuple[int, int] = (-1, -1)
         self.chant_left = 0.0
         self.door = -1                        # the door socket it is battering, or -1
 
@@ -79,7 +79,7 @@ class Monster:
         m = Monster(self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown)
         m.max_hp, m.s, m.chill, m.chill_left, m.frozen = self.max_hp, self.s, self.chill, self.chill_left, self.frozen
         m.poison = [stack[:] for stack in self.poison]
-        m.chant_curse, m.chant_tower, m.chant_left, m.door = self.chant_curse, self.chant_tower, self.chant_left, self.door
+        m.chant_curse, m.chant_spot, m.chant_left, m.door = self.chant_curse, self.chant_spot, self.chant_left, self.door
         return m
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -240,7 +240,15 @@ class ForcedCurse:
     at: float
     leader: int
     curse: Curse
-    tower: int
+    spot: tuple[int, int]
+
+
+def curse_radius(curse: Curse, leader_kind: MonsterKind | None) -> float:
+    """The radius a curse falls in when this kind casts it: its own radius, widened by its leader."""
+    widen = 0.0
+    if leader_kind is not None and leader_kind.leader is not None:
+        widen = leader_kind.leader.widen
+    return CURSES[curse].radius + widen
 
 
 Planner = Callable[["World", int], Any]   # returns a handle with .result() -> Decision
@@ -331,6 +339,16 @@ class World:
                 return t
         return None
 
+    def caught(self, spot: tuple[int, int], radius: float) -> list[Tower]:
+        """The towers standing within ``radius`` tiles of ``spot``'s tile, in id order."""
+        found = []
+        sx, sy = spot
+        for t in self.towers.values():
+            if (t.tile[0] - sx) ** 2 + (t.tile[1] - sy) ** 2 <= radius * radius:
+                found.append(t)
+        found.sort(key=lambda t: t.id)
+        return found
+
     def in_reach(self, tower: Tower, s: float) -> bool:
         for a, b in self.level.coverage(tower.tile, tower.reach):
             if a <= s <= b:
@@ -406,7 +424,10 @@ class World:
         self._emit("upgraded", tower.id)
 
     def sell(self, tower_id: int) -> int:
-        tower = self.towers.pop(tower_id)
+        tower = self.towers[tower_id]
+        if tower.curses:
+            raise Refused("The curse holds it.")
+        del self.towers[tower_id]
         refund = int(tower.spent * SELL_REFUND)
         self.gold += refund
         self._emit("sold", tower.id, tower.tile, refund)
@@ -577,7 +598,7 @@ class World:
     def _leaders(self, dt: float) -> None:
         for fc in self.forced:
             if fc.at <= self.time:
-                self._land(fc.leader, fc.curse, fc.tower)
+                self._land(fc.leader, fc.curse, fc.spot)
         if self.forced:
             self.forced = [fc for fc in self.forced if fc.at > self.time]
         for m in self.monsters:
@@ -587,8 +608,8 @@ class World:
             if m.chant_curse is not None:
                 m.chant_left -= dt
                 if m.chant_left <= 0:
-                    self._land(m.id, m.chant_curse, m.chant_tower)
-                    m.chant_curse, m.chant_tower = None, -1
+                    self._land(m.id, m.chant_curse, m.chant_spot)
+                    m.chant_curse, m.chant_spot = None, (-1, -1)
                 continue
             if m.asking is not None:
                 m.ask_left -= dt
@@ -601,9 +622,9 @@ class World:
                     elif decision.cast is None:
                         m.cooldown = decision.retry
                     else:
-                        m.chant_curse, m.chant_tower, m.chant_left = decision.cast.curse, decision.cast.tower, spec.channel
+                        m.chant_curse, m.chant_spot, m.chant_left = decision.cast.curse, decision.cast.spot, spec.channel
                         m.cooldown = spec.cooldown
-                        self._emit("chant", m.id, decision.cast.curse, decision.cast.tower)
+                        self._emit("chant", m.id, decision.cast.curse, decision.cast.spot)
                 continue
             m.cooldown -= dt
             if m.cooldown <= 0 and self.planner is not None and self.towers and m.frozen <= 0:
@@ -613,33 +634,39 @@ class World:
 
     def _break(self, m: Monster) -> None:
         """A leader's pondering or chant broken by a spell: the curse never comes, and its whole cooldown starts again."""
-        tower = m.chant_tower
-        m.chant_curse, m.chant_tower, m.chant_left = None, -1, 0.0
+        spot = m.chant_spot
+        m.chant_curse, m.chant_spot, m.chant_left = None, (-1, -1), 0.0
         m.asking, m.ask_left = None, 0.0
         spec = m.kind.leader
         if spec is not None:
             m.cooldown = spec.cooldown
         self.chants_broken += 1
-        self._emit("broken", m.id, tower)
+        self._emit("broken", m.id, spot)
 
-    def _land(self, leader_id: int, curse: Curse, tower_id: int) -> None:
+    def _land(self, leader_id: int, curse: Curse, spot: tuple[int, int]) -> None:
         leader = self.monster(leader_id)
-        tower = self.towers.get(tower_id)
-        if leader is None or tower is None:
-            self._emit("fizzle", leader_id, tower_id)
+        if leader is None:
+            self._emit("fizzle", leader_id, spot)
             return
         spec = leader.kind.leader
         x, y = self.level.point(leader.s)
-        cx, cy = tower.centre
+        cx, cy = spot[0] + 0.5, spot[1] + 0.5
         if spec is None or _hypot(cx - x, cy - y) > spec.cast_range + CAST_SLACK:
-            self._emit("fizzle", leader_id, tower_id)
+            self._emit("fizzle", leader_id, spot)
             return
-        if tower.ward > 0:
-            self._emit("ward_holds", leader_id, tower_id, curse)
-            return
-        tower.curses[curse] = CURSES[curse].duration
-        self.curses_landed += 1
-        self._emit("cursed", leader_id, tower_id, curse)
+        caught = self.caught(spot, curse_radius(curse, leader.kind))
+        cursed: list[int] = []
+        for tower in caught:
+            if tower.ward > 0:
+                self._emit("ward_holds", leader_id, tower.id, curse)
+            else:
+                tower.curses[curse] = CURSES[curse].duration
+                cursed.append(tower.id)
+        if cursed:
+            self.curses_landed += 1
+            self._emit("cursed", leader_id, spot, curse, tuple(cursed))
+        elif not any(t.ward > 0 for t in caught):
+            self._emit("fizzle", leader_id, spot)
 
     def _move(self, dt: float) -> None:
         doors = [d for d in self.doors if d.built]
@@ -769,9 +796,11 @@ class World:
             if attack == "nova":
                 self._emit("nova", t.id)
                 for m in hit:
-                    if stats.chill >= m.chill or m.chill_left <= 0:
-                        m.chill = stats.chill
-                    m.chill_left = max(m.chill_left, stats.chill_time)
+                    chill = stats.chill * m.kind.taken(Element.COLD)   # the slow follows cold resistance
+                    if chill > 0.0:
+                        if chill >= m.chill or m.chill_left <= 0:
+                            m.chill = chill
+                        m.chill_left = max(m.chill_left, stats.chill_time)
                     self._hurt(m, damage, t.kind.element)
             elif attack == "chain":
                 self._chain(t, hit[0], damage, stats.chains)

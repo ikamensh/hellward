@@ -28,6 +28,7 @@ class Curse(str, Enum):
 class CurseSpec:
     name: str
     duration: float
+    radius: float = 1.5
     damage: float = 1.0   # multiplies the tower's damage
     rate: float = 1.0     # multiplies its attacks per second
     range: float = 1.0    # multiplies its reach
@@ -36,10 +37,10 @@ class CurseSpec:
 
 
 CURSES: Final[dict[Curse, CurseSpec]] = {
-    Curse.WEAKEN: CurseSpec("Weaken", 8.0, damage=0.35, blurb="deals a third of its damage"),
-    Curse.DECREPIFY: CurseSpec("Decrepify", 8.0, rate=0.4, blurb="attacks at 40% speed"),
-    Curse.DIM_VISION: CurseSpec("Dim Vision", 8.0, range=0.55, blurb="sees half as far"),
-    Curse.BONE_PRISON: CurseSpec("Bone Prison", 4.5, silenced=True, blurb="caged: cannot attack"),
+    Curse.WEAKEN: CurseSpec("Weaken", 8.0, radius=1.5, damage=0.35, blurb="deals a third of its damage"),
+    Curse.DECREPIFY: CurseSpec("Decrepify", 8.0, radius=1.5, rate=0.4, blurb="attacks at 40% speed"),
+    Curse.DIM_VISION: CurseSpec("Dim Vision", 8.0, radius=2.3, range=0.55, blurb="sees half as far"),
+    Curse.BONE_PRISON: CurseSpec("Bone Prison", 4.5, radius=1.0, silenced=True, blurb="caged: cannot attack"),
 }
 
 
@@ -50,6 +51,7 @@ class LeaderSpec:
     cooldown: float = 9.0
     channel: float = 1.0      # the visible incantation between the choice and the curse landing
     first_cast: float = 3.0   # seconds after it appears before it may first choose
+    widen: float = 0.0        # added to every radius it casts
 
 
 @dataclass(frozen=True)

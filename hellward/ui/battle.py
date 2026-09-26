@@ -196,10 +196,9 @@ class BattleScene(Scene):
             sound.play("cleanse")
         elif kind == "chant":
             leader = world.monster(e[1])
-            tower = world.towers.get(e[3])
             sound.play("chant")
-            if leader is not None and tower is not None:
-                self.hud.note(f"{leader.kind.name} chants {CURSES[e[2]].name} at the {tower.kind.name}.", style.CURSE)
+            if leader is not None:
+                self.hud.note(f"{leader.kind.name} chants {CURSES[e[2]].name} on the marked spot.", style.CURSE)
         elif kind == "cursed":
             sound.play("curse")
         elif kind == "fizzle":
@@ -229,10 +228,8 @@ class BattleScene(Scene):
             if leader is None:
                 return
             if decision.cast is not None:
-                tower = world.towers.get(decision.cast.tower)
-                if tower is not None:
-                    self.hud.note(f"{leader.kind.name} weighed {decision.considered}: {CURSES[decision.cast.curse].name} "
-                                  f"on the {tower.kind.name}, +{decision.cast.gain:.0f} life", style.UNIQUE)
+                self.hud.note(f"{leader.kind.name} weighed {decision.considered}: {CURSES[decision.cast.curse].name} "
+                              f"on the marked spot, +{decision.cast.gain:.0f} life", style.UNIQUE)
             elif decision.later is not None and self.hud.clock - self.last_hold_note > 6:
                 self.last_hold_note = self.hud.clock
                 self.hud.note(f"{leader.kind.name} waits: in {decision.later.delay:.0f}s its curse is worth more", style.DIM)
