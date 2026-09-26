@@ -3,7 +3,7 @@ the hell portal they come out of and the sanctuary gate they are headed for.
 
 Drawn in 2-D with Pillow and NumPy at the art density. Things that stand up and must hide what walks
 behind them (the arches, pillars and towers) are sprites, not part of this picture. The painted version
-of this picture (:func:`ground`) replaces it when ``hellward/assets/painted/ground.png`` exists.
+of this picture (:func:`ground`) replaces it when ``hellward/assets/painted/ground-<location>.png`` exists.
 """
 
 from __future__ import annotations
@@ -222,9 +222,14 @@ def stand_in(level: Level, seed: int = 11) -> Image.Image:
     return Image.fromarray(np.clip(array, 0, 255).astype(np.uint8), "RGB").filter(ImageFilter.SMOOTH)
 
 
-def ground(level: Level) -> Image.Image:
-    painted = PAINTED / "ground.png"
-    if painted.exists():
-        image = Image.open(painted).convert("RGB")
+def painted(key: str) -> Path:
+    """Where a location's painted floor lives, when it has one."""
+    return PAINTED / f"ground-{key}.png"
+
+
+def ground(key: str, level: Level) -> Image.Image:
+    """A location's floor: its painting when there is one, else the stand-in."""
+    if painted(key).exists():
+        image = Image.open(painted(key)).convert("RGB")
         return image.resize((level.width * PX, level.height * PX), Image.LANCZOS)
     return stand_in(level)

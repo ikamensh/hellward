@@ -1,8 +1,9 @@
 """The leaders' choice of curse: it reads resistances, stays in reach and beats the naive policies."""
 
 import statistics
+from dataclasses import replace
 
-from hellward.sim import planner
+from hellward.sim import campaign, planner
 from hellward.sim.autoplay import Defender
 from hellward.sim.content import Group, Wave
 from hellward.sim.model import SIM_DT, World
@@ -10,7 +11,8 @@ from hellward.sim.model import SIM_DT, World
 
 def skeleton_pack() -> World:
     """Skeletons walking the first corridor with a shaman behind them, past a plague totem and a pyre."""
-    world = World(waves=(Wave((Group("skeleton", 6, 0.6), Group("shaman", 1, 1, start=3.0)), 10),))
+    pack = Wave((Group("skeleton", 6, 0.6), Group("shaman", 1, 1, start=3.0)), 10)
+    world = World(replace(campaign.CATHEDRAL, waves=(pack,), wave_names=("pack",)))
     world.gold = 1000
     world.build("plague", (2, 3))   # right beside the shaman's path: the nearest tower
     world.build("pyre", (6, 1))     # further off, over the skeletons' heads

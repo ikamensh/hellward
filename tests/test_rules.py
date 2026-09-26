@@ -2,16 +2,25 @@
 
 import math
 import random
+from dataclasses import replace
 
 import pytest
 
-from hellward.sim.content import CLEANSE_COST, DOOR, MONSTERS, START_LIVES, Curse, Group, Wave
-from hellward.sim.level import CATHEDRAL, Tile
+from hellward.sim import campaign
+from hellward.sim.content import DOOR, MONSTERS, SPELLS, START_LIVES, Curse, Group, Wave
+from hellward.sim.level import Tile
 from hellward.sim.model import SIM_DT, Refused, World
 
+CATHEDRAL = campaign.CATHEDRAL.level
 
-def wave_of(kind: str, count: int = 1, interval: float = 1.0) -> tuple[Wave, ...]:
-    return (Wave((Group(kind, count, interval),), 10),)
+
+def with_waves(*waves: Wave) -> campaign.Location:
+    """The cathedral with these waves instead of its own."""
+    return replace(campaign.CATHEDRAL, waves=waves, wave_names=tuple(f"wave {i}" for i in range(len(waves))))
+
+
+def wave_of(kind: str, count: int = 1, interval: float = 1.0) -> campaign.Location:
+    return with_waves(Wave((Group(kind, count, interval),), 10))
 
 
 def run(world: World, seconds: float, dt: float = SIM_DT) -> None:
@@ -48,13 +57,13 @@ def test_door_sockets_are_arches_on_the_path():
 
 
 def test_an_unopposed_monster_walks_the_path_and_costs_its_lives():
-    world = started(World(waves=wave_of("overlord")))
+    world = started(World(wave_of("overlord")))
     run(world, CATHEDRAL.length / MONSTERS["overlord"].speed + 2)
     assert world.lives == START_LIVES - MONSTERS["overlord"].lives
 
 
 def test_a_gate_holds_walkers_until_they_break_it():
-    world = World(waves=wave_of("zombie", count=3))
+    world = World(wave_of("zombie", count=3))
     world.gold = 1000
     world.build_door(0)
     started(world)
@@ -69,7 +78,7 @@ def test_a_gate_holds_walkers_until_they_break_it():
 
 
 def test_flyers_pass_over_a_gate():
-    world = World(waves=wave_of("gargoyle"))
+    world = World(wave_of("gargoyle"))
     world.gold = 1000
     for i in range(3):
         world.build_door(i)
@@ -80,7 +89,7 @@ def test_flyers_pass_over_a_gate():
 
 
 def kill_time(curse: Curse | None) -> float:
-    world = World(waves=wave_of("zombie"))
+    world = World(wave_of("zombie"))
     world.gold = 1000
     tower = world.build("pyre", (4, 3))
     if curse is not None:
@@ -99,7 +108,7 @@ def test_every_curse_but_none_slows_a_kill():
 
 
 def test_bone_prison_silences_and_cleanse_lifts_it():
-    world = World(waves=wave_of("zombie"))
+    world = World(wave_of("zombie"))
     world.gold = 1000
     tower = world.build("pyre", (4, 3))
     tower.curses[Curse.BONE_PRISON] = 1000.0   # held open while the zombie walks into reach
@@ -107,7 +116,7 @@ def test_bone_prison_silences_and_cleanse_lifts_it():
     run(world, 6)   # well inside the pyre's reach by now
     zombie = world.monsters[0]
     assert zombie.hp == pytest.approx(MONSTERS["zombie"].hp)
-    world.mana = CLEANSE_COST
+    world.mana = SPELLS["cleanse"].mana
     world.cleanse(tower.id)
     assert world.mana == 0 and not tower.curses
     run(world, 3)
@@ -134,7 +143,7 @@ def test_selling_refunds_most_of_what_was_spent():
     world = World()
     tower = world.build("storm", (4, 3))
     world.upgrade(tower.id)
-    spent = 260 - world.gold + 0
+    spent = campaign.CATHEDRAL.start_gold - world.gold
     refund = world.sell(tower.id)
     assert 0.6 * spent <= refund < spent
     assert not world.towers
@@ -159,7 +168,7 @@ def test_a_clone_plays_on_exactly_like_its_original_and_leaves_it_alone():
 
 def test_each_cleared_wave_pays_its_bonus_once_even_when_called_early():
     waves = (Wave((Group("fallen", 2, 0.5),), 11), Wave((Group("fallen", 2, 0.5),), 13), Wave((Group("fallen", 1, 1),), 17))
-    world = World(waves=waves)
+    world = World(with_waves(*waves))
     world.gold = 1000
     world.build("storm", (7, 3))
     world.build("pyre", (4, 3))

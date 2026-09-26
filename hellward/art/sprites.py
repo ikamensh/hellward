@@ -6,7 +6,7 @@ into a cache (in parallel: forty seconds of rendering on one core) and read from
 ``HELLWARD_ART=procedural`` ignores the paintings. Towers, gates and the ground work the same way.
 
 Names: ``mon/<kind>/<facing>/<frame>`` with the facings ``front``, ``back``, ``right``, ``left``;
-``tower/<kind>/<rank>``; ``gate/<look>``; ``arch``; ``pillar``; ``ground``.
+``tower/<kind>/<rank>``; ``gate/<look>``; ``arch``; ``pillar``; ``ground/<location>`` (:func:`ground`).
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ from sagaforge import restyle
 from hellward.art import figures, mapart, rig, structures
 from hellward.art.rig import DENSITY
 from hellward.sim.content import MONSTERS
-from hellward.sim.level import Level
+from hellward.sim.campaign import Location
 
 PAINTED = Path(__file__).resolve().parent.parent / "assets" / "painted"
 _SOURCES = [Path(m.__file__) for m in (figures, rig, structures, mapart)]
@@ -114,7 +114,7 @@ def _cell(canvas: tuple[float, float], origin: tuple[float, float]) -> Cell:
     return Cell((float(canvas[0]), float(canvas[1])), (float(origin[0]), float(origin[1])))
 
 
-def register(game: Game, level: Level, cache_dir: Path) -> Art:
+def register(game: Game, cache_dir: Path) -> Art:
     cache = warm(cache_dir)
     assets = game.assets
     painted: set[str] = set()
@@ -157,12 +157,18 @@ def register(game: Game, level: Level, cache_dir: Path) -> Art:
         image = image.resize((width, height), Image.LANCZOS)
         top = (height - 800 * DENSITY) // 2
         assets.image_from_pil("title", image.crop((0, top, width, top + 800 * DENSITY)))
-    ground = mapart.ground(level) if not procedural() else mapart.stand_in(level)
-    assets.image_from_pil("ground", ground)
-    if (PAINTED / "ground.png").exists() and not procedural():
-        painted.add("ground")
     return Art(cells, _cell(*structures.TOWER_CELL), _cell(*structures.GATE_CELL), _cell(*structures.ARCH_CELL),
                _cell(*structures.PILLAR_CELL), painted)
+
+
+def ground(game: Game, location: Location) -> str:
+    """Register a location's floor the first time a defence there begins; its image name."""
+    name = f"ground/{location.key}"
+    if not game.assets.has_image(name):
+        level = location.level
+        image = mapart.stand_in(level) if procedural() else mapart.ground(location.key, level)
+        game.assets.image_from_pil(name, image)
+    return name
 
 
 def _painted_cells(name: str) -> dict[str, Image.Image] | None:

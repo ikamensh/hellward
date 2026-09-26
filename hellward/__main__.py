@@ -11,7 +11,6 @@ from saga2d import Game
 from hellward.art import fx, sprites
 from hellward.audio.bank import SoundBank
 from hellward.sim.autoplay import Defender
-from hellward.sim.level import CATHEDRAL
 from hellward.sim.model import World
 from hellward.ui import menus, style
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
@@ -28,7 +27,7 @@ def build(game: Game, cache: Path):
     game.push(loading)
     game.tick(1 / 60)   # the first launch spends a while drawing textures and sounds: show that it is alive
     SoundBank.prepare(cache)
-    art = sprites.register(game, CATHEDRAL, cache)
+    art = sprites.register(game, cache)
     fx.register(game, cache)
     game.pop()
     return art

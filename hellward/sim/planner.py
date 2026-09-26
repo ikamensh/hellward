@@ -73,13 +73,17 @@ def smart(world: World, leader_id: int) -> Inline:
 
 
 def reachable(world: World, leader: Monster, delay: float = 0.0) -> list[Tower]:
-    """Towers the leader will still reach when its chant ends, assuming it keeps walking."""
+    """Towers the leader will still reach when its chant ends, assuming it keeps walking, and that no ward will
+    protect then."""
     spec = leader.kind.leader
-    s = leader.s + leader.speed * (DECIDE_DELAY + spec.channel + delay)
+    lands = DECIDE_DELAY + spec.channel + delay
+    s = leader.s + leader.speed * lands
     x, y = world.level.point(s)
     limit = spec.cast_range + CAST_SLACK * 0.5
     found = []
     for t in world.towers.values():
+        if t.ward > lands:
+            continue   # warded until after the curse would land
         cx, cy = t.centre
         if (cx - x) ** 2 + (cy - y) ** 2 <= limit * limit:
             found.append(t)
@@ -147,16 +151,17 @@ def estimate(world: World, leader: Monster, tower: Tower, curse: Curse, delay: f
     if not times:
         return 0.0
     tracks = [(m, _trajectory(world, m, times)) for m in world.monsters]
-    full = tower.stats.range * tower.multiplier("range")
+    full = tower.stats.range * tower.range_mult()
+    now = tower.damage_mult() * tower.rate_mult()
     total = 0.0
     for i in range(len(times)):
-        before = _damage_in(tower, full, world, tracks, i) * tower.multiplier("damage") * tower.multiplier("rate")
+        before = _damage_in(tower, full, world, tracks, i) * now
         if before <= 0:
             continue
         if spec.silenced or tower.silenced:
             after = 0.0
         elif spec.range != 1.0:
-            after = _damage_in(tower, full * spec.range, world, tracks, i) * tower.multiplier("damage") * tower.multiplier("rate")
+            after = _damage_in(tower, full * spec.range, world, tracks, i) * now
         else:
             after = before * spec.damage * spec.rate
         total += (before - after) * SAMPLE

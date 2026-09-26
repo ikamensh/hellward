@@ -21,6 +21,7 @@ class Tile(str, Enum):
     PATH = "P"
     DOOR = "D"       # a door socket on the path
     PILLAR = "o"     # an obstacle standing on the floor
+    POOL = "~"       # floor nothing stands on: lava, an open grave (drawn by the location's floor)
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,7 @@ class Level:
     waypoints: tuple[tuple[int, int], ...]   # tile coordinates the path turns at, portal first
     doors: tuple[tuple[int, int], ...]
     obstacles: frozenset[tuple[int, int]] = field(default_factory=frozenset)
+    pools: frozenset[tuple[int, int]] = field(default_factory=frozenset)
 
     def __post_init__(self) -> None:
         for (x0, y0), (x1, y1) in zip(self.waypoints, self.waypoints[1:]):
@@ -75,6 +77,8 @@ class Level:
                     row.append(Tile.WALL)  # a door socket is an arch in a wall
                 elif (x, y) in self.obstacles:
                     row.append(Tile.PILLAR)
+                elif (x, y) in self.pools:
+                    row.append(Tile.POOL)
                 else:
                     row.append(Tile.FLOOR)
             rows.append(tuple(row))
@@ -164,13 +168,3 @@ class Level:
             else:
                 merged.append((a, b))
         return tuple(merged)
-
-
-CATHEDRAL = Level(
-    name="The Desecrated Cathedral",
-    width=25,
-    height=14,
-    waypoints=((0, 2), (8, 2), (8, 6), (3, 6), (3, 11), (12, 11), (12, 4), (18, 4), (18, 10), (24, 10)),
-    doors=((3, 9), (12, 7), (18, 8)),
-    obstacles=frozenset({(15, 1), (21, 2), (22, 6), (1, 12), (21, 12), (10, 1)}),
-)

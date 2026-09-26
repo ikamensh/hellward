@@ -166,28 +166,40 @@ class Wave:
     hp: float = 1.0         # every monster's life is multiplied by this
 
 
-WAVES: tuple[Wave, ...] = (
-    Wave((Group("fallen", 10, 1.1),), 40, hp=1.0),
-    Wave((Group("fallen", 12, 0.9), Group("shaman", 1, 1, start=5.0)), 50, hp=1.1),
-    Wave((Group("skeleton", 10, 1.2), Group("fallen", 6, 0.8, start=4.0)), 60, hp=1.25),
-    Wave((Group("zombie", 7, 1.8), Group("fallen", 10, 0.8, start=2.0), Group("shaman", 2, 5.0, start=5.0)), 70, hp=1.4),
-    Wave((Group("goatman", 12, 1.0), Group("gargoyle", 5, 1.4, start=6.0), Group("shaman", 1, 1, start=8.0)), 80, hp=1.53),
-    Wave((Group("skeleton", 14, 0.8), Group("overlord", 2, 6.0, start=3.0), Group("priest", 1, 1, start=6.0)), 90, hp=1.69),
-    Wave((Group("zombie", 8, 1.4), Group("goatman", 10, 0.9, start=3.0), Group("witch", 1, 1, start=5.0),
-          Group("shaman", 1, 1, start=9.0)), 100, hp=1.87),
-    Wave((Group("gargoyle", 10, 0.9), Group("overlord", 3, 5.0, start=2.0), Group("goatman", 8, 1.0, start=4.0),
-          Group("priest", 1, 1, start=6.0), Group("witch", 1, 1, start=10.0)), 110, hp=2.05),
-    Wave((Group("skeleton", 16, 0.6), Group("zombie", 8, 1.2, start=2.0), Group("overlord", 3, 4.0, start=5.0),
-          Group("shaman", 1, 1, start=4.0), Group("priest", 1, 1, start=8.0), Group("witch", 1, 1, start=12.0)), 120, hp=2.2),
-    Wave((Group("azazel", 1, 1, start=4.0), Group("fallen", 16, 0.7), Group("goatman", 10, 1.0, start=6.0),
-          Group("priest", 1, 1, start=2.0), Group("witch", 1, 1, start=7.0), Group("gargoyle", 6, 1.0, start=12.0)), 0, hp=2.35),
-)
+@dataclass(frozen=True)
+class SpellSpec:
+    key: str
+    name: str
+    mana: float
+    aim: str              # what a click chooses: "tower", "monster" or "floor"
+    blurb: str
+    damage: float = 0.0   # at a wave life multiplier of 1; it grows with the monsters' life
+    radius: float = 0.0
+    delay: float = 0.0    # seconds between the cast and the strike
+    lasting: float = 0.0  # seconds the ground burns, or the monsters stay frozen
+    burn: float = 0.0     # damage per second of the burning ground
 
-START_GOLD = 260
+
+SPELLS: dict[str, SpellSpec] = {s.key: s for s in (
+    SpellSpec("cleanse", "Cleanse", 35, "tower", "Burns every curse off one tower."),
+    SpellSpec("smite", "Smite", 40, "monster", "Holy lightning strikes one monster, and no resistance softens it. "
+              "A chanting leader's curse fizzles.", damage=150),
+    SpellSpec("meteor", "Meteor", 60, "floor", "Falls a moment after the cast and leaves the floor burning.", damage=180,
+              radius=1.4, delay=1.2, lasting=3.0, burn=30),
+    SpellSpec("orb", "Frozen Orb", 50, "floor", "Freezes everything near it: no walking, no battering, and chants break.",
+              damage=50, radius=1.8, lasting=2.5),
+)}
+
 START_LIVES = 20
 MANA_MAX = 100.0
 MANA_START = 60.0
 MANA_REGEN = 1.5
-CLEANSE_COST = 35.0
 WAVE_BREAK = 25.0          # seconds between a cleared wave and the next, unless called early
 EARLY_CALL_GOLD = 1.0      # gold per second of break skipped
+BURN_RADIUS = 1.1          # the burning floor a meteor leaves
+SHATTER_RADIUS = 1.2
+SHATTER_SHARE = 0.25       # of a shattered monster's full life
+CONTAGION_REACH = 1.5
+THORNS = 2.0               # a gate under Thorns returns this many times each blow
+SOUL = 20.0                # mana a slain leader gives under Soul Harvest
+WARD = 8.0                 # seconds a cleansed tower is warded under Salvation

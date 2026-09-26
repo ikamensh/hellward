@@ -13,12 +13,12 @@ from dataclasses import dataclass
 
 from saga2d import RenderLayer, Scene, Sprite, SpriteAnchor
 
-from hellward.art import figures
+from hellward.art import figures, sprites
 from hellward.art.fx import ELEMENT_COLORS
 from hellward.art.rig import PROJECTION, TILE
 from hellward.art.sprites import Art, Cell
 from hellward.art.structures import tower_top
-from hellward.sim.content import CURSES, DOOR, Curse
+from hellward.sim.content import CURSES, Curse
 from hellward.sim.level import Tile
 from hellward.sim.model import Monster, Tower, World
 from hellward.ui.lighting import Light
@@ -84,7 +84,7 @@ class WorldView:
         self.level = world.level
         self.clock = 0.0
         level = self.level
-        scene.add_sprite(Sprite("ground", position=(MAP_X, MAP_Y), anchor=SpriteAnchor.TOP_LEFT,
+        scene.add_sprite(Sprite(sprites.ground(scene.game, world.location), position=(MAP_X, MAP_Y), anchor=SpriteAnchor.TOP_LEFT,
                                 size=(level.width * T, level.height * T), layer=RenderLayer.BACKGROUND))
         for x, y in level.doors:
             cx, cy = px(x + 0.5, y + 0.5)
@@ -304,7 +304,7 @@ class WorldView:
         sprite = self.gates.get(index)
         if not built and sprite is None:
             return
-        look = "broken" if not built else "intact" if hp > DOOR.hp * 0.5 else "damaged"
+        look = "broken" if not built else "intact" if hp > self.world.gate_life * 0.5 else "damaged"
         if sprite is None:
             x, y = self.level.doors[index]
             sprite = self.gates[index] = self.scene.add_sprite(placed(f"gate/{look}", self.art.gate, *px(x + 0.5, y + 0.5)))

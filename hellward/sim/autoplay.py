@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from hellward.sim.content import CLEANSE_COST, DOOR, TOWERS, WAVE_BREAK
+from hellward.sim.content import DOOR, WAVE_BREAK
 from hellward.sim.model import DOOR_STOP, JOSTLE, Refused, Tower, World
 
 ROTATION = ("pyre", "frost", "storm", "plague", "pyre", "storm", "plague", "pyre", "frost", "storm")
@@ -45,7 +45,8 @@ class Defender:
 
     def plan(self, world: World) -> None:
         tiles = [tile for _, tile in tile_scores(world)]
-        self.planned = [(ROTATION[(i + self.shift) % len(ROTATION)], tile) for i, tile in enumerate(tiles[:self.towers])]
+        rotation = [kind for kind in ROTATION if kind in world.location.arsenal.towers]
+        self.planned = [(rotation[(i + self.shift) % len(rotation)], tile) for i, tile in enumerate(tiles[:self.towers])]
 
     def act(self, world: World, dt: float) -> None:
         self.clock -= dt
@@ -56,7 +57,7 @@ class Defender:
             self.plan(world)
         if self.cleanse:
             self._cleanse(world)
-        if self.doors and world.wave >= 1:
+        if self.doors and world.location.arsenal.gates and world.wave >= 1:
             for door in world.doors:
                 if not door.built and world.gold >= DOOR.cost + 20:
                     try:
@@ -74,7 +75,7 @@ class Defender:
             todo = [(kind, tile) for kind, tile in self.planned if tile not in built]
             if todo:
                 kind, tile = todo[0]
-                if world.gold < TOWERS[kind].levels[0].cost:
+                if world.gold < world.cost(kind):
                     return
                 world.build(kind, tile)
                 continue
@@ -87,7 +88,7 @@ class Defender:
             world.upgrade(tower.id)
 
     def _cleanse(self, world: World) -> None:
-        if world.mana < CLEANSE_COST:
+        if world.mana < world.spell_cost("cleanse"):
             return
         busy: list[Tower] = []
         for t in world.towers.values():

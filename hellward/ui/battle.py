@@ -15,11 +15,13 @@ from saga2d import Camera, RenderLayer, Scene
 
 from hellward.art.sprites import Art
 from hellward.sim.autoplay import Defender
-from hellward.sim.content import CURSES, DOOR, MONSTERS, TOWERS
+from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location
+from hellward.sim.content import CURSES, DOOR, MONSTERS
 from hellward.sim.model import SIM_DT, Monster, Refused, Tower, World
+from hellward.sim.skills import NO_PERKS, Perks
 from hellward.ui import style
 from hellward.ui.effects import Effects
-from hellward.ui.hud import BUILD, WAVE_NAMES, Hud
+from hellward.ui.hud import BUILD, Hud
 from hellward.ui.lighting import Lighting
 from hellward.ui.menus import PauseScene
 from hellward.ui.view import MAP_X, MAP_Y, T, TOWER_SCALE, WorldView, px
@@ -43,11 +45,15 @@ class BattleScene(Scene):
         "u": "upgrade", "s": "sell", "c": "cleanse", "escape": "cancel",
     }
 
-    def __init__(self, art: Art, *, seed: int = 0, planner: Callable | None = None, sound: Any = None,
+    def __init__(self, art: Art, location: Location = CATHEDRAL, *, difficulty: Difficulty = NORMAL, perks: Perks = NO_PERKS,
+                 seed: int = 0, planner: Callable | None = None, sound: Any = None,
                  autopilot: Defender | None = None, on_end: Callable[[World], None] | None = None,
                  settings: Any = None, restart: Callable[[], None] | None = None,
                  to_title: Callable[[], None] | None = None) -> None:
         self.art = art
+        self.location = location
+        self.difficulty = difficulty
+        self.perks = perks
         self.settings = settings
         self.restart = restart
         self.to_title = to_title
@@ -67,14 +73,14 @@ class BattleScene(Scene):
 
     def on_enter(self) -> None:
         self.camera = Camera((WIDTH, HEIGHT))
-        self.world = World(seed=self.seed, planner=self.planner)
+        self.world = World(self.location, difficulty=self.difficulty, perks=self.perks, seed=self.seed, planner=self.planner)
         self.view = WorldView(self, self.world, self.art)
         self.fx = Effects(self, self.view, self.world)
         self.hud = Hud(self, self.world)
         self.lighting = Lighting(self, (MAP_X, MAP_Y), (self.world.level.width * T, self.world.level.height * T))
         if self.settings is not None:
             self.fx.show_thoughts = self.settings["minds"]
-        self.hud.banner(self.world.level.name, "Hold the sanctuary gate. The first wave comes soon.", life=4.5)
+        self.hud.banner(self.location.name, "Hold the sanctuary. The first wave comes soon.", life=4.5)
         self.sound.music("battle")
 
     def on_background(self) -> None:
@@ -139,10 +145,11 @@ class BattleScene(Scene):
         sound = self.sound
         if kind == "wave":
             index = e[1]
-            subtitle = "The Flayer himself walks the nave." if index == len(world.waves) - 1 else f"Wave {index + 1} of {len(world.waves)}"
-            self.hud.banner(WAVE_NAMES[index], subtitle, color=style.BLOOD if index == len(world.waves) - 1 else style.GOLD)
+            last = index == len(world.waves) - 1
+            subtitle = "The last wave." if last else f"Wave {index + 1} of {len(world.waves)}"
+            self.hud.banner(world.location.wave_names[index], subtitle, color=style.BLOOD if last else style.GOLD)
             sound.play("wave")
-            if index == len(world.waves) - 1:
+            if last and any(g.kind == "azazel" for g in world.waves[index].groups):
                 sound.music("boss")
         elif kind == "cleared":
             if e[2]:
@@ -211,7 +218,7 @@ class BattleScene(Scene):
     # -- Commands --------------------------------------------------------------------------------
 
     def cost(self, key: str) -> int:
-        return DOOR.cost if key == "gate" else TOWERS[key].levels[0].cost
+        return DOOR.cost if key == "gate" else self.world.cost(key)
 
     def _try(self, action: Callable[[], Any]) -> bool:
         try:
@@ -413,7 +420,7 @@ class BattleScene(Scene):
         self.draw_rect(MAP_X + tile[0] * T + 2, MAP_Y + tile[1] * T + 2, T - 4, T - 4, (0, 0, 0, 0),
                        border_color=(120, 220, 120, 200) if ok else (230, 60, 60, 220), border_width=2, space="world",
                        layer=RenderLayer.EFFECTS)
-        self._ring((tile[0] + 0.5, tile[1] + 0.5), TOWERS[key].levels[0].range, (120, 220, 120, 200) if ok else (230, 60, 60, 200))
+        self._ring((tile[0] + 0.5, tile[1] + 0.5), self.world.tower_levels[key][0].range, (120, 220, 120, 200) if ok else (230, 60, 60, 200))
 
     def _gate_sockets(self, hovered: int | None) -> None:
         for i, (x, y) in enumerate(self.world.level.doors):
@@ -428,7 +435,7 @@ class BattleScene(Scene):
         world = self.world
         for figure in self.view.figures.values():
             m = figure.monster
-            max_hp = m.kind.hp * world.waves[m.wave].hp
+            max_hp = m.max_hp
             x, y = self.view.chest(m)
             top = y - m.kind.size * T * 0.75 - 8
             if m.hp < max_hp or m.kind.leader is not None:
@@ -441,8 +448,8 @@ class BattleScene(Scene):
                 self.draw_text(dots, x, top - 6, font_size=18, color=(220, 150, 255, 255), anchor_x="center", space="world",
                                layer=RenderLayer.UI_WORLD)
         for door in world.doors:
-            if door.built and door.hp < DOOR.hp:
+            if door.built and door.hp < world.gate_life:
                 x, y = world.level.doors[door.index]
                 cx, cy = px(x + 0.5, y + 0.5)
                 self.draw_rect(cx - 20, cy - 52, 40, 5, (0, 0, 0, 200), space="world", layer=RenderLayer.EFFECTS)
-                self.draw_rect(cx - 19, cy - 51, 38 * door.hp / DOOR.hp, 3, (230, 190, 90, 255), space="world", layer=RenderLayer.UI_WORLD)
+                self.draw_rect(cx - 19, cy - 51, 38 * door.hp / world.gate_life, 3, (230, 190, 90, 255), space="world", layer=RenderLayer.UI_WORLD)

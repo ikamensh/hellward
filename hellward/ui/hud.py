@@ -12,7 +12,7 @@ from typing import Callable
 from saga2d import Scene
 
 from hellward.art.fx import ORB_LEVELS
-from hellward.sim.content import CLEANSE_COST, CURSES, DOOR, MANA_MAX, SELL_REFUND, START_LIVES, TOWERS, Element
+from hellward.sim.content import CURSES, DOOR, SELL_REFUND, START_LIVES, TOWERS, Element
 from hellward.sim.model import Monster, Tower, World
 from hellward.ui import style
 
@@ -20,8 +20,6 @@ TOP = 672
 SLOT = 68
 BUILD = ("pyre", "storm", "frost", "plague", "gate")
 SLOT_X = 146
-WAVE_NAMES = ("The Fallen Horde", "The Shaman's Warband", "The Restless Dead", "Rot and Fire", "Horns and Wings",
-              "The Bone Priest", "The Blood Witch", "The Winged Siege", "The Council of Curses", "Azazel the Flayer")
 ELEMENT_NAMES = {Element.FIRE: "Fire", Element.LIGHTNING: "Lightning", Element.COLD: "Cold", Element.POISON: "Poison"}
 
 
@@ -100,7 +98,7 @@ class Hud:
         scene.draw_line(40, 0, 40, TOP, (90, 70, 44, 255), 2)
         scene.draw_line(1240, 0, 1240, TOP, (90, 70, 44, 255), 2)
         self._orb("life", 14, TOP + 8, world.lives / START_LIVES, f"{world.lives}", "Life")
-        self._orb("mana", 1154, TOP + 8, world.mana / MANA_MAX, f"{int(world.mana)}", "Mana")
+        self._orb("mana", 1154, TOP + 8, world.mana / world.mana_max, f"{int(world.mana)}", "Mana")
         for i, key in enumerate(BUILD):
             x = SLOT_X + i * (SLOT + 10)
             y = TOP + 16
@@ -114,7 +112,7 @@ class Hud:
                 else:
                     scene.draw_image(f"tower/{key}/0", x + 12, y - 16, 44, 44 * 150 / 72, opacity=1.0 if affordable else 0.4)
             if key == "gate":
-                name, tip = "Warded Gate", f"Bar an arch on the path. Walkers must break it ({DOOR.hp:.0f} life); flyers pass over."
+                name, tip = "Warded Gate", f"Bar an arch on the path. Walkers must break it ({world.gate_life:.0f} life); flyers pass over."
             else:
                 kind = TOWERS[key]
                 name, tip = kind.name, f"{ELEMENT_NAMES[kind.element]}. {kind.blurb}"
@@ -153,8 +151,8 @@ class Hud:
             kind = selected.kind
             stats = selected.stats
             scene.draw_text(f"{kind.name} {'I' * (selected.level + 1)}", x0, y0 + 14, style="heading", anchor_y="center")
-            parts = [f"{stats.damage * selected.multiplier('damage'):.0f} {ELEMENT_NAMES[kind.element].lower()}",
-                     f"{stats.rate * selected.multiplier('rate'):.2f}/s", f"reach {selected.reach:.1f}"]
+            parts = [f"{stats.damage * selected.damage_mult():.0f} {ELEMENT_NAMES[kind.element].lower()}",
+                     f"{stats.rate * selected.rate_mult():.2f}/s", f"reach {selected.reach:.1f}"]
             if stats.splash:
                 parts.append(f"blast {stats.splash:.1f}")
             if stats.chains:
@@ -172,10 +170,12 @@ class Hud:
             self._button("upgrade", x0, by, 112, 28, f"Upgrade {cost}" if cost else "Highest rank", enabled=bool(cost) and world.gold >= cost,
                          tip="[U] The next rank: more damage and reach, and a finer look.")
             self._button("sell", x0 + 118, by, 100, 28, f"Sell +{int(selected.spent * SELL_REFUND)}", tip="[S] Tear it down for most of its cost.")
-            self._button("cleanse", x0 + 224, by, 116, 28, f"Cleanse {CLEANSE_COST:.0f}", enabled=bool(selected.curses) and world.mana >= CLEANSE_COST,
+            cleanse = world.spell_cost("cleanse")
+            self._button("cleanse", x0 + 224, by, 116, 28, f"Cleanse {cleanse:.0f}", enabled=bool(selected.curses) and world.mana >= cleanse,
                          tip="[C] Burn every curse off this tower with holy light. Costs mana.", accent=style.HOLY)
             return
-        title = "The cathedral waits" if world.wave < 0 else WAVE_NAMES[min(world.wave, len(WAVE_NAMES) - 1)]
+        names = world.location.wave_names
+        title = world.location.name if world.wave < 0 else names[world.wave]
         scene.draw_text(scene.fit_text(title, 340, style="heading"), x0, y0 + 14, style="heading", anchor_y="center")
         if world.outcome is not None:
             status = "Victory." if world.outcome == "victory" else "The sanctuary has fallen."
@@ -215,7 +215,7 @@ class Hud:
         """Diablo's bar at the top of the screen: the name, the life left, and what it resists."""
         scene = self.scene
         kind = m.kind
-        max_hp = kind.hp * self.world.waves[m.wave].hp
+        max_hp = m.max_hp
         w, x, y = 300, 640 - 150, 10
         color = style.BOSS if kind.key == "azazel" else style.UNIQUE if kind.leader else style.BONE
         scene.draw_rect(x, y, w, 24, (40, 6, 8, 230), border_color=(120, 30, 30, 255), border_width=1.5)
