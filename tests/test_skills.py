@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from hellward.sim import campaign
-from hellward.sim.autoplay import tile_scores
+from hellward.sim.players.ordinary import tile_scores
 from hellward.sim.campaign import g
 from hellward.sim.content import SOUL, Element, Wave
 from hellward.sim.model import SIM_DT, World

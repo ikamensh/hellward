@@ -1,7 +1,8 @@
-"""Record Hellward through the real renderer: the scripted defender against the smart leaders.
+"""Record Hellward through the real renderer: a scripted player against the smart leaders.
 
     uv run python tools/showcase.py OUT                        # find the leaders' curses, film around them
     uv run python tools/showcase.py OUT --at 95,420 --seconds 7
+    uv run python tools/showcase.py OUT --location caves --player ordinary
     uv run python tools/showcase.py OUT --moments               # only list the moments worth filming
 
 Writes ``clip.mp4`` (full size, 30 fps), ``clip.gif`` (smaller, for chat) and a still from the middle of every
@@ -20,25 +21,28 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 
-def moments(seed: int, limit: float = 900.0) -> list[tuple[float, str]]:
-    """Game times worth filming: a leader starting to curse, a gate breaking, the boss arriving."""
+def moments(seed: int, location: str, player: str, limit: float = 900.0) -> list[tuple[float, str]]:
+    """Game times worth filming: a leader starting to curse, a gate breaking, the last wave arriving."""
     from hellward.sim import planner
-    from hellward.sim.autoplay import Defender
+    from hellward.sim.campaign import LOCATIONS
     from hellward.sim.model import SIM_DT, World
+    from hellward.sim.players import PLAYERS
+    from hellward.sim.players.hands import Hands
 
-    world = World(seed=seed, planner=planner.smart)
-    defender = Defender()
+    world = World(LOCATIONS[location], seed=seed, planner=planner.smart)
+    defender, hands = PLAYERS[player](seed), Hands(world, react=0.6)
     found = []
     while world.outcome is None and world.time < limit:
-        defender.act(world, SIM_DT)
+        defender.act(hands)
         world.step(SIM_DT)
+        hands.observe(world.events)
         for e in world.events:
             if e[0] == "chant":
                 found.append((world.time, f"chant {world.monster(e[1]).kind.key if world.monster(e[1]) else '?'} wave {world.wave + 1}"))
             elif e[0] == "door_broken":
                 found.append((world.time, f"gate {e[1]} broken"))
             elif e[0] == "wave" and e[1] == len(world.waves) - 1:
-                found.append((world.time, "the boss wave"))
+                found.append((world.time, "the last wave"))
             elif e[0] in ("victory", "defeat"):
                 found.append((world.time, e[0]))
         world.events.clear()
@@ -103,7 +107,7 @@ def _stereo(clip):
     return np.stack([clip, clip], axis=1) if clip.ndim == 1 else clip
 
 
-def film(out: Path, seed: int, shots: list[float], seconds: float, fps: int, lead: float) -> None:
+def film(out: Path, seed: int, location: str, player: str, shots: list[float], seconds: float, fps: int, lead: float) -> None:
     import os
 
     os.environ.setdefault("SAGA2D_SILENT", "1")
@@ -112,7 +116,8 @@ def film(out: Path, seed: int, shots: list[float], seconds: float, fps: int, lea
     from hellward.__main__ import build
     from hellward.audio.bank import SoundBank
     from hellward.sim import planner
-    from hellward.sim.autoplay import Defender
+    from hellward.sim.campaign import LOCATIONS
+    from hellward.sim.players import PLAYERS
     from hellward.ui.battle import BattleScene
 
     frames_dir = out / "frames"
@@ -126,7 +131,7 @@ def film(out: Path, seed: int, shots: list[float], seconds: float, fps: int, lea
     SoundBank.prepare(cache, wait=True)   # the music too, before filming starts
     recorder = Recorder(game.audio)
     bank = SoundBank(game, clock=lambda: recorder.frame / fps)   # the voice budget keeps the film's time, not the wall's
-    scene = BattleScene(art, seed=seed, planner=planner.smart, autopilot=Defender(), sound=bank)
+    scene = BattleScene(art, LOCATIONS[location], seed=seed, planner=planner.smart, autopilot=PLAYERS[player](seed), sound=bank)
     game.push(scene)
     index = 0
     dt = 1 / fps
@@ -163,6 +168,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("out", type=Path)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--location", default="cathedral")
+    parser.add_argument("--player", default="ordinary")
     parser.add_argument("--at", type=lambda s: [float(x) for x in s.split(",")], default=None, help="game times to film")
     parser.add_argument("--seconds", type=float, default=6.0)
     parser.add_argument("--lead", type=float, default=2.0, help="seconds filmed before each moment")
@@ -172,7 +179,7 @@ def main() -> None:
     args.out.mkdir(parents=True, exist_ok=True)
     shots = args.at
     if shots is None or args.moments:
-        found = moments(args.seed)
+        found = moments(args.seed, args.location, args.player)
         for t, what in found:
             print(f"{t:7.1f}s  {what}")
         if args.moments:
@@ -181,7 +188,7 @@ def main() -> None:
         picks = [chants[len(chants) // 4], chants[len(chants) // 2], chants[3 * len(chants) // 4]] if len(chants) >= 3 else chants
         boss = [t for t, what in found if what == "the boss wave"]
         shots = picks + [b + 30 for b in boss[:1]]
-    film(args.out, args.seed, shots, args.seconds, args.fps, args.lead)
+    film(args.out, args.seed, args.location, args.player, shots, args.seconds, args.fps, args.lead)
 
 
 if __name__ == "__main__":

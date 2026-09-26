@@ -1,9 +1,9 @@
 """How hard the defence is, and how much the leaders' choices matter.
 
-    uv run python tools/balance.py                  # every leader policy against eight scripted defenders
-    uv run python tools/balance.py --policies none,smart --defenders 4
+    uv run python tools/balance.py                  # every leader policy against eight ordinary defenders
+    uv run python tools/balance.py --policies none,smart --defenders 4 --location hells_gate
 
-Each defender is the scripted player with a different element rotation and tower count. For every leader
+Each defender is the ordinary player with a different element rotation and tower count. For every leader
 policy it prints the victories, the lives the defenders lost (mean and range) and the curses cast. The
 leaders are worth something when ``smart`` costs the defenders clearly more lives than ``random``.
 """
@@ -20,27 +20,31 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim import planner  # noqa: E402
-from hellward.sim.autoplay import Defender  # noqa: E402
+from hellward.sim.campaign import LOCATIONS  # noqa: E402
 from hellward.sim.content import START_LIVES  # noqa: E402
-from hellward.sim.model import World  # noqa: E402
+from hellward.sim.model import SIM_DT, World  # noqa: E402
+from hellward.sim.players.hands import Hands  # noqa: E402
+from hellward.sim.players.ordinary import Ordinary  # noqa: E402
 
 POLICIES = {"none": lambda: None, "random": lambda: planner.RandomLeaders(7), "nearest": lambda: planner.nearest,
             "greedy": lambda: planner.greedy, "smart": lambda: planner.smart}
 
 
-def defenders(count: int) -> list[Defender]:
-    return [Defender(shift=i % 5, towers=(13, 15)[i // 5 % 2]) for i in range(count)]
+def defenders(count: int) -> list[Ordinary]:
+    return [Ordinary(shift=i % 5, towers=(13, 15)[i // 5 % 2]) for i in range(count)]
 
 
-def match(policy: str, index: int, count: int) -> dict:
+def match(policy: str, index: int, count: int, location: str) -> dict:
     defender = defenders(count)[index]
-    world = World(seed=index, planner=POLICIES[policy]())
+    world = World(LOCATIONS[location], seed=index, planner=POLICIES[policy]())
     world.lives = 10_000   # uncapped: count every life lost instead of stopping at a defeat
+    hands = Hands(world, react=0.6)
     stats: Counter = Counter()
     leaks: Counter = Counter()
     while world.outcome is None and world.time < 1800:
-        defender.act(world, 0.05)
-        world.step(0.05)
+        defender.act(hands)
+        world.step(SIM_DT)
+        hands.observe(world.events)
         for e in world.events:
             if e[0] in ("cursed", "fizzle", "cleansed", "door_broken"):
                 stats[e[0]] += 1
@@ -57,9 +61,10 @@ def main() -> None:
     parser.add_argument("--policies", default=",".join(POLICIES))
     parser.add_argument("--defenders", type=int, default=8)
     parser.add_argument("--jobs", type=int, default=4)
+    parser.add_argument("--location", default="cathedral")
     args = parser.parse_args()
     policies = args.policies.split(",")
-    jobs = [(p, i, args.defenders) for p in policies for i in range(args.defenders)]
+    jobs = [(p, i, args.defenders, args.location) for p in policies for i in range(args.defenders)]
     with ProcessPoolExecutor(args.jobs) as pool:
         results = list(pool.map(match, *zip(*jobs)))
     for policy in policies:

@@ -14,10 +14,10 @@ from typing import Any, Callable
 from saga2d import Camera, RenderLayer, Scene
 
 from hellward.art.sprites import Art
-from hellward.sim.autoplay import Defender
 from hellward.sim.campaign import CATHEDRAL, NORMAL, Difficulty, Location
 from hellward.sim.content import CURSES, DOOR, MONSTERS
 from hellward.sim.model import SIM_DT, Monster, Refused, Tower, World
+from hellward.sim.players.hands import Hands, Player
 from hellward.sim.skills import NO_PERKS, Perks
 from hellward.ui import style
 from hellward.ui.effects import Effects
@@ -47,7 +47,7 @@ class BattleScene(Scene):
 
     def __init__(self, art: Art, location: Location = CATHEDRAL, *, difficulty: Difficulty = NORMAL, perks: Perks = NO_PERKS,
                  seed: int = 0, planner: Callable | None = None, sound: Any = None,
-                 autopilot: Defender | None = None, on_end: Callable[[World], None] | None = None,
+                 autopilot: Player | None = None, on_end: Callable[[World], None] | None = None,
                  settings: Any = None, restart: Callable[[], None] | None = None,
                  to_title: Callable[[], None] | None = None) -> None:
         self.art = art
@@ -78,6 +78,7 @@ class BattleScene(Scene):
         self.fx = Effects(self, self.view, self.world)
         self.hud = Hud(self, self.world)
         self.lighting = Lighting(self, (MAP_X, MAP_Y), (self.world.level.width * T, self.world.level.height * T))
+        self.hands = Hands(self.world, react=0.6)
         if self.settings is not None:
             self.fx.show_thoughts = self.settings["minds"]
         self.hud.banner(self.location.name, "Hold the sanctuary. The first wave comes soon.", life=4.5)
@@ -100,9 +101,10 @@ class BattleScene(Scene):
             while self.acc >= SIM_DT:
                 self.acc -= SIM_DT
                 if self.autopilot is not None:
-                    self.autopilot.act(world, SIM_DT)
+                    self.autopilot.act(self.hands)
                 self.view.before_step()
                 world.step(SIM_DT)
+                self.hands.observe(world.events)
                 for event in world.events:
                     self._event(event)
                 world.events.clear()

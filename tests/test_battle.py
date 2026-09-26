@@ -8,7 +8,7 @@ from saga2d.testing import assert_text_fits
 
 from hellward.__main__ import build
 from hellward.sim import planner
-from hellward.sim.autoplay import Defender
+from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.content import DOOR, TOWERS
 from hellward.sim.model import SIM_DT
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
@@ -35,7 +35,7 @@ def run(g: Game, seconds: float, dt: float = 1 / 30) -> None:
 
 def test_a_scripted_defence_plays_through_the_scene(game):
     g, art = game
-    scene = BattleScene(art, seed=1, planner=planner.smart, autopilot=Defender())
+    scene = BattleScene(art, seed=1, planner=planner.smart, autopilot=Ordinary())
     g.push(scene)
     scene.speed = 4.0
     cursed = False

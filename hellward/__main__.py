@@ -10,7 +10,7 @@ from saga2d import Game
 
 from hellward.art import fx, sprites
 from hellward.audio.bank import SoundBank
-from hellward.sim.autoplay import Defender
+from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.model import World
 from hellward.ui import menus, style
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> None:
         sound.music("title")
 
     def battle(autopilot: bool) -> BattleScene:
-        return BattleScene(art, seed=args.seed, planner=thinker, sound=sound, autopilot=Defender() if autopilot else None,
+        return BattleScene(art, seed=args.seed, planner=thinker, sound=sound, autopilot=Ordinary() if autopilot else None,
                            on_end=end, settings=values, restart=lambda: begin(autopilot), to_title=title)
 
     def begin(autopilot: bool) -> None:

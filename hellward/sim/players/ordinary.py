@@ -1,16 +1,18 @@
-"""A scripted defender: it plays a whole defence for the tests, the balance tools and the showcase clip.
+"""The ordinary scripted defender: the tests, the clips and the balance tools' baseline.
 
 It is deliberately ordinary: towers on the tiles that watch the most path (a door's queue counts
 extra), elements in rotation, gates in the arches once it can afford them, upgrades with what is left,
-and a Cleanse on the cursed tower that has work to do.
+and a Cleanse on the cursed tower that has work to do. It learns no skills and casts no other spell.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from hellward.sim.campaign import Difficulty, Location
 from hellward.sim.content import DOOR, WAVE_BREAK
 from hellward.sim.model import DOOR_STOP, JOSTLE, Refused, Tower, World
+from hellward.sim.players.hands import Hands
 
 ROTATION = ("pyre", "frost", "storm", "plague", "pyre", "storm", "plague", "pyre", "frost", "storm")
 DOOR_BONUS = 4.0     # path tiles a door queue in reach is worth when ranking a tile
@@ -34,7 +36,8 @@ def tile_scores(world: World, reach: float = 3.0) -> list[tuple[float, tuple[int
 
 
 @dataclass
-class Defender:
+class Ordinary:
+    name: str = "ordinary"
     cleanse: bool = True
     doors: bool = True
     call_early: bool = True
@@ -48,15 +51,18 @@ class Defender:
         rotation = [kind for kind in ROTATION if kind in world.location.arsenal.towers]
         self.planned = [(rotation[(i + self.shift) % len(rotation)], tile) for i, tile in enumerate(tiles[:self.towers])]
 
-    def act(self, world: World, dt: float) -> None:
-        self.clock -= dt
-        if self.clock > 0:
+    def skills(self, location: Location, difficulty: Difficulty, sigils: int) -> frozenset[str]:
+        return frozenset()
+
+    def act(self, hands: Hands) -> None:
+        world = hands.world
+        if world.time < self.clock:
             return
-        self.clock = THINK
+        self.clock = world.time + THINK
         if not self.planned:
             self.plan(world)
         if self.cleanse:
-            self._cleanse(world)
+            self._cleanse(hands)
         if self.doors and world.location.arsenal.gates and world.wave >= 1:
             for door in world.doors:
                 if not door.built and world.gold >= DOOR.cost + 20:
@@ -87,7 +93,8 @@ class Defender:
                 return
             world.upgrade(tower.id)
 
-    def _cleanse(self, world: World) -> None:
+    def _cleanse(self, hands: Hands) -> None:
+        world = hands.world
         if world.mana < world.spell_cost("cleanse"):
             return
         busy: list[Tower] = []
@@ -97,14 +104,5 @@ class Defender:
                 if any(any(a <= m.s <= b for a, b in full) for m in world.monsters):
                     busy.append(t)
         if busy:
-            world.cleanse(max(busy, key=lambda t: (t.spent, -t.id)).id)
+            hands.cleanse(max(busy, key=lambda t: (t.spent, -t.id)).id)
 
-
-def play(world: World, defender: Defender | None = None, *, dt: float = 0.05, limit: float = 1800.0) -> World:
-    """Play a defence to its end with the scripted defender."""
-    defender = defender or Defender()
-    while world.outcome is None and world.time < limit:
-        defender.act(world, dt)
-        world.step(dt)
-        world.events.clear()
-    return world

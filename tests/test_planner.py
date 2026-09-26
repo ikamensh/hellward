@@ -4,7 +4,8 @@ import statistics
 from dataclasses import replace
 
 from hellward.sim import campaign, planner
-from hellward.sim.autoplay import Defender
+from hellward.sim.players.hands import Hands
+from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.content import Group, Wave
 from hellward.sim.model import SIM_DT, World
 
@@ -69,10 +70,11 @@ def test_smart_curses_are_close_to_the_best_and_beat_the_naive_ones():
 
     world = World(seed=2, planner=recorder)
     world.lives = 10_000
-    defender = Defender()
+    defender, hands = Ordinary(), Hands(world, react=0.6)
     while len(found) < 6 and world.time < 1500:
-        defender.act(world, SIM_DT)
+        defender.act(hands)
         world.step(SIM_DT)
+        hands.observe(world.events)
         world.events.clear()
     assert len(found) == 6
     shares = {"smart": [], "nearest": []}

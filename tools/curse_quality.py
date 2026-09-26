@@ -1,7 +1,7 @@
 """How close the leaders' curses are to the best curse they could have cast.
 
     uv run python tools/curse_quality.py                 # 60 real decision moments, every policy
-    uv run python tools/curse_quality.py --moments 20 --horizon 20
+    uv run python tools/curse_quality.py --moments 20 --horizon 20 --location hells_gate
 
 Moments are taken from whole defences: the scripted defender plays against smart leaders, and every few
 decisions the world is copied at the instant a leader asks what to curse. For each moment every curse the
@@ -29,13 +29,15 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim import planner  # noqa: E402
-from hellward.sim.autoplay import Defender  # noqa: E402
+from hellward.sim.campaign import LOCATIONS  # noqa: E402
 from hellward.sim.model import SIM_DT, World  # noqa: E402
+from hellward.sim.players.hands import Hands  # noqa: E402
+from hellward.sim.players.ordinary import Ordinary  # noqa: E402
 
 POLICIES = ("smart", "greedy", "nearest", "random")
 
 
-def moments(count: int, every: int) -> list[tuple[World, int]]:
+def moments(count: int, every: int, location: str) -> list[tuple[World, int]]:
     """Worlds copied at the instant a leader asks, from a few whole defences."""
     found: list[tuple[World, int]] = []
     seen = 0
@@ -49,12 +51,14 @@ def moments(count: int, every: int) -> list[tuple[World, int]]:
                 found.append((world.clone(), leader_id))
             return planner.Inline(decision)
 
-        world = World(seed=game, planner=recorder)
+        world = World(LOCATIONS[location], seed=game, planner=recorder)
         world.lives = 10_000
-        defender = Defender(shift=game % 5, towers=(13, 15)[game // 5 % 2])
+        defender = Ordinary(shift=game % 5, towers=(13, 15)[game // 5 % 2])
+        hands = Hands(world, react=0.6)
         while world.outcome is None and world.time < 1800 and len(found) < count:
-            defender.act(world, SIM_DT)
+            defender.act(hands)
             world.step(SIM_DT)
+            hands.observe(world.events)
             world.events.clear()
         game += 1
     return found
@@ -92,8 +96,9 @@ def main() -> None:
     parser.add_argument("--every", type=int, default=3, help="keep every n-th decision")
     parser.add_argument("--horizon", type=float, default=16.0)
     parser.add_argument("--jobs", type=int, default=4)
+    parser.add_argument("--location", default="cathedral")
     args = parser.parse_args()
-    cases = moments(args.moments, args.every)
+    cases = moments(args.moments, args.every, args.location)
     with ProcessPoolExecutor(args.jobs) as pool:
         results = list(pool.map(judge, [w for w, _ in cases], [i for _, i in cases], [args.horizon] * len(cases)))
     useful = [r for r in results if r["best"] > 1.0]
