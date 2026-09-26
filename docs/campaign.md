@@ -118,7 +118,7 @@ Eight columns. The four towers of Act I and the two of Act II each have a column
 | Column | 1 | 2 | 3 | 4 |
 |---|---|---|---|---|
 | **Fire** (Pyre) | Adept of Fire: the second rank | Fire Ball: the first rank bursts too, every blast 0.3 wider | Master of Fire: the third rank | Blaze: fireballs leave the floor burning for 2 s |
-| **Lightning** (Storm Obelisk) | Adept of Lightning | Chain Lightning: one more leap at every rank, leaps keep 95% | Master of Lightning | Static Field: strikes leaders first, and leaps to them first |
+| **Lightning** (Storm Obelisk) | Adept of Storms | Chain Lightning: one more leap at every rank, leaps keep 95% | Master of Storms | Static Field: strikes leaders first, and leaps to them first |
 | **Cold** (Frost Shrine) | Adept of Cold | Glacial Spike: novas reach 0.4 further and hit 50% harder | Master of Cold | Shatter: a monster that dies chilled bursts for a tenth of its life |
 | **Poison** (Plague Totem) | Adept of Poison | Contagion: venom leaps to a neighbour when its monster dies | Master of Poison | Lower Resist: a poisoned monster resists everything 25 points less |
 | **Bone** (Bone Altar, Act II) | Adept of Bone | Corpse Explosion: a monster that dies amplified bursts for 15% of its life, unresisted, within 1.2 | Master of Bone | Life Tap: a monster that dies amplified gives a fifth of its bounty in mana |

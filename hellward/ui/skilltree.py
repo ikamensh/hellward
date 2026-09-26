@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from saga2d import Anchor, Button, Row, Scene
+from saga2d import Anchor, Button, Column, Scene
 
 from hellward.sim.campaign import Location, idle
 from hellward.sim.skills import COLUMNS, SKILLS, Skill, above, can_learn
@@ -39,9 +39,10 @@ class SkillTreeScene(Scene):
         self.spots: list[widgets.Hotspot] = []
 
     def on_enter(self) -> None:
-        self.ui.add(Row(Button("Unlearn all", shortcut="U", on_click=self.unlearn_all, width=200),
-                        Button("Close", shortcut="Esc", on_click=self.game.pop, width=160),
-                        anchor=Anchor.BOTTOM, margin=(0, 16), spacing=14))
+        # Warding and Sorcery hold three skills, so the fourth row under them is where the buttons stand
+        self.ui.add(Column(Button("Unlearn all", shortcut="U", on_click=self.unlearn_all, width=270),
+                           Button("Close", shortcut="Esc", on_click=self.game.pop, width=270),
+                           anchor=Anchor.BOTTOM_RIGHT, margin=(68, 60), spacing=12))
 
     def unlearn_all(self) -> None:
         if self.progress.learned:
@@ -111,11 +112,11 @@ class SkillTreeScene(Scene):
         if learned:
             self.draw_image(f"fx/soft/{_glow(skill.column)}", x + 10, y - 20, node_w - 20, 70, opacity=0.35)
         text = style.PALE_GOLD if (learned or learnable) else style.DIM
-        size = 15 if len(skill.name) < 15 else 13
+        size = 15 if len(skill.name) < 13 else 13 if len(skill.name) < 16 else 12
         self.draw_text(self.fit_text(skill.name, node_w - 12, font_size=size, font=style.TITLE_FONT), cx, y + 20, font_size=size,
                        color=text, font=style.TITLE_FONT, anchor_x="center", anchor_y="center")
-        widgets.centred(self, skill.blurb, cx, y + 36, node_w - 16, font_size=11, color=style.BONE if not dormant else style.DIM,
-                        max_lines=4)
+        widgets.centred(self, skill.blurb, cx, y + 36, node_w - 14, font_size=10.5, color=style.BONE if not dormant else style.DIM,
+                        max_lines=5)
         for k in range(skill.cost):   # its price in sigils
             px = cx + (k - (skill.cost - 1) / 2) * 15
             self.draw_circle(px, y + NODE_H - 14, 5.0, (230, 184, 90, 255) if learned else (120, 96, 60, 255))
