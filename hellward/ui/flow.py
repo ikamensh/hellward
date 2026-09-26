@@ -111,7 +111,7 @@ class Flow:
             self.world_map()   # the way there is not open
             return
         self.game.clear_and_push(BattleScene(
-            self.art, location, perks=perks(self.progress.learned),
+            self.art, location, perks=perks(self.progress.learned), learned=self.progress.learned,
             seed=self.seed, planner=self.planner, sound=self.sound, on_outcome=self.keep, on_end=self.reckon,
             settings=self.settings, restart=lambda: self.defend(location), to_title=self.title, to_map=self.world_map))
 

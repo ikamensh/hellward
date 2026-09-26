@@ -4,6 +4,8 @@
     python3 ~/saga/tools/slot.py -- caffeinate -i uv run python tools/margin.py apprentice
     uv run python tools/margin.py warden --locations caves,hells_gate --seeds 1000-1003
     uv run python tools/margin.py warden --leaders random   # how much the leaders' choices cost
+    uv run python tools/margin.py --replay replays/20260101T120000Z-tristram.json   # a person's build, at its
+        # location and seed only: how much harder it could still have been won
 
 For every location it bisects, on each seed, the largest factor on every monster's life (``defend(hp=...)``; the
 spells do not grow with it) at which the player still wins, to 2%, and prints the
@@ -16,6 +18,7 @@ the margin against the smart ones is how much the leaders' choices are worth. It
 from __future__ import annotations
 
 import argparse
+import json
 import statistics
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -31,27 +34,34 @@ if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of it
 from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
-from hellward.sim.players.hands import defend  # noqa: E402
+from hellward.sim.players.ghost import Ghost  # noqa: E402
+from hellward.sim.players.hands import Player, defend  # noqa: E402
+from hellward.sim.skills import cost  # noqa: E402
 
 LOW, HIGH, STEP = 0.2, 12.0, 1.02
 
 
-def wins(player: str, key: str, seed: int, sigils: int, leaders: str, hp: float) -> bool:
+def contender(who: str, seed: int) -> Player:
+    """A player by its name, or the ghost of a logged defence as ``replay:<path>``."""
+    return Ghost(who.removeprefix("replay:")) if who.startswith("replay:") else PLAYERS[who](seed)
+
+
+def wins(who: str, key: str, seed: int, sigils: int, leaders: str, hp: float) -> bool:
     policy = planner.smart if leaders == "smart" else planner.RandomLeaders(seed)
-    world, _ = defend(LOCATIONS[key], PLAYERS[player](seed), seed=seed, sigils=sigils, planner=policy, hp=hp)
+    world, _ = defend(LOCATIONS[key], contender(who, seed), seed=seed, sigils=sigils, planner=policy, hp=hp)
     return world.outcome == "victory"
 
 
-def margin(player: str, key: str, seed: int, sigils: int, leaders: str) -> float:
+def margin(who: str, key: str, seed: int, sigils: int, leaders: str) -> float:
     """The largest life factor won, bisected in ratio to STEP; 0 when even LOW is lost."""
-    if not wins(player, key, seed, sigils, leaders, LOW):
+    if not wins(who, key, seed, sigils, leaders, LOW):
         return 0.0
     low, high = LOW, HIGH
-    if wins(player, key, seed, sigils, leaders, high):
+    if wins(who, key, seed, sigils, leaders, high):
         return high
     while high / low > STEP:
         mid = (low * high) ** 0.5
-        if wins(player, key, seed, sigils, leaders, mid):
+        if wins(who, key, seed, sigils, leaders, mid):
             low = mid
         else:
             high = mid
@@ -65,13 +75,22 @@ def seed_list(text: str) -> list[int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("player", choices=sorted(PLAYERS))
+    parser.add_argument("player", nargs="?", choices=sorted(PLAYERS))
+    parser.add_argument("--replay", default=None, help="a battle scene's log: bisect its ghost's margin instead, "
+                        "at the log's location and seed only")
     parser.add_argument("--locations", default=",".join(ORDER))
     parser.add_argument("--seeds", default="1000-1007")
     parser.add_argument("--sigils", type=int, default=None)
     parser.add_argument("--leaders", default="smart", choices=("smart", "random"))
     parser.add_argument("--jobs", type=int, default=6)
     args = parser.parse_args()
+    if args.replay is not None:
+        if args.player is not None:
+            parser.error("--replay takes the place of a player name, not both")
+        ghost_main(args)
+        return
+    if args.player is None:
+        parser.error("a player name or --replay is required")
     keys = args.locations.split(",")
     seeds = seed_list(args.seeds)
 
@@ -87,6 +106,17 @@ def main() -> None:
         values = found[i * len(seeds):(i + 1) * len(seeds)]
         print(f"{args.player:10s} {args.leaders:6s} {key:11s} life {LOCATIONS[key].life:4.2f}  M median {statistics.median(values):5.2f}"
               f"  range {min(values):5.2f}-{max(values):5.2f}", flush=True)
+
+
+def ghost_main(args: argparse.Namespace) -> None:
+    """Bisect the margin of the ghost built from ``--replay``'s log: its location only, its seed only."""
+    log = json.loads(Path(args.replay).read_text())
+    key, seed = log["location"], log["seed"]
+    sigils = cost(frozenset(log["skills"]))
+    if args.sigils is not None:
+        sigils = args.sigils
+    found = margin(f"replay:{args.replay}", key, seed, sigils, args.leaders)
+    print(f"{'ghost':10s} {args.leaders:6s} {key:11s} life {LOCATIONS[key].life:4.2f}  M {found:5.2f}", flush=True)
 
 
 if __name__ == "__main__":

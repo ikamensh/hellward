@@ -10,7 +10,9 @@ thinking.
 
 from __future__ import annotations
 
+import json
 import math
+from datetime import datetime, timezone
 from typing import Any, Callable
 
 from saga2d import Camera, RenderLayer, Scene
@@ -49,6 +51,7 @@ class BattleScene(Scene):
     }
 
     def __init__(self, art: Art, location: Location = CATHEDRAL, *, perks: Perks = NO_PERKS,
+                 learned: frozenset[str] | None = None,
                  seed: int = 0, planner: Callable | None = None, sound: Any = None,
                  autopilot: Player | None = None, on_end: Callable[[World], None] | None = None,
                  on_outcome: Callable[[World], None] | None = None,
@@ -57,6 +60,9 @@ class BattleScene(Scene):
         self.art = art
         self.location = location
         self.perks = perks
+        self.learned = frozenset(learned) if learned is not None else frozenset()
+        self.replay: list[list] = []     # the person's commands, [time, name, args...], for a ghost to replay
+        self._replay_written = False
         self.settings = settings
         self.restart = restart
         self.to_title = to_title
@@ -123,6 +129,7 @@ class BattleScene(Scene):
             if self.on_outcome is not None:
                 callback, self.on_outcome = self.on_outcome, None
                 callback(world)
+            self._write_replay()
             self.ended += dt
             if self.ended > 3.0 and self.on_end is not None:
                 self.hud.banners.clear()   # the reckoning is drawn over this scene
@@ -267,6 +274,31 @@ class BattleScene(Scene):
         self._route()
         return True
 
+    def _record(self, name: str, *args: Any) -> None:
+        """Keep one of the person's commands with the time it took effect. Towers by tile, monsters by
+        where they stood; refused commands never reach here. Nothing while the autopilot plays."""
+        if self.autopilot is None:
+            self.replay.append([self.world.time, name, *args])
+
+    def _write_replay(self) -> None:
+        """The moment the defence is decided: the person's commands as one JSON file in the ``replays``
+        folder next to the saves. A player who leaves mid-fight never gets here, and writes nothing."""
+        if self._replay_written or self.autopilot is not None:
+            return
+        self._replay_written = True
+        folder = self.game.data_dir / "replays"
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        path = folder / f"{stamp}-{self.location.key}.json"
+        n = 1
+        while path.exists():
+            n += 1
+            path = folder / f"{stamp}-{self.location.key}-{n}.json"
+        world = self.world
+        path.write_text(json.dumps({"version": 1, "location": self.location.key, "seed": self.seed,
+                                    "skills": sorted(self.learned), "outcome": world.outcome,
+                                    "lives": world.lives, "time": world.time, "commands": self.replay}))
+
     def pick(self, key: str) -> None:
         if not offers(self.location, key):
             try:
@@ -305,7 +337,9 @@ class BattleScene(Scene):
         if key == "smite":
             leader = self.threat()
             if leader is not None:
+                x, y = self.world.position(leader)
                 if self._try(lambda: self.world.smite(leader.id)):
+                    self._record("smite", x, y)
                     self.placing = None
                 return
         self.selected = None
@@ -341,10 +375,20 @@ class BattleScene(Scene):
             if target is None:
                 self._refuse("Smite strikes a monster: click on one.")
                 return False
-            return self._try(lambda: world.smite(target.id))
+            x, y = world.position(target)
+            if self._try(lambda: world.smite(target.id)):
+                self._record("smite", x, y)
+                return True
+            return False
         if key == "meteor":
-            return self._try(lambda: world.meteor(x, y))
-        return self._try(lambda: world.orb(x, y))
+            if self._try(lambda: world.meteor(x, y)):
+                self._record("meteor", x, y)
+                return True
+            return False
+        if self._try(lambda: world.orb(x, y)):
+            self._record("orb", x, y)
+            return True
+        return False
 
     def slots(self) -> tuple[str, ...]:
         """The build bar here: the ordinary slots, and the new towers where this location offers them."""
@@ -378,7 +422,8 @@ class BattleScene(Scene):
 
     def call_wave(self) -> None:
         if self.world.can_call_wave:
-            self._try(self.world.call_wave)
+            if self._try(self.world.call_wave):
+                self._record("call_wave")
 
     def toggle_speed(self) -> None:
         self.speed = 1.0 if self.speed > 1 else 2.0
@@ -394,16 +439,21 @@ class BattleScene(Scene):
 
     def upgrade(self) -> None:
         if self.selected is not None:
-            self._try(lambda: self.world.upgrade(self.selected.id))
+            tile = list(self.selected.tile)
+            if self._try(lambda: self.world.upgrade(self.selected.id)):
+                self._record("upgrade", tile)
 
     def sell(self) -> None:
         if self.selected is not None:
             tower, self.selected = self.selected, None
-            self._try(lambda: self.world.sell(tower.id))
+            if self._try(lambda: self.world.sell(tower.id)):
+                self._record("sell", list(tower.tile))
 
     def cleanse(self) -> None:
         if self.selected is not None:
-            self._try(lambda: self.world.cleanse(self.selected.id))
+            tile = list(self.selected.tile)
+            if self._try(lambda: self.world.cleanse(self.selected.id)):
+                self._record("cleanse", tile)
 
     def cancel(self) -> None:
         """Escape lets go of what is held or selected; with nothing to let go of, it opens the menu."""
@@ -481,10 +531,13 @@ class BattleScene(Scene):
             if self.placing == "gate":
                 door = self.door_at(tile)
                 if door is not None and self._try(lambda: self.world.build_door(door)):
+                    self._record("gate", door)
                     self.placing = None
                 return True
             if self.placing is not None and tile is not None:
-                if self._try(lambda: self.world.build(self.placing, tile)):
+                kind = self.placing
+                if self._try(lambda: self.world.build(kind, tile)):
+                    self._record("build", kind, list(tile))
                     if not event.shift:
                         self.placing = None
                 return True
