@@ -12,7 +12,9 @@ to shoot at.
 
 In the fight it watches the leaders: a chant against a tower that matters is smitten, or frozen with the crowd
 around it; a curse that lands on a busy tower is cleansed; a gate about to break under a crowd gets a Frozen
-Orb; a dense queue gets a Meteor; and a monster about to reach the sanctuary with little life left is smitten.
+Orb; a dense queue gets a Meteor; a monster about to reach the sanctuary with little life left is smitten, and
+one worth many lives there (Azazel) draws every Smite a chant can spare. Mana is never left to sit at the top
+of the orb: a full orb goes on a lesser crowd or the monster a Smite hurts most.
 """
 
 from __future__ import annotations
