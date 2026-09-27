@@ -32,6 +32,19 @@ ELEMENT_NAMES = {Element.FIRE: "Fire", Element.LIGHTNING: "Lightning", Element.C
 DISC = {"altar": (214, 204, 176, 255), "grove": (120, 230, 60, 255)}   # a coloured rune disc while a kind has no sprite
 
 
+BUILD_WIDTH = 402   # from SLOT_X to the centre panel
+
+
+def slot_size(count: int) -> tuple[float, float]:
+    """A build slot's size and the step from one to the next: full size for the five of Act I, smaller when a location
+    offers the Act II towers too, so the bar ends before the centre panel."""
+    if count * (SLOT + 10) - 10 <= BUILD_WIDTH:
+        return float(SLOT), float(SLOT + 10)
+    gap = 6.0
+    size = (BUILD_WIDTH - (count - 1) * gap) / count
+    return size, size + gap
+
+
 def monster_notes(kind: MonsterKind) -> list[str]:
     """What a monster resists, in Diablo's words, and whether it flies."""
     notes = []
@@ -128,9 +141,11 @@ class Hud:
         self._orb("mana", 1154, TOP + 8, world.mana / world.mana_max, f"{int(world.mana)}", "Mana")
         location = world.location
         slots = list(BUILD) + [key for key in NEW_TOWERS if offers(location, key)]
+        size, step = slot_size(len(slots))
+        k = size / SLOT   # the slot's pictures shrink with it
         for i, key in enumerate(slots):
-            x = SLOT_X + i * (SLOT + 10)
-            y = TOP + 16
+            x = SLOT_X + i * step
+            y = TOP + 16 + (SLOT - size) / 2
             if key == "gate":
                 name, tip = "Warded Gate", (f"Bar an arch on the path. Walkers must break it ({world.gate_life:.0f} life); flyers pass "
                                             "over. A broken gate lies in rubble until the fight dies down between waves.")
@@ -140,31 +155,31 @@ class Hud:
             offered = offers(location, key)
             cost = costs(key)
             affordable = offered and world.gold >= cost
-            scene.draw_image("ui/slot_lit" if placing == key else "ui/slot", x, y, SLOT, SLOT)
+            scene.draw_image("ui/slot_lit" if placing == key else "ui/slot", x, y, size, size)
             with scene.screen_layer(2):
                 shown = 1.0 if affordable else 0.4 if offered else 0.12
                 if key == "gate":
-                    scene.draw_image("gate/intact", x + 12, y + 2, 44, 44 * 80 / 60, opacity=shown)
+                    scene.draw_image("gate/intact", x + 12 * k, y + 2 * k, 44 * k, 44 * k * 80 / 60, opacity=shown)
                 elif scene.game.assets.has_image(f"tower/{key}/0"):
-                    scene.draw_image(f"tower/{key}/0", x + 12, y - 16, 44, 44 * 150 / 72, opacity=shown)
+                    scene.draw_image(f"tower/{key}/0", x + 12 * k, y - 16 * k, 44 * k, 44 * k * 150 / 72, opacity=shown)
                 else:
-                    scene.draw_circle(x + SLOT / 2, y + SLOT / 2, 20, DISC[key][:3] + (int(shown * 255),))
+                    scene.draw_circle(x + size / 2, y + size / 2, 20 * k, DISC[key][:3] + (int(shown * 255),))
                 self._keycap(x, y, str(i + 1))
                 if not offered:
-                    self._padlock(x + SLOT / 2, y + SLOT / 2)
+                    self._padlock(x + size / 2, y + size / 2)
             if offered:
-                scene.draw_text(f"{cost}", x + SLOT / 2, y + SLOT + 16, font_size=14, color=style.GOLD if affordable else style.DIM,
-                                anchor_x="center", anchor_y="center")
-                self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), affordable, f"{name} — {cost} gold\n{tip}"))
+                scene.draw_text(f"{cost}", x + size / 2, TOP + 16 + SLOT + 16, font_size=14,
+                                color=style.GOLD if affordable else style.DIM, anchor_x="center", anchor_y="center")
+                self.controls.append(Control(f"build:{key}", (x, y, size, size), affordable, f"{name} — {cost} gold\n{tip}"))
             elif key in TOWERS:
                 try:
                     arrival = first_offering(key).called
                 except KeyError:
                     arrival = None
                 note = f"It arrives in {arrival}." if arrival is not None else "It is not offered yet."
-                self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), False, f"{name}\nNot here. {note}"))
+                self.controls.append(Control(f"build:{key}", (x, y, size, size), False, f"{name}\nNot here. {note}"))
             else:
-                self.controls.append(Control(f"build:{key}", (x, y, SLOT, SLOT), False,
+                self.controls.append(Control(f"build:{key}", (x, y, size, size), False,
                                              f"{name}\nNot here. It arrives in {first_offering(key).called}."))
         self._centre(selected)
 

@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from saga2d import Anchor, Button, Row, Scene
 
 from hellward.art import sprites
-from hellward.sim.campaign import ORDER, SIGIL_LIVES, Location, LOCATIONS, idle, offers
+from hellward.sim.campaign import ACT_NAMES, ACTS, ORDER, SIGIL_LIVES, Location, LOCATIONS, idle, offers
 from hellward.sim.content import CURSES, MONSTERS, SPELLS, START_LIVES, TOWERS, Curse
 from hellward.sim.skills import SKILLS, perks
 from hellward.ui import style, widgets
@@ -66,12 +66,11 @@ class BriefingScene(Scene):
         with self.screen_layer(1):
             self.draw_rect(0, 0, 1280, 800, (6, 3, 5, 205))
         with self.screen_layer(2):
-            index = ORDER.index(location.key)
             self.draw_text(location.name, 642, 46, font_size=50, color=(0, 0, 0, 220), font=style.TITLE_FONT, anchor_x="center",
                            anchor_y="center")
             self.draw_text(location.name, 640, 44, font_size=50, color=style.GOLD, font=style.TITLE_FONT, anchor_x="center",
                            anchor_y="center")
-            self.draw_text(f"The descent, {index + 1} of {len(ORDER)}  ·  {len(location.waves)} waves", 640, 94,
+            self.draw_text(f"{ACT_NAMES[location.act]}, {ACTS[location.act].index(location.key) + 1} of {len(ACTS[location.act])}  ·  {len(location.waves)} waves", 640, 94,
                            font_size=15, color=style.DIM, anchor_x="center", anchor_y="center")
             self.draw_text(location.lesson, 640, 118, font_size=17, color=style.BONE, anchor_x="center",
                            anchor_y="center")

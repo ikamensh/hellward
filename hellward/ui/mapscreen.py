@@ -188,7 +188,7 @@ class MapScene(Scene):
             self.draw_text(act_name, 640, 34, style="banner", anchor_x="center", anchor_y="center")
             won = sum(progress.best(key) for key in ACTS[self.act])
             total = 3 * len(ACTS[self.act])
-            self.draw_text(f"Act {self.act}: {won} of {total} sigils won. {progress.free} to spend on skills.",
+            self.draw_text(f"Act {'I' * self.act}: {won} of {total} sigils won. {progress.free} to spend on skills.",
                            640, 66, font_size=15, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
         if mouse is not None:
             spot = widgets.hit(self.spots, *mouse)

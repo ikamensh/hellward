@@ -487,6 +487,7 @@ LOCATIONS: dict[str, Location] = {loc.key: loc for loc in (
     DOCKS, SPIDER_FOREST, JUNGLE, DROWNED_CITY, TRAVINCAL, TEMPLE
 )}
 ORDER = tuple(LOCATIONS)   # the campaign's order, which the balance tools also use for the points a player holds
+ACT_NAMES: dict[int, str] = {1: "The Descent", 2: "The Drowned Temples"}
 ACT_ENDS: dict[int, str] = {1: "hells_gate", 2: "temple"}
 ACTS: dict[int, tuple[str, ...]] = {
     1: ("tristram", "graveyard", "cathedral", "catacombs", "caves", "hells_gate"),

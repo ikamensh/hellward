@@ -31,13 +31,14 @@ def main() -> None:
 
     from hellward.__main__ import build
     from hellward.sim import planner
-    from hellward.sim.campaign import LOCATIONS
+    from hellward.sim.campaign import ACTS, LOCATIONS
     from hellward.sim.content import Curse
     from hellward.sim.players.ordinary import Ordinary
     from hellward.sim.skills import perks
     from hellward.story import STORIES
     from hellward.ui.battle import BattleScene, Silent
     from hellward.ui.flow import Flow
+    from hellward.ui.mapscreen import MapScene
     from hellward.ui.progress import Progress
     from hellward.ui.story import ChronicleScene, PrologueScene, StoryScene
 
@@ -68,6 +69,15 @@ def main() -> None:
         flow.world_map()
         ticks(6)
         shot("map")
+
+    def act_two_map() -> None:
+        """Act II's map, as a player who holds all of Act I and has seen its ending finds it."""
+        for key in ACTS[1]:
+            flow.progress.won.setdefault(key, 3)
+        flow.progress.see("act1/end")
+        game.clear_and_push(MapScene(flow, act=2))
+        ticks(6)
+        shot("map-2")
 
     def make_intro(key: str):
         def intro() -> None:
@@ -162,7 +172,7 @@ def main() -> None:
         ticks(60)
         shot("chronicle-first")
 
-    frames = {"title": title, "map": world_map, "skills": skills, "magic": magic, "reckoning": reckoning,
+    frames = {"title": title, "map": world_map, "map-2": act_two_map, "skills": skills, "magic": magic, "reckoning": reckoning,
               "story-tristram-before": story_page, "prologue-12": make_prologue("prologue-12", 12.0),
               "prologue-27": make_prologue("prologue-27", 27.0), "chronicle-first": chronicle_first}
     for key in LOCATIONS:
