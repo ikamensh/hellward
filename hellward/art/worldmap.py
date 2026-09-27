@@ -22,6 +22,7 @@ from PIL import Image, ImageDraw, ImageFilter
 from hellward.art.rig import DENSITY
 
 PAINTED = Path(__file__).resolve().parent.parent / "assets" / "painted" / "worldmap.jpg"
+PAINTED_II = Path(__file__).resolve().parent.parent / "assets" / "painted" / "worldmap-2.jpg"
 WIDTH, HEIGHT = 1280, 800
 SURFACE = 182          # where the ground begins (Act I)
 
@@ -317,6 +318,10 @@ def _chamber(image: Image.Image, at: tuple[float, float], color: tuple[int, int,
 
 def picture(act: int = 1) -> Image.Image:
     """The map as the game shows it: the painting when there is one, else the stand-in."""
-    if PAINTED.exists():
-        return Image.open(PAINTED).convert("RGB").resize((WIDTH * DENSITY, HEIGHT * DENSITY), Image.LANCZOS)
+    if act == 1:
+        if PAINTED.exists():
+            return Image.open(PAINTED).convert("RGB").resize((WIDTH * DENSITY, HEIGHT * DENSITY), Image.LANCZOS)
+    else:
+        if PAINTED_II.exists():
+            return Image.open(PAINTED_II).convert("RGB").resize((WIDTH * DENSITY, HEIGHT * DENSITY), Image.LANCZOS)
     return stand_in(act=act)

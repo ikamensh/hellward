@@ -157,7 +157,8 @@ def register(game: Game, cache_dir: Path) -> Art:
         image = image.resize((width, height), Image.LANCZOS)
         top = (height - 800 * DENSITY) // 2
         assets.image_from_pil("title", image.crop((0, top, width, top + 800 * DENSITY)))
-    assets.image_from_pil("worldmap", worldmap.picture())
+    assets.image_from_pil("worldmap", worldmap.picture(act=1))
+    assets.image_from_pil("worldmap-2", worldmap.picture(act=2))
     return Art(cells, _cell(*structures.TOWER_CELL), _cell(*structures.GATE_CELL), _cell(*structures.ARCH_CELL),
                _cell(*structures.PILLAR_CELL), painted)
 

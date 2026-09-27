@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from saga2d import Game
 
-from hellward.sim.campaign import LOCATIONS, ORDER, Location, sigils
+from hellward.sim.campaign import ACTS, LOCATIONS, ORDER, Location, sigils
 from hellward.sim.skills import can_learn, check, cost, kept
 
 SLOT = "campaign"
@@ -75,9 +75,9 @@ class Progress:
         self.save()
         return gained
 
-    def next_location(self) -> Location | None:
-        """The first location that is open and not yet held."""
-        for key in ORDER:
+    def next_location(self, act: int) -> Location | None:
+        """The first location in the given act that is open and not yet held."""
+        for key in ACTS[act]:
             location = LOCATIONS[key]
             if self.opened(location) and not self.held(key):
                 return location

@@ -49,7 +49,13 @@ class Flow:
             self._open_map()
             return
         self.progress.see(key)
-        self.game.clear_and_push(StoryScene(self, STORIES[key].pages, then=self._open_map))
+        self.game.clear_and_push(StoryScene(self, STORIES[key].pages, then=self._after(key)))
+
+    def _after(self, key: str) -> Callable[[], None]:
+        """Where a story leaves the map: after Act I's ending, on Act II's map, the lantern walking to the Docks."""
+        if key == LAST_PAGES[1]:
+            return lambda: self._open_map(act=2, first=True)
+        return self._open_map
 
     def due(self) -> str | None:
         """The story a map opening owes the player, if any: an act's ending once its last location is held, else the
@@ -66,8 +72,8 @@ class Flow:
                 return page
         return None
 
-    def _open_map(self) -> None:
-        self.game.clear_and_push(MapScene(self))
+    def _open_map(self, act: int | None = None, first: bool = False) -> None:
+        self.game.clear_and_push(MapScene(self, act=act, first=first))
         self.sound.music("title")
 
     def descend(self) -> None:
@@ -80,7 +86,7 @@ class Flow:
             self._descend()
 
     def _descend(self) -> None:
-        self.game.clear_and_push(MapScene(self, first=self.progress.sigils == 0))
+        self.game.clear_and_push(MapScene(self, act=1, first=self.progress.sigils == 0))
         self.sound.music("title")
 
     def intro(self, location: Location) -> None:
@@ -147,7 +153,10 @@ class Flow:
             story = STORIES.get(key)
             if story is not None and key not in self.progress.seen:
                 self.progress.see(key)
-                dest = (lambda: self.intro(world.location)) if again else self.world_map
+                if key == LAST_PAGES[1]:
+                    dest = self._after(key)
+                else:
+                    dest = (lambda: self.intro(world.location)) if again else self.world_map
                 self.game.clear_and_push(StoryScene(self, story.pages, then=dest))
                 return
         if again:

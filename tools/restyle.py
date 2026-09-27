@@ -388,7 +388,7 @@ def cmd_ground(args: argparse.Namespace) -> None:
             print(line, flush=True)
 
 
-WORLDMAP_PROMPT = (
+WORLDMAP_PROMPT_I = (
     "Edit target: the attached map, {w}x{h} px, the world map of a dark gothic tower-defence game. Repaint it as one finished, richly "
     "detailed painting in the manner of the late-1990s dark action-RPG classics: a cut-away view of the ground under a medieval "
     "village at night. On the surface, under a starry sky with a blood-red moon: the burning village of Tristram on the left, a "
@@ -400,19 +400,29 @@ WORLDMAP_PROMPT = (
     "Keep exactly: where each chamber, tunnel, building and the moon is, and the horizon line. No text, no labels, no people, no "
     "monsters. Output the same {w}x{h} layout.")
 
+WORLDMAP_PROMPT_II = (
+    "Edit target: the attached map, {w}x{h} px, the world map of a dark gothic tower-defence game. Repaint it as one finished, richly "
+    "detailed painting in the manner of the late-1990s dark action-RPG classics: a jungle coast seen from above. On the left, black "
+    "sea with short piers of the Kurast Docks. Inland, dense jungle: the Spider Forest with web-choked trees, the Flayer Jungle with "
+    "long straight roads. In the lower center, the Drowned City: canals and swamp water. On the right hill, Travincal's terraces and "
+    "the Temple of Light with the mother lamp glowing gold. Five glowing chambers joined by trails.\n\n"
+    "Keep exactly: where each chamber, trail, pier and coastline is. No text, no labels, no people, no monsters. Output the same {w}x{h} layout.")
+
 
 def cmd_worldmap(args: argparse.Namespace) -> None:
     args.dir.mkdir(parents=True, exist_ok=True)
-    image = worldmap.stand_in()
+    act = args.act
+    image = worldmap.stand_in(act=act)
     small = image.resize((image.width // 2, image.height // 2), Image.LANCZOS)
-    source = args.dir / "worldmap.input.png"
+    source = args.dir / f"worldmap{'-2' if act == 2 else ''}.input.png"
     small.save(source)
-    out = args.dir / "worldmap" / f"{args.provider}.png"
-    _paint(source, WORLDMAP_PROMPT.format(w=small.width, h=small.height), out, args.provider, "16:10" if args.provider == "codex" else "3:2")
+    out = args.dir / f"worldmap{'-2' if act == 2 else ''}" / f"{args.provider}.png"
+    prompt = WORLDMAP_PROMPT_I if act == 1 else WORLDMAP_PROMPT_II
+    _paint(source, prompt.format(w=small.width, h=small.height), out, args.provider, "16:10" if args.provider == "codex" else "3:2")
     painted = Image.open(out).convert("RGB").resize(image.size, Image.LANCZOS)
-    painted.save(worldmap.PAINTED, quality=92)
-    Image.blend(image, painted, 0.5).save(args.dir / "worldmap-overlay.png")
-    print(f"installed {worldmap.PAINTED}; compare {args.dir / 'worldmap-overlay.png'}")
+    painted.save(worldmap.PAINTED if act == 1 else worldmap.PAINTED_II, quality=92)
+    Image.blend(image, painted, 0.5).save(args.dir / f"worldmap{'-2' if act == 2 else ''}-overlay.png")
+    print(f"installed {worldmap.PAINTED if act == 1 else worldmap.PAINTED_II}; compare {args.dir / f'worldmap{'-2' if act == 2 else ''}-overlay.png'}")
 
 
 KEYART_PROMPT = (
@@ -450,6 +460,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--subjects", type=lambda s: set(s.split(",")), default=None)
     parser.add_argument("--locations", type=lambda s: set(s.split(",")), default=None, help="floors to paint (ground)")
+    parser.add_argument("--act", type=int, choices=(1, 2), default=1, help="which act's world map to paint (worldmap)")
     parser.add_argument("--provider", choices=PROVIDERS, default="codex", help="render with, and cut this one's render first")
     parser.add_argument("--jobs", type=int, default=3)
     parser.add_argument("--effort", default="low", help="Codex's reasoning effort: raise it when the painter drops instructions")

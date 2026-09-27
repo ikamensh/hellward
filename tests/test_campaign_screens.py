@@ -8,8 +8,10 @@ from saga2d import Game
 from saga2d.testing import assert_text_fits
 
 from hellward.__main__ import build
+from hellward.art import worldmap
+from hellward.story import STORIES
 from hellward.sim import planner
-from hellward.sim.campaign import LOCATIONS, ORDER
+from hellward.sim.campaign import ACTS, ACT_ENDS, LOCATIONS, ORDER
 from hellward.sim.content import SPELLS
 from hellward.sim.players.ordinary import Ordinary
 from hellward.ui import menus
@@ -225,3 +227,81 @@ def test_a_won_defence_is_kept_even_when_the_player_leaves_before_the_reckoning(
     battle.to_map()   # the pause menu's To the map, before the reckoning comes
     tick(g)
     assert flow.progress.best("tristram") == 3
+
+
+def test_map_shows_act_one_for_new_campaign(game):
+    g, flow = game
+    flow.descend()
+    tick(g)
+    press(g, "escape")   # skip prologue
+    tick(g, 5)
+    press(g, "return")   # skip tristram/before
+    press(g, "return")
+    tick(g, 0.5)   # past input guard
+    # Back to map from intro
+    press(g, "escape")
+    tick(g)
+    map_scene = g.scenes[-1]
+    assert isinstance(map_scene, MapScene)
+    assert map_scene.act == 1
+
+
+def test_act_two_tab_locked_without_hells_gate(game):
+    g, flow = game
+    flow.descend()
+    tick(g)
+    press(g, "escape")   # skip prologue
+    tick(g, 5)
+    press(g, "return")
+    press(g, "return")
+    tick(g, 0.5)   # past input guard
+    press(g, "escape")   # back to map
+    tick(g)
+    map_scene = g.scenes[-1]
+    assert isinstance(map_scene, MapScene)
+    assert map_scene.act == 1
+    # Try to switch to Act II - should be refused
+    press(g, "2")
+    tick(g)
+    assert map_scene.act == 1
+
+
+def test_act_two_tab_opens_after_hells_gate_held(cache, tmp_path):
+    saves = tmp_path / "saves"
+    g, flow = open_game(cache, saves)
+    # Simulate having won all Act I locations including Hell's Gate
+    flow.progress.won = {key: 1 for key in ACTS[1]}
+    flow.world_map()
+    tick(g)
+    # Act I ending plays first
+    page = g.scenes[-1]
+    assert isinstance(page, StoryScene) and page.pages[page.index].key == "act1-end-1"
+    for _ in range(2 * len(STORIES["act1/end"].pages)):
+        press(g, "return")
+    tick(g)
+    # Now map should be on Act II
+    map_scene = g.scenes[-1]
+    assert isinstance(map_scene, MapScene)
+    assert map_scene.act == 2
+    # Lantern should be at Docks (first location of Act II)
+    assert map_scene.lantern == worldmap.ANCHORS[2]["docks"]
+    g.close()
+
+
+def test_after_act1_ending_map_opens_on_act2_and_walks_to_docks(cache, tmp_path):
+    saves = tmp_path / "saves"
+    g, flow = open_game(cache, saves)
+    # Simulate having won Hell's Gate but not seen the ending
+    flow.progress.won = {key: 1 for key in ACTS[1]}
+    flow.progress.see("act1/end")  # mark ending as seen to skip it
+    flow.world_map()
+    tick(g)
+    map_scene = g.scenes[-1]
+    assert isinstance(map_scene, MapScene)
+    assert map_scene.act == 2
+    # The lantern should walk to Docks on first arrival
+    tick(g, 5)
+    # Should show Docks before page
+    page = g.scenes[-1]
+    assert isinstance(page, StoryScene) and page.pages[page.index].key == "docks-before"
+    g.close()
