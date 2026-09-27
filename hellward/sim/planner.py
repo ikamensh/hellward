@@ -315,7 +315,7 @@ def candidates(world: World, leader: Monster, delay: float = 0.0) -> list[Option
     seen: set[tuple[Curse, tuple[int, ...]]] = set()
     for spot in sorted({t.tile for t in towers}):
         for curse in curses:
-            caught = tuple(t.id for t in world.caught(spot, curse_radius(curse, leader.kind)) if t.ward <= start)
+            caught = tuple(t.id for t in world.caught(spot, curse_radius(curse, leader.kind, world.curse_scale)) if t.ward <= start)
             key = (curse, caught)
             if key in seen:
                 continue

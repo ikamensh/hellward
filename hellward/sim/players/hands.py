@@ -33,6 +33,9 @@ AIM_GAP = 0.5         # seconds between two aimed spells
 
 
 class Player(Protocol):
+    """A scripted player. It may also say how quick its hands are: ``reaction``, the range a leader's sign is seen
+    late by (default :data:`REACT`), and ``aim_gap``, the seconds between two aimed spells (default :data:`AIM_GAP`)."""
+
     name: str
 
     def skills(self, location: Location, sigils: int) -> frozenset[str]:
@@ -68,6 +71,7 @@ class Record:
     spells: Counter = field(default_factory=Counter)
     leaks: Counter = field(default_factory=Counter)   # lives lost by wave
     skills: frozenset[str] = frozenset()              # what the player learned for it
+    towers_caught: list[int] = field(default_factory=list)  # number of towers caught per landed curse
     raised: int = 0               # monsters raised by a leader
     burned: float = 0.0           # mana burned by curses
 
@@ -79,14 +83,15 @@ def ready(world: World, spell: str, spare: float = 0.0) -> bool:
             and world.mana - spare >= world.spell_cost(spell))
 
 
-def react_for(seed: int) -> float:
-    return REACT[0] + (REACT[1] - REACT[0]) * random.Random(seed * 7919 + 17).random()
+def react_for(seed: int, reaction: tuple[float, float] = REACT) -> float:
+    return reaction[0] + (reaction[1] - reaction[0]) * random.Random(seed * 7919 + 17).random()
 
 
 class Hands:
-    def __init__(self, world: World, react: float) -> None:
+    def __init__(self, world: World, react: float, aim_gap: float = AIM_GAP) -> None:
         self.world = world
         self.react = react
+        self.aim_gap = aim_gap
         self.record = Record()
         self._signs: dict[int, Sign] = {}
         self._last_aim = -1e9
@@ -114,6 +119,7 @@ class Hands:
             elif kind == "cursed":
                 self._signs.pop(e[1], None)
                 record.landed += 1
+                record.towers_caught.append(len(e[4]))
             elif kind == "ward_holds":
                 self._signs.pop(e[1], None)
                 record.warded += 1
@@ -152,7 +158,7 @@ class Hands:
     # -- Spells ------------------------------------------------------------------------------------
 
     def _aimed(self) -> None:
-        if self.world.time - self._last_aim < AIM_GAP - 1e-9:
+        if self.world.time - self._last_aim < self.aim_gap - 1e-9:
             raise Refused("One aimed spell at a time.")
 
     def smite(self, monster_id: int) -> None:
@@ -190,19 +196,22 @@ class Hands:
 
 def defend(location: Location, player: Player, *, seed: int, sigils: int,
            planner: Planner | None, hp: float = 1.0, lives: int | None = None, limit: float = 3000.0,
+           curse_scale: float = 1.0,
            watch: Callable[[World], None] | None = None) -> tuple[World, Record]:
     """One defence played to its end by a player. ``hp`` scales every monster's life, leaving the spells as
     they are (the balance tools' margin); ``lives`` replaces the sanctuary's (the balance tools set it huge
     to count every life lost); *watch* sees the world after every step, with that step's events. A defence
-    still undecided after ``limit`` seconds is a bug."""
+    still undecided after ``limit`` seconds is a bug. ``curse_scale`` multiplies every curse radius (0 = only the marked tile)."""
     learned = player.skills(location, sigils)
     if cost(learned) > sigils:
         raise ValueError(f"{player.name} learned {cost(learned)} sigils' worth of skills with {sigils}")
-    world = World(location, hardness=hp, perks=perks(learned), seed=seed, planner=planner)
+    world = World(location, hardness=hp, perks=perks(learned), seed=seed, planner=planner, curse_scale=curse_scale)
     world.record = True
     if lives is not None:
         world.lives = lives
-    hands = Hands(world, react_for(seed))
+    react = react_for(seed, getattr(player, 'reaction', REACT))
+    aim_gap = getattr(player, 'aim_gap', AIM_GAP)
+    hands = Hands(world, react, aim_gap)
     hands.record.skills = learned
     while world.outcome is None and world.time < limit:
         player.act(hands)

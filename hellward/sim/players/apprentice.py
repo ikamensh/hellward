@@ -18,7 +18,9 @@ from hellward.sim.skills import SKILLS, can_learn
 FIRST = ("adept_fire", "warmth", "adept_cold", "adept_lightning", "holy_shield", "fire_ball",
          "adept_poison", "salvation", "glacial_spike", "chain_lightning", "soul_harvest",
          "contagion", "master_fire", "master_cold", "master_lightning", "master_poison",
-         "blaze", "shatter", "static_field", "lower_resist", "thorns", "spell_mastery")
+         "blaze", "shatter", "static_field", "lower_resist", "thorns", "spell_mastery",
+         "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+         "adept_nature", "hurricane", "master_nature", "twister")
 
 METEOR_CROWD = 4     # others within METEOR_REACH of the aimed monster that make a Meteor worth it
 METEOR_REACH = 1.4   # tiles around the aimed monster

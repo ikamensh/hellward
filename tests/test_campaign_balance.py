@@ -78,14 +78,14 @@ def test_chants_broken_are_the_broken_chants_among_all_chants_begun_not_the_brok
 def test_the_margin_is_bisected_to_two_percent_inside_its_bracket(monkeypatch, edge):
     played = []
 
-    def up_to_edge(player, location, seed, sigils, *, hp):
-        played.append(hp)
-        return {"outcome": "victory" if hp <= edge else "defeat", "hp": hp}
+    def up_to_edge(player, location, seed, sigils, *, life, curse_scale=1.0):
+        played.append(life)
+        return {"outcome": "victory" if life <= edge else "defeat", "life": life}
 
     monkeypatch.setattr(campaign_balance, "play", up_to_edge)
     m, runs = campaign_balance.margin("a", "tristram", 1000, 0)
     low, high = campaign_balance.MARGIN_RANGE
-    assert [r["hp"] for r in runs] == played and len(played) == 7   # 2% of a tenfold bracket
+    assert [r["life"] for r in runs] == played and len(played) == 7   # 2% of a tenfold bracket
     assert all(low < hp < high for hp in played)
     shown = campaign_balance.show_margin(m)
     if edge < low:

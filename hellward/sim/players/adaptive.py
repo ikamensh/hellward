@@ -44,7 +44,8 @@ from hellward.sim.content import (
     CURSES, DOOR, MONSTERS, SPELLS, TOWERS, Curse, Element, MonsterKind, TowerLevel,
 )
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Refused, Tower, World
-from hellward.sim.players.hands import AIM_GAP, Hands, ready
+from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
+from hellward.sim.players.spacing import max_curse_radius, score_with_spacing
 from hellward.sim.skills import SKILLS, can_learn
 
 SAMPLE = 0.25          # seconds between two looks at where the monsters are
@@ -80,24 +81,39 @@ ORDERS: dict[str, tuple[str, ...]] = {
     "mixed": ("adept_fire", "adept_cold", "holy_shield", "warmth", "fire_ball", "glacial_spike",
               "adept_lightning", "chain_lightning", "salvation", "adept_poison", "contagion",
               "soul_harvest", "master_fire", "master_cold", "master_lightning", "master_poison",
-              "thorns", "blaze", "shatter", "static_field", "lower_resist", "spell_mastery"),
+              "thorns", "blaze", "shatter", "static_field", "lower_resist", "spell_mastery",
+              "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+              "adept_nature", "hurricane", "master_nature", "twister"),
     "warden": ("holy_shield", "warmth", "adept_cold", "salvation", "adept_fire", "adept_poison",
                "adept_lightning", "fire_ball", "glacial_spike", "chain_lightning", "contagion",
-               "thorns", "soul_harvest", "master_fire", "master_cold", "master_lightning", "master_poison"),
+               "thorns", "soul_harvest", "master_fire", "master_cold", "master_lightning", "master_poison",
+               "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+               "adept_nature", "hurricane", "master_nature", "twister"),
     "sorcerer": ("warmth", "soul_harvest", "spell_mastery", "holy_shield", "adept_cold", "adept_fire",
                  "adept_poison", "adept_lightning", "fire_ball", "glacial_spike", "chain_lightning",
-                 "contagion", "master_fire", "master_cold", "master_lightning", "master_poison"),
+                 "contagion", "master_fire", "master_cold", "master_lightning", "master_poison",
+                 "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+                 "adept_nature", "hurricane", "master_nature", "twister"),
     "frost": ("adept_cold", "glacial_spike", "holy_shield", "warmth", "master_cold", "shatter",
-              "adept_fire", "adept_poison", "fire_ball", "contagion", "master_fire", "master_poison"),
+              "adept_fire", "adept_poison", "fire_ball", "contagion", "master_fire", "master_poison",
+              "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+              "adept_nature", "hurricane", "master_nature", "twister"),
     "fire": ("adept_fire", "fire_ball", "holy_shield", "warmth", "adept_cold", "master_fire", "blaze",
-             "glacial_spike", "master_cold"),
+             "glacial_spike", "master_cold",
+             "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+             "adept_nature", "hurricane", "master_nature", "twister"),
     "storm": ("adept_lightning", "chain_lightning", "holy_shield", "warmth", "adept_cold", "master_lightning",
-              "static_field", "glacial_spike", "master_cold"),
+              "static_field", "glacial_spike", "master_cold",
+              "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+              "adept_nature", "hurricane", "master_nature", "twister"),
     "venom": ("adept_poison", "holy_shield", "contagion", "warmth", "adept_cold", "master_poison",
-              "lower_resist", "glacial_spike", "master_cold"),
+              "lower_resist", "glacial_spike", "master_cold",
+              "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+              "adept_nature", "hurricane", "master_nature", "twister"),
 }
 DEFAULT_ORDER = "mixed"
-TOWER_OF = {"fire": "pyre", "lightning": "storm", "cold": "frost", "poison": "plague"}
+TOWER_OF = {"fire": "pyre", "lightning": "storm", "cold": "frost", "poison": "plague",
+            "bone": "altar", "nature": "grove"}
 
 
 def useful(location: Location, key: str) -> bool:
@@ -190,6 +206,8 @@ class View:
 
 class Adaptive:
     name = "adaptive"
+    reaction: tuple[float, float] = REACT
+    aim_gap: float = AIM_GAP
 
     def __init__(self, order: str = "") -> None:
         self.order = order                    # a themed order of the skill tree; empty takes the plan's
@@ -260,6 +278,7 @@ class Adaptive:
     def _watch(self, world: World) -> None:
         """Note where every monster stands and how crowded it is there, and which towers carry curses; fold the
         trails of the monsters gone."""
+        assert self.study is not None and self.picture is not None
         study = self.study
         counts = [0] * study.bins
         for m in world.monsters:
@@ -294,6 +313,7 @@ class Adaptive:
             self.gate_hp[d.index] = d.hp
 
     def _new_wave(self, world: World) -> None:
+        assert self.picture is not None
         self.lost_last = self.lives_at_wave - world.lives
         self.lives_at_wave = world.lives
         self.wave = world.wave
@@ -312,6 +332,7 @@ class Adaptive:
     def _reread(self, world: World) -> None:
         """Blend the picture with the guess from the map and the roster, and with the monsters of this wave (on the
         map and still to come, each walking the rest of its kind's usual trail); then price everything anew."""
+        assert self.study is not None and self.picture is not None
         study, picture = self.study, self.picture
         bins = study.bins
         coming: dict[str, list[float]] = {}
@@ -325,7 +346,7 @@ class Adaptive:
         pull = [0.0] * bins          # seconds × life³ of poisonable monsters: who a totem aims at
         poisonable = [0.0] * bins
         for key in study.roster:
-            kind = MONSTERS[key]
+            kind: MonsterKind = MONSTERS[key]
             came = picture.came.get(key, 0.0)
             seen = picture.seconds.get(key)
             usual = [t / came for t in seen] if seen is not None and came >= 1.0 else study.guess[key]
@@ -368,19 +389,21 @@ class Adaptive:
                 for b in range(bins)]
         self.view = View(seconds, near, around, worth, venom, poisonable, room)
         self.density = {}
-        for kind in world.location.arsenal.towers:
-            for level, stats in enumerate(world.tower_levels[kind]):
-                self.density[(kind, level)] = [self._urgency(b) * self._density(world, kind, stats, b) if seconds[b] > 0
-                                               else 0.0 for b in range(bins)]
+        for tower_kind in world.location.arsenal.towers:
+            for level, stats in enumerate(world.tower_levels[tower_kind]):
+                self.density[(tower_kind, level)] = [self._urgency(b) * self._density(world, tower_kind, stats, b) if seconds[b] > 0
+                                                else 0.0 for b in range(bins)]
         self._price(world)
 
     # -- Prices --------------------------------------------------------------------------------------
 
     def _urgency(self, b: int) -> float:
+        assert self.study is not None
         return 1.0 + (URGENCY + 0.1 * self.lost_last) * b / self.study.bins
 
     def _density(self, world: World, kind: str, stats: TowerLevel, b: int) -> float:
         """Worth of the damage a tower of this kind and rank deals per wave from one bin of path it reaches."""
+        assert self.view is not None
         view = self.view
         attack = TOWERS[kind].attack
         dps = stats.damage * stats.rate
@@ -405,6 +428,7 @@ class Adaptive:
         """Worth of the damage per wave a tower of this kind and rank would deal on this tile, from the picture;
         a frost shrine adds what its chill lets the others deal where nothing chills yet, and a plague totem counts
         only the venom that finds room: four stacks on a monster at most, and every totem aims at the strongest."""
+        assert self.study is not None
         density = self.density[(kind, level)]
         value = 0.0
         cover = self.study.cover(tile, stats.range)
@@ -414,6 +438,7 @@ class Adaptive:
                 value += share * (density[b] + max(0.0, gain - _slowed(chilled[b])) * self.firepower[b])
             return value
         if stats.poison > 0:
+            assert self.view is not None
             room = self.view.room
             for b, share in cover:
                 value += share * density[b] * min(1.0, max(0.1, (room[b] - darts[b]) / stats.rate))
@@ -424,6 +449,7 @@ class Adaptive:
 
     def _price(self, world: World) -> None:
         """Price every tower that could stand and every upgrade: worth per gold."""
+        assert self.study is not None
         study = self.study
         bins = study.bins
         self.firepower = [0.0] * bins
@@ -456,16 +482,22 @@ class Adaptive:
                 better = self.worth(t.kind.key, t.level + 1, t.levels[t.level + 1], t.tile, chilled, darts)
                 prices[("upgrade", t.id)] = (better - self.tower_worth[t.id]) * (1.0 - self._curse_share(t)) / cost
         standing = {t.tile for t in world.towers.values()}
+        existing_tiles = list(standing)
+        radius = max_curse_radius(world.location)
         for kind in world.location.arsenal.towers:
             stats = world.tower_levels[kind][0]
             for tile in study.tiles:
                 if tile not in standing:
                     worth = self.worth(kind, 0, stats, tile, self.chilled, self.darts)
+                    if radius > 0:
+                        worth = score_with_spacing(worth, existing_tiles, tile, world.location)
                     prices[("build", kind, tile)] = worth / stats.cost
         self.prices = prices
-        self.cheapest = min((self._cost(world, k) for k in prices), default=0)
+        cheapest = min((self._cost(world, k) for k in prices), default=0)
+        self.cheapest = cheapest if cheapest is not None else 0
 
     def _chilled_but(self, tower: Tower, frosts: list[Tower]) -> list[float]:
+        assert self.study is not None
         chilled = [0.0] * self.study.bins
         for t in frosts:
             if t is not tower:
@@ -484,6 +516,7 @@ class Adaptive:
         """Per kind and bin, the damage a monster of that kind takes from there to the sanctuary under the towers
         standing, sharing their fire with its usual crowd: what a person weighs when asking whether it gets through."""
         study, view = self.study, self.view
+        assert study is not None and view is not None
         bins = study.bins
         hurt = {e: [0.0] * bins for e in ELEMENTS}
         for t in world.towers.values():
@@ -511,11 +544,13 @@ class Adaptive:
 
     def threat(self, m: Monster) -> float:
         """Life a monster is likely to carry into the sanctuary; zero or less if the towers ahead should kill it."""
+        assert self.study is not None
         return m.hp - self.ahead[m.kind.key][self.study.bin(m.s)]
 
     def pressing(self, m: Monster) -> bool:
         """A monster that would get through and has already walked past most of the towers' fire (a person trusts
         the towers with a monster at the portal), or one that costs many lives."""
+        assert self.study is not None
         ahead = self.ahead[m.kind.key]
         passed = ahead[self.study.bin(m.s)] <= PASSED * ahead[0]
         return self.threat(m) > 0 and (passed or m.kind.lives >= BOSS)
@@ -529,7 +564,7 @@ class Adaptive:
             if spare < self.cheapest:
                 return
             prices = self.prices
-            top = max(prices, key=prices.get)
+            top = max(prices, key=lambda k: prices[k])
             best = prices[top]
             if best <= 0:
                 return
@@ -538,7 +573,7 @@ class Adaptive:
                 near = [k for k, v in prices.items() if v >= best * SETTLE and self._cost(world, k) <= spare]
                 if not near:
                     return
-                choice = max(near, key=prices.get)
+                choice = max(near, key=lambda k: prices[k])
             if choice[0] == "build":
                 world.build(choice[1], choice[2])
             else:
@@ -550,6 +585,7 @@ class Adaptive:
         never fire again, and their gold can still stand where the monsters are going."""
         if not self.endgame or not world.monsters:
             return
+        assert self.study is not None
         rear = min(m.s for m in world.monsters)
         behind = [t for t in world.towers.values()   # a cursed tower cannot be sold
                   if not t.curses and max(b for b, _ in self.study.cover(t.tile, t.stats.range)) + 1 < rear]
@@ -561,7 +597,8 @@ class Adaptive:
     def _cost(self, world: World, choice: tuple) -> int:
         if choice[0] == "build":
             return world.cost(choice[1])
-        return world.upgrade_cost(world.towers[choice[1]])
+        cost = world.upgrade_cost(world.towers[choice[1]])
+        return cost if cost is not None else 0
 
     def _keep(self, world: World) -> int:
         """Gold held back for a gate that is down or failing, where towers watch its queue."""
@@ -571,6 +608,7 @@ class Adaptive:
         return 0
 
     def _guarded(self, index: int) -> bool:
+        assert self.study is not None
         return bool(self.firepower) and self.firepower[self.study.queue_bins[index]] > 0
 
     def _gates(self, world: World) -> None:
@@ -633,15 +671,18 @@ class Adaptive:
             return False
         full = world.mana >= world.mana_max - 5
         for sign, m in chants:
-            share = sum(self._share(t.id) for t in world.caught(sign.spot, sign.radius))
-            if share * SEVERITY[sign.curse] >= SMITE_SHARE or full:
-                hands.smite(m.id)
-                return True
+            if sign.curse is not None:
+                share = sum(self._share(t.id) for t in world.caught(sign.spot, sign.radius))
+                if share * SEVERITY[sign.curse] >= SMITE_SHARE or full:
+                    hands.smite(m.id)
+                    return True
         blow = SPELLS["smite"].damage * world.power()
         for m in world.leaders():
+            assert m is not None
             if m.hp <= blow:
                 hands.smite(m.id)
                 return True
+        assert self.study is not None
         rescue = [m for m in world.monsters if 0 < self.threat(m) <= blow and m.s > self.study.length * 0.5]
         if rescue:
             hands.smite(max(rescue, key=lambda m: (m.kind.lives, m.s)).id)
@@ -662,7 +703,7 @@ class Adaptive:
         def weight(m: Monster) -> float:
             return m.kind.lives * (1.0 if danger[m.id] else CALM) * (LEADER if m.kind.leader is not None else 1.0)
 
-        options = []
+        options: list[tuple[float, str, int | tuple[float, float]]] = []
         if self._can(world, "smite") and (spare >= world.spell_cost("smite") or full):
             blow = SPELLS["smite"].damage * power
             m = max(world.monsters, key=lambda m: (min(blow, m.hp) * weight(m), m.s))
@@ -689,10 +730,13 @@ class Adaptive:
         if spell == "smite":
             if not (pressed or full):
                 return False
+            assert isinstance(target, int)
             hands.smite(target)
         elif spell == "meteor":
+            assert isinstance(target, tuple)
             hands.meteor(*target)
         else:
+            assert isinstance(target, tuple)
             hands.orb(*target)
         return True
 
@@ -713,6 +757,7 @@ class Adaptive:
 
     def _s_at(self, at: tuple[float, float]) -> float:
         """The path's nearest point to a spot on the floor, as ``s``."""
+        assert self.study is not None
         level = self.study.level
         return min((level.s_of(tile) for tile in level.path_tiles),
                    key=lambda s: (level.point(s)[0] - at[0]) ** 2 + (level.point(s)[1] - at[1]) ** 2)

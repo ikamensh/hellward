@@ -254,12 +254,12 @@ class ForcedCurse:
     spot: tuple[int, int]
 
 
-def curse_radius(curse: Curse, leader_kind: MonsterKind | None) -> float:
-    """The radius a curse falls in when this kind casts it: its own radius, widened by its leader."""
+def curse_radius(curse: Curse, leader_kind: MonsterKind | None, curse_scale: float = 1.0) -> float:
+    """The radius a curse falls in when this kind casts it: its own radius, widened by its leader, scaled by curse_scale."""
     widen = 0.0
     if leader_kind is not None and leader_kind.leader is not None:
         widen = leader_kind.leader.widen
-    return CURSES[curse].radius + widen
+    return (CURSES[curse].radius + widen) * curse_scale
 
 
 Planner = Callable[["World", int], Any]   # returns a handle with .result() -> Decision
@@ -267,13 +267,14 @@ Planner = Callable[["World", int], Any]   # returns a handle with .result() -> D
 
 class World:
     def __init__(self, location: Location = CATHEDRAL, *, hardness: float = 1.0, perks: Perks = NO_PERKS,
-                 seed: int = 0, planner: Planner | None = None, record: bool = True) -> None:
+                 seed: int = 0, planner: Planner | None = None, record: bool = True, curse_scale: float = 1.0) -> None:
         self.location = location
         self.level = location.level
         self.waves = location.waves
         self.perks = perks
         self.tower_levels = baked(perks)
         self.hardness = hardness   # every monster's life is multiplied by this; the spells are not
+        self.curse_scale = curse_scale  # multiplies every curse radius (0 = only the marked tile)
         self.rng = random.Random(seed)
         self.planner = planner
         self.record = record
@@ -309,7 +310,7 @@ class World:
 
     def clone(self) -> World:
         """A private copy to look ahead in: no events, no planner, its own random stream."""
-        w = World(self.location, hardness=self.hardness, perks=self.perks, record=False)
+        w = World(self.location, hardness=self.hardness, perks=self.perks, record=False, curse_scale=self.curse_scale)
         w.rng.setstate(self.rng.getstate())
         w.time, w.gold, w.lives, w.mana = self.time, self.gold, self.lives, self.mana
         w.towers = {i: t.copy() for i, t in self.towers.items()}
@@ -697,7 +698,7 @@ class World:
         if spec is None or _hypot(cx - x, cy - y) > spec.cast_range + CAST_SLACK:
             self._emit("fizzle", leader_id, spot)
             return
-        caught = self.caught(spot, curse_radius(curse, leader.kind))
+        caught = self.caught(spot, curse_radius(curse, leader.kind, self.curse_scale))
         cursed: list[int] = []
         for tower in caught:
             if tower.ward > 0:

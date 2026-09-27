@@ -184,3 +184,61 @@ def test_the_adaptive_player_learns_within_its_sigils_and_the_tree(order):
             check(learned)
             assert cost(learned) <= sigils
             assert not [key for key in SKILLS if can_learn(learned, key, sigils)]   # nothing left it could buy
+
+
+@pytest.mark.parametrize("name", sorted(set(PLAYERS) - {"planned"}))   # the planned one plays only searched builds
+def test_every_player_plays_an_act_two_location_with_its_towers_to_an_outcome(name):
+    """Kurast Docks offers the Bone Altar; every player defends it through the hands, whatever it makes of it."""
+    world, _ = defend(LOCATIONS["docks"], PLAYERS[name](1), seed=1, sigils=18, planner=planner.smart)
+    assert world.outcome in ("victory", "defeat")
+
+
+def test_the_veteran_holds_tristram_and_sees_a_sign_no_sooner_than_a_person_slower_than_the_strong_ones():
+    from hellward.sim.players.hands import react_for
+    veteran = PLAYERS["veteran"](1)
+    assert all(0.8 <= react_for(seed, veteran.reaction) <= 1.2 for seed in range(50))
+    world, _ = defend(LOCATIONS["tristram"], veteran, seed=1, sigils=0, planner=planner.smart)
+    assert world.outcome == "victory"
+
+
+def test_the_veteran_drafts_its_build_and_never_reads_the_wardens_stored_plans():
+    from hellward.sim.players.warden import draft_skills
+    veteran = PLAYERS["veteran"](1)
+    assert veteran.plans == {}
+    assert veteran.skills(LOCATIONS["cathedral"], 6) == draft_skills(LOCATIONS["cathedral"], 6)
+
+
+def test_the_corner_player_puts_frost_on_the_corners_of_tristrams_road():
+    from hellward.sim.players.corner import path_corners
+    corner = PLAYERS["corner"](1)
+    world, _ = defend(LOCATIONS["tristram"], corner, seed=1, sigils=0, planner=planner.smart)
+    frosts = {t.tile for t in world.towers.values() if t.kind.key == "frost"}
+    corners = set(path_corners(LOCATIONS["tristram"].level))
+    assert corners and frosts & corners
+
+
+def test_spacing_marks_down_a_tile_beside_a_tower_where_a_curse_would_catch_both():
+    from hellward.sim.players.spacing import max_curse_radius, score_with_spacing
+    cathedral = LOCATIONS["cathedral"]   # its leaders curse with Weaken and Decrepify, radius 1.5
+    assert max_curse_radius(cathedral) == 1.5
+    beside = score_with_spacing(10.0, [(5, 5)], (6, 6), cathedral)
+    apart = score_with_spacing(10.0, [(5, 5)], (7, 5), cathedral)
+    assert beside < apart == 10.0
+
+
+def test_a_curse_scale_of_zero_curses_only_the_marked_tile():
+    world = World(LOCATIONS["tristram"], seed=1, curse_scale=0.0)
+    world.gold = 1000
+    for tile in ((5, 5), (6, 5), (6, 6)):
+        world.build("pyre", tile)
+    from hellward.sim.model import curse_radius
+    from hellward.sim.content import Curse, MONSTERS
+    assert [t.tile for t in world.caught((5, 5), curse_radius(Curse.WEAKEN, MONSTERS["shaman"], world.curse_scale))] == [(5, 5)]
+
+
+def test_the_margin_tool_scales_the_locations_own_life_factor(monkeypatch):
+    import margin
+    seen = []
+    monkeypatch.setattr(margin, "defend", lambda location, player, **kw: (seen.append(location.life), (type("W", (), {"outcome": "victory"})(), None))[1])
+    assert margin.wins("apprentice", "graveyard", 1000, 3, "smart", 1.5)
+    assert seen == [LOCATIONS["graveyard"].life * 1.5]

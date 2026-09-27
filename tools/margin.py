@@ -2,22 +2,25 @@
 (``Location.life``) is tuned with (docs/campaign.md, "Tuning by simulation").
 
     python3 ~/saga/tools/slot.py -- caffeinate -i uv run python tools/margin.py apprentice
-    uv run python tools/margin.py warden --locations caves,hells_gate --seeds 1000-1003
-    uv run python tools/margin.py warden --leaders random   # how much the leaders' choices cost
+    uv run python tools/margin.py veteran --locations tristram --seeds 1000-1001 --jobs 2
+    uv run python tools/margin.py veteran --leaders random   # how much the leaders' choices cost
     uv run python tools/margin.py --replay replays/20260101T120000Z-tristram.json   # a person's build, at its
         # location and seed only: how much harder it could still have been won
 
-For every location it bisects, on each seed, the largest factor on every monster's life (``defend(hp=...)``; the
-spells do not grow with it) at which the player still wins, to 2%, and prints the
-median and the range. A defence holds whole until the monsters outgrow it and then collapses within a few percent,
-so the margin, not the lives kept, is what tells an easy location from a hard one. The player's sigils are the campaign's: three per earlier location, unless
-``--sigils`` says otherwise. ``--leaders random`` makes the leaders curse at random: the margin against them over
-the margin against the smart ones is how much the leaders' choices are worth. It runs the compiled simulation.
+For every location it bisects, on each seed, the largest factor on every monster's life (by replacing
+``Location.life`` with ``Location.life * k``; the spells grow with it) at which the player still wins, to 2%,
+and prints the median and the range. A defence holds whole until the monsters outgrow it and then collapses
+within a few percent, so the margin, not the lives kept, is what tells an easy location from a hard one.
+The player's sigils are the campaign's: three per earlier location, unless ``--sigils`` says otherwise.
+``--leaders random`` makes the leaders curse at random: the margin against them over the margin against the
+smart ones is how much the leaders' choices are worth. ``--curse-scale`` multiplies every curse radius
+(0 = only the marked tile). It runs the compiled simulation.
 """
 
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import statistics
 import sys
@@ -46,22 +49,23 @@ def contender(who: str, seed: int) -> Player:
     return Ghost(who.removeprefix("replay:")) if who.startswith("replay:") else PLAYERS[who](seed)
 
 
-def wins(who: str, key: str, seed: int, sigils: int, leaders: str, hp: float) -> bool:
+def wins(who: str, key: str, seed: int, sigils: int, leaders: str, life_mult: float, curse_scale: float = 1.0) -> bool:
     policy = planner.smart if leaders == "smart" else planner.RandomLeaders(seed)
-    world, _ = defend(LOCATIONS[key], contender(who, seed), seed=seed, sigils=sigils, planner=policy, hp=hp)
+    loc = dataclasses.replace(LOCATIONS[key], life=LOCATIONS[key].life * life_mult)
+    world, _ = defend(loc, contender(who, seed), seed=seed, sigils=sigils, planner=policy, hp=1.0, curse_scale=curse_scale)
     return world.outcome == "victory"
 
 
-def margin(who: str, key: str, seed: int, sigils: int, leaders: str) -> float:
+def margin(who: str, key: str, seed: int, sigils: int, leaders: str, curse_scale: float = 1.0) -> float:
     """The largest life factor won, bisected in ratio to STEP; 0 when even LOW is lost."""
-    if not wins(who, key, seed, sigils, leaders, LOW):
+    if not wins(who, key, seed, sigils, leaders, LOW, curse_scale):
         return 0.0
     low, high = LOW, HIGH
-    if wins(who, key, seed, sigils, leaders, high):
+    if wins(who, key, seed, sigils, leaders, high, curse_scale):
         return high
     while high / low > STEP:
         mid = (low * high) ** 0.5
-        if wins(who, key, seed, sigils, leaders, mid):
+        if wins(who, key, seed, sigils, leaders, mid, curse_scale):
             low = mid
         else:
             high = mid
@@ -82,6 +86,7 @@ def main() -> None:
     parser.add_argument("--seeds", default="1000-1007")
     parser.add_argument("--sigils", type=int, default=None)
     parser.add_argument("--leaders", default="smart", choices=("smart", "random"))
+    parser.add_argument("--curse-scale", type=float, default=1.0)
     parser.add_argument("--jobs", type=int, default=6)
     args = parser.parse_args()
     if args.replay is not None:
@@ -99,7 +104,7 @@ def main() -> None:
             return args.sigils
         return 3 * ORDER.index(key)
 
-    jobs = [(args.player, key, seed, budget(key), args.leaders) for key in keys for seed in seeds]
+    jobs = [(args.player, key, seed, budget(key), args.leaders, args.curse_scale) for key in keys for seed in seeds]
     with ProcessPoolExecutor(args.jobs) as pool:
         found = list(pool.map(margin, *zip(*jobs)))
     for i, key in enumerate(keys):
@@ -115,7 +120,7 @@ def ghost_main(args: argparse.Namespace) -> None:
     sigils = cost(frozenset(log["skills"]))
     if args.sigils is not None:
         sigils = args.sigils
-    found = margin(f"replay:{args.replay}", key, seed, sigils, args.leaders)
+    found = margin(f"replay:{args.replay}", key, seed, sigils, args.leaders, args.curse_scale)
     print(f"{'ghost':10s} {args.leaders:6s} {key:11s} life {LOCATIONS[key].life:4.2f}  M {found:5.2f}", flush=True)
 
 

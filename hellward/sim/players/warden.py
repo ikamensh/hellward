@@ -27,7 +27,8 @@ from pathlib import Path
 from hellward.sim.campaign import Location
 from hellward.sim.content import CURSES, DOOR, MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Curse, Element
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
-from hellward.sim.players.hands import AIM_GAP, Hands, ready
+from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
+from hellward.sim.players.spacing import max_curse_radius, score_with_spacing
 from hellward.sim.skills import SKILLS, can_learn, perks, tower_levels
 
 PLANS = Path(__file__).parent / "plans" / "warden.json"
@@ -155,6 +156,10 @@ def draft_skills(location: Location, sigils: int) -> frozenset[str]:
         wanted += ["adept_poison", "contagion", "master_poison", "lower_resist"]
     if "frost" in arsenal.towers:
         wanted += ["glacial_spike", "master_cold", "shatter"]
+    if "altar" in arsenal.towers:
+        wanted += ["adept_bone", "corpse_explosion", "master_bone", "life_tap"]
+    if "grove" in arsenal.towers:
+        wanted += ["adept_nature", "hurricane", "master_nature", "twister"]
     if len(arsenal.spells) > 2:
         wanted += ["spell_mastery"]
     learned: frozenset[str] = frozenset()
@@ -185,7 +190,18 @@ def tile_value(location: Location, kind: str, tile: tuple[int, int], reach: floa
         return 10.0 * queues + (0.6 if not location.level.doors else 0.2) * length
     if kind == "plague":
         return length + 3.0 * queues
+    if kind == "altar":
+        return length * 2.0 + 4.0 * queues
+    if kind == "grove":
+        return length * 1.5 + 3.0 * queues
     return length + 6.0 * queues
+
+
+def tile_value_spaced(location: Location, kind: str, tile: tuple[int, int], reach: float,
+                       existing: list[tuple[int, int]]) -> float:
+    """Tile value with curse-radius spacing penalty."""
+    base = tile_value(location, kind, tile, reach)
+    return score_with_spacing(base, existing, tile, location)
 
 
 def draft_build(location: Location, learned: frozenset[str], towers: int = 14) -> tuple[Step, ...]:
@@ -201,16 +217,20 @@ def draft_build(location: Location, learned: frozenset[str], towers: int = 14) -
         share["plague"] *= 0.6
     if "storm" in share:
         share["storm"] *= 0.7 + flyers(location)
+    if "altar" in share:
+        share["altar"] *= 0.5
+    if "grove" in share:
+        share["grove"] *= 0.4
     total = sum(share.values())
     tiles = [(x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y)]
     chosen: list[tuple[str, tuple[int, int]]] = []
     counts = {k: 0 for k in kinds}
     for _ in range(towers):
-        # the kind furthest behind its share of the towers, on its best free tile
         kind = min(kinds, key=lambda k: (counts[k] + 1) / (share[k] / total + 1e-9))
         reach = tower_levels(kind, p)[1].range
         free = [t for t in tiles if t not in {tile for _, tile in chosen}]
-        tile = max(free, key=lambda t: (tile_value(location, kind, t, reach), -t[1], -t[0]))
+        existing = [tile for _, tile in chosen]
+        tile = max(free, key=lambda t: (tile_value_spaced(location, kind, t, reach, existing), -t[1], -t[0]))
         chosen.append((kind, tile))
         counts[kind] += 1
     order = sorted(range(len(level.doors)), key=lambda i: level.door_s[i])
@@ -236,6 +256,8 @@ def draft_build(location: Location, learned: frozenset[str], towers: int = 14) -
 @dataclass
 class Warden:
     name: str = "warden"
+    reaction: tuple[float, float] = REACT
+    aim_gap: float = AIM_GAP
     plans: dict[str, Plan] = field(default_factory=load_plans)
     plan: Plan | None = None                  # a plan to play instead of the stored one (the search's candidates)
     chosen: Plan | None = None                # the plan of this defence, fixed when the skills are learned
@@ -283,6 +305,7 @@ class Warden:
 
     def _gates(self, world: World) -> None:
         """Set a broken gate again once no walker stands in its arch, if the build has set it before."""
+        assert self.chosen is not None
         steps = self.chosen.steps
         for door in world.doors:
             if door.built or door.rubble or world.gold < DOOR.cost or Step("gate", door=door.index) not in steps[:self.done]:
@@ -291,6 +314,7 @@ class Warden:
                 world.build_door(door.index)
 
     def _spend(self, world: World) -> None:
+        assert self.chosen is not None
         steps = self.chosen.steps
         while self.done < len(steps):
             step = steps[self.done]
@@ -325,7 +349,8 @@ class Warden:
                       if world.upgrade_cost(t) is not None and world.rank_needs(t) is None]
             if ranked:
                 tower = max(ranked, key=lambda t: (self.work.get(t.id, 0.0) / t.spent, -t.id))
-                if world.gold < world.upgrade_cost(tower):
+                cost = world.upgrade_cost(tower)
+                if cost is None or world.gold < cost:
                     return
                 world.upgrade(tower.id)
                 continue
@@ -342,6 +367,7 @@ class Warden:
 
     def _call(self, world: World) -> None:
         """Call the next wave early for its gold, a second into the break, once the mana orb is full enough."""
+        assert self.chosen is not None
         if not world.can_call_wave or world.break_left is None or world.wave < 0:
             return
         if world.break_left > WAVE_BREAK - 1.0:
@@ -414,7 +440,7 @@ class Warden:
             if leader is None:
                 continue
             chanting.append(leader)
-            if sign.kind == "chant":
+            if sign.kind == "chant" and sign.curse is not None:
                 caught = [t for t in world.caught(sign.spot, sign.radius) if t.ward <= 0]
                 if not caught:
                     continue
@@ -427,8 +453,8 @@ class Warden:
             return False
         if ready(world, "orb"):
             x, y = seen   # where the leader stood when its sign appeared: a person aims where they saw it
-            caught = _near(world, x, y, SPELLS["orb"].radius)
-            if sum(1 for m in caught if m in chanting) >= 2 or sum(m.hp for m in caught) >= ORB_CROWD * world.power():
+            nearby: list[Monster] = _near(world, x, y, SPELLS["orb"].radius)
+            if sum(1 for m in nearby if m in chanting) >= 2 or sum(m.hp for m in nearby) >= ORB_CROWD * world.power():
                 hands.orb(x, y)
                 self.last_aim = world.time
                 return True
@@ -543,7 +569,7 @@ def _clear(world: World, s: float) -> bool:
 
 
 def _near(world: World, x: float, y: float, radius: float) -> list[Monster]:
-    found = []
+    found: list[Monster] = []
     for m in world.monsters:
         mx, my = world.level.point(m.s)
         if (mx - x) ** 2 + (my - y) ** 2 <= radius * radius:

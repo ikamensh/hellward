@@ -22,7 +22,7 @@ from pathlib import Path
 from hellward.sim.campaign import Location
 from hellward.sim.content import CURSES, DOOR, SPELLS, Curse, Element
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
-from hellward.sim.players.hands import AIM_GAP, Hands, ready
+from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.skills import can_learn
 
 PLANS = Path(__file__).parent / "plans"
@@ -94,6 +94,8 @@ def load(location: str) -> Plan:
 @dataclass
 class Planned:
     name: str = "planned"
+    reaction: tuple[float, float] = REACT
+    aim_gap: float = AIM_GAP
     plan: Plan | None = None   # given, or loaded for the location when the defence begins
     next: int = 0              # the plan's next step
     gates: set[int] = field(default_factory=set)   # arches the plan has warded, to ward again when broken
@@ -123,6 +125,7 @@ class Planned:
     # -- The build -----------------------------------------------------------------------------------
 
     def _build(self, world: World) -> None:
+        assert self.plan is not None
         plan = self.plan
         if plan.rebuild == "now" or (plan.rebuild == "break" and world.break_left is not None):
             for index in sorted(self.gates):
@@ -139,9 +142,10 @@ class Planned:
                     world.build(step[1], step[2])
             elif step[0] == "rank":
                 tower = world.tower_at(step[1])
-                price = world.upgrade_cost(tower) if tower is not None else None
+                assert tower is not None
+                price = world.upgrade_cost(tower)
                 if price is not None:
-                    if tower is not None and world.rank_needs(tower) is not None:
+                    if world.rank_needs(tower) is not None:
                         self.next += 1
                         continue
                     if world.gold < price:
@@ -165,11 +169,13 @@ class Planned:
             if not ranked:
                 return
             tower = min(ranked, key=lambda t: (t.level, -t.spent, t.id))
-            if world.gold < world.upgrade_cost(tower):
+            cost = world.upgrade_cost(tower)
+            if cost is None or world.gold < cost:
                 return
             world.upgrade(tower.id)
 
     def _call(self, world: World) -> None:
+        assert self.plan is not None
         if world.break_left is None or not world.can_call_wave:
             return
         want = self.plan.calls[world.wave + 1]
@@ -186,12 +192,13 @@ class Planned:
 
     def _answer(self, hands: Hands) -> None:
         """A chant seen: smite its leader when the tower it aims at is worth it, or freeze it with its crowd."""
+        assert self.plan is not None
         world = hands.world
         if not self._aim_ready(world) or not self._can(world, "smite"):
             return
         best, best_loss = None, 0.0
         for sign in hands.threats():
-            if sign.kind != "chant" or world.monster(sign.leader) is None:
+            if sign.kind != "chant" or world.monster(sign.leader) is None or sign.curse is None:
                 continue
             loss = sum(curse_loss(world, t, sign.curse) for t in world.caught(sign.spot, sign.radius))
             if loss > best_loss:
@@ -199,6 +206,7 @@ class Planned:
         if best is None or best_loss < self.plan.smite_worth:
             return
         leader = world.monster(best.leader)
+        assert leader is not None
         if self._can(world, "orb"):
             x, y = world.level.point(leader.s)
             crowd = _orb_value(world, x, y, _positions(world, 0.0))
@@ -210,6 +218,7 @@ class Planned:
         self.last_aim = world.time
 
     def _cleanse(self, hands: Hands) -> None:
+        assert self.plan is not None
         world = hands.world
         if not self._can(world, "cleanse"):
             return
@@ -225,6 +234,7 @@ class Planned:
 
     def _strike(self, hands: Hands) -> None:
         """Meteor, Frozen Orb and Smite as weapons: a gate about to break, a leak, a crowd, or a full orb."""
+        assert self.plan is not None
         world = hands.world
         if not world.monsters or not self._aim_ready(world):
             return
