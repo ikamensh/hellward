@@ -12,8 +12,8 @@ machine's slot queue, as above.
 * **Sigils.** Each defence gets the sigils the best player has earned by then: the sum of B*'s median
   sigils on the earlier locations. So the locations are played in order, and unless ``--sigils N`` gives
   every defence the same budget, what is played must start the campaign (Tristram on).
-* **B\\*** at a location is the player with the best median lives; ties go to more wins, then to
-  more mean lives. The table marks it.
+* **B\\*** at a location is the strong player (:data:`STRONG`, when any is played) with the best median lives;
+  ties go to more wins, then to more mean lives. The table marks it.
 * ``--margin``: M, the largest factor on every monster's life at which B* still wins, bisected to 2% between
   0.4 and 4 on each of the first 8 seeds; the table gives the median. The factor leaves the spells as they
   are: M is what raising the location's life would give.
@@ -73,6 +73,7 @@ COLUMNS = ("location", "player", "sigils", "wins/N", "median lives", "fewest", "
            "curse-s/leader", "chants broken", "spells", "mana capped s", "decision p95 ms",
            "towers/curse")
 
+STRONG = ("warden", "adaptive")   # who B* is drawn from: the planned player's searched builds are the ceiling
 BSTAR_TARGETS = {1: (1.5, 1.4, 1.3, 1.25, 1.2, 1.15), 2: (1.35, 1.3, 1.25, 1.2, 1.15, 1.1)}   # B*'s M per location
 TOLERANCE = 0.07
 
@@ -188,7 +189,7 @@ def play_campaign(pool: Executor, players: list[str], stages: list[str], seeds: 
         started = time.perf_counter()
         jobs = [(p, location, seed, budget) for p in players for seed in seeds]
         runs = list(pool.map(play, *zip(*jobs)))
-        stage = Stage(location, budget, runs, best(runs, players))
+        stage = Stage(location, budget, runs, best(runs, [p for p in players if p in STRONG] or players))
         earned += statistics.median_low(r["earned"] for r in runs if r["player"] == stage.best)
         note(f"{location}: {len(runs)} defences with {budget} sigils, B* {stage.best} "
              f"({time.perf_counter() - started:.0f} s)")
@@ -380,7 +381,7 @@ def within(value: float | None, low: float, high: float = math.inf) -> bool | No
 
 def targets(table: list[dict]) -> list[list[str]]:
     ACT1, ACT2 = campaign.ACTS[1], campaign.ACTS[2]
-    bstar_m = Verdict("B*'s M per location: Act I ≈1.5,1.4,1.3,1.25,1.2,1.15; Act II ≈1.35,1.3,1.25,1.2,1.15,1.1 "
+    bstar_m = Verdict("B*'s M (the better of warden and adaptive) per location: Act I ≈1.5,1.4,1.3,1.25,1.2,1.15; Act II ≈1.35,1.3,1.25,1.2,1.15,1.1 "
                       "(±0.07; Act I's first two may be gentler, for the apprentice)")
     apprentice_early = Verdict("Apprentice wins Act I's first two locations")
     corner_falloff = Verdict("Corner's M falls ≥ 20% from curse_scale 0 to 1 and sits below Veteran's")

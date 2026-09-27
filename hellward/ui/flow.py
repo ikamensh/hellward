@@ -134,8 +134,12 @@ class Flow:
         self.game.clear_and_push(self.demo_scene())
 
     def demo_scene(self) -> Scene:
-        """The title's "Watch the leaders at work": the strongest scripted player defends the Cathedral."""
-        return BattleScene(self.art, CATHEDRAL, seed=self.seed, planner=self.planner, sound=self.sound, autopilot=self.demo_player(),
+        """The title's "Watch the leaders at work": the strongest scripted player defends the Cathedral, with the skills
+        the sigils won on the way there buy."""
+        player = self.demo_player()
+        learned = player.skills(CATHEDRAL, 3 * ORDER.index(CATHEDRAL.key))
+        return BattleScene(self.art, CATHEDRAL, perks=perks(learned), learned=learned, seed=self.seed, planner=self.planner,
+                           sound=self.sound, autopilot=player,
                            on_end=lambda world: self.title(), settings=self.settings, restart=self.demo, to_title=self.title,
                            to_map=self.world_map)
 

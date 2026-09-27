@@ -13,7 +13,7 @@ from hellward.sim.skills import COLUMNS, SKILLS, TREE_COST, can_learn, check, pe
 
 
 def world_of(*groups, learned=(), **kwargs) -> World:
-    location = replace(campaign.CATACOMBS, waves=(Wave(tuple(groups), 10),), wave_names=("test",))
+    location = replace(campaign.CATACOMBS, waves=(Wave(tuple(groups), 10),), wave_names=("test",), life=1.0)   # rules, not tuning
     world = World(location, perks=perks(learned), **kwargs)
     world.gold = 5000
     return world

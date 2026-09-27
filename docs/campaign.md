@@ -307,9 +307,11 @@ towers fell. That is the play the area curses and ranks ask for, and the play Il
 every coin spent, the frost where it counts). Tuned to the veteran, a player like him would find the acts easy
 again.
 
-So each location is tuned to the **strongest bot**, B\*: the best median margin of the warden, the adaptive and
-the planned player. A strong player keeps a little to spare; a middling one (the veteran) falls from about the
-third location of each act and has to find the better play.
+So each location is tuned to the **strongest bot**, B\*: the better median margin of the warden and the adaptive
+player, who play from what they see. The planned player replays a build searched over a hundred training seeds,
+many replays' worth of knowledge; it is the ceiling a mastered build reaches, not the target. A strong player keeps
+a little to spare; a middling one (the veteran) falls from about the third location of each act and has to find
+the better play.
 
 - **What a player may do.** A player sees what a human sees: the intro's roster, the map, the gold, the mana, the
   leaders' chants and marks. It chooses its skills, places and upgrades towers, builds gates and casts every spell.
@@ -321,8 +323,9 @@ third location of each act and has to find the better play.
     0.8–1.2 s and casts one aimed spell a second at most. It stands for a middling player.
   - **corner:** Ilya's stated opening: frost on every path corner, mixed towers packed round it, every coin spent. It
     checks that the area curses and chill-by-resistance took away the answer that won the old Normal.
-  - **warden, planned, adaptive:** the strong players, with builds drafted or searched offline. The best of them,
-    location by location, is the target.
+  - **warden, adaptive:** the strong players, drafting their builds from the intro or pricing them as the fight
+    goes. The better of them, location by location, is the target.
+  - **planned:** a strong player with a build searched offline per location: the ceiling.
   - **apprentice:** a thoughtful first descent.
   - **ordinary:** the demo's defender.
 
@@ -375,49 +378,58 @@ third location of each act and has to find the better play.
 
 ## The tuning record (2026-09-27)
 
-Measured on the compiled simulation, `tools/margin.py PLAYER`, evaluation seeds 1000–1007 for the veteran and
-1000–1003 for the others, against the smart leaders, three sigils for every earlier location. The runs are in
-`~/saga/evidence/hellward/campaign-tuning/`.
+Measured on the compiled simulation with `tools/margin.py PLAYER --seeds 1000-1003`, against the smart leaders,
+with resolute leaders, three sigils for every earlier location. Each cell is the median M over four seeds; bold
+is B\*. The runs are in `~/saga/evidence/hellward/campaign-tuning/`.
 
 **Act I**
 
 | | Tristram | Graveyard | Cathedral | Catacombs | Caves | Hell's Gate |
 |---|---|---|---|---|---|---|
-| life factor | 1.49 | 1.46 | 3.27 | 2.0 | 2.54 | 1.41 |
-| **veteran's M** (target) | **1.50** (1.5) | **2.19** (gentle) | **1.30** (1.3) | **1.24** (1.2) | **1.14** (1.15) | **1.09** (1.1) |
-| apprentice | 1.16 | 1.10 | 0.25 | | | |
-| B\* (warden / adaptive) | 1.50 | 2.31 | 2.07 | 1.99 | 1.57 | 1.23 |
-| corner, area curses | 0.73 | 1.16 | 0.42 | 0.63 | 0.47 | 0.59 |
-| corner, one tile only | 0.75 | 1.20 | 0.47 | 0.67 | 0.47 | 0.61 |
-| veteran against random curses | | | 1.46 | 1.34 | 1.24 | 1.15 |
+| life factor | 1.49 | 1.5 | 5.2 | 3.35 | 3.3 | 1.44 |
+| B\*'s target | 1.5 | gentle | 1.3 | 1.25 | 1.2 | 1.15 |
+| adaptive | **1.50** | 1.94 | **1.35** | **1.19** | **1.20** | **1.18** |
+| warden | 1.45 | **2.29** | 0.80 | 0.79 | 0.91 | 1.06 |
+| veteran | 1.50 | 2.24 | 0.80 | 0.74 | 0.89 | 1.10 |
+| apprentice (8 seeds) | 1.16 | 1.11 | | | | |
+| planned | 1.50 | 3.13 | 1.06 | 0.84 | 1.19 | 0.91 |
+| corner | 1.26 | 1.91 | 0.32 | 0.55 | 0.57 | 0.96 |
 
 **Act II**
 
 | | Docks | Spider Forest | Jungle | Drowned City | Travincal | Temple |
 |---|---|---|---|---|---|---|
-| life factor | 4.66 | 3.24 | 3.96 | 2.75 | 2.89 | 0.83 |
-| **veteran's M** (target) | **1.34** (1.4) | **1.37** (1.3) | **1.20** (1.2) | **1.14** (1.15) | **1.10** (1.1) | **1.06** (1.05) |
-| B\* (warden / adaptive) | 1.64 | 2.07 | 1.34 | 1.20 | 1.43 | 2.10 |
-| veteran against random curses | | | 1.29 | 1.15 | 1.08 | 1.49 |
-
-(Act II's B\* row was measured at the first-pass factors of the Docks, 4.21, and the Spider Forest, 3.42.)
+| life factor | 4.66 | 5.3 | 4.2 | 2.6 | 3.3 | 1.53 |
+| B\*'s target | 1.35 | 1.3 | 1.25 | 1.2 | 1.15 | 1.1 |
+| adaptive | 1.30 | **1.32** | **1.27** | 0.97 | **1.21** | **1.14** |
+| warden | **1.35** | 0.94 | 1.03 | **1.20** | 0.95 | 0.57 |
+| veteran | 1.32 | 0.84 | 1.12 | 1.19 | 0.94 | 0.56 |
+| planned | 1.45 | 1.11 | 2.13 | 1.79 | 1.39 | 0.68 |
+| corner | 0.70 | 0.77 | 0.64 | 1.07 | 0.71 | 0.32 |
 
 **What it says**
 
-- **The veteran meets every target.** Each act's end sits at about 1.05–1.1: it wins there, with little to spare.
-- **The apprentice** wins Tristram and the Graveyard and falls from the Cathedral on, as designed.
-- **The strongest bots** keep at least 1.2 everywhere. The adaptive player's lead at the Cathedral (2.07 against
-  the warden's 1.29) is under the 1.5× line the design sets for a suspected exploit, but only just.
-- **Ilya's opening, as the corner player plays it, loses from the Cathedral on** (0.4–0.7). The area curses cost
-  it only 5–10% against single-tile curses. It is beaten by the rest: the retune, frost's slow following cold
-  resistance, and ranks that must be learned. A curse lands on about one or two of the corner player's towers; the
-  target of 20% was not met.
-- **The leaders' choices are worth 5–15% from each act's third location**, up to 41% at the Temple, where the
-  Bone Priest curses. The Drowned City (1%) and Travincal (−2%) miss the 10% target: there, curses thrown at random
-  hurt the veteran as much as chosen ones. The Inquisitor's marks and the council's crowd leave the planner little
-  to choose.
-- **Still open:** none of it has met a person; the ghost player can measure Ilya's own margin once he has played
-  (`tools/margin.py --replay`). The planned player's Act II builds have not been searched yet.
+- **B\* meets every target** within 0.07 and wins every seed at every location: its worst seed is 1.07 (the
+  Temple).
+- **A middling player falls** from the Cathedral on: the veteran holds Hell's Gate, the Docks, the Jungle and the
+  Drowned City, and loses the rest of the middle and the Temple. It loses late: at seed 1000 its lives go in the
+  last two or three waves (the Temple's all in the Bone Priest's), except at the Caves, where the goatmen get
+  through from the first wave.
+- **The two strong bots part most** at the Temple (1.14 against 0.57) and the Cathedral (1.35 against 0.80). The
+  adaptive player's few rank III towers, a gate and Smite on whatever matters are the play there. The warden's
+  fourteen towers are not.
+- **Resolute leaders barely moved the adaptive player** (the Temple 2.10 → 2.03 before the retune). Its edge is
+  the build, not only the broken chants.
+- **Ilya's opening, as the corner player plays it, loses everywhere after the Graveyard** but the Drowned City.
+- **The first two locations stay the apprentice's:** it wins them on every seed.
+- **Still open:**
+  - The planned player's builds were searched at the veteran-era factors, before resolute leaders. They fall below
+    B\* at most locations and must be searched again before they mean a ceiling.
+  - The leaders' worth (random against smart) was measured on the veteran before the retune. It met the 10% target
+    only at the Cathedral (1.12) and the Temple (1.41); it missed at the Catacombs (1.08), the Caves (1.09), Hell's
+    Gate (1.055), the Jungle (1.075), the Drowned City (1.01) and Travincal (0.98).
+  - None of it has met a person. The ghost player can measure Ilya's own margin once he has played
+    (`tools/margin.py --replay`).
 
 ## Screens
 

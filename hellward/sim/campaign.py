@@ -138,9 +138,9 @@ GRAVEYARD = Location(
           "wards them.",
     taunt="I buried every one of them, and they still come when I call. Build your gates. My acolytes will cage "
           "the fire behind them.",
-    lesson="A gate holds the dead in a queue, and Smite on the sign stops a curse before it comes.",
+    lesson="A gate holds the dead in a queue. Smite on the sign stops a curse, but that leader's next one lands.",
     requires=("tristram",),
-    life=1.46,
+    life=1.5,
 )
 
 CATHEDRAL = Location(
@@ -173,7 +173,7 @@ CATHEDRAL = Location(
           "goatmen do not fear your thunder.",
     lesson="Goatmen shrug off lightning and skeletons venom: mix your towers by what comes.",
     requires=("graveyard",),
-    life=3.27,
+    life=5.2,
 )
 
 CATACOMBS = Location(
@@ -206,7 +206,7 @@ CATACOMBS = Location(
           "still here?",
     lesson="Overlords break gates in seconds; frost weakens their blows and venom seeks the biggest.",
     requires=("cathedral",),
-    life=2.0,
+    life=3.35,
 )
 
 CAVES = Location(
@@ -238,7 +238,7 @@ CAVES = Location(
     taunt="Walls mean nothing to wings. Look up. And tell me, keeper: why do my bones never show your face?",
     lesson="Wings ignore gates, and the lava leaves few places to build.",
     requires=("catacombs",),
-    life=2.54,
+    life=3.3,
 )
 
 HELLS_GATE = Location(
@@ -273,7 +273,7 @@ HELLS_GATE = Location(
     taunt="In every night I have seen, the lamp goes out. I have begun to wonder what I have not seen.",
     lesson="Every curse at once, and Azazel will not burn.",
     requires=("caves",),
-    life=1.41,
+    life=1.44,
 )
 
 
@@ -345,7 +345,7 @@ SPIDER_FOREST = Location(
     taunt="The old trees have taken your side. Stand close to them, then. One curse will find you all.",
     lesson="Poison is useless here. A grove makes a bunch worth its risk.",
     requires=("docks",),
-    life=3.24,
+    life=5.3,
 )
 
 JUNGLE = Location(
@@ -376,7 +376,7 @@ JUNGLE = Location(
     taunt="My inquisitors do not chant. You will know their curse when the ground burns under your towers, and not before.",
     lesson="The inquisitors curse without a chant: ward the marked towers, and kill them first.",
     requires=("spider_forest",),
-    life=3.96,
+    life=4.2,
 )
 
 DROWNED_CITY = Location(
@@ -410,7 +410,7 @@ DROWNED_CITY = Location(
     taunt="The Hulks were drowned men once. They do not tire, and your gates are cloth to them.",
     lesson="Frost barely slows the drowned; fire and lightning must. Gates fall fast.",
     requires=("jungle",),
-    life=2.75,
+    life=2.6,
 )
 
 TRAVINCAL = Location(
@@ -446,7 +446,7 @@ TRAVINCAL = Location(
     taunt="Turn back, and I will leave Tristram's lamp alone. It is a small lamp. No one would miss it.",
     lesson="Curses from every side: spread wide, ward what matters, and kill the elders first.",
     requires=("drowned_city",),
-    life=2.89,
+    life=3.3,
 )
 
 TEMPLE = Location(
@@ -479,7 +479,7 @@ TEMPLE = Location(
     taunt="I cannot see you in the bones. So I have come to see you myself.",
     lesson="Each curse of his that lands burns your mana for every tower it catches: spread out, and smite his chant.",
     requires=("travincal",),
-    life=0.83,
+    life=1.53,
 )
 
 LOCATIONS: dict[str, Location] = {loc.key: loc for loc in (
