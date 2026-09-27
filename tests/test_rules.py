@@ -15,8 +15,8 @@ CATHEDRAL = campaign.CATHEDRAL.level
 
 
 def with_waves(*waves: Wave) -> campaign.Location:
-    """The cathedral with these waves instead of its own."""
-    return replace(campaign.CATHEDRAL, waves=waves, wave_names=tuple(f"wave {i}" for i in range(len(waves))))
+    """The cathedral with these waves instead of its own, at its monsters' own life: the rules, not the tuning."""
+    return replace(campaign.CATHEDRAL, waves=waves, wave_names=tuple(f"wave {i}" for i in range(len(waves))), life=1.0)
 
 
 def wave_of(kind: str, count: int = 1, interval: float = 1.0) -> campaign.Location:

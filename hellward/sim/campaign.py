@@ -313,7 +313,7 @@ DOCKS = Location(
     taunt="You crossed a sea for a lamp that is not yours. My shaman will raise every Flayer you leave whole.",
     lesson="Amplify where your towers' reaches cross; kill the shaman, or burst the dead so they stay down.",
     requires=("hells_gate",),
-    life=4.21,
+    life=4.66,
 )
 
 SPIDER_FOREST = Location(
@@ -345,7 +345,7 @@ SPIDER_FOREST = Location(
     taunt="The old trees have taken your side. Stand close to them, then. One curse will find you all.",
     lesson="Poison is useless here. A grove makes a bunch worth its risk.",
     requires=("docks",),
-    life=3.42,
+    life=3.24,
 )
 
 JUNGLE = Location(

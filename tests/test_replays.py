@@ -137,12 +137,11 @@ class Recorder:
 def test_a_ghost_replays_a_logged_tristram_defence_the_same_way():
     recorder = Recorder()
     original, _ = defend(LOCATIONS["tristram"], recorder, seed=1, sigils=0, planner=planner.smart)
-    assert original.outcome == "victory"
     log = {"version": 1, "location": "tristram", "seed": 1, "skills": [],
            "outcome": original.outcome, "lives": original.lives, "time": original.time,
            "commands": recorder.commands}
     replayed, _ = defend(LOCATIONS["tristram"], Ghost(log), seed=1, sigils=0, planner=planner.smart, hp=1.0)
-    assert replayed.outcome == original.outcome == "victory"
+    assert replayed.outcome == original.outcome
     assert replayed.lives == original.lives and replayed.time == original.time
 
 

@@ -1,5 +1,6 @@
 """The battle scene on the mock backend: a scripted defence plays through it, and a player can build by clicking."""
 
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -8,6 +9,7 @@ from saga2d.testing import assert_text_fits
 
 from hellward.__main__ import build
 from hellward.sim import planner
+from hellward.sim.campaign import CATHEDRAL
 from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.content import DOOR, TOWERS
 from hellward.sim.model import SIM_DT
@@ -35,7 +37,7 @@ def run(g: Game, seconds: float, dt: float = 1 / 30) -> None:
 
 def test_a_scripted_defence_plays_through_the_scene(game):
     g, art = game
-    scene = BattleScene(art, seed=1, planner=planner.smart, autopilot=Ordinary())
+    scene = BattleScene(art, replace(CATHEDRAL, life=1.0), seed=1, planner=planner.smart, autopilot=Ordinary())   # the scene, not the tuning
     g.push(scene)
     scene.speed = 4.0
     cursed = False
