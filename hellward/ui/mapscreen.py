@@ -37,7 +37,7 @@ class MapScene(Scene):
         self.clock = 0.0
         self.walk: list[tuple[float, float]] = []   # the points still ahead of the lantern
         self.going: str | None = None
-        here = worldmap.ANCHORS[self.progress.at]
+        here = worldmap.ANCHORS[1][self.progress.at]
         self.lantern = here
         self.first = first   # a first Descend from the title walks on to Tristram by itself
 
@@ -69,7 +69,7 @@ class MapScene(Scene):
     def _route(self, start: str, end: str) -> list[tuple[float, float]]:
         a, b = ORDER.index(start), ORDER.index(end)
         step = 1 if b >= a else -1
-        points = [worldmap.ANCHORS[start]]
+        points = [worldmap.ANCHORS[1][start]]
         for i in range(a, b, step):
             points += list(worldmap.trail(ORDER[i], ORDER[i + step])[1:])
         return points
@@ -117,7 +117,7 @@ class MapScene(Scene):
 
     def _arrive(self) -> None:
         key, self.going, self.walk = self.going, None, []
-        self.lantern = worldmap.ANCHORS[key]
+        self.lantern = worldmap.ANCHORS[1][key]
         if self.progress.opened(LOCATIONS[key]):
             self.flow.intro(LOCATIONS[key])
 
@@ -163,7 +163,7 @@ class MapScene(Scene):
     def _place(self, key: str, mouse) -> None:
         progress = self.progress
         location = LOCATIONS[key]
-        x, y = worldmap.ANCHORS[key]
+        x, y = worldmap.ANCHORS[1][key]
         opened = progress.opened(location)
         won = progress.best(key)
         over = mouse is not None and math.hypot(mouse[0] - x, mouse[1] - y) < 34 and opened
