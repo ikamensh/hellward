@@ -719,6 +719,12 @@ class Effects:
                                  space="world", layer=RenderLayer.EFFECTS)
         for figure in self.view.figures.values():   # frozen solid: a block of ice over it
             m = figure.monster
+            if m.resolute:   # broken once: an ember halo throbbing at its feet, until its unbreakable curse
+                w = m.kind.size * T * (1.9 + 0.15 * math.sin(clock * 6 + m.id))
+                x, y = figure.x, figure.y
+                for image, opacity in (("fx/soft/ember", 0.5), ("fx/ring/ember", 1.0)):
+                    scene.draw_image(image, x - w / 2, y - w * 0.3, w, w * 0.6, opacity=opacity,
+                                     space="world", layer=RenderLayer.EFFECTS)
             if m.frozen > 0:
                 w = m.kind.size * T * 1.2
                 x, y = self.view.chest(m)

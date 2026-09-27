@@ -53,7 +53,7 @@ class Refused(Exception):
 class Monster:
     __slots__ = ("id", "kind", "hp", "max_hp", "s", "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
                  "cooldown", "asking", "ask_left", "chant_curse", "chant_spot", "chant_left", "door",
-                 "amplified", "amplify", "risen", "marking")
+                 "amplified", "amplify", "risen", "marking", "resolute")
 
     def __init__(self, id: int, kind: MonsterKind, wave: int, lane: float, jostle: float, hp: float, cooldown: float) -> None:
         self.id = id
@@ -79,6 +79,7 @@ class Monster:
         self.amplify = 0.0                    # the fraction it takes extra (0.3 = 30% more damage)
         self.risen = False                    # has this monster been raised once already
         self.marking = False                  # is this leader currently marking (instead of chanting)
+        self.resolute = False                 # broken once: its next curse cannot be broken
 
     def copy(self) -> Monster:
         """Everything but a leader's pending question to its planner."""
@@ -87,7 +88,7 @@ class Monster:
         m.poison = [stack[:] for stack in self.poison]
         m.chant_curse, m.chant_spot, m.chant_left, m.door = self.chant_curse, self.chant_spot, self.chant_left, self.door
         m.amplified, m.amplify = self.amplified, self.amplify
-        m.risen, m.marking = self.risen, self.marking
+        m.risen, m.marking, m.resolute = self.risen, self.marking, self.resolute
         return m
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -656,9 +657,10 @@ class World:
                     elif decision.cast is None:
                         m.cooldown = decision.retry
                     else:
-                        if spec.mark > 0:
-                            m.chant_curse, m.chant_spot, m.chant_left = decision.cast.curse, decision.cast.spot, spec.mark
-                            m.marking = True
+                        if spec.mark > 0 or m.resolute:   # a resolute curse is voiced like a mark: nothing breaks it
+                            m.chant_curse, m.chant_spot = decision.cast.curse, decision.cast.spot
+                            m.chant_left = spec.mark if spec.mark > 0 else spec.channel
+                            m.marking, m.resolute = True, False
                             m.cooldown = spec.cooldown
                             self._emit("mark", m.id, decision.cast.curse, decision.cast.spot)
                         else:
@@ -674,9 +676,10 @@ class World:
                 self._emit("ponder", m.id)
 
     def _break(self, m: Monster) -> None:
-        """A leader's pondering or chant broken by a spell: the curse never comes, and its whole cooldown starts again.
-        A mark cannot be broken: Smite and Frozen Orb on a marking leader damage/freeze it but do not break the mark."""
-        if m.marking:
+        """A leader's pondering or chant broken by a spell: the curse never comes, its whole cooldown starts again, and
+        it grows resolute: its next curse, pondering and all, cannot be broken. Nor can a mark: Smite and Frozen Orb on
+        a marking or resolute leader damage and freeze it, and the curse still comes."""
+        if m.marking or m.resolute:
             return
         spot = m.chant_spot
         m.chant_curse, m.chant_spot, m.chant_left = None, (-1, -1), 0.0
@@ -684,6 +687,7 @@ class World:
         spec = m.kind.leader
         if spec is not None:
             m.cooldown = spec.cooldown
+        m.resolute = True
         self.chants_broken += 1
         self._emit("broken", m.id, spot)
 

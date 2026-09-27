@@ -94,6 +94,7 @@ class Hands:
         self.aim_gap = aim_gap
         self.record = Record()
         self._signs: dict[int, Sign] = {}
+        self._resolute: set[int] = set()   # leaders broken once, their dark halo showing: the next curse holds
         self._last_aim = -1e9
 
     def observe(self, events: list[tuple], dt: float = SIM_DT) -> None:
@@ -111,9 +112,11 @@ class Hands:
                 record.chants += 1
             elif kind == "mark":
                 self._sign(e[1], "mark", e[3], e[2])  # a mark is a sign like a chant
+                self._resolute.discard(e[1])          # a resolute leader's curse is voiced as a mark
                 record.chants += 1
             elif kind == "broken":
                 self._signs.pop(e[1], None)
+                self._resolute.add(e[1])
                 record.broken += 1
                 record.broken_chants += e[2] != (-1, -1)   # a broken pondering marked no spot yet
             elif kind == "cursed":
@@ -128,8 +131,10 @@ class Hands:
                 record.fizzled += 1
             elif kind == "death":
                 self._signs.pop(e[1], None)
+                self._resolute.discard(e[1])
             elif kind == "leak":
                 self._signs.pop(e[1], None)
+                self._resolute.discard(e[1])
                 record.leaks[world.wave] += e[3]
             elif kind == "raised":
                 record.raised += 1
@@ -151,8 +156,10 @@ class Hands:
         return sorted(seen, key=lambda s: (s.kind not in ("chant", "mark"), s.since, s.leader))
 
     def _breakable_threats(self) -> list[Sign]:
-        """Threats that can be broken by Smite or Frozen Orb: pondering and chanting, but not marking."""
-        seen = [s for s in self._signs.values() if s.since + self.react <= self.world.time + 1e-9 and s.kind in ("ponder", "chant")]
+        """Threats that can be broken by Smite or Frozen Orb: pondering and chanting, but not marking, and nothing
+        from a resolute leader."""
+        seen = [s for s in self._signs.values() if s.since + self.react <= self.world.time + 1e-9
+                and s.kind in ("ponder", "chant") and s.leader not in self._resolute]
         return sorted(seen, key=lambda s: (s.kind != "chant", s.since, s.leader))
 
     # -- Spells ------------------------------------------------------------------------------------
@@ -168,7 +175,7 @@ class Hands:
 
     def smite_threat(self) -> bool:
         """The panel's Q with a leader pondering or chanting: smite the one closest to cursing. Whether it cast.
-        Does not target marking leaders: a mark cannot be broken."""
+        Does not target marking or resolute leaders: their curse cannot be broken."""
         threats = self._breakable_threats()
         if not threats:
             return False

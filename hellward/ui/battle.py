@@ -228,7 +228,8 @@ class BattleScene(Scene):
         elif kind == "broken":
             sound.play("broken")
             leader = world.monster(e[1])
-            self.hud.note(f"{leader.kind.name if leader else 'The leader'} loses its curse.", style.HOLY)
+            self.hud.note(f"{leader.kind.name if leader else 'The leader'} loses its curse, and its next will not break.",
+                          style.HOLY)
         elif kind == "ward_holds":
             sound.play("ward")
             tower = world.towers.get(e[2])
@@ -358,12 +359,12 @@ class BattleScene(Scene):
 
     def threat(self) -> Monster | None:
         """The leader closest to cursing whose curse Smite can still break: the chant nearest its end, else the
-        pondering nearest its end. A marking leader's curse lands whatever is struck, so Q passes it by."""
+        pondering nearest its end. A marking or resolute leader's curse lands whatever is struck, so Q passes it by."""
         leaders = self.world.leaders()
         chanting = [m for m in leaders if m.chant_curse is not None and not m.marking]
         if chanting:
             return min(chanting, key=lambda m: (m.chant_left, m.id))
-        pondering = [m for m in leaders if m.asking is not None]
+        pondering = [m for m in leaders if m.asking is not None and not m.resolute]
         return min(pondering, key=lambda m: (m.ask_left, m.id)) if pondering else None
 
     def _cast_at(self, key: str, wx: float, wy: float) -> bool:

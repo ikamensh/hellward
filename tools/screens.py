@@ -3,7 +3,7 @@
     uv run python tools/screens.py OUT [--only NAME,NAME] [--seconds 60] [--seed 1]
 
 Writes ``OUT/<name>.png``: ``title``, ``map``, ``intro-<location>`` for every location,
-``skills``, ``battle-<location>`` for every location, ``magic``, ``chant``, ``mark``, ``reckoning``, ``story-tristram-before``,
+``skills``, ``battle-<location>`` for every location, ``magic``, ``chant``, ``mark``, ``resolute``, ``reckoning``, ``story-tristram-before``,
 ``prologue-12``, ``prologue-27`` and ``chronicle-first``.
 The display must be awake (``caffeinate -u``). The frames are for looking at,
 not for keeping in the repository.
@@ -160,6 +160,21 @@ def main() -> None:
             shot(name)
         return telegraph
 
+    def resolute() -> None:
+        """A leader just smitten out of its chant: the dark halo of a leader whose next curse will not break."""
+        scene = BattleScene(art, LOCATIONS["cathedral"], seed=args.seed, planner=planner.smart, autopilot=Ordinary())
+        game.clear_and_push(scene)
+        world = scene.world
+        scene.speed = 4.0
+        while not any(m.chant_curse is not None for m in world.leaders()) and world.time < 300:
+            ticks(1)
+        scene.speed = 1.0
+        leader = next(m for m in world.leaders() if m.chant_curse is not None)
+        world.mana = 100
+        world.smite(leader.id)
+        ticks(20)
+        shot("resolute")
+
     def reckoning() -> None:
         flow.defend(LOCATIONS["tristram"])
         scene = game.scenes[-1]
@@ -196,6 +211,7 @@ def main() -> None:
 
     frames = {"title": title, "map": world_map, "map-2": act_two_map, "skills": skills, "magic": magic,
               "chant": make_telegraph("chant", "cathedral", False), "mark": make_telegraph("mark", "travincal", True),
+              "resolute": resolute,
               "reckoning": reckoning,
               "story-tristram-before": story_page, "prologue-12": make_prologue("prologue-12", 12.0),
               "prologue-27": make_prologue("prologue-27", 27.0), "chronicle-first": chronicle_first}

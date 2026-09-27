@@ -51,6 +51,35 @@ def test_smite_breaks_a_chant_and_the_leader_waits_its_whole_cooldown():
     assert priest.cooldown > 5
 
 
+def test_a_broken_leader_grows_resolute_and_its_next_curse_lands_whatever_strikes_it():
+    """Smite and Frozen Orb stop at most every other curse of a leader: once broken, its next curse is voiced as a
+    mark, pondering and all, and lands through every spell; after it, the leader can be broken again."""
+    world, leader = chanting_leader(hardness=20.0)   # a priest the spells cannot kill
+    level = world.level
+    for x, y in [(x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y) and world.tower_at((x, y)) is None][::3]:
+        world.gold = 1000
+        world.build("pyre", (x, y))   # a tower in reach wherever it walks
+    world.mana = 100
+    world.smite(leader)
+    priest = world.monster(leader)
+    assert priest.resolute
+    world.events.clear()
+    while not events(world, "mark"):
+        if priest.asking is not None and world.recharge.get("smite", 0.0) <= 0:
+            world.mana = 100
+            world.smite(leader)   # a resolute pondering does not break
+        world.step()
+        assert world.outcome is None and world.time < 60
+    assert priest.marking and not priest.resolute
+    world.recharge.clear()
+    world.mana = 100
+    world.orb(*world.level.point(priest.s))
+    assert priest.chanting
+    run(world, 2)
+    assert events(world, "cursed")
+    assert world.chants_broken == 1
+
+
 def test_a_frozen_monster_neither_walks_nor_batters_and_a_frozen_leader_loses_its_chant():
     world = world_of(g("zombie", 3, 0.3))
     world.gold = 1000
