@@ -327,13 +327,15 @@ game stays hard for them too.
 | | 1 | 2 | 3 | 4 | 5 | 6 |
 |---|---|---|---|---|---|---|
 | veteran's M, Act I | ≈1.5 | ≈1.4 | ≈1.3 | ≈1.2 | ≈1.15 | ≈1.1 |
-| veteran's M, Act II | ≈1.25 | ≈1.2 | ≈1.15 | ≈1.1 | ≈1.07 | ≈1.05 |
+| veteran's M, Act II | ≈1.4 | ≈1.3 | ≈1.2 | ≈1.15 | ≈1.1 | ≈1.05 |
 
 - **Winning:** at the tuned factor (M's 1.0) the veteran wins every seed. At each act's end it keeps a median of 10–17
   lives, shaped by the last waves.
 - **The strongest bot's M, B\*:** at least 1.2 everywhere. Where the strong players' margins differ by more than 1.5
   times, the reason is found before that location is tuned: an outlier is a bot exploit until shown otherwise.
-- **The apprentice** wins the first two locations of each act.
+- **The apprentice** wins Act I's first two locations. The Graveyard is held gentler than the veteran's curve for it
+  (the veteran is twice the apprentice there). Act II is not held to the apprentice, who never gets through Act I;
+  its first two locations are the veteran's gentle ones instead.
 - **The corner player:** its M falls at least 20% when the curse radii go from zero to the table's, and it sits below
   the veteran's.
 - **The leaders matter:** from each act's third location on, the veteran's M against random curses is at least

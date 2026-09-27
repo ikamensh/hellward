@@ -74,7 +74,7 @@ COLUMNS = ("location", "player", "sigils", "wins/N", "median lives", "fewest", "
            "towers/curse")
 
 VETERAN_TARGETS_ACT1 = (1.5, 1.4, 1.3, 1.2, 1.15, 1.1)
-VETERAN_TARGETS_ACT2 = (1.25, 1.2, 1.15, 1.1, 1.07, 1.05)
+VETERAN_TARGETS_ACT2 = (1.4, 1.3, 1.2, 1.15, 1.1, 1.05)
 VETERAN_TOLERANCE = 0.07
 
 
@@ -380,9 +380,9 @@ def within(value: float | None, low: float, high: float = math.inf) -> bool | No
 
 def targets(table: list[dict]) -> list[list[str]]:
     ACT1, ACT2 = campaign.ACTS[1], campaign.ACTS[2]
-    veteran_m = Verdict("Veteran's M per location: Act I ≈1.5,1.4,1.3,1.2,1.15,1.1 (±0.07); Act II ≈1.25,1.2,1.15,1.1,1.07,1.05 (±0.07)")
+    veteran_m = Verdict("Veteran's M per location: Act I ≈1.5,1.4,1.3,1.2,1.15,1.1 (±0.07); Act II ≈1.4,1.3,1.2,1.15,1.1,1.05 (±0.07)")
     bstar_min = Verdict("B* (best of warden, planned, adaptive) M ≥ 1.2 everywhere")
-    apprentice_early = Verdict("Apprentice wins each act's first two locations")
+    apprentice_early = Verdict("Apprentice wins Act I's first two locations")
     corner_falloff = Verdict("Corner's M falls ≥ 20% from curse_scale 0 to 1 and sits below Veteran's")
     veteran_leader_gap = Verdict("From each act's third location on, Veteran's M against random ≥ 1.10× against smart")
     veteran_towers_curse = Verdict("Mean towers caught per landed curse for Veteran ≈ 2")
@@ -403,7 +403,7 @@ def targets(table: list[dict]) -> list[list[str]]:
         if row["best"] and row["M"] is not None:
             bstar_min.check(where, row["M"] >= 1.2, f"B* M {show_margin(row['M'])}", "M (--margin)")
         if row["player"] == "apprentice":
-            if where in ACT1[:2] or where in ACT2[:2]:
+            if where in ACT1[:2]:
                 apprentice_early.check(where, row["wins"] == row["n"], f"won {row['wins']}/{row['n']}")
         if row["player"] == "corner" and row.get("M_cs0") is not None and row.get("M_cs1") is not None:
             falloff = 1.0 - row["M_cs1"] / row["M_cs0"]
