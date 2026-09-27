@@ -1,4 +1,4 @@
-"""Hellward's audio: the cue set the scene plays, the rendered files, the bank's rules and the music loops.
+"""Hellward's audio: the cue set the scene plays, the rendered files, the bank's rules and the scores.
 
 The cache is prepared once for the module (effects and all eight tracks), the way the game does
 before its first frame; every test reads what the game would play.
@@ -263,10 +263,28 @@ def test_music_starts_and_crossfades(game: Game):
     bank.music("battle_cathedral")
     assert game.audio.music_name == "battle_cathedral"
     assert len(game.backend.music_players) == 2, "the title fades out under the battle"
+    assert [p["loop"] for p in game.backend.music_players] == [True, False]
     bank.music("battle_cathedral")
     assert len(game.backend.music_players) == 2, "asking again changes nothing"
     bank.stop_music(0.5)
     assert game.audio.music_name is None
+
+
+def test_dungeon_music_is_played_once(tmp_path: Path):
+    (tmp_path / "sounds").mkdir()
+    (tmp_path / "sounds" / "VERSION").write_text(VERSION)
+    (tmp_path / "music").mkdir()
+    for name in ("battle_cathedral", "boss"):
+        (tmp_path / "music" / f"{name}.wav").write_bytes(b"")
+    g = Game("Hellward test", backend="mock", asset_path=tmp_path)
+    try:
+        bank = SoundBank(g)
+        bank.music("battle_cathedral")
+        assert g.backend.music_players[0]["loop"] is False
+        bank.music("boss")
+        assert g.backend.music_players[-1]["loop"] is False
+    finally:
+        g.close()
 
 
 def test_music_waits_for_its_track(game: Game, cache: Path, monkeypatch: pytest.MonkeyPatch):
@@ -297,36 +315,28 @@ class _Alive:
 
 
 def test_every_location_has_its_own_battle_track():
-    from hellward.audio.music import BATTLE_FOR, PIECES, track_for
+    from hellward.audio.music import BATTLE_FOR, track_for
+    from hellward.sim.campaign import LOCATIONS
 
-    assert len(set(BATTLE_FOR.values())) == len(BATTLE_FOR), "every dungeon sounds different"
-    for key, track in BATTLE_FOR.items():
-        assert track in PIECES, f"{key} -> {track} not in PIECES"
-        # round-trip
-        assert track_for(key) == track
+    assert set(BATTLE_FOR) == set(LOCATIONS)
+    assert len(set(BATTLE_FOR.values())) == len(LOCATIONS), "every dungeon sounds different"
+    for key in LOCATIONS:
+        assert track_for(key) in PIECES
+        assert PIECES[track_for(key)].seconds >= 300
 
 
-@pytest.mark.parametrize("name, low, high", [
-    ("title", 40, 50),
-    ("battle_tristram", 50, 62),
-    ("battle_graveyard", 43, 53),
-    ("battle_cathedral", 48, 58),
-    ("battle_catacombs", 38, 48),
-    ("battle_caves", 36, 46),
-    ("battle_hells_gate", 40, 50),
-    ("battle_docks", 43, 53),
-    ("battle_spider_forest", 33, 43),
-    ("battle_jungle", 35, 45),
-    ("battle_drowned_city", 52, 62),
-    ("battle_travincal", 48, 58),
-    ("battle_temple", 53, 63),
-    ("boss", 45, 60),
-])
-def test_music_is_a_seamless_stereo_loop(cache: Path, name: str, low: float, high: float):
+@pytest.mark.parametrize("name", PIECES)
+def test_music_is_a_clean_stereo_score(cache: Path, name: str):
     clip = read_wav(cache / "music" / f"{name}.wav")
     assert clip.ndim == 2 and clip.shape[1] == 2
-    assert low <= len(clip) / SAMPLE_RATE <= high
-    assert 0.3 < np.abs(clip).max() < 0.81
-    step = np.abs(np.diff(clip, axis=0))
-    seam = np.abs(clip[0] - clip[-1])
-    assert (seam <= np.percentile(step, 99.5, axis=0)).all(), "the loop point jumps like no other sample does"
+    assert abs(len(clip) / SAMPLE_RATE - PIECES[name].seconds) < 1 / SAMPLE_RATE
+    assert 0.1 < np.abs(clip).max() < 0.81
+    if name != "title":
+        assert np.abs(clip[0]).max() < 1e-3
+        assert np.abs(clip[-1]).max() < 1e-3
+        chapter = clip[30 * SAMPLE_RATE:40 * SAMPLE_RATE]
+        later = clip[120 * SAMPLE_RATE:130 * SAMPLE_RATE]
+        assert not np.array_equal(chapter, later), "the score must develop rather than repeat a passage"
+        window = 20 * SAMPLE_RATE
+        levels = [np.sqrt(np.mean(clip[i:i + window] ** 2)) for i in range(0, len(clip) - window, window)]
+        assert max(levels) > 1.3 * min(levels), "the score must have a quiet and a strong section"

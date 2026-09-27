@@ -42,7 +42,7 @@ def main() -> None:
     if args.music:
         for name, piece in PIECES.items():
             write_wav(args.out / f"{name}.wav", piece.render())
-            print(f"{name}: {piece.seconds:.0f} s loop")
+            print(f"{name}: {piece.seconds:.0f} s" + (" loop" if name == "title" else " score"))
 
 
 if __name__ == "__main__":

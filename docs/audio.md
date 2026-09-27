@@ -13,7 +13,7 @@ spectrograms and levels, not by ear.
 | `hellward/assets/pieces/` | 71 generated pieces (mono, 16-bit, 44.1 kHz, 7.1 MB) and `manifest.json` with each prompt, seed and hash |
 | `tools/pieces.py` | the pieces' prompts, seeds and style suffixes; `refresh` remakes what changed |
 | `hellward/audio/cues.py` | every cue the scene plays, composed from pieces and `sagaforge.synth` |
-| `hellward/audio/music.py`, `instruments.py` | the eight loops and their instruments |
+| `hellward/audio/music.py`, `instruments.py` | six dungeon scores, the title and boss music, and their instruments |
 | `hellward/audio/bank.py` | `SoundBank`: the cache, takes, pitch, the voice budget, music crossfades |
 | `tools/sampler.py` | every cue back to back in one WAV, and the music, to listen to |
 
@@ -118,33 +118,37 @@ so every player's cache is rebuilt, and run `uv run pytest -q tests/test_audio.p
 
 Composed in code (`music.py`) on instruments adapted from Warband's and a few of Hellward's own:
 a detuned twelve-string (each course two plucks 7 cents apart, the low courses with an octave
-string), a bowed drone that crossfades round the loop, far-off `oo` voices, an organ, a cast
-church bell (hum, minor-third tierce, clang) and a heartbeat for a drum. Everything wraps round
-the loop, the reverb too, so the loops are seamless.
+string), a bowed drone, far-off `oo` voices, an organ, a cast church bell (hum, minor-third tierce,
+clang) and a heartbeat for a drum. Each dungeon has a through-composed score of eight-bar
+chapters with alternate harmonic routes and an arc from stillness to danger and back. Environmental
+sounds sit inside the music: fire and wind in Tristram, wind and drops at the graves, drips in the
+cathedral and catacombs, lava breaths in the caves, and low infernal air at the gate. Chapters
+crossfade in the room; the complete score fades out and plays once. The title remains a loop.
 
 | Track | Length | What plays |
 |---|---|---|
 | `title` | 45 s, 12 bars at 64 | D aeolian over a D–A drone: a lone twelve-string arpeggio, a slow falling melody on it, distant voices from bar 5, a bell at the top and two-thirds in, a heart under the second half |
-| `battle_tristram` | 56.5 s, 16 bars at 68 | D aeolian over D–A: the familiar village night with a pulse — the heart on every half bar, frame and bones joining halfway, a low bow and far voices in the second half |
-| `battle_graveyard` | 48 s, 12 bars at 60 | E dorian over E–B: moon over open graves — a sparse high guitar, organ and a lament sung by far voices, dry bones for drums, funeral bells through the biggest room of the descent |
-| `battle_cathedral` | 53 s, 16 bars at 72 | D phrygian: a torchlit procession — the heart on every half bar, the arpeggio quickening to sixteenths in the second half with a frame drum, rattles and a low bow; monks and far voices; bells every eight bars |
-| `battle_catacombs` | 43.5 s, 12 bars at 66 | C phrygian over a C–D♭ drone: the bone halls, narrow and close — a cello hammering the flat second, toms and a heart in the walls, low monks and organ, one deep bell, no high strings; the driest room down here |
-| `battle_caves` | 42 s, 16 bars at 92 | F phrygian-dominant: lava light — restless taiko and war drums, a bright sixteenth-note guitar and a driving bow, a rising ember of a melody; no church bells this deep, only timpani and stone |
-| `battle_hells_gate` | 46 s, 16 bars at 84 | D phrygian over a D–E♭ drone: the gate opens — war drums and taiko, a low bow on the flat second, organ clusters and monks, a falling choir line, and the village's own melody returning corrupted on the guitar |
-| `battle_docks` | 48 s, 12 bars at 60 | G aeolian: Kurast Docks at night — a slow harbour swell, low marimba ostinato on guitar, a bamboo flute melody, lapping water pulse on frame drum and clicks; distant bells on the tide |
-| `battle_spider_forest` | 38.4 s, 16 bars at 100 | B phrygian-dominant: skittering through web-choked trees — plucked high strings in a whole-tone figure, dry clicking percussion, a sparse organ pad, chime-like bells piercing the canopy |
-| `battle_jungle` | 40 s, 16 bars at 95 | A dorian: hunting in the Flayer Jungle — fast frame drums and log drums drive a relentless pulse, a chanting low monk drone, cello ostinato, a twelve-string figure rising through the second half; timpani on the downbeats |
-| `battle_drowned_city` | 57.6 s, 12 bars at 50 | F♯ phrygian: the submerged city — detuned slow bells tolling far apart, a deep sub-heartbeat pulse, a sighing organ and choir pad swelling over a C–D♭ drone; the longest, stillest loop |
-| `battle_travincal` | 53.3 s, 16 bars at 72 | E phrygian: the council's terrace — ceremonial processional with gongs, brass-like organ chords, frame drum and heartbeat, a rising cello line and twelve-string arpeggio building tension; timpani and bells every eight bars |
-| `battle_temple` | 58.5 s, 16 bars at 65 | D dorian: the Temple of Light approach — an organ drone with a golden major-minor shift, a choir pad, heartbeat pulse, a twelve-string ostinato and a soaring choir line resolving between minor and major; timpani and bells |
-| `boss` | 54.5 s, 20 bars at 88 | D phrygian over a D–E♭ drone: Azazel's last wave — war drums and taiko, a low bow hammering the flat second, a sixteenth-note twelve-string, organ clusters, monks, a falling choir line, timpani and bells |
+| `battle_tristram` | 5:17 | D aeolian: a solitary twelve-string, the heart and a village lament as the fire grows |
+| `battle_graveyard` | 5:02 | E dorian: wind, grave drops, a distant choral lament, organ and funeral bells |
+| `battle_cathedral` | 5:23 | D phrygian: a torchlit procession, monks, frame drum and bells gathering strength in the nave |
+| `battle_catacombs` | 5:00 | C phrygian: close dripping stone, a bowed flat second, organ and toms in the bone halls |
+| `battle_caves` | 5:04 | F phrygian-dominant: lava breaths, racing guitar, a rising ember melody and war drums |
+| `battle_hells_gate` | 5:15 | D phrygian: infernal air, a falling choir and the village melody returning in a darker form |
+| `battle_docks` | ≈5 | G aeolian: a harbour swell, chimes over a hollow choir, a slow heart and frame drum |
+| `battle_spider_forest` | ≈5 | A dorian: skittering twelve-string over rattles and toms, insects in the dark |
+| `battle_jungle` | ≈5 | E phrygian: hunting drums (taiko, toms, a running frame drum), a cello and monks |
+| `battle_drowned_city` | ≈5 | C# aeolian: sunk and slow, a hollow choir over organ, a lone heart, water dripping |
+| `battle_travincal` | ≈5 | D# phrygian: the council's procession, monks and organ over war drums |
+| `battle_temple` | ≈5 | B phrygian-dominant: the mother lamp's hall, choir and organ, the heart rising to the last fight |
+| `boss` | about 4 min | Azazel's last wave: the gate's music driven harder, then emptied out at the end |
 
 A location's intro already plays its battle track (`Flow.intro`), so the briefing carries the
 dungeon's feel before the first wave; a defence keeps it, and Azazel's wave breaks in with `boss`.
 `SoundBank.prepare` renders the cues synchronously (about 2.5 s of CPU on an M-series Mac) and
 composes the music in a background thread, title first, then the dungeons in the campaign's order,
 boss last; `bank.music(mood)` starts a track, crossfading 1.5–2.5 s, the moment it is
-on disk. The cache is about 16 MB of cues and 70 MB of music under the game's asset path.
+on disk. The dungeon and boss scores play once. The cache is about 20 MB of cues and 364 MB
+of music under the game's asset path.
 
 ## Tests
 
@@ -155,5 +159,5 @@ centroid) and a fireball carries more sub-100 Hz energy than any fire bolt; fros
 ring brighter than fire; the bell rings on; stingers last 3–6 s; `prepare` is idempotent, restores
 a missing file and discards the cache on a new `VERSION`; the budget holds, keeps the last voice
 for a death, and a second of budget-admitted battle mixes under full scale; takes rotate and pitch
-wanders within ±4 %; music starts, crossfades and waits for its track; each loop is stereo, the
-right length, and its seam is no bigger a step than the other samples.
+wanders within ±4 %; music starts, crossfades and waits for its track; each score is stereo,
+the right length, ends cleanly, and has quiet and strong passages.

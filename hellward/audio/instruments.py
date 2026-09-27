@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from sagaforge.synth import AH, OH, OO, formant, hz, level, lowpass, mix, noise, pluck, seconds, sustained, thump, tone
+from sagaforge.synth import AH, OH, OO, SAMPLE_RATE, formant, hz, level, lowpass, mix, noise, pluck, seconds, sustained, thump, tone
 
 SAW = tuple((k, 1 / k) for k in range(1, 13))
 REED = tuple((k, 1 / k) for k in range(1, 14, 2))  # odd harmonics: a stopped organ pipe
@@ -99,6 +99,15 @@ def church_bell(note: Note, length: float, *, seed: int = 0) -> np.ndarray:
 
 def chime(note: Note, length: float, *, seed: int = 0) -> np.ndarray:
     return tone(note, length, attack=0.003, tau=length * 0.35, partials=((1, 1.0), (2.76, 0.4), (5.4, 0.2), (8.9, 0.08)))
+
+
+def drip(note: Note, *, seed: int = 0) -> np.ndarray:
+    """A small drop echoing from stone, with a brief downward pitch bend and a soft splash."""
+    f = _freq(note)
+    t = seconds(0.32)
+    phase = 2 * np.pi * np.cumsum(f * (1.25 - 0.25 * np.minimum(t / 0.11, 1))) / SAMPLE_RATE
+    water = np.sin(phase) * np.exp(-t / 0.075)
+    return level(mix(water, noise(0.08, 500, 3500, tau=0.016, seed=seed) * 0.12), 1.0)
 
 
 # -- Drums -----------------------------------------------------------------------
