@@ -10,11 +10,11 @@ from typing import Any, Callable
 from saga2d import Game, Scene
 
 from hellward.art.sprites import Art
-from hellward.sim.campaign import CATHEDRAL, LAST, ORDER, Location
+from hellward.sim.campaign import ACT_ENDS, CATHEDRAL, LOCATIONS, ORDER, Location
 from hellward.sim.model import World
 from hellward.sim.players.hands import Player
 from hellward.sim.skills import perks
-from hellward.story import STORIES
+from hellward.story import LAST_PAGES, STORIES
 from hellward.ui.battle import BattleScene
 from hellward.ui.briefing import BriefingScene
 from hellward.ui.mapscreen import MapScene
@@ -42,23 +42,28 @@ class Flow:
         self.sound.music("title")
 
     def world_map(self) -> None:
-        """Before the map shows, play one due and unseen story: the act ending when the last location is held
-        (first, and instead of the after pages), else the first held location's after page in campaign order."""
-        if self.progress.held(LAST):
-            story = STORIES.get("act1/end")
-            if story is not None and story.key not in self.progress.seen:
-                self.progress.see(story.key)
-                self.game.clear_and_push(StoryScene(self, story.pages, then=self._open_map))
-                return
+        """Before the map shows, play one due and unseen story (:meth:`due`), then the map."""
+        key = self.due()
+        if key is None:
             self._open_map()
             return
+        self.progress.see(key)
+        self.game.clear_and_push(StoryScene(self, STORIES[key].pages, then=self._open_map))
+
+    def due(self) -> str | None:
+        """The story a map opening owes the player, if any: an act's ending once its last location is held, else the
+        after page of a held location in an act not yet finished (a finished act's pages wait in the Chronicle), in
+        campaign order. A player who quit at the reckoning gets it here."""
+        seen = self.progress.seen
+        for act, end in ACT_ENDS.items():
+            if self.progress.held(end) and LAST_PAGES[act] not in seen:
+                return LAST_PAGES[act]
         for key in ORDER:
             page = f"{key}/after"
-            if page in STORIES and page not in self.progress.seen and self.progress.held(key):
-                self.progress.see(page)
-                self.game.clear_and_push(StoryScene(self, STORIES[page].pages, then=self._open_map))
-                return
-        self._open_map()
+            if (page in STORIES and page not in seen and self.progress.held(key)
+                    and not self.progress.held(ACT_ENDS[LOCATIONS[key].act])):
+                return page
+        return None
 
     def _open_map(self) -> None:
         self.game.clear_and_push(MapScene(self))
@@ -135,7 +140,8 @@ class Flow:
         """Leave the reckoning by either button: after a victory the act ending (at the last location) or the
         location's after page plays first when unseen, then the button's way."""
         if world.outcome == "victory":
-            key = "act1/end" if world.location.key == LAST else f"{world.location.key}/after"
+            act = world.location.act
+            key = LAST_PAGES[act] if world.location.key == ACT_ENDS[act] else f"{world.location.key}/after"
             story = STORIES.get(key)
             if story is not None and key not in self.progress.seen:
                 self.progress.see(key)

@@ -350,7 +350,7 @@ def targets(table: list[dict]) -> list[list[str]]:
         else:
             rest.check(where, wins >= 0.8 * n, f"won {wins}/{n}")
             strong.check(where, wins == n, f"won {wins}/{n}")
-        if row["location"] == campaign.LAST:   # elsewhere B* loses no life to either
+        if row["location"] == campaign.ACT_ENDS[2]:   # the final location B* loses no life to either
             delta = row["impact"]
             mattered = None if delta is None else delta[0] >= 3 and (delta[1] or 0) >= 0.2
             leaders.check(where, mattered, f"leader impact {show_impact(delta)}", "leader impact (--leaders)")

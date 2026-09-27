@@ -68,6 +68,8 @@ class Record:
     spells: Counter = field(default_factory=Counter)
     leaks: Counter = field(default_factory=Counter)   # lives lost by wave
     skills: frozenset[str] = frozenset()              # what the player learned for it
+    raised: int = 0               # monsters raised by a leader
+    burned: float = 0.0           # mana burned by curses
 
 
 def ready(world: World, spell: str, spare: float = 0.0) -> bool:
@@ -102,6 +104,9 @@ class Hands:
             elif kind == "chant":
                 self._sign(e[1], "chant", e[3], e[2])
                 record.chants += 1
+            elif kind == "mark":
+                self._sign(e[1], "mark", e[3], e[2])  # a mark is a sign like a chant
+                record.chants += 1
             elif kind == "broken":
                 self._signs.pop(e[1], None)
                 record.broken += 1
@@ -120,6 +125,10 @@ class Hands:
             elif kind == "leak":
                 self._signs.pop(e[1], None)
                 record.leaks[world.wave] += e[3]
+            elif kind == "raised":
+                record.raised += 1
+            elif kind == "burned":
+                record.burned += e[2]
         record.curse_seconds += int_sum(len(t.curses) for t in world.towers.values()) * dt
         if world.mana >= world.mana_max - 1e-9:
             record.mana_capped += dt
@@ -133,6 +142,11 @@ class Hands:
     def threats(self) -> list[Sign]:
         """The leaders' signs a person has taken in by now, the oldest first: those most about to curse."""
         seen = [s for s in self._signs.values() if s.since + self.react <= self.world.time + 1e-9]
+        return sorted(seen, key=lambda s: (s.kind not in ("chant", "mark"), s.since, s.leader))
+
+    def _breakable_threats(self) -> list[Sign]:
+        """Threats that can be broken by Smite or Frozen Orb: pondering and chanting, but not marking."""
+        seen = [s for s in self._signs.values() if s.since + self.react <= self.world.time + 1e-9 and s.kind in ("ponder", "chant")]
         return sorted(seen, key=lambda s: (s.kind != "chant", s.since, s.leader))
 
     # -- Spells ------------------------------------------------------------------------------------
@@ -147,8 +161,9 @@ class Hands:
         self._cast("smite")
 
     def smite_threat(self) -> bool:
-        """The panel's Q with a leader pondering or chanting: smite the one closest to cursing. Whether it cast."""
-        threats = self.threats()
+        """The panel's Q with a leader pondering or chanting: smite the one closest to cursing. Whether it cast.
+        Does not target marking leaders: a mark cannot be broken."""
+        threats = self._breakable_threats()
         if not threats:
             return False
         self.smite(threats[0].leader)

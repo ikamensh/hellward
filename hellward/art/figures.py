@@ -343,10 +343,19 @@ def witch(pose: Pose) -> Mesh:
 BUILDERS = {
     "fallen": fallen, "shaman": lambda p: fallen(p, shaman=True), "skeleton": skeleton, "zombie": zombie,
     "goatman": goatman, "gargoyle": gargoyle, "overlord": overlord, "azazel": azazel, "priest": priest, "witch": witch,
+    "flayer": lambda p: fallen(p, shaman=False),  # reuse fallen with different colors
+    "zealot": lambda p: goatman(p),  # reuse goatman with different colors
+    "spider": gargoyle,  # reuse gargoyle
+    "bat": gargoyle,  # reuse gargoyle
+    "hulk": overlord,  # reuse overlord
+    "drowned": zombie,  # reuse zombie
+    "fetish": lambda p: fallen(p, shaman=True),  # reuse shaman
+    "inquisitor": priest,  # reuse priest
+    "bone_priest": priest,  # reuse priest
 }
 
 #: Zombies shamble; overlords and the boss stride heavily; gargoyles flap rather than step.
-GAITS = {"zombie": 0.6, "overlord": 0.75, "azazel": 0.7, "gargoyle": 0.5}
+GAITS = {"zombie": 0.6, "overlord": 0.75, "azazel": 0.7, "gargoyle": 0.5, "hulk": 0.7, "bat": 0.5}
 
 
 def pose_of(kind: str, frame: str) -> Pose:

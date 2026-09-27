@@ -53,7 +53,7 @@ class Refused(Exception):
 class Monster:
     __slots__ = ("id", "kind", "hp", "max_hp", "s", "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
                  "cooldown", "asking", "ask_left", "chant_curse", "chant_spot", "chant_left", "door",
-                 "amplified", "amplify")
+                 "amplified", "amplify", "risen", "marking")
 
     def __init__(self, id: int, kind: MonsterKind, wave: int, lane: float, jostle: float, hp: float, cooldown: float) -> None:
         self.id = id
@@ -77,6 +77,8 @@ class Monster:
         self.door = -1                        # the door socket it is battering, or -1
         self.amplified = 0.0                  # seconds of Amplify Damage left
         self.amplify = 0.0                    # the fraction it takes extra (0.3 = 30% more damage)
+        self.risen = False                    # has this monster been raised once already
+        self.marking = False                  # is this leader currently marking (instead of chanting)
 
     def copy(self) -> Monster:
         """Everything but a leader's pending question to its planner."""
@@ -85,6 +87,7 @@ class Monster:
         m.poison = [stack[:] for stack in self.poison]
         m.chant_curse, m.chant_spot, m.chant_left, m.door = self.chant_curse, self.chant_spot, self.chant_left, self.door
         m.amplified, m.amplify = self.amplified, self.amplify
+        m.risen, m.marking = self.risen, self.marking
         return m
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -639,6 +642,7 @@ class World:
                 if m.chant_left <= 0:
                     self._land(m.id, m.chant_curse, m.chant_spot)
                     m.chant_curse, m.chant_spot = None, (-1, -1)
+                    m.marking = False
                 continue
             if m.asking is not None:
                 m.ask_left -= dt
@@ -651,9 +655,16 @@ class World:
                     elif decision.cast is None:
                         m.cooldown = decision.retry
                     else:
-                        m.chant_curse, m.chant_spot, m.chant_left = decision.cast.curse, decision.cast.spot, spec.channel
-                        m.cooldown = spec.cooldown
-                        self._emit("chant", m.id, decision.cast.curse, decision.cast.spot)
+                        if spec.mark > 0:
+                            m.chant_curse, m.chant_spot, m.chant_left = decision.cast.curse, decision.cast.spot, spec.mark
+                            m.marking = True
+                            m.cooldown = spec.cooldown
+                            self._emit("mark", m.id, decision.cast.curse, decision.cast.spot)
+                        else:
+                            m.chant_curse, m.chant_spot, m.chant_left = decision.cast.curse, decision.cast.spot, spec.channel
+                            m.marking = False
+                            m.cooldown = spec.cooldown
+                            self._emit("chant", m.id, decision.cast.curse, decision.cast.spot)
                 continue
             m.cooldown -= dt
             if m.cooldown <= 0 and self.planner is not None and self.towers and m.frozen <= 0:
@@ -662,7 +673,10 @@ class World:
                 self._emit("ponder", m.id)
 
     def _break(self, m: Monster) -> None:
-        """A leader's pondering or chant broken by a spell: the curse never comes, and its whole cooldown starts again."""
+        """A leader's pondering or chant broken by a spell: the curse never comes, and its whole cooldown starts again.
+        A mark cannot be broken: Smite and Frozen Orb on a marking leader damage/freeze it but do not break the mark."""
+        if m.marking:
+            return
         spot = m.chant_spot
         m.chant_curse, m.chant_spot, m.chant_left = None, (-1, -1), 0.0
         m.asking, m.ask_left = None, 0.0
@@ -694,8 +708,15 @@ class World:
         if cursed:
             self.curses_landed += 1
             self._emit("cursed", leader_id, spot, curse, tuple(cursed))
+            if spec is not None and spec.burn > 0:
+                amount = spec.burn * len(cursed)
+                if self.mana > 0:
+                    burned = min(self.mana, amount)
+                    self.mana -= burned
+                    self._emit("burned", leader_id, burned)
         elif not any(t.ward > 0 for t in caught):
             self._emit("fizzle", leader_id, spot)
+        leader.marking = False
 
     def _move(self, dt: float) -> None:
         doors = [d for d in self.doors if d.built]
@@ -1089,6 +1110,30 @@ class World:
             self._died(m, element, bursts)
 
     def _died(self, m: Monster, element: Element | None, bursts: bool) -> None:
+        # A monster its kind's shaman stands near rises once, unless a burst tore it apart (bursts=False: a burst
+        # killed it)
+        if bursts and not m.risen and m.kind.leader is None:
+            raise_kind = m.kind.key
+            for leader in self.monsters:
+                if leader.hp > 0 and leader.kind.leader is not None:
+                    spec = leader.kind.leader
+                    if spec.raises == raise_kind:
+                        lx, ly = self.level.point(leader.s)
+                        mx, my = self.level.point(m.s)
+                        if (lx - mx) ** 2 + (ly - my) ** 2 <= spec.raise_reach ** 2:
+                            # Raise the monster
+                            m.risen = True
+                            m.hp = m.max_hp * 0.5
+                            m.frozen = max(m.frozen, 1.0)
+                            self._emit("raised", m.id, leader.id)
+                            return  # Monster doesn't die, no bounty, no kill, no wave count-off
+
+        # If a marking leader dies, its mark fizzles
+        if m.marking:
+            self._emit("fizzle", m.id, m.chant_spot)
+            m.marking = False
+            m.chant_curse, m.chant_spot, m.chant_left = None, (-1, -1), 0.0
+
         self.gold += m.kind.bounty
         self.kills += 1
         where = self.level.point(m.s)

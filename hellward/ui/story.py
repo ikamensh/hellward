@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Callable
 from PIL import Image as PILImage
 from saga2d import Scene
 
-from hellward.sim.campaign import LAST, LOCATIONS
+from hellward.sim.campaign import ACT_ENDS, LOCATIONS
 from hellward.story import STORIES, Page, Story
 from hellward.ui import style
 
@@ -81,20 +81,17 @@ def draw_cover(scene: Scene, name: str | None, zoom: float = 1.0, pan: float = 0
 
 def due_stories(progress: Progress) -> list[Story]:
     """Every story in :data:`hellward.story.STORIES` whose moment has come, in dict order: a before page when
-    its location is opened, an after page when it is held, ``act1/end`` when the act's last location is held.
-    Keys whose location does not exist (Act II is not built yet) are skipped."""
+    its location is opened, an after page when it is held, an act's ending when its last location is held."""
     out = []
-    for key, story in STORIES.items():
-        if key == "act1/end":
-            if progress.held(LAST):
-                out.append(story)
-            continue
-        loc, sep, when = key.partition("/")
-        if not sep or loc not in LOCATIONS:
-            continue
-        if when == "before" and progress.opened(LOCATIONS[loc]):
-            out.append(story)
-        elif when == "after" and progress.held(loc):
+    for story in STORIES.values():
+        place, _, when = story.key.partition("/")
+        if when == "end":
+            due = progress.held(ACT_ENDS[story.act])
+        elif when == "before":
+            due = progress.opened(LOCATIONS[place])
+        else:
+            due = progress.held(place)
+        if due:
             out.append(story)
     return out
 

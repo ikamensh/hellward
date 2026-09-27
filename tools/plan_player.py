@@ -44,7 +44,7 @@ from hellward.sim.model import DOOR_STOP, JOSTLE, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.hands import defend  # noqa: E402
 from hellward.sim.players.planned import Plan, Planned, load, plan_path  # noqa: E402
-from hellward.sim.skills import SKILLS  # noqa: E402
+from hellward.sim.skills import SKILLS, column_of  # noqa: E402
 
 
 
@@ -157,10 +157,9 @@ def first_plan(location: Location, kinds: list[str]) -> Plan:
 
 
 def first_skills(kinds: list[str], location: Location) -> list[str]:
-    column = {"pyre": "fire", "storm": "lightning", "frost": "cold", "plague": "poison"}
     order = []
     for kind in dict.fromkeys(kinds):
-        order += [k for k, s in SKILLS.items() if s.column == column[kind]]
+        order += [k for k, s in SKILLS.items() if s.column == column_of(kind)]
     if location.arsenal.gates:
         order += ["holy_shield", "salvation", "thorns"]
     order += ["warmth", "soul_harvest", "spell_mastery"]

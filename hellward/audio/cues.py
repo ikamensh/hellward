@@ -418,7 +418,18 @@ FALLS: dict[str, Fall] = {
     "shaman": Fall("shaman_cry", "body_light", takes=2),
     "priest": Fall("priest_cry", "bones", gap=-0.15, body_gain=0.6, longest=1.4, takes=2),
     "witch": Fall("witch_cry", "body_medium", takes=2),
+    # Act II borrows Act I's pieces, the nearest in body and voice, until its own foley is generated
+    "flayer": Fall("fallen_cry", "body_light"),
+    "zealot": Fall("priest_cry", "body_medium"),
+    "spider": Fall("gargoyle_cry", "body_light", body_gain=0.7),
+    "bat": Fall("gargoyle_cry", "body_light", body_gain=0.6),
+    "hulk": Fall("overlord_cry", "body_heavy", gap=-0.2, body_gain=0.9, boom=0.35),
+    "drowned": Fall("zombie_cry", "body_wet", gap=-0.2),
+    "fetish": Fall("shaman_cry", "body_light", takes=2),
+    "inquisitor": Fall("priest_cry", "body_medium", takes=2),
+    "bone_priest": Fall("priest_cry", "bones", gap=-0.3, body_gain=0.95, boom=0.5, takes=2),
 }
+BOSSES = ("azazel", "bone_priest")   # their deaths are alerts, whole and unpitched, in a room
 
 
 def death(kind: str, take: int) -> np.ndarray:
@@ -435,7 +446,7 @@ def death(kind: str, take: int) -> np.ndarray:
     if fall.boom:
         layers.append((at, thump(70, 28, 0.8, attack=0.004, tau=0.2) * fall.boom))
     out = mix(*layers)
-    return room(out, 2.5, 0.3, seed=9) if kind == "azazel" else out
+    return room(out, 2.5, 0.3, seed=9) if kind in BOSSES else out
 
 
 def _death(kind: str) -> Callable[[int], np.ndarray]:
@@ -475,8 +486,8 @@ CUES: dict[str, Cue] = {
     "broken": Cue(broken, 1, "alert", ACTION * 1.1),
     "victory": Cue(victory, 1, "alert", ALERT),
     "defeat": Cue(defeat, 1, "alert", ALERT),
-    **{f"death_{kind}": Cue(_death(kind), fall.takes, "alert" if kind == "azazel" else "battle",
-                            ALERT if kind == "azazel" else BATTLE, pitch=0.0 if kind == "azazel" else 0.03)
+    **{f"death_{kind}": Cue(_death(kind), fall.takes, "alert" if kind in BOSSES else "battle",
+                            ALERT if kind in BOSSES else BATTLE, pitch=0.0 if kind in BOSSES else 0.03)
        for kind, fall in FALLS.items()},
 }
 

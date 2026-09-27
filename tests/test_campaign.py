@@ -2,7 +2,7 @@
 
 import pytest
 
-from hellward.sim.campaign import LAST, LOCATIONS, ORDER, SIGIL_LIVES, sigils
+from hellward.sim.campaign import ACT_ENDS, LOCATIONS, ORDER, SIGIL_LIVES, sigils
 from hellward.sim.content import MONSTERS, SPELLS, START_LIVES, TOWERS
 from hellward.sim.level import Tile
 
@@ -34,7 +34,7 @@ def test_a_location_names_only_what_exists(key):
 def test_the_campaign_goes_down_in_order_and_every_location_opens():
     for i, key in enumerate(ORDER):
         assert all(ORDER.index(need) < i for need in LOCATIONS[key].requires)
-    assert ORDER[-1] == LAST
+    assert ORDER[-1] == ACT_ENDS[2]
     assert all(LOCATIONS[key].requires == (before,) for before, key in zip(ORDER, ORDER[1:]))   # one way down
     offered = [set(LOCATIONS[k].arsenal.towers) | set(LOCATIONS[k].arsenal.spells) for k in ORDER]
     for earlier, later in zip(offered, offered[1:]):

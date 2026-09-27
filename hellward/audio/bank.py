@@ -29,7 +29,7 @@ from hellward.audio.music import PIECES
 from saga2d import Game
 from sagaforge.synth import write_wav
 
-VERSION = "2"
+VERSION = "3"
 SOUNDS, MUSIC = "sounds", "music"
 #: The composer's order: the title plays first, the boss last.
 COMPOSE_ORDER = ("title", "battle", "boss")
