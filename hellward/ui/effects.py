@@ -380,6 +380,37 @@ class Effects:
             old.inner.remove()
         self.telegraphs[leader_id] = Telegraph(leader_id, spot, rune, inner)
 
+    def on_mark(self, leader_id: int, curse, spot: tuple[int, int]) -> None:
+        """A mark: rune circle on the spot like a chant's, but with no beam and a steady burning look."""
+        m = self.world.monster(leader_id)
+        radius = curse_radius(curse, m.kind if m is not None else None)
+        bx, by = px(spot[0] + 0.5, spot[1] + 0.5)
+        by += 0.25 * T
+        width = 2 * radius * T
+        rune = self.scene.add_sprite(Sprite("fx/sigil/curse", position=(bx, by), size=(width, width * 0.55), layer=RenderLayer.OBJECTS,
+                                            opacity=180))
+        inner = self.scene.add_sprite(Sprite("fx/soft/curse", position=(bx, by), size=(width * 0.83, width * 0.55 * 0.83),
+                                             layer=RenderLayer.OBJECTS, opacity=200))
+        old = self.telegraphs.pop(leader_id, None)
+        if old is not None:
+            old.rune.remove()
+            old.inner.remove()
+        self.telegraphs[leader_id] = Telegraph(leader_id, spot, rune, inner)
+
+    def on_raised(self, monster_id: int, leader_id: int) -> None:
+        """A green burst at the raised monster."""
+        m = self.world.monster(monster_id)
+        if m is None:
+            return
+        x, y = self.view.chest(m)
+        self.bloom("fx/soft/poison", x, y, 10, 80, 0.6, opacity=220)
+        self.burst("fx/shard", x, y, 16, speed=(50, 140), life=(0.3, 0.7), size=(8, 8), shrink=False)
+        self.light(x, y, 120, (120, 255, 80), 1.0, 0.5)
+
+    def on_burned(self, leader_id: int, amount: float) -> None:
+        """Blue '-N mana' over the mana orb (HUD)."""
+        self.say(f"−{int(amount)} mana", 640, 50, (80, 180, 255, 255), size=24, life=1.5, rise=40, font=style.TITLE_FONT)
+
     def _end_telegraph(self, leader_id: int) -> tuple[float, float] | None:
         telegraph = self.telegraphs.pop(leader_id, None)
         if telegraph is None:

@@ -54,6 +54,10 @@ class LeaderSpec:
     channel: float = 1.0      # the visible incantation between the choice and the curse landing
     first_cast: float = 3.0   # seconds after it appears before it may first choose
     widen: float = 0.0        # added to every radius it casts
+    raises: str = ""          # the monster kind it raises
+    raise_reach: float = 3.0  # tile-centre distance within which it raises
+    mark: float = 0.0         # seconds a marked curse burns on its spot before it lands; 0 = chanted as today
+    burn: float = 0.0         # mana burned per tower the curse catches
 
 
 @dataclass(frozen=True)
@@ -92,6 +96,20 @@ MONSTERS: Final[dict[str, MonsterKind]] = {m.key: m for m in (
                 leader=LeaderSpec((Curse.BONE_PRISON, Curse.DIM_VISION), cooldown=10.0), size=0.85),
     MonsterKind("witch", "Blood Witch", hp=260, speed=0.95, bounty=45, lives=2, door_dps=6, resist={F: 0.25, L: 0.25},
                 leader=LeaderSpec((Curse.DECREPIFY, Curse.WEAKEN), cooldown=8.5), size=0.85),
+    MonsterKind("flayer", "Flayer", hp=60, speed=1.45, bounty=4, door_dps=8, resist={F: 0.25}, size=0.5),
+    MonsterKind("zealot", "Zealot", hp=190, speed=1.0, bounty=10, door_dps=16, resist={L: 0.4, F: 0.25}, size=0.85),
+    MonsterKind("spider", "Spider", hp=120, speed=1.35, bounty=8, door_dps=10, resist={P: 1.0, C: -0.25}, size=0.7),
+    MonsterKind("bat", "Blood Bat", hp=55, speed=1.9, bounty=5, flying=True, resist={C: 0.5, P: 0.25}, size=0.5),
+    MonsterKind("hulk", "Thorned Hulk", hp=760, speed=0.55, bounty=30, lives=2, door_dps=70, resist={P: 1.0, C: 0.25, F: -0.25}, size=1.1),
+    MonsterKind("drowned", "The Drowned", hp=320, speed=0.7, bounty=14, door_dps=22, resist={C: 0.5, P: 0.5, L: -0.25}, size=0.85),
+    MonsterKind("fetish", "Fetish Shaman", hp=150, speed=1.1, bounty=35, lives=2, door_dps=4, resist={F: 0.25}, size=0.6,
+                leader=LeaderSpec((Curse.WEAKEN,), cooldown=9.0, raises="flayer")),
+    MonsterKind("inquisitor", "Zakarum Inquisitor", hp=280, speed=0.95, bounty=45, lives=2, door_dps=6, resist={L: 0.4, F: 0.25}, size=0.9,
+                leader=LeaderSpec((Curse.WEAKEN, Curse.DIM_VISION), cooldown=12.0, mark=1.5)),
+    MonsterKind("bone_priest", "The Bone Priest", hp=6000, speed=0.45, bounty=0, lives=20, door_dps=150,
+                resist={P: 1.0, C: 0.25, F: 0.25, L: 0.25}, size=1.6,
+                leader=LeaderSpec((Curse.BONE_PRISON, Curse.WEAKEN, Curse.DECREPIFY, Curse.DIM_VISION), cast_range=6.0,
+                                  cooldown=8.0, widen=1.0, burn=5.0)),
 )}
 
 

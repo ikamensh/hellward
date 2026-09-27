@@ -116,6 +116,11 @@ RANK_SKILL: Final[dict[str, tuple[str, str]]] = {
 }
 
 
+def column_of(kind: str) -> str:
+    """The tree column of a tower kind: where its ranks are learned."""
+    return SKILLS[RANK_SKILL[kind][0]].column
+
+
 @dataclass(frozen=True)
 class Perks:
     """Every number and rule the learned skills change; the defaults are the untrained game."""

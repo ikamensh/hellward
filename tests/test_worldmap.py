@@ -2,7 +2,9 @@
 
 from hellward.art import worldmap
 from hellward.art.rig import DENSITY
-from hellward.sim.campaign import ORDER
+from hellward.sim.campaign import ACTS
+
+ORDER = ACTS[1]   # the painted map is Act I's; Act II's map is to come
 
 
 def test_every_trail_runs_from_its_place_to_the_next_and_back_again():

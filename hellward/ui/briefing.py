@@ -138,6 +138,13 @@ class BriefingScene(Scene):
             notes = monster_notes(kind)
             if leader:
                 notes.append("Curses: " + ", ".join(CURSES[c].name for c in kind.leader.curses))
+                spec = kind.leader
+                if spec.raises:
+                    notes.append(f"Raises fallen {MONSTERS[spec.raises].name}s")
+                if spec.mark > 0:
+                    notes.append(f"Marks its spot {spec.mark:g} s ahead: no chant, nothing breaks it")
+                if spec.burn > 0:
+                    notes.append(f"Each curse burns {spec.burn:g} mana per tower caught")
             widgets.centred(self, ", ".join(notes) or "No resistances", x + width / 2, top + 148, width - 12, font_size=11,
                             color=style.PALE_GOLD, max_lines=4)
             x += width + 10

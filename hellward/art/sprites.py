@@ -114,6 +114,19 @@ def _cell(canvas: tuple[float, float], origin: tuple[float, float]) -> Cell:
     return Cell((float(canvas[0]), float(canvas[1])), (float(origin[0]), float(origin[1])))
 
 
+# Act II monsters tinted from their Act I stand-ins when no painted sheet exists
+_ACT2_TINTS = {
+    "flayer": ((180, 60, 40), "fallen"),
+    "zealot": ((255, 200, 60), "goatman"),
+    "spider": ((100, 100, 110), "gargoyle"),
+    "bat": ((140, 50, 160), "gargoyle"),
+    "hulk": ((80, 120, 60), "overlord"),
+    "drowned": ((60, 80, 120), "zombie"),
+    "fetish": ((160, 40, 60), "shaman"),
+    "inquisitor": ((240, 220, 80), "priest"),
+    "bone_priest": ((220, 200, 160), "priest"),
+}
+
 def register(game: Game, cache_dir: Path) -> Art:
     cache = warm(cache_dir)
     assets = game.assets
@@ -127,6 +140,10 @@ def register(game: Game, cache_dir: Path) -> Art:
         cells[kind] = Cell((cw / DENSITY, ch / DENSITY), (sheet.origin[0] / DENSITY, sheet.origin[1] / DENSITY))
         for key, image in frames.items():
             facing, frame = key.split("/")
+            if kind in _ACT2_TINTS and not is_painted:
+                tint_color = _ACT2_TINTS[kind][0]
+                tinted = ImageOps.colorize(image.convert("L"), (0, 0, 0), tint_color)
+                image = tinted.convert("RGBA")
             if facing == "side":
                 assets.image_from_pil(f"mon/{kind}/right/{frame}", image)
                 assets.image_from_pil(f"mon/{kind}/left/{frame}", ImageOps.mirror(image))

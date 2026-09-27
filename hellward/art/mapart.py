@@ -74,6 +74,24 @@ THEMES: dict[str, Theme] = {
                   "the gate of hell seen from above: cracked black obsidian and brimstone ground veined with glowing lava, a "
                   "road of black basalt flagstones along the path stained with blood, walls of jagged obsidian lit red from "
                   "below, pools and rivers of lava, skull piles and brimstone spires"),
+    "docks": Theme((32, 28, 26), (56, 48, 44), (24, 20, 20), (48, 40, 36), "pit", "bones", False, False, "fires",
+                   "Kurast's rotting docks at night: black water and dark wooden planks, a path of weathered boards over the "
+                   "piers, walls of crumbling warehouses with lantern light, scattered crates, rope coils and barnacled posts"),
+    "spider_forest": Theme((28, 36, 26), (48, 56, 44), (20, 28, 20), (40, 48, 36), "grave", "headstone", False, False, "moon",
+                           "the spider forest's canopy floor: dark green moss and black loam, a winding path of root and stone, "
+                           "ancient oaks with silver bark forming a druid ring, webs strung between trunks, fallen leaves"),
+    "jungle": Theme((24, 40, 22), (44, 60, 40), (18, 28, 18), (36, 48, 32), "pit", "boulder", False, False, "fires",
+                    "the flayer jungle's dense floor: deep green moss and black earth, two long straight roads of packed dirt, "
+                    "walls of massive buttress roots and lianas, torchlight from zealot shrines, scattered bones and fetishes"),
+    "drowned_city": Theme((26, 28, 36), (40, 44, 56), (18, 20, 24), (32, 36, 48), "pit", "bones", False, True, "moon",
+                          "Kurast's drowned streets: black water canals reflecting moonlight, flagstone paths along the canals, "
+                          "walls of water-stained masonry with green moss, bone pits in the plazas, lanterns on drowned arches"),
+    "travincal": Theme((48, 44, 32), (72, 64, 48), (36, 32, 24), (56, 52, 38), "pit", "spire", True, True, "torches",
+                       "the High Council's terrace: gilt-edged marble flagstones, a wide carpet of crimson and gold, "
+                       "pillared arches along the way, braziers burning with pale flame, the mother lamp's light above"),
+    "temple": Theme((42, 38, 32), (60, 56, 48), (30, 26, 22), (50, 46, 40), "pit", "bones", True, True, "torches",
+                    "the Temple of Light's nave: worn marble flagstones veined with gold, a dim crimson carpet to the altar, "
+                    "tall pillars with bone niches, torch sconces guttering, the mother lamp hanging dim, scattered skulls"),
 }
 
 

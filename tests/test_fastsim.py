@@ -171,6 +171,88 @@ def test_a_clone_steps_as_its_world() -> None:
         assert sim_bench.state(twin) == sim_bench.state(world), f"parted at step {step + 1}"
 
 
+def busy_act2_world() -> World:
+    """Temple (Act II) with Act II monsters: a risen Flayer, a marking Inquisitor, a Bone Priest burning mana."""
+    arsenal = replace(LOCATIONS["temple"].arsenal,
+                      towers=LOCATIONS["temple"].arsenal.towers)
+    place = replace(LOCATIONS["temple"], arsenal=arsenal)
+    world = World(place, perks=perks(SKILLS), seed=7, planner=planner.smart)
+    world.lives = 10_000
+    player, hands = Ordinary(), Hands(world, react=0.6)
+
+    def full() -> bool:
+        m = world.monsters
+        return (world.wave >= 2 and bool(world.leaders()) and bool(world.bolts) and bool(world.hazards)
+                and any(x.door >= 0 for x in m) and any(x.poison for x in m) and any(x.chill_left > 0 for x in m))
+
+    while not full():
+        assert world.outcome is None
+        player.act(hands)
+        world.step()
+        hands.observe(world.events)
+        world.events.clear()
+    world.call_wave()
+    world.planner = None
+    for m in world.monsters:
+        m.asking, m.ask_left = None, 0.0
+    world.mana = world.mana_max
+    world.meteor(*world.position(world.monsters[0]))
+    world.mana = world.mana_max
+    world.orb(*world.position(next(m for m in reversed(world.monsters) if m.door < 0)))
+    world.mana = world.mana_max
+    world.smite(world.monsters[1].id)
+    towers = sorted(world.towers.values(), key=lambda t: t.id)
+    towers[0].curses[Curse.DECREPIFY] = 5.0
+    towers[1].curses[Curse.BONE_PRISON] = 3.0
+    towers[2].ward = 4.0
+    leader = world.leaders()[0]
+    leader.chant_curse, leader.chant_spot, leader.chant_left = Curse.WEAKEN, towers[3].tile, 0.8
+    world.gold = 10000
+    free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
+            if world.level.buildable(x, y) and world.tower_at((x, y)) is None]
+    altar = world.build("altar", free[0])
+    grove = world.build("grove", free[1])
+    grove.timer = 3.5
+    for m in world.monsters[:3]:
+        m.amplified, m.amplify = 2.0, 0.3
+
+    # Add Act II specific state: a risen flayer and a marking inquisitor
+    from hellward.sim.content import MONSTERS
+    from hellward.sim.model import Monster
+    flayer = MONSTERS["flayer"]
+    flayer_hp = flayer.hp * world.waves[world.wave].hp * world.location.life
+    risen_flayer = Monster(world._id(), flayer, world.wave, 0.0, 0.0, flayer_hp * 0.5, 0.0)
+    risen_flayer.s = 15.0
+    risen_flayer.risen = True
+    risen_flayer.frozen = 0.5
+    world.monsters.append(risen_flayer)
+
+    inquisitor = MONSTERS["inquisitor"]
+    inq_hp = inquisitor.hp * world.waves[world.wave].hp * world.location.life
+    marking_inq = Monster(world._id(), inquisitor, world.wave, 0.0, 0.0, inq_hp, inquisitor.leader.first_cast)
+    marking_inq.s = 20.0
+    marking_inq.chant_curse = Curse.WEAKEN
+    marking_inq.chant_spot = towers[0].tile
+    marking_inq.chant_left = 0.8
+    marking_inq.marking = True
+    world.monsters.append(marking_inq)
+
+    return world
+
+
+def test_act2_clone_fidelity() -> None:
+    """Clone fidelity for an Act II busy world with risen and marking monsters."""
+    world = busy_act2_world()
+    assert any(m.risen for m in world.monsters)
+    assert any(m.marking for m in world.monsters)
+    world.record = False
+    twin = world.clone()
+    for step in range(300):
+        world.step()
+        twin.step()
+        assert sim_bench.state(twin) == sim_bench.state(world), f"parted at step {step + 1}"
+
+
 def test_float_sum_adds_as_the_builtin_sum_does() -> None:
     """Property: to the bit, on sums that cancel, that carry, and that are ordinary."""
     rng = random.Random(9)

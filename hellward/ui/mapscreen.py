@@ -13,7 +13,9 @@ from typing import TYPE_CHECKING
 from saga2d import Anchor, Button, Row, Scene
 
 from hellward.art import worldmap
-from hellward.sim.campaign import LOCATIONS, ORDER
+from hellward.sim.campaign import ACTS, LOCATIONS
+
+ORDER = ACTS[1]   # the painted map is Act I's; Act II's map and the act tabs are to come
 from hellward.ui import style, widgets
 from hellward.ui.story import INPUT_GUARD
 

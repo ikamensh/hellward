@@ -9,7 +9,7 @@ from saga2d.testing import assert_text_fits
 
 from hellward.__main__ import build
 from hellward.sim import planner
-from hellward.sim.campaign import LOCATIONS, ORDER
+from hellward.sim.campaign import ACTS, LOCATIONS, ORDER
 from hellward.sim.players.ordinary import Ordinary
 from hellward.story import STORIES, Page
 from hellward.ui import menus
@@ -178,7 +178,7 @@ def test_winning_tristram_shows_its_after_page_once(game):
 
 def test_a_save_holding_act_one_plays_the_ending_once(game):
     g, flow = game
-    flow.progress.won = {key: 1 for key in ORDER}
+    flow.progress.won = {key: 1 for key in ACTS[1]}
     flow.world_map()
     tick(g)
     page = g.scenes[-1]
