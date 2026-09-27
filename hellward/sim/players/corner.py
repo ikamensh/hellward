@@ -104,8 +104,8 @@ class Corner:
             return
         self._clock = world.time + self.THINK
         self._spells(hands)
-        self._gates(world)
-        self._spend(world)
+        if self._spend(world):   # the towers first; the gates only once the planned towers stand
+            self._gates(world)
         if world.can_call_wave and world.break_left is not None and world.break_left < 23.0:
             world.call_wave()
 
@@ -128,7 +128,7 @@ class Corner:
             reach = tower_reach(kind, world)
             free_tiles.sort(key=lambda t: (min(math.hypot(t[0] - ft[0], t[1] - ft[1]) for ft in self._frost_tiles) if self._frost_tiles else 0.0,
                                            -score_with_spacing(tile_value_for_kind(world.location, kind, t, reach), list(built), t, world.location) if radius > 0 else -tile_value_for_kind(world.location, kind, t, reach)))
-            for tile in free_tiles[:2]:
+            for tile in free_tiles[:3]:
                 if tile not in built:
                     self._planned.append((kind, tile))
                     built.add(tile)
@@ -175,26 +175,28 @@ class Corner:
                 except Refused:
                     pass
 
-    def _spend(self, world: World) -> None:
+    def _spend(self, world: World) -> bool:
+        """Build the planned towers in order, then raise ranks, every coin as it comes. Whether every planned tower
+        stands."""
         while True:
             built = {t.tile for t in world.towers.values()}
             todo = [(kind, tile) for kind, tile in self._planned if tile not in built]
             if todo:
                 kind, tile = todo[0]
                 if world.gold < world.cost(kind):
-                    return
+                    return False
                 try:
                     world.build(kind, tile)
                 except Refused:
-                    self._planned.pop(0)
+                    self._planned.remove((kind, tile))
                 continue
             upgrades = [(t, c) for t in world.towers.values()
                         if (c := world.upgrade_cost(t)) is not None and world.rank_needs(t) is None]
             if not upgrades:
-                return
+                return True
             tower, cost = min(upgrades, key=lambda u: (u[0].level, u[0].id))
             if world.gold < cost:
-                return
+                return True
             world.upgrade(tower.id)
 
 
