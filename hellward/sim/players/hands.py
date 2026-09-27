@@ -94,7 +94,7 @@ class Hands:
         self.aim_gap = aim_gap
         self.record = Record()
         self._signs: dict[int, Sign] = {}
-        self._resolute: set[int] = set()   # leaders broken once, their dark halo showing: the next curse holds
+        self._resolute: set[int] = set()   # leaders broken once, their ember halo showing: the next curse holds
         self._last_aim = -1e9
 
     def observe(self, events: list[tuple], dt: float = SIM_DT) -> None:
