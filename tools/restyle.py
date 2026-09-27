@@ -60,6 +60,24 @@ MONSTER_SUBJECTS = {
               "carrying a plain bone staff",
     "witch": "a Blood Witch: a slender sorceress with pale skin, long black hair and two small dark horns, in a long crimson gown with "
              "a high dark collar and a gold clasp, carrying a black staff topped with a red crystal",
+    "flayer": "a Flayer: a tiny knee-high jungle fiend, hunched with bony limbs, a bone mask with a feather crest, glowing orange eyes, "
+              "holding a short bone-tipped spear",
+    "zealot": "a Zealot: a tall human fanatic in white-and-gold robes with a tall mitre-like hood, glowing brown eyes, "
+              "swinging a long flail with a spiked head",
+    "spider": "a Spider: a big eight-legged spider, low and wide, dark body with a red hourglass marking, legs moving in walk frames, "
+              "mandibles clicking",
+    "bat": "a Blood Bat: a small flying bat with wings spread, crimson body, glowing red eyes, pointed ears, "
+           "hovering at gargoyle height",
+    "hulk": "a Thorned Hulk: a huge broad brute of dark bark and thorns, long arms knuckle-walking, small head with glowing amber eyes, "
+            "thorns sprouting from back and shoulders",
+    "drowned": "a Drowned: a bloated pale blue-green corpse with weed hanging from its limbs, slack jaw, pale glowing eyes, "
+               "arms reaching forward with clawed hands",
+    "fetish": "a Fetish Shaman: a flayer with a huge feathered headdress of gold and red plumes, bone mask, glowing yellow eyes, "
+              "carrying a staff topped with a smoking skull",
+    "inquisitor": "an Inquisitor: a Zakarum zealot leader in heavy white-and-gold vestments, ornate gold-trimmed mitre, "
+                  "holding a book in the left hand and raising an open palm in the right",
+    "bone_priest": "the Bone Priest: a towering skeletal boss at 1.6x scale in a hooded ash-brown robe with a crimson stole, "
+                   "a gold spiked crown, carrying a staff topped by a caged green orb",
 }
 
 FIXES = {
@@ -69,6 +87,12 @@ FIXES = {
     "gargoyle": "The wings are flat triangles: paint bat wings with finger bones and torn membrane, spread exactly as drawn.",
     "azazel": "The wings are flat triangles: paint bat wings with bones and membrane, spread exactly as drawn.",
     "zombie": "The arms are straight blocks: paint gaunt rotting arms in the same reach.",
+    "spider": "The legs are thin rods: paint eight segmented spider legs with joints, moving naturally in walk frames.",
+    "bat": "The wings are flat triangles: paint bat wings with finger bones and torn membrane, spread exactly as drawn.",
+    "hulk": "The thorns are simple cones: paint gnarled bark and organic thorns growing from the body.",
+    "drowned": "The weed is simple rods: paint wet seaweed and kelp draping naturally from the bloated body.",
+    "fetish": "The headdress feathers are simple rods: paint layered feathers with barbs and natural curvature.",
+    "bone_priest": "The cage is boxy rods: paint an ornate gold cage with filigree around the glowing orb.",
 }
 
 FRAME_WORDS = {
@@ -126,9 +150,11 @@ def tower_subject() -> Subject:
     layout = ("Columns, left to right: a fire pyre (a stone pillar carrying an iron brazier of roaring flame); a storm obelisk (a "
               "dark basalt obelisk with glowing blue runes and a floating blue crystal, copper coils from the second rank); a frost "
               "shrine (a cluster of pale blue ice crystals on a stone plinth); a plague totem (a bone pole of stacked skulls with "
-              "glowing green eyes and a horned ram skull on top, over a pool of green venom). Rows, top to bottom: the first, second "
-              "and third rank of each; every rank is taller and grander than the one above it, on purpose.")
-    prompt = _prompt(sheet, layout, "the four magical defence towers of a gothic cathedral, each standing on its own square stone plinth",
+              "glowing green eyes and a horned ram skull on top, over a pool of green venom); a bone altar (a stone slab piled with "
+              "skulls and ribs, a violet-green flame growing with rank); a druid grove (a ring of standing stones around a twisted oak, "
+              "leafier with each rank). Rows, top to bottom: the first, second and third rank of each; every rank is taller and grander "
+              "than the one above it, on purpose.")
+    prompt = _prompt(sheet, layout, "the six magical defence towers of a gothic cathedral, each standing on its own square stone plinth",
                      "Paint carved gothic stone, wrought iron and bone in place of the blocky shapes, keeping each tower's outline.")
     return Subject("towers", sheet, images, prompt, "towers", [k for k, _ in keys])
 

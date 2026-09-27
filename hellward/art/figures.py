@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from functools import lru_cache
+import math
 
 from PIL import Image
 from sagaforge import render3d as r3
@@ -340,22 +341,253 @@ def witch(pose: Pose) -> Mesh:
     return humanoid(b, pose, head=head, right_hand=staff, left_hand=[], extra=collar)
 
 
+# -- Act II monsters -----------------------------------------------------------------------------
+
+
+def flayer(pose: Pose) -> Mesh:
+    """Tiny jungle fiend, knee-high, hunched, bony limbs, bone mask with feather crest, short spear."""
+    skin = (180, 60, 40)
+    b = Build(hip=0.12, leg_w=0.045, torso=(0.14, 0.1, 0.13), head=0.08, arm_len=0.12, arm_w=0.04,
+              skin=skin, legs_color=(120, 40, 30), body_color=(140, 50, 35), hunch=22)
+    head = r3.box((0, 0, 0), (b.head * 1.3, b.head * 1.1, b.head * 1.2), (80, 60, 50))  # bone mask
+    head += r3.box((0, b.head * 0.5, -b.head * 0.25), (b.head * 0.8, b.head * 0.7, b.head * 0.5), (60, 45, 40))
+    for side in (-1, 1):   # feather crest
+        head += rod((side * b.head * 0.35, -0.02, b.head * 0.9), (side * b.head * 0.6, -0.06, b.head * 1.8), 0.02, (200, 170, 60))
+    head += eyes(b.head, color=(255, 180, 40), spread=0.45, height=0.2)
+    spear = rod((0, -0.02, 0.0), (0, 0.22, 0.02), 0.025, (110, 90, 70))
+    spear += blade((0, 0.18, 0.02), (0, 0.35, 0.05), 0.05, (180, 170, 160))
+    spear = held(spear, 55)
+    return humanoid(b, pose, head=head, right_hand=spear, left_hand=[])
+
+
+def zealot(pose: Pose) -> Mesh:
+    """Tall human fanatic in white-and-gold robes, tall mitre-like hood, long flail."""
+    skin = (220, 190, 170)
+    robe = (245, 235, 210)
+    gold = (210, 170, 40)
+    b = Build(hip=0.36, leg_w=0.055, torso=(0.22, 0.14, 0.28), head=0.085, arm_len=0.28, arm_w=0.045,
+              skin=skin, legs_color=robe, body_color=robe, robe=robe, hunch=2)
+    head = r3.sphere((0, 0, 0), b.head, skin, rings=4, sides=7)
+    head += eyes(b.head, color=(40, 30, 20), spread=0.35, height=0.1)
+    mitre = r3.pyramid((0, -0.02, -b.head * 0.15), (b.head * 1.1, b.head * 1.1), b.head * 2.6, robe)
+    mitre += r3.box((0, 0, -b.head * 0.2), (b.head * 1.2, b.head * 0.8, b.head * 0.4), gold)
+    head = mitre + head
+    stole = r3.box((0, 0.06, 0.3 + 0.12), (0.06, 0.01, 0.28), gold)
+    flail = rod((0, -0.03, 0.02), (0, 0.05, -0.28), 0.025, (120, 90, 60))
+    chain = []
+    for i in range(3):
+        z = -0.32 - i * 0.09
+        chain += r3.sphere((0, 0.03, z), 0.035, (160, 130, 80), rings=3, sides=5)
+    flail += chain
+    flail = held(flail, 65, -15)
+    return humanoid(b, pose, head=head, right_hand=flail, left_hand=[], extra=stole)
+
+
+def spider(pose: Pose) -> Mesh:
+    """Big eight-legged spider, low and wide, dark body with red hourglass, walk frames move legs."""
+    body_color = (40, 20, 25)
+    leg_color = (20, 10, 15)
+    hourglass = (220, 40, 40)
+    mesh: Mesh = []
+    # Cephalothorax (front body) - main body where legs attach
+    thorax = r3.sphere((0, 0, 0), 0.18, body_color, rings=5, sides=7)
+    mesh += thorax
+    # Abdomen (large rear body) joined to thorax
+    abd = r3.sphere((0, -0.38, 0.05), 0.3, body_color, rings=6, sides=8)
+    abd += r3.box((0, -0.38, 0.3), (0.12, 0.08, 0.06), hourglass)
+    abd += r3.box((0, -0.38, 0.36), (0.08, 0.06, 0.04), hourglass)
+    # Pedicel (narrow waist joining abdomen to thorax)
+    abd += r3.cylinder((0, -0.18, 0.0), 0.04, 0.2, body_color, sides=6)
+    mesh += abd
+    # Mandibles (chelicerae)
+    for side in (-1, 1):
+        mand = rod((side * 0.1, 0.15, 0.05), (side * 0.18, 0.22, -0.02), 0.025, leg_color)
+        mesh += mand
+    # Eyes (cluster of 8 small eyes on front of thorax)
+    for dx in (-0.04, 0.04):
+        for dy in (-0.03, 0.0, 0.03):
+            mesh += r3.box((dx, 0.15, 0.1), (0.015, 0.015, 0.015), (255, 180, 30))
+    # Eight legs attached to thorax at proper positions (4 pairs along thorax sides)
+    leg_phase = pose.leg / 30.0  # -1 to 1
+    # Leg attachment points on thorax: 4 pairs at different y positions
+    leg_pairs = [
+        (-1, -35, 0.12), (-1, -10, 0.04), (-1, 15, -0.04), (-1, 40, -0.12),  # left side
+        (1, -35, 0.12), (1, -10, 0.04), (1, 15, -0.04), (1, 40, -0.12),    # right side
+    ]
+    for side, ang_base, attach_y in leg_pairs:
+        swing = leg_phase * 35 * (1 if side < 0 else -1)
+        ang = math.radians(ang_base + swing)
+        # Attach at thorax side
+        attach_x = side * 0.18
+        attach_z = 0.05
+        # Two segments per leg
+        seg1_end = (attach_x + side * 0.25 * math.cos(ang), attach_y + 0.25 * math.sin(ang), attach_z - 0.05)
+        seg2_end = (seg1_end[0] + side * 0.22 * math.cos(ang * 0.7),
+                    seg1_end[1] + 0.22 * math.sin(ang * 0.7), -0.05)
+        mesh += rod((attach_x, attach_y, attach_z), seg1_end, 0.022, leg_color)
+        mesh += rod(seg1_end, seg2_end, 0.018, leg_color)
+    return move(mesh, 0, 0, 0.1)
+
+
+def bat(pose: Pose) -> Mesh:
+    """Blood bat, wings spread, small body; flies like the gargoyle (same height offset)."""
+    body_color = (100, 20, 40)
+    wing_color = (140, 30, 60)
+    mesh: Mesh = []
+    # Small body
+    mesh += r3.sphere((0, 0, 0), 0.07, body_color, rings=4, sides=6)
+    mesh += r3.box((0, 0.04, -0.02), (0.05, 0.06, 0.04), (80, 15, 30))  # snout
+    mesh += eyes(0.07, color=(255, 60, 80), spread=0.5, height=0.15)
+    # Ears
+    for side in (-1, 1):
+        mesh += rod((side * 0.05, 0, 0.06), (side * 0.12, -0.02, 0.15), 0.015, body_color)
+    # Wings
+    spread = 30 + pose.flap * 0.8
+    for side in (-1, 1):
+        mesh += wing((side * 0.05, -0.02, 0.05), 0.55, 0.25, side, spread, wing_color)
+    return move(mesh, 0, 0, 0.32)  # same hover as gargoyle
+
+
+def hulk(pose: Pose) -> Mesh:
+    """Thorned Hulk: huge broad brute of bark and thorns, long arms, small head, knuckle-walking."""
+    bark = (80, 60, 40)
+    thorn = (140, 100, 60)
+    thorn_tip = (180, 160, 80)
+    b = Build(hip=0.55, leg_w=0.14, torso=(0.55, 0.35, 0.45), head=0.09, arm_len=0.55, arm_w=0.12,
+              skin=bark, legs_color=bark, body_color=(70, 55, 35), hunch=30)
+    head = r3.sphere((0, 0, 0), b.head, bark, rings=4, sides=6)
+    head += r3.box((0, b.head * 0.4, -b.head * 0.3), (b.head * 1.1, b.head * 0.8, b.head * 0.5), (60, 45, 30))
+    head += eyes(b.head, color=(200, 180, 60), spread=0.4, height=0.2)
+    # Thorns on back and shoulders
+    extra: Mesh = []
+    for x in (-0.22, 0.22):
+        extra += rod((x, 0.05, 0.52), (x, 0.1, 0.75), 0.035, thorn)
+        extra += r3.cone((x, 0.1, 0.75), 0.025, 0.08, thorn_tip, sides=4)
+    for i in range(3):
+        z = 0.55 + i * 0.12
+        extra += rod((0, 0.08, z), (0, 0.15, z + 0.18), 0.025, thorn)
+        extra += r3.cone((0, 0.15, z + 0.18), 0.018, 0.06, thorn_tip, sides=4)
+    # Knuckle-walking: arms forward, hands on ground
+    fist = r3.box((0, 0, 0), (b.arm_w * 1.8, b.arm_w * 1.8, b.arm_w * 1.5), (60, 45, 30))
+    return humanoid(b, replace(pose, arm=-40, right=-50, left=-50), head=head,
+                    right_hand=fist, left_hand=fist, extra=extra)
+
+
+def drowned(pose: Pose) -> Mesh:
+    """Bloated drowned corpse, pale blue-green, weed hanging off it, arms reaching."""
+    skin = (70, 100, 110)
+    weed = (40, 80, 50)
+    b = Build(hip=0.28, leg_w=0.08, torso=(0.3, 0.22, 0.32), head=0.095, arm_len=0.3, arm_w=0.06,
+              skin=skin, legs_color=(50, 75, 85), body_color=(80, 110, 120), hunch=18, reach=70)
+    head = r3.sphere((0, 0, 0), b.head, skin, rings=4, sides=7)
+    head += r3.box((0.02, b.head * 0.5, -b.head * 0.4), (b.head * 1.1, b.head * 0.7, b.head * 0.5), (50, 60, 70))  # slack jaw
+    head += eyes(b.head, color=(160, 220, 200), spread=0.45, height=0.15)
+    head = roll(head, 10, (0, 0, -b.head))
+    # Weed hanging from body
+    extra: Mesh = []
+    for dx in (-0.12, -0.04, 0.04, 0.12):
+        w = rod((dx, 0.15, 0.4), (dx + 0.03, 0.22, 0.2), 0.015, weed)
+        w += rod((dx, 0.15, 0.4), (dx - 0.02, 0.18, 0.1), 0.012, weed)
+        extra += w
+    claws = []
+    for dx in (-0.02, 0.0, 0.02):
+        claws += rod((dx, 0.0, 0.0), (dx * 1.3, 0.06, -0.08), 0.012, (40, 50, 55))
+    return humanoid(b, pose, head=head, right_hand=claws, left_hand=claws, extra=extra)
+
+
+def fetish(pose: Pose) -> Mesh:
+    """Fetish Shaman: a flayer with a big feathered headdress and a staff with a smoking skull (chant frames)."""
+    skin = (160, 40, 60)
+    b = Build(hip=0.13, leg_w=0.05, torso=(0.15, 0.11, 0.14), head=0.085, arm_len=0.14, arm_w=0.045,
+              skin=skin, legs_color=(110, 30, 45), body_color=(130, 45, 55), hunch=20)
+    head = r3.box((0, 0, 0), (b.head * 1.4, b.head * 1.2, b.head * 1.3), (70, 40, 50))  # bone mask
+    head += r3.box((0, b.head * 0.5, -b.head * 0.25), (b.head * 0.9, b.head * 0.8, b.head * 0.5), (50, 35, 40))
+    # Large feathered headdress
+    for i, dx in enumerate((-0.1, -0.05, 0.0, 0.05, 0.1)):
+        color = (200, 160, 50) if i % 2 == 0 else (210, 60, 50)
+        head += rod((dx * 0.8, -0.03, b.head * 1.0), (dx * 1.5, -0.1, b.head * 2.8), 0.035, color)
+    head += eyes(b.head, color=(255, 200, 60), spread=0.5, height=0.2)
+    # Staff with smoking skull
+    staff = rod((0, -0.02, 0.05), (0, 0.04, -0.25), 0.03, (90, 70, 50))
+    staff += rod((0, -0.02, 0.05), (0, -0.1, 0.55), 0.03, (90, 70, 50))
+    staff += r3.sphere((0, -0.11, 0.6), 0.07, (220, 200, 170), rings=4, sides=6)  # skull
+    # Smoke from skull
+    staff += r3.cone((0, -0.08, 0.65), 0.06, 0.15, (80, 80, 90, 120), sides=6)
+    staff += r3.cone((0, -0.05, 0.75), 0.04, 0.1, (60, 60, 70, 80), sides=6)
+    return humanoid(b, pose, head=head, right_hand=staff, left_hand=[])
+
+
+def inquisitor(pose: Pose) -> Mesh:
+    """Zakarum Inquisitor: a zealot leader in heavier gold vestments, a book in one hand and a raised open palm (chant frames)."""
+    skin = (210, 180, 160)
+    vestment = (250, 240, 210)
+    gold = (220, 180, 50)
+    b = Build(hip=0.38, leg_w=0.06, torso=(0.25, 0.16, 0.3), head=0.09, arm_len=0.3, arm_w=0.05,
+              skin=skin, legs_color=vestment, body_color=vestment, robe=vestment, hunch=0)
+    head = r3.sphere((0, 0, 0), b.head, skin, rings=4, sides=7)
+    head += eyes(b.head, color=(30, 25, 20), spread=0.35, height=0.1)
+    # Ornate mitre with gold trim
+    mitre = r3.pyramid((0, -0.02, -b.head * 0.15), (b.head * 1.2, b.head * 1.2), b.head * 3.0, vestment)
+    for side in (-1, 1):
+        mitre += rod((side * b.head * 0.9, 0, b.head * 1.2), (side * b.head * 1.6, 0, b.head * 2.8), 0.025, gold)
+    mitre += r3.box((0, 0, -b.head * 0.2), (b.head * 1.3, b.head * 0.9, b.head * 0.5), gold)
+    head = mitre + head
+    # Book in left hand
+    book = r3.box((0, 0, 0), (0.12, 0.02, 0.16), (40, 30, 20))
+    book += r3.box((0, -0.01, 0.08), (0.11, 0.03, 0.01), gold)
+    book += r3.box((0.055, -0.01, 0.0), (0.01, 0.03, 0.16), (60, 40, 20))  # spine
+    # Right hand raised open palm (chanting)
+    palm = r3.box((0, 0, 0), (0.07, 0.015, 0.09), skin)
+    for dx in (-0.025, -0.008, 0.008, 0.025):
+        palm += rod((dx, 0.015, 0.0), (dx * 1.1, 0.06, 0.0), 0.01, skin)
+    return humanoid(b, pose, head=head, right_hand=palm, left_hand=book)
+
+
+def bone_priest(pose: Pose) -> Mesh:
+    """Bone Priest boss: reuse the priest rig at 1.6x with a gold spiked crown and a staff topped by a caged green orb (chant frames)."""
+    bone = (222, 214, 190)
+    robe = (62, 50, 44)
+    gold = (210, 170, 30)
+    orb = (60, 220, 120)
+    b = Build(hip=0.48, leg_w=0.08, torso=(0.35, 0.22, 0.42), head=0.144, arm_len=0.384, arm_w=0.08,
+              skin=bone, legs_color=robe, body_color=robe, robe=robe, hunch=6)
+    head = r3.sphere((0, 0, 0), b.head, bone, rings=4, sides=7)
+    head += eyes(b.head, color=(120, 255, 150), spread=0.4, height=0.15)
+    hood = r3.cone((0, -0.02, -b.head * 0.2), b.head * 1.35, b.head * 2.4, darker(robe, 0.8), sides=8)
+    head = hood + head
+    # Gold spiked crown
+    crown = []
+    for i in range(7):
+        x = (i - 3) * 0.045
+        crown += r3.cone((x, 0.04, b.head * 0.95), 0.022, 0.1, gold, sides=4)
+        crown += r3.cone((x, 0.04, b.head * 1.0), 0.012, 0.06, (255, 255, 200), sides=4)
+    head += crown
+    stole = r3.box((0, 0.075, 0.3 + 0.13), (0.07, 0.01, 0.26), (140, 30, 40))
+    # Staff with caged green orb
+    staff = rod((0, -0.02, 0.05), (0, 0.04, -0.4), 0.04, (60, 56, 50))
+    staff += rod((0, -0.02, 0.05), (0, -0.16, 0.8), 0.04, (60, 56, 50))
+    # Cage around orb
+    cage = []
+    for i in range(6):
+        a = 2 * math.pi * i / 6
+        cage += rod((0, -0.16, 0.7), (math.cos(a) * 0.1, math.sin(a) * 0.1, 0.9), 0.015, gold)
+    cage += r3.box((0, -0.16, 0.7), (0.2, 0.01, 0.2), gold)
+    cage += r3.box((0, -0.16, 0.9), (0.2, 0.01, 0.2), gold)
+    cage += r3.sphere((0, -0.16, 0.8), 0.09, orb, rings=5, sides=7)
+    staff += cage
+    return humanoid(b, pose, head=head, right_hand=staff, left_hand=[], extra=stole)
+
+
 BUILDERS = {
     "fallen": fallen, "shaman": lambda p: fallen(p, shaman=True), "skeleton": skeleton, "zombie": zombie,
     "goatman": goatman, "gargoyle": gargoyle, "overlord": overlord, "azazel": azazel, "priest": priest, "witch": witch,
-    "flayer": lambda p: fallen(p, shaman=False),  # reuse fallen with different colors
-    "zealot": lambda p: goatman(p),  # reuse goatman with different colors
-    "spider": gargoyle,  # reuse gargoyle
-    "bat": gargoyle,  # reuse gargoyle
-    "hulk": overlord,  # reuse overlord
-    "drowned": zombie,  # reuse zombie
-    "fetish": lambda p: fallen(p, shaman=True),  # reuse shaman
-    "inquisitor": priest,  # reuse priest
-    "bone_priest": priest,  # reuse priest
+    "flayer": flayer, "zealot": zealot, "spider": spider, "bat": bat, "hulk": hulk,
+    "drowned": drowned, "fetish": fetish, "inquisitor": inquisitor, "bone_priest": bone_priest,
 }
 
 #: Zombies shamble; overlords and the boss stride heavily; gargoyles flap rather than step.
-GAITS = {"zombie": 0.6, "overlord": 0.75, "azazel": 0.7, "gargoyle": 0.5, "hulk": 0.7, "bat": 0.5}
+GAITS = {"zombie": 0.6, "overlord": 0.75, "azazel": 0.7, "gargoyle": 0.5, "hulk": 0.7, "bat": 0.5,
+         "flayer": 1.1, "zealot": 1.0, "spider": 1.2, "drowned": 0.7, "fetish": 1.0, "inquisitor": 0.95, "bone_priest": 0.6}
 
 
 def pose_of(kind: str, frame: str) -> Pose:
