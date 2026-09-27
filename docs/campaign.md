@@ -198,7 +198,8 @@ The Act II leaders bring new ways of cursing:
   - **Leaving nothing to raise:** a Flayer burst by Corpse Explosion or Shatter stays dead.
 - **Zakarum Inquisitor** (the zealots'): Weaken and Dim Vision, **marked, not chanted**.
   - **The mark:** when it has chosen, its rune circle burns on the floor for 1.5 s, and then the curse lands. Nothing
-    breaks a mark, not even Smite or Frozen Orb.
+    breaks a mark, not even Smite or Frozen Orb. (A leader of any kind whose curse a spell broke voices its next
+    curse the same way: it is resolute.)
   - **The answers:** ward the marked towers (Salvation's Cleanse on an uncursed tower), move nothing into the circle,
     or kill the inquisitor before the mark runs out.
   - **Cooldown:** 12 s.
@@ -296,10 +297,19 @@ The screen after a story page ignores keys pressed before it opened, so a held E
 
 ## Tuning by simulation
 
-The method stays; the yardstick changes. The bots that beat the old Normal hardest hold two to nine times the
-monsters' life a first-descent player holds. Tuned to their ceiling, the game would be unwinnable for people. It is
-therefore tuned to a **veteran**: a strong player with a person's hands. The strongest bots are a check that the
-game stays hard for them too.
+The method stays; the yardstick changes twice.
+
+The first pass tuned the old Normal to the apprentice, and Ilya won all of it without losing a life. The second
+pass tuned the acts to a **veteran**, the warden's rules with a person's slower hands, and found the veteran far
+below the strong bots: at 1.5 times the Temple's monsters the adaptive player kept all twenty lives with six
+rank III towers spread apart, a gate and a Smite on whatever mattered, while the veteran's fourteen scattered
+towers fell. That is the play the area curses and ranks ask for, and the play Ilya already chose (few kinds,
+every coin spent, the frost where it counts). Tuned to the veteran, a player like him would find the acts easy
+again.
+
+So each location is tuned to the **strongest bot**, B\*: the best median margin of the warden, the adaptive and
+the planned player. A strong player keeps a little to spare; a middling one (the veteran) falls from about the
+third location of each act and has to find the better play.
 
 - **What a player may do.** A player sees what a human sees: the intro's roster, the map, the gold, the mana, the
   leaders' chants and marks. It chooses its skills, places and upgrades towers, builds gates and casts every spell.
@@ -308,10 +318,11 @@ game stays hard for them too.
   aimed spell each half second at most.
 - **The players:**
   - **veteran:** the warden's rules drafting its build from the intro, with no stored or searched plan. It reacts in
-    0.8–1.2 s and casts one aimed spell a second at most. This is the target.
+    0.8–1.2 s and casts one aimed spell a second at most. It stands for a middling player.
   - **corner:** Ilya's stated opening: frost on every path corner, mixed towers packed round it, every coin spent. It
     checks that the area curses and chill-by-resistance took away the answer that won the old Normal.
-  - **warden, planned, adaptive:** the strong players, with builds drafted or searched offline.
+  - **warden, planned, adaptive:** the strong players, with builds drafted or searched offline. The best of them,
+    location by location, is the target.
   - **apprentice:** a thoughtful first descent.
   - **ordinary:** the demo's defender.
 
@@ -328,16 +339,16 @@ game stays hard for them too.
 
 | | 1 | 2 | 3 | 4 | 5 | 6 |
 |---|---|---|---|---|---|---|
-| veteran's M, Act I | ≈1.5 | ≈1.4 | ≈1.3 | ≈1.2 | ≈1.15 | ≈1.1 |
-| veteran's M, Act II | ≈1.4 | ≈1.3 | ≈1.2 | ≈1.15 | ≈1.1 | ≈1.05 |
+| B\*, Act I | ≈1.5 | ≈1.4 | ≈1.3 | ≈1.25 | ≈1.2 | ≈1.15 |
+| B\*, Act II | ≈1.35 | ≈1.3 | ≈1.25 | ≈1.2 | ≈1.15 | ≈1.1 |
 
-- **Winning:** at the tuned factor (M's 1.0) the veteran wins every seed. At each act's end it keeps a median of 10–17
-  lives, shaped by the last waves.
-- **The strongest bot's M, B\*:** at least 1.2 everywhere. Where the strong players' margins differ by more than 1.5
-  times, the reason is found before that location is tuned: an outlier is a bot exploit until shown otherwise.
-- **The apprentice** wins Act I's first two locations. The Graveyard is held gentler than the veteran's curve for it
-  (the veteran is twice the apprentice there). Act II is not held to the apprentice, who never gets through Act I;
-  its first two locations are the veteran's gentle ones instead.
+- **Winning:** at the tuned factor (M's 1.0) the strongest bot wins every seed.
+- **Outliers:** where the strong players' margins differ by more than 1.5 times, the reason is found before that
+  location is tuned: an outlier is a bot exploit until shown otherwise. The 2026-09-27 outliers were not: the
+  adaptive player's lead at the Cathedral and the Temple is the few-strong-towers play above, and a person can play
+  it.
+- **The apprentice** wins Act I's first two locations, which stay gentler than B\*'s curve for it: the first
+  steps teach. Act II is not held to the apprentice, who never gets through Act I.
 - **The corner player:** its M falls at least 20% when the curse radii go from zero to the table's, and it sits below
   the veteran's.
 - **The leaders matter:** from each act's third location on, the veteran's M against random curses is at least
@@ -347,14 +358,18 @@ game stays hard for them too.
 - **Decision time:** at most 100 ms per decision at Travincal and the Temple on the build the game runs. The game's
   leaders think on the compiled simulation when it is built (`tools/sim_bench.py` measures it).
 - **Ilya's own play:** from this build on, every defence a person plays is logged (location, seed, skills, every
-  command with its game time) in `~/.hellward/replays/`. A ghost player can replay his build, so the veteran's targets
-  can move to where his margin really sits.
+  command with its game time) in `~/.hellward/replays/`. A ghost player can replay his build, so the targets can move to
+  where his margin really sits.
 
 **What the first tuning taught** stays true of the rules:
 
 - A gate queue rebuilt the moment it broke was a kill zone, so **a broken gate lies in rubble until the fight dies
   down between waves**.
 - Smite broke seven chants in ten, so **every spell gathers itself** after a cast.
+- Even so, one Smite a leader's cooldown kept that leader silent: the adaptive player broke about nineteen chants a
+  Temple defence, and without Smite it lost every seed it had won with all twenty lives. So **a broken leader grows
+  resolute**: an ember halo at its feet, and its next curse, pondering and all, is voiced as a mark that nothing
+  breaks. Smite stops at most every other curse of a leader; spacing and Cleanse answer the rest.
 - Spells that grew with the difficulty turned hard fights into spell play, so **spells grow with the location
   only**.
 
