@@ -313,6 +313,7 @@ DOCKS = Location(
     taunt="You crossed a sea for a lamp that is not yours. My shaman will raise every Flayer you leave whole.",
     lesson="Amplify where your towers' reaches cross; kill the shaman, or burst the dead so they stay down.",
     requires=("hells_gate",),
+    life=4.21,
 )
 
 SPIDER_FOREST = Location(
@@ -344,6 +345,7 @@ SPIDER_FOREST = Location(
     taunt="The old trees have taken your side. Stand close to them, then. One curse will find you all.",
     lesson="Poison is useless here. A grove makes a bunch worth its risk.",
     requires=("docks",),
+    life=3.42,
 )
 
 JUNGLE = Location(
@@ -374,6 +376,7 @@ JUNGLE = Location(
     taunt="My inquisitors do not chant. You will know their curse when the ground burns under your towers, and not before.",
     lesson="The inquisitors curse without a chant: ward the marked towers, and kill them first.",
     requires=("spider_forest",),
+    life=3.96,
 )
 
 DROWNED_CITY = Location(
@@ -407,6 +410,7 @@ DROWNED_CITY = Location(
     taunt="The Hulks were drowned men once. They do not tire, and your gates are cloth to them.",
     lesson="Frost barely slows the drowned; fire and lightning must. Gates fall fast.",
     requires=("jungle",),
+    life=2.75,
 )
 
 TRAVINCAL = Location(
@@ -442,6 +446,7 @@ TRAVINCAL = Location(
     taunt="Turn back, and I will leave Tristram's lamp alone. It is a small lamp. No one would miss it.",
     lesson="Curses from every side: spread wide, ward what matters, and kill the elders first.",
     requires=("drowned_city",),
+    life=2.89,
 )
 
 TEMPLE = Location(
@@ -474,6 +479,7 @@ TEMPLE = Location(
     taunt="I cannot see you in the bones. So I have come to see you myself.",
     lesson="Each curse of his that lands burns your mana for every tower it catches: spread out, and smite his chant.",
     requires=("travincal",),
+    life=0.83,
 )
 
 LOCATIONS: dict[str, Location] = {loc.key: loc for loc in (
