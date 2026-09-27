@@ -3,8 +3,9 @@
 A gothic tower defence on Saga2D in which demon leaders curse the player's towers, choosing their
 curses by simulating the fight ahead. Part of the Saga stack (`~/saga/`, see `../AGENTS.md`).
 Saga2D is a pinned PyPI release (source in `../saga2d`); `../sagaforge` is an editable path
-dependency. `docs/design.md` is one defence; `docs/campaign.md` is the campaign around it (six
-locations, the skill tree, the spells, the world map, and how it is tuned).
+dependency. `docs/design.md` is one defence; `docs/campaign.md` is the campaign around it (two acts of six
+locations, the skill tree, the spells, the world maps, the story, and how it is tuned); `docs/story.md` is the
+story's cast and rules.
 
 ## Commands
 
@@ -15,6 +16,8 @@ uv run pytest -q                             # the suite
 uv run python tools/balance.py --location caves      # every leader policy against eight ordinary defenders
 uv run python tools/curse_quality.py --location caves  # how close the leaders' curses are to the best possible
 uv run python tools/campaign_balance.py --out DIR   # the campaign's tuning table (heavy: through ~/saga/tools/slot.py)
+uv run python tools/margin.py veteran        # the tuning's yardstick: how much harder each location could be (slot.py)
+uv run python tools/margin.py --replay ~/.hellward/replays/F.json   # the same for a logged person's defence
 uv run python tools/sim_bench.py             # a defence per location, source against compiled: time and digests
 uv run python tools/warden_plans.py search   # the warden's build for a location, searched on training seeds
 uv run python tools/plan_player.py plan all   # search the planned player's builds (slot.py; after a rules change)
@@ -25,30 +28,36 @@ uv run python tools/restyle.py ground DIR    # paint the floors not yet painted 
 uv run python tools/showcase.py OUT          # a clip with its soundtrack through the real renderer (caffeinate -u)
 uv run python tools/screens.py OUT           # PNG frames of every screen through the real renderer (caffeinate -u)
 uv run python tools/intro.py STEP OUT        # the story intro as film and as comic (docs/intro.md)
+uv run python tools/story.py paint           # paint the story's missing panels (Codex; refs first: story.py refs)
 ```
 
 ## Layout
 
 - `hellward/sim/` — the rules, with no saga2d: `content.py` (monsters, towers, curses, spells),
-  `campaign.py` (the six locations with their maps, waves and arsenal; sigils),
+  `campaign.py` (the two acts' locations with their maps, waves and arsenal; `ACTS`, `ACT_ENDS`; sigils),
   `skills.py` (the tree and the `Perks` it bakes into a defence), `level.py` (the map, the path as
   one coordinate `s`, reach as intervals of `s`), `model.py` (the fixed-step `World`, cheap to
   clone), `planner.py` (the leaders' curse choice), `players/` (scripted players, which act
-  through `hands.py`: a person's view and reaction time).
-- `hellward/sim/fastsim.py` — the simulation compiled with mypyc for the tools that play many defences
-  (`build/fastsim/`); `sums.py` adds floats as source and compiled both do. `tests/test_fastsim.py` holds the
+  through `hands.py`: a person's view and reaction time; `veteran` is the tuning's yardstick, `corner` Ilya's
+  opening, `ghost` a logged person's defence replayed, `spacing.py` the area-curse penalty they share).
+- `hellward/story.py` — every story page (its panel's picture, words and what the painter paints), the panel
+  bible (`REFERENCES`, `STYLES`, `RULES`, `FRAMING`); panels in `assets/story/`, the prologue in
+  `assets/story/prologue/`.
+- `hellward/sim/fastsim.py` — the simulation compiled with mypyc for the game (built on its first launch) and the
+  tools that play many defences (`build/fastsim/`); `sums.py` adds floats as source and compiled both do. `tests/test_fastsim.py` holds the
   compiled simulation to the source, event for event.
 - `hellward/audio/` — `cues.py` (every cue by name, from the pieces in `assets/pieces/` and synth),
-  `music.py` (the eight loops: title, one battle per location, boss), `bank.py` (`SoundBank`: cache, takes, voice budget, crossfades);
+  `music.py` (the loops: title, one battle per location, boss), `bank.py` (`SoundBank`: cache, takes, voice budget, crossfades);
   `docs/audio.md`. Bump `bank.VERSION` after changing any sound.
 - `hellward/art/` — `rig.py`, `figures.py`, `structures.py` (the posed low-poly stand-ins: monsters in
   three facings, towers in three ranks, gates, arches), `mapart.py` (each location's floor by its
-  theme), `worldmap.py` (the world map and the places on it), `fx.py` (procedural glows, sigils,
+  theme), `worldmap.py` (each act's world map and the places on it), `fx.py` (procedural glows, sigils,
   orbs, spell icons, the panel), `sprites.py` (registers everything: the painting in
   `assets/painted/` when its cells match, else the stand-in; `HELLWARD_ART=procedural` forces them).
-- `hellward/ui/` — `flow.py` (the ways between the screens), `progress.py` (the saved campaign),
+- `hellward/ui/` — `flow.py` (the ways between the screens), `progress.py` (the saved campaign and the pages seen),
+  `story.py` (story pages, the prologue, the Chronicle), `loading.py`,
   `mapscreen.py`, `briefing.py` (a location's intro), `skilltree.py`, `battle.py` (the defence:
-  fixed-step clock, input, spells, event routing), `view.py` (sprites kept in step with the rules),
+  fixed-step clock, input, spells, event routing, the replay log), `view.py` (sprites kept in step with the rules),
   `effects.py` (bolts, lightning, novas, curses, spells, the leaders' thoughts), `lighting.py` (the
   darkness overlay), `hud.py` (panel, orbs, spell bar, chronicle, banners), `thinking.py` (the
   planner's worker process), `title.py` (title and reckoning), `menus.py`, `widgets.py`, `style.py`.
@@ -61,7 +70,7 @@ uv run python tools/intro.py STEP OUT        # the story intro as film and as co
   the sources): never a leader's planner, cooldown or chant clock, never a clone of the live world.
 - After a rules change run `tools/balance.py` and `tools/curse_quality.py`; quote the before and
   after numbers in the commit.
-- The tools run the simulation compiled (`HELLWARD_INTERPRETED=1` runs the source), which keeps it to
+- The game and the tools run the simulation compiled (`HELLWARD_INTERPRETED=1` runs the source), which keeps it to
   mypyc's terms: `uv run mypy` stays clean, no simulation module calls the built-in `sum`, a `Final`
   constant is never rebound, and nothing reads `vars()` or `__dict__` of a simulation object. A new tool
   that plays many defences activates it before importing the simulation, as `tools/balance.py` does.
@@ -69,3 +78,5 @@ uv run python tools/intro.py STEP OUT        # the story intro as film and as co
   and the stand-ins' process pools spawn, and a spawned worker re-imports the main module.
 - A new frame, facing or monster makes its painted sheet stale (the game warns and draws the stand-in):
   repaint it with `tools/restyle.py`. Look at every visual change in a real frame (`tools/showcase.py`).
+- Never edit the simulation's sources (`hellward/sim/`) while a tuning or search run is going: its worker
+  processes check the compiled build against the sources and stop.
