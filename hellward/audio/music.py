@@ -33,6 +33,8 @@ MODES = {
     "phrygian": (0, 1, 3, 5, 7, 8, 10),
     "dorian": (0, 2, 3, 5, 7, 9, 10),
     "phrygian_dominant": (0, 1, 4, 5, 7, 8, 10),
+    "lydian": (0, 2, 4, 6, 7, 9, 11),
+    "mixolydian": (0, 2, 4, 5, 7, 9, 10),
 }
 _NOTE_INDEX = {"C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5, "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11}
 SPREAD = (0, 2, 4, 7, 9, 11, 14)  # chord tones stacked in thirds: root, third, fifth, octave, tenth, twelfth, two octaves
@@ -193,12 +195,24 @@ TRISTRAM: Motif = ((4, 1.5), (3, 0.5), (2, 1.0), (1, 1.0), (0, 3.0), (-1, 1.0))
 DESCENT: Motif = ((7, 1.0), (6, 0.5), (4, 0.5), (5, 2.0), (4, 1.0), (1, 1.0), (0, 2.0))
 LAMENT: Motif = ((7, 2.0), (5, 1.0), (4, 2.0), (3, 1.0), (2, 3.0), (0, 2.0))
 EMBER: Motif = ((0, 0.5), (1, 0.5), (4, 0.5), (5, 1.0), (4, 0.5), (1, 0.5), (0, 2.0))
+TIDE: Motif = ((0, 1.0), (2, 0.5), (4, 1.0), (5, 0.5), (4, 1.0), (2, 0.5), (0, 2.0))
+SKITTER: Motif = ((0, 0.25), (2, 0.25), (4, 0.25), (6, 0.25), (8, 0.5), (6, 0.25), (4, 0.25), (2, 0.25), (0, 1.0))
+HUNT: Motif = ((0, 0.5), (0, 0.5), (3, 0.5), (5, 1.0), (3, 0.5), (0, 1.0), (-3, 0.5), (-5, 1.0))
+SIGH: Motif = ((0, 3.0), (2, 1.5), (1, 1.5), (0, 4.0))
+PROCESSION: Motif = ((0, 1.0), (2, 1.0), (4, 2.0), (5, 1.0), (4, 1.0), (2, 0.5), (0, 2.0))
+GOLDEN: Motif = ((0, 1.5), (4, 1.0), (6, 0.5), (4, 1.0), (2, 1.0), (0, 2.0), (-3, 1.0), (0, 3.0))
 HEART_KIT = {"heart": (inst.heartbeat, 0.32, 0.0), "frame": (inst.frame_drum, 0.16, -0.3), "rattle": (inst.rattle, 0.06, 0.45)}
 BONE_KIT = {"heart": (inst.heartbeat, 0.22, 0.0), "frame": (inst.frame_drum, 0.12, -0.3), "rattle": (inst.rattle, 0.12, 0.45)}
 LAVA_KIT = {"war": (inst.war_drum, 0.22, -0.1), "taiko": (inst.taiko, 0.22, 0.25), "tom": (inst.tom, 0.16, -0.35),
             "heart": (inst.heartbeat, 0.2, 0.0), "rattle": (inst.rattle, 0.08, 0.5)}
 DOOM_KIT = {"war": (inst.war_drum, 0.28, 0.0), "taiko": (inst.taiko, 0.22, 0.2), "tom": (inst.tom, 0.2, -0.35),
             "heart": (inst.heartbeat, 0.25, 0.0), "rattle": (inst.rattle, 0.07, 0.5)}
+SWAMP_KIT = {"heart": (inst.heartbeat, 0.18, 0.0), "frame": (inst.frame_drum, 0.1, -0.2), "click": (inst.rattle, 0.08, 0.3), "water": (inst.rattle, 0.04, 0.5)}
+SPIDER_KIT = {"click": (inst.rattle, 0.12, -0.4), "tick": (inst.rattle, 0.08, 0.4), "frame": (inst.frame_drum, 0.06, 0.0)}
+JUNGLE_KIT = {"frame": (inst.frame_drum, 0.2, -0.3), "log": (inst.tom, 0.22, 0.25), "heart": (inst.heartbeat, 0.15, 0.0), "rattle": (inst.rattle, 0.1, 0.4)}
+DROWNED_KIT = {"sub": (inst.heartbeat, 0.12, 0.0)}
+TRAVINCAL_KIT = {"heart": (inst.heartbeat, 0.25, 0.0), "frame": (inst.frame_drum, 0.14, -0.3), "tom": (inst.tom, 0.12, -0.2)}
+TEMPLE_KIT = {"heart": (inst.heartbeat, 0.28, 0.0), "frame": (inst.frame_drum, 0.1, -0.2)}
 
 
 def title(s: Score) -> np.ndarray:
@@ -338,6 +352,113 @@ def battle_hells_gate(s: Score) -> np.ndarray:
     return s.master(room=3.2, wet=0.32, damping=4200, rms=0.1, seed=26)
 
 
+def battle_docks(s: Score) -> np.ndarray:
+    """Kurast Docks: a harbour at night. Slow swell, low marimba ostinato, a bamboo flute, lapping water pulse."""
+    key, prog = Key("G2", "aeolian"), (0, 0, 3, 3, 5, 5, 0, 4)
+    pedal(s, (key.hz(0, 0), key.hz(4, 0)), inst.drone, gain=0.14, span=8, seed=1)
+    drums(s, SWAMP_KIT, {"heart": "x...............", "water": "....o.......o..."}, bars=12, seed=2)
+    drums(s, SWAMP_KIT, {"frame": "......o.......o.", "click": "..o...o...o...o."}, bars=6, start=6, seed=3)
+    ostinato(s, key, prog, inst.twelve_string, bars=12, gain=0.12, figure=(0, None, 0, None, 4, None, 0, None), step=0.5, octave=0,
+             ring=1.2, at=-0.2, seed=4)
+    arpeggio(s, key, prog, inst.twelve_string, bars=6, start=6, gain=0.1, at=0.3, pattern=(0, 2, 4, 3, 2, 0), step=0.5, octave=2,
+             ring=2.5, width=0.15, seed=5)
+    pad(s, key, prog, inst.hollow_choir, bars=6, start=6, gain=0.05, octave=1, voicing=(0, 4, 7), width=0.4, seed=6)
+    line(s, key, prog, TIDE, inst.twelve_string, bars=4, start=4, gain=0.11, at=0.25, octave=1, shapes=("A", "A_end"), seed=7)
+    bells(s, key, ((0.0, 0), (24.0, 4)), gain=0.07, length=8.0)
+    return s.master(room=5.5, wet=0.5, damping=3000, rms=0.08, seed=31)
+
+
+def battle_spider_forest(s: Score) -> np.ndarray:
+    """The Spider Forest: skittering. Plucked high strings in a whole-tone figure, dry clicking percussion."""
+    key, prog = Key("B2", "phrygian_dominant"), (0, 0, 1, 1, 5, 4, 1, 0)
+    pedal(s, (key.hz(0, 0), key.hz(1, 0)), inst.drone, gain=0.08, span=4, seed=1)
+    drums(s, SPIDER_KIT, {"click": "x.x.x.x.x.x.x.x.", "tick": ".x.x.x.x.x.x.x.x"}, bars=16, seed=2)
+    drums(s, SPIDER_KIT, {"frame": "....o.......o...", "tick": "..x...x...x...x."}, bars=8, start=8, seed=3)
+    ostinato(s, key, prog, inst.twelve_string, bars=16, gain=0.18, at=-0.3, figure=(0, 2, 4, 6, 4, 2, 0, 2), step=0.25, octave=2,
+             ring=1.0, seed=4)
+    ostinato(s, key, prog, inst.twelve_string, bars=8, start=8, gain=0.09, figure=(0, 2, 4, 6, 4, 2, 0, 2), step=0.25, octave=2,
+             ring=0.8, at=0.25, seed=5)
+    pad(s, key, prog, inst.organ, bars=8, start=8, gain=0.04, octave=1, voicing=(0, 2, 4, 6), seed=6)
+    line(s, key, prog, SKITTER, inst.twelve_string, bars=4, start=4, gain=0.1, at=0.3, octave=3, legato=0.5, shapes=("A", "A_end"), seed=7)
+    bells(s, key, ((0.0, 0), (16.0, 2), (32.0, 4), (48.0, 1)), gain=0.05, length=4.0)
+    return s.master(room=2.5, wet=0.25, damping=5500, rms=0.09, seed=32)
+
+
+def battle_jungle(s: Score) -> np.ndarray:
+    """The Flayer Jungle: hunting drums. Fast frame drums and log drums, a chanting low voice-like drone."""
+    key, prog = Key("A2", "dorian"), (0, 0, 3, 3, 4, 4, 5, 5)
+    pedal(s, (key.hz(0, 0), key.hz(4, 0)), inst.drone, gain=0.15, span=8, seed=1)
+    drums(s, JUNGLE_KIT, {"frame": "x.x.x.x.x.x.x.x.", "heart": "........x......."}, bars=16, seed=2)
+    drums(s, JUNGLE_KIT, {"log": "x...x...x...x...", "frame": "x.x.x.x.x.x.x.x.", "rattle": "..o...o...o...o."}, bars=8, start=8,
+          fill={"log": "x.x.x.x.x.x.x.x.", "frame": "x.x.x.x.x.x.x.x."}, every=8, seed=3)
+    ostinato(s, key, prog, inst.cello, bars=16, gain=0.1, figure=(0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 4, 0, 0, 0, 5, 0), step=0.25, octave=0,
+             ring=0.9, at=0.1, seed=4)
+    pad(s, key, prog, inst.monks, bars=8, start=8, gain=0.08, octave=0, voicing=(0, 4, 7), width=0.3, seed=5)
+    pad(s, key, prog, inst.hollow_choir, bars=8, start=8, gain=0.05, octave=1, voicing=(0, 2, 4), seed=6)
+    line(s, key, prog, HUNT, inst.cello, bars=4, start=4, gain=0.12, at=0.2, octave=0, phrase_bars=2, shapes=("A", "B"), seed=7)
+    arpeggio(s, key, prog, inst.twelve_string, bars=8, start=8, gain=0.08, at=-0.35, pattern=(0, 2, 3, 5, 4, 3), step=0.5, octave=1,
+             ring=1.8, seed=8)
+    for bar in range(0, 16, 4):
+        s.add(inst.timpani(key.hz(chord_at(prog, bar), -1), 1.2, seed=bar), bar * 4, gain=0.1)
+    return s.master(room=3.8, wet=0.35, damping=4500, rms=0.095, seed=33)
+
+
+def battle_drowned_city(s: Score) -> np.ndarray:
+    """The Drowned City: submerged. Detuned slow bells, a deep sub pulse, a sighing pad."""
+    key, prog = Key("F#2", "phrygian"), (0, 0, 1, 6, 0, 0, 5, 4)
+    pedal(s, (key.hz(0, 0), key.hz(1, 0)), inst.drone, gain=0.1, span=6, seed=1)
+    drums(s, DROWNED_KIT, {"sub": "x..............."}, bars=12, seed=2)
+    pad(s, key, prog, inst.organ, bars=12, gain=0.06, octave=0, voicing=(0, 1, 3, 7), overlap=2.5, seed=3)
+    pad(s, key, prog, inst.hollow_choir, bars=12, gain=0.05, octave=1, voicing=(0, 3, 7), overlap=3.0, width=0.5, seed=4)
+    for bar in range(12):
+        if bar % 8 == 0:
+            s.add(inst.church_bell(key.hz(0, 1), 10.0, seed=bar), bar * 4, at=0.3, gain=0.07)
+        elif bar % 8 == 4:
+            s.add(inst.church_bell(key.hz(1, 1), 10.0, seed=bar + 20), bar * 4, at=-0.3, gain=0.06)
+    line(s, key, prog, SIGH, inst.hollow_choir, bars=6, start=6, gain=0.08, at=0.0, octave=1, legato=1.5, phrase_bars=3, shapes=("A", "A_end"), seed=7)
+    bells(s, key, ((0.0, 0), (48.0, 1)), gain=0.06, length=10.0)
+    return s.master(room=6.5, wet=0.55, damping=2500, rms=0.075, seed=34)
+
+
+def battle_travincal(s: Score) -> np.ndarray:
+    """Travincal: the council's terrace. A ceremonial processional, gongs, brass-like chords in phrygian, rising tension."""
+    key, prog = Key("E2", "phrygian"), (0, 0, 5, 6, 0, 0, 1, 5)
+    pedal(s, (key.hz(0, 0), key.hz(1, 0)), inst.drone, gain=0.12, span=8, seed=1)
+    drums(s, TRAVINCAL_KIT, {"heart": "x.......x......."}, bars=16, seed=2)
+    drums(s, TRAVINCAL_KIT, {"frame": "......o.......o."}, bars=8, start=8,
+          fill={"frame": "......o...o.o.o."}, every=8, seed=3)
+    pad(s, key, prog, inst.organ, bars=16, gain=0.08, octave=1, voicing=(0, 4, 7, 10, 14), overlap=1.5, seed=4)
+    pad(s, key, prog, inst.monks, bars=8, start=8, gain=0.06, octave=1, voicing=(0, 4), seed=5)
+    ostinato(s, key, prog, inst.cello, bars=8, start=8, gain=0.08, figure=(0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 4, 0, 1, 0), step=0.25, octave=0,
+             ring=0.9, at=0.1, seed=6)
+    arpeggio(s, key, prog, inst.twelve_string, bars=8, start=8, gain=0.1, at=-0.3, pattern=(0, 3, 2, 3, 4, 3, 2, 3), step=0.25, octave=1,
+             ring=1.6, seed=7)
+    line(s, key, prog, PROCESSION, inst.twelve_string, bars=8, start=8, gain=0.12, at=0.3, octave=2, phrase_bars=4, shapes=("A", "B"), seed=8)
+    line(s, key, prog, PROCESSION, inst.organ, bars=4, start=12, gain=0.08, at=0.0, octave=1, phrase_bars=2, shapes=("A_end",), seed=9)
+    bells(s, key, ((0.0, 0), (32.0, 4), (64.0, 1), (16.0, 1), (48.0, 1)), gain=0.08, length=6.0)
+    for bar in (0, 8):
+        s.add(inst.timpani(key.hz(chord_at(prog, bar), -1), 1.6, seed=bar), bar * 4, gain=0.12)
+    return s.master(room=4.2, wet=0.4, damping=3800, rms=0.095, seed=35)
+
+
+def battle_temple(s: Score) -> np.ndarray:
+    """The Temple of Light: the last fight's approach. An organ-like drone with a golden major-minor shift, choir pad, a heartbeat pulse."""
+    key, prog = Key("D2", "dorian"), (0, 0, 2, 2, 4, 4, 5, 5, 0, 0, 2, 2, 4, 4, 5, 5)
+    pedal(s, (key.hz(0, 0), key.hz(4, 0), key.hz(6, 0)), inst.organ, gain=0.1, span=8, overlap=3.0, seed=1)
+    drums(s, TEMPLE_KIT, {"heart": "x.......x......."}, bars=16, seed=2)
+    drums(s, TEMPLE_KIT, {"frame": "......o.......o."}, bars=8, start=8, seed=3)
+    pad(s, key, prog, inst.hollow_choir, bars=16, gain=0.07, octave=1, voicing=(0, 2, 4, 7, 9), overlap=2.0, width=0.4, seed=4)
+    pad(s, key, prog, inst.organ, bars=8, start=8, gain=0.05, octave=1, voicing=(0, 4, 7, 11), seed=5)
+    ostinato(s, key, prog, inst.twelve_string, bars=8, start=8, gain=0.08, figure=(0, None, 4, None, 6, None, 4, None), step=0.5, octave=1,
+             ring=2.0, at=-0.2, seed=6)
+    line(s, key, prog, GOLDEN, inst.hollow_choir, bars=8, start=8, gain=0.1, at=0.25, octave=2, legato=1.3, phrase_bars=4, shapes=("A", "B"), seed=7)
+    line(s, key, prog, GOLDEN, inst.twelve_string, bars=4, start=12, gain=0.12, at=0.3, octave=2, shapes=("A_end",), seed=8)
+    bells(s, key, ((0.0, 0), (32.0, 4), (64.0, 0)), gain=0.07, length=7.0)
+    for bar in range(0, 16, 4):
+        s.add(inst.timpani(key.hz(chord_at(prog, bar), -1), 1.4, seed=bar), bar * 4, gain=0.1)
+    return s.master(room=5.0, wet=0.45, damping=3500, rms=0.095, seed=36)
+
+
 def boss(s: Score) -> np.ndarray:
     """Azazel the Flayer: the last wave of Hell's Gate. War drums, a low bow hammering the flat second,
     an organ and monks in clusters, bells."""
@@ -383,6 +504,12 @@ PIECES: dict[str, Piece] = {
     "battle_catacombs": Piece(battle_catacombs, 66, 12),
     "battle_caves": Piece(battle_caves, 92, 16),
     "battle_hells_gate": Piece(battle_hells_gate, 84, 16),
+    "battle_docks": Piece(battle_docks, 60, 12),
+    "battle_spider_forest": Piece(battle_spider_forest, 100, 16),
+    "battle_jungle": Piece(battle_jungle, 95, 16),
+    "battle_drowned_city": Piece(battle_drowned_city, 50, 12),
+    "battle_travincal": Piece(battle_travincal, 72, 16),
+    "battle_temple": Piece(battle_temple, 65, 16),
     "boss": Piece(boss, 88, 20),
 }
 
@@ -394,6 +521,12 @@ BATTLE_FOR: dict[str, str] = {
     "catacombs": "battle_catacombs",
     "caves": "battle_caves",
     "hells_gate": "battle_hells_gate",
+    "docks": "battle_docks",
+    "spider_forest": "battle_spider_forest",
+    "jungle": "battle_jungle",
+    "drowned_city": "battle_drowned_city",
+    "travincal": "battle_travincal",
+    "temple": "battle_temple",
 }
 
 
