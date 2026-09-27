@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 
 from saga2d import ParticleEmitter, RenderLayer, Scene, Sprite
 
+from hellward.art.fx import SIGIL_RING
 from hellward.sim.content import CURSES, MONSTERS, SPELLS, Curse
 from hellward.sim.model import Bolt, World, curse_radius
 from hellward.sim.planner import Decision
@@ -117,12 +118,15 @@ class Falling:
 
 @dataclass
 class Telegraph:
-    """A chant's countdown: a rune circle on the floor on the marked spot, closing as the chant runs out."""
+    """A curse on its way: a rune circle on the floor round the spot, as wide as the curse falls (a tower standing
+    inside it is caught). A chant's glow fills the circle as the chant runs out; a mark's burns full and steady."""
 
     leader: int
     spot: tuple[int, int]
     rune: Sprite
     inner: Sprite
+    length: float    # the chant's or mark's whole time, in seconds
+    marking: bool
 
 
 @dataclass
@@ -366,36 +370,28 @@ class Effects:
             x, y = self.view.chest(m)
             self.bloom("fx/soft/curse", x, y, 10, 80, 0.9, opacity=220)
             self.burst([f"fx/miasma/{i}" for i in range(3)], x, y, 8, speed=(20, 50), life=(0.5, 0.9), size=(20, 20), shrink=False)
-        radius = curse_radius(curse, m.kind if m is not None else None)
-        bx, by = px(spot[0] + 0.5, spot[1] + 0.5)
-        by += 0.25 * T
-        width = 2 * radius * T
-        rune = self.scene.add_sprite(Sprite("fx/sigil/curse", position=(bx, by), size=(width, width * 0.55), layer=RenderLayer.OBJECTS,
-                                            opacity=0))
-        inner = self.scene.add_sprite(Sprite("fx/soft/curse", position=(bx, by), size=(width * 0.83, width * 0.55 * 0.83),
-                                             layer=RenderLayer.OBJECTS, opacity=0))
-        old = self.telegraphs.pop(leader_id, None)
-        if old is not None:
-            old.rune.remove()
-            old.inner.remove()
-        self.telegraphs[leader_id] = Telegraph(leader_id, spot, rune, inner)
+        self._telegraph(leader_id, curse, spot, marking=False)
 
     def on_mark(self, leader_id: int, curse, spot: tuple[int, int]) -> None:
-        """A mark: rune circle on the spot like a chant's, but with no beam and a steady burning look."""
+        """A mark: the rune circle like a chant's, but with no beam and no countdown: it cannot be broken."""
+        self._telegraph(leader_id, curse, spot, marking=True)
+
+    def _telegraph(self, leader_id: int, curse, spot: tuple[int, int], *, marking: bool) -> None:
         m = self.world.monster(leader_id)
-        radius = curse_radius(curse, m.kind if m is not None else None)
+        radius = curse_radius(curse, m.kind if m is not None else None, self.world.curse_scale)
         bx, by = px(spot[0] + 0.5, spot[1] + 0.5)
-        by += 0.25 * T
-        width = 2 * radius * T
-        rune = self.scene.add_sprite(Sprite("fx/sigil/curse", position=(bx, by), size=(width, width * 0.55), layer=RenderLayer.OBJECTS,
-                                            opacity=180))
-        inner = self.scene.add_sprite(Sprite("fx/soft/curse", position=(bx, by), size=(width * 0.83, width * 0.55 * 0.83),
-                                             layer=RenderLayer.OBJECTS, opacity=200))
+        ring = radius * T / SIGIL_RING
+        rune = self.scene.add_sprite(Sprite("fx/sigil/curse", position=(bx, by), size=(ring, ring), layer=RenderLayer.OBJECTS,
+                                            opacity=200 if marking else 0))
+        full = 2 * radius * T
+        inner = self.scene.add_sprite(Sprite("fx/soft/curse", position=(bx, by), size=(full, full) if marking else (1, 1),
+                                             layer=RenderLayer.OBJECTS, opacity=170 if marking else 0))
         old = self.telegraphs.pop(leader_id, None)
         if old is not None:
             old.rune.remove()
             old.inner.remove()
-        self.telegraphs[leader_id] = Telegraph(leader_id, spot, rune, inner)
+        length = m.chant_left if m is not None and m.chant_left > 0 else 1.0
+        self.telegraphs[leader_id] = Telegraph(leader_id, spot, rune, inner, length, marking)
 
     def on_raised(self, monster_id: int, leader_id: int) -> None:
         """A green burst at the raised monster."""
@@ -593,15 +589,14 @@ class Effects:
             if m is None or m.chant_curse is None:
                 self._end_telegraph(leader_id)
                 continue
-            base = 2 * curse_radius(m.chant_curse, m.kind) * T
-            left = max(0.0, m.chant_left / m.kind.leader.channel)
-            closing = 0.9 + 1.5 * left           # the circle closes on the spot as the chant runs out
-            scale = closing / 0.9
-            telegraph.rune.size = (base * scale, base * 0.55 * scale)
+            if telegraph.marking:
+                continue
+            full = 2 * curse_radius(m.chant_curse, m.kind, world.curse_scale) * T
+            gone = 1.0 - max(0.0, m.chant_left / telegraph.length)   # the glow fills the circle as the chant runs out
             telegraph.rune.rotation = (self.view.clock * 140) % 360
-            telegraph.rune.opacity = int(255 * min(1.0, (1 - left) * 4 + 0.3))
-            telegraph.inner.size = (base * 0.83 * scale, base * 0.55 * 0.83 * scale)
-            telegraph.inner.opacity = int(120 + 100 * (1 - left))
+            telegraph.rune.opacity = int(255 * min(1.0, gone * 4 + 0.3))
+            telegraph.inner.size = (max(1.0, full * gone), max(1.0, full * gone))
+            telegraph.inner.opacity = int(120 + 100 * gone)
         for pillar in list(self.pillars):
             pillar.age += dt
             if pillar.age >= pillar.life:

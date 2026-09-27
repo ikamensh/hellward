@@ -9,7 +9,7 @@ from saga2d.testing import assert_text_fits
 
 from hellward.__main__ import build
 from hellward.sim import planner
-from hellward.sim.campaign import ACTS, LOCATIONS, ORDER
+from hellward.sim.campaign import ACTS, LOCATIONS
 from hellward.sim.players.ordinary import Ordinary
 from hellward.story import STORIES, Page
 from hellward.ui import menus

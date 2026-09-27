@@ -130,13 +130,14 @@ def play(player: str, location: str, seed: int, sigils: int, *, leaders: str = "
     }
 
 
-def margin(player: str, location: str, seed: int, sigils: int, curse_scale: float = 1.0) -> tuple[float, list[dict]]:
+def margin(player: str, location: str, seed: int, sigils: int, curse_scale: float = 1.0,
+           leaders: str = "smart") -> tuple[float, list[dict]]:
     """The largest factor on the location's life at which the player still wins this seed, to 2%, and its runs."""
     low, high = MARGIN_RANGE
     runs = []
     while high / low > MARGIN_STEP:
         mid = math.sqrt(low * high)
-        run = play(player, location, seed, sigils, life=mid, curse_scale=curse_scale)
+        run = play(player, location, seed, sigils, leaders=leaders, life=mid, curse_scale=curse_scale)
         runs.append(run)
         if run["outcome"] == "victory":
             low = mid
@@ -210,9 +211,9 @@ def measure_best(pool: Executor, stages: list[Stage], seeds: list[int], *, margi
                 pending += [(s, "margin_cs1", pool.submit(margin, "corner", s.location, seed, s.sigils, 1.0))
                             for seed in seeds[:MARGIN_SEEDS]]
             if "veteran" in PLAYERS:
-                pending += [(s, "margin_vet_random", pool.submit(margin, "veteran", s.location, seed, s.sigils, "random", 1.0))
+                pending += [(s, "margin_vet_random", pool.submit(margin, "veteran", s.location, seed, s.sigils, 1.0, "random"))
                             for seed in seeds[:MARGIN_SEEDS]]
-                pending += [(s, "margin_vet_smart", pool.submit(margin, "veteran", s.location, seed, s.sigils, "smart", 1.0))
+                pending += [(s, "margin_vet_smart", pool.submit(margin, "veteran", s.location, seed, s.sigils, 1.0, "smart"))
                             for seed in seeds[:MARGIN_SEEDS]]
         if leaders:
             pending += [(s, policy, pool.submit(play, s.best, s.location, seed, s.sigils, leaders=policy,
@@ -393,13 +394,13 @@ def targets(table: list[dict]) -> list[list[str]]:
             if where in ACT1:
                 idx = ACT1.index(where)
                 target = VETERAN_TARGETS_ACT1[idx]
-                veteran_m.check(where, within(row["M"], target - VETERAN_TOLERANCE, target + VETERAN_TOLERANCE),
-                               f"M {show_margin(row['M'])} vs target {target:.2f}", "M (--margin)")
+                veteran_m.check(where, within(row.get("M_smart"), target - VETERAN_TOLERANCE, target + VETERAN_TOLERANCE),
+                               f"M {show_margin(row.get('M_smart'))} vs target {target:.2f}", "M (--margin)")
             elif where in ACT2:
                 idx = ACT2.index(where)
                 target = VETERAN_TARGETS_ACT2[idx]
-                veteran_m.check(where, within(row["M"], target - VETERAN_TOLERANCE, target + VETERAN_TOLERANCE),
-                               f"M {show_margin(row['M'])} vs target {target:.2f}", "M (--margin)")
+                veteran_m.check(where, within(row.get("M_smart"), target - VETERAN_TOLERANCE, target + VETERAN_TOLERANCE),
+                               f"M {show_margin(row.get('M_smart'))} vs target {target:.2f}", "M (--margin)")
         if row["best"] and row["M"] is not None:
             bstar_min.check(where, row["M"] >= 1.2, f"B* M {show_margin(row['M'])}", "M (--margin)")
         if row["player"] == "apprentice":

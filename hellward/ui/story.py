@@ -326,6 +326,7 @@ class ChronicleScene(Scene):
 
     def on_enter(self) -> None:
         assert self._prologue is not None
+        self.flow.progress.see("prologue")   # seen here, Descend won't show it again
         self._prologue.game = self.game
         self._prologue.begin()
 

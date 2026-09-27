@@ -140,7 +140,7 @@ def busy_world() -> World:
     world.gold = 10000
     free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
             if world.level.buildable(x, y) and world.tower_at((x, y)) is None]
-    altar = world.build("altar", free[0])
+    world.build("altar", free[0])
     grove = world.build("grove", free[1])
     grove.timer = 3.5   # its twister about to root
     for m in world.monsters[:3]:
@@ -210,7 +210,7 @@ def busy_act2_world() -> World:
     world.gold = 10000
     free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
             if world.level.buildable(x, y) and world.tower_at((x, y)) is None]
-    altar = world.build("altar", free[0])
+    world.build("altar", free[0])
     grove = world.build("grove", free[1])
     grove.timer = 3.5
     for m in world.monsters[:3]:

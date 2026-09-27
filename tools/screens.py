@@ -3,7 +3,7 @@
     uv run python tools/screens.py OUT [--only NAME,NAME] [--seconds 60] [--seed 1]
 
 Writes ``OUT/<name>.png``: ``title``, ``map``, ``intro-<location>`` for every location,
-``skills``, ``battle-<location>`` for every location, ``magic``, ``reckoning``, ``story-tristram-before``,
+``skills``, ``battle-<location>`` for every location, ``magic``, ``chant``, ``mark``, ``reckoning``, ``story-tristram-before``,
 ``prologue-12``, ``prologue-27`` and ``chronicle-first``.
 The display must be awake (``caffeinate -u``). The frames are for looking at,
 not for keeping in the repository.
@@ -138,6 +138,28 @@ def main() -> None:
         ticks(3)
         shot("magic")
 
+    def make_telegraph(name: str, key: str, marking: bool):
+        def telegraph() -> None:
+            """A leader's curse on its way, halfway through: its rune circle as wide as the curse falls."""
+            scene = BattleScene(art, LOCATIONS[key], seed=args.seed, planner=planner.smart, autopilot=Ordinary())
+            game.clear_and_push(scene)
+            world = scene.world
+            scene.speed = 4.0
+
+            def cursing():
+                return next((m for m in world.leaders() if m.chant_curse is not None and m.marking == marking), None)
+
+            while cursing() is None and world.time < 300:
+                ticks(1)
+            scene.speed = 1.0
+            leader = cursing()
+            assert leader is not None, f"no leader {'marked' if marking else 'chanted'} at {key}"
+            half = leader.chant_left / 2
+            while leader.chant_curse is not None and leader.chant_left > half:
+                ticks(1)
+            shot(name)
+        return telegraph
+
     def reckoning() -> None:
         flow.defend(LOCATIONS["tristram"])
         scene = game.scenes[-1]
@@ -172,7 +194,9 @@ def main() -> None:
         ticks(60)
         shot("chronicle-first")
 
-    frames = {"title": title, "map": world_map, "map-2": act_two_map, "skills": skills, "magic": magic, "reckoning": reckoning,
+    frames = {"title": title, "map": world_map, "map-2": act_two_map, "skills": skills, "magic": magic,
+              "chant": make_telegraph("chant", "cathedral", False), "mark": make_telegraph("mark", "travincal", True),
+              "reckoning": reckoning,
               "story-tristram-before": story_page, "prologue-12": make_prologue("prologue-12", 12.0),
               "prologue-27": make_prologue("prologue-27", 27.0), "chronicle-first": chronicle_first}
     for key in LOCATIONS:

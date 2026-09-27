@@ -11,7 +11,7 @@ from hellward.__main__ import build
 from hellward.art import worldmap
 from hellward.story import STORIES
 from hellward.sim import planner
-from hellward.sim.campaign import ACTS, ACT_ENDS, LOCATIONS, ORDER
+from hellward.sim.campaign import ACTS, LOCATIONS
 from hellward.sim.content import SPELLS
 from hellward.sim.players.ordinary import Ordinary
 from hellward.ui import menus

@@ -880,7 +880,7 @@ class World:
             x, y = level.point(m.s)
             dx, dy = x - best_x, y - best_y
             if dx * dx + dy * dy <= knot2 + 1e-9:
-                if m.amplify < bonus:
+                if m.amplified <= 0 or m.amplify < bonus:   # a lapsed amplification takes the new one as it is
                     m.amplify = bonus
                 if m.amplified < lasting:
                     m.amplified = lasting
@@ -1111,9 +1111,10 @@ class World:
             self._died(m, element, bursts)
 
     def _died(self, m: Monster, element: Element | None, bursts: bool) -> None:
-        # A monster its kind's shaman stands near rises once, unless a burst tore it apart (bursts=False: a burst
-        # killed it)
-        if bursts and not m.risen and m.kind.leader is None:
+        # A monster its kind's shaman stands near rises once, unless a burst tore it apart: one killed it (bursts is
+        # False), or its own death bursts (Shatter, Corpse Explosion), which leaves nothing to raise
+        bursting = bursts and ((self.perks.shatter and m.chill_left > 0) or (self.perks.corpse_explosion and m.amplified > 0))
+        if bursts and not bursting and not m.risen and m.kind.leader is None:
             raise_kind = m.kind.key
             for leader in self.monsters:
                 if leader.hp > 0 and leader.kind.leader is not None:

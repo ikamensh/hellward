@@ -315,8 +315,10 @@ game stays hard for them too.
   - **apprentice:** a thoughtful first descent.
   - **ordinary:** the demo's defender.
 
-  All of them learn ranks from the tree, space their towers knowing the curse radii, and use the Act II towers. The
-  searched builds are searched again once the rules land, against leaders that roll out as the game's do.
+  Every player that learns skills learns the ranks. The warden, veteran, planned and adaptive players space their
+  towers against the curse radii and build the Bone Altar and the Druid Grove where offered; the corner, apprentice
+  and ordinary players keep to the four old towers and space nothing. The searched builds are searched again once the
+  rules land, against leaders that roll out as the game's do.
 - **Seeds:** offline planning uses training seeds 0–99; the tables use evaluation seeds 1000–1019.
 - **Sigils in hand:** three for every earlier location (Act II adds Act I's 18). That is the pace Ilya kept.
 - **The margin M:** how far a location's life factor could grow and still be won, `tools/margin.py` bisecting

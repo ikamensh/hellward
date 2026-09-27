@@ -82,6 +82,11 @@ def _leader(world: World, leader_id: int) -> Monster:
     return leader
 
 
+def _voiced(spec: LeaderSpec) -> float:
+    """Seconds between the choice and the curse landing: the chant, or the mark's burning for a leader that marks."""
+    return spec.mark if spec.mark > 0 else spec.channel
+
+
 def _spec(leader: Monster) -> LeaderSpec:
     spec = leader.kind.leader
     if spec is None:
@@ -96,7 +101,7 @@ def reachable(world: World, leader: Monster, delay: float = 0.0) -> list[Tower]:
     """Towers the leader will still reach when its chant ends, assuming it keeps walking, and that no ward will
     protect then."""
     spec = _spec(leader)
-    lands = DECIDE_DELAY + spec.channel + delay
+    lands = DECIDE_DELAY + _voiced(spec) + delay
     s = leader.s + leader.speed * lands
     x, y = world.level.point(s)
     limit = spec.cast_range + CAST_SLACK * 0.5
@@ -247,10 +252,10 @@ def _lent_altar(tower: Tower, spec: CurseSpec, world: World, start: float, left:
                 tracks: list[tuple[Monster, list[float]]]) -> float:
     stats = tower.stats
     full = stats.range * tower.range_mult()
-    if spec.silenced:
-        return _altar_damage(tower, world, times, tracks, start, left, spec, full, full, 0.0, 0.0, True)
-    after_reach = full * spec.range if spec.range != 1.0 else full
     before = stats.damage * tower.damage_mult()
+    if spec.silenced:   # caged: it lends none of its amplification while the curse lasts
+        return _altar_damage(tower, world, times, tracks, start, left, spec, full, full, before, 0.0, True)
+    after_reach = full * spec.range if spec.range != 1.0 else full
     after = before * spec.damage if spec.damage != 1.0 else before
     if spec.rate != 1.0:
         after *= spec.rate   # a slower pulse lays its knot less often
@@ -294,7 +299,7 @@ def candidates(world: World, leader: Monster, delay: float = 0.0) -> list[Option
     if not towers:
         return []
     spec = _spec(leader)
-    start = DECIDE_DELAY + spec.channel + delay
+    start = DECIDE_DELAY + _voiced(spec) + delay
     curses = spec.curses
     longest = max(CURSES[c].duration for c in curses)
     times = []
@@ -346,7 +351,7 @@ def utility(after: World, before: World, lasting: float = 0.0) -> float:
 def rollout(world: World, leader_id: int, option: Option | None, seconds: float, dt: float = ROLLOUT_DT) -> float:
     w = world.clone()
     if option is not None:
-        at = world.time + DECIDE_DELAY + _spec(_leader(world, leader_id)).channel + option.delay
+        at = world.time + DECIDE_DELAY + _voiced(_spec(_leader(world, leader_id))) + option.delay
         w.forced.append(ForcedCurse(at, leader_id, option.curse, option.spot))
     end = world.time + seconds - 1e-9
     lasting = 0.0

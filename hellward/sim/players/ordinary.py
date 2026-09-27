@@ -13,7 +13,6 @@ from hellward.sim.campaign import Location
 from hellward.sim.content import DOOR, WAVE_BREAK
 from hellward.sim.model import DOOR_STOP, JOSTLE, Refused, Tower, World
 from hellward.sim.players.hands import Hands, REACT, AIM_GAP
-from hellward.sim.players.spacing import max_curse_radius, score_with_spacing
 from hellward.sim.sums import float_sum, int_sum
 
 ROTATION = ("pyre", "frost", "storm", "plague", "pyre", "storm", "plague", "pyre", "frost", "storm")
@@ -25,8 +24,6 @@ def tile_scores(world: World, reach: float = 3.0) -> list[tuple[float, tuple[int
     level = world.level
     queues = [d.s - DOOR_STOP - JOSTLE / 2 for d in world.doors]
     scored = []
-    existing: list[tuple[int, int]] = []
-    radius = max_curse_radius(world.location)
     for y in range(level.height):
         for x in range(level.width):
             if not level.buildable(x, y):
@@ -34,8 +31,6 @@ def tile_scores(world: World, reach: float = 3.0) -> list[tuple[float, tuple[int
             spans = level.coverage((x, y), reach)
             score = float_sum(b - a for a, b in spans)
             score += DOOR_BONUS * int_sum(1 for q in queues if any(a <= q <= b for a, b in spans))
-            if radius > 0:
-                score = score_with_spacing(score, existing, (x, y), world.location)
             scored.append((score, (x, y)))
     scored.sort(key=lambda item: (-item[0], item[1]))
     return scored

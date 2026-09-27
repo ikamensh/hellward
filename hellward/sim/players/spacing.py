@@ -7,7 +7,7 @@ the widest curse radius the location's leaders cast.
 from __future__ import annotations
 
 from hellward.sim.campaign import Location
-from hellward.sim.content import CURSES, MONSTERS, Curse, MonsterKind
+from hellward.sim.content import MONSTERS
 from hellward.sim.model import curse_radius
 
 

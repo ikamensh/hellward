@@ -49,7 +49,7 @@ class TestAct2MonsterRigs:
                 img1 = images[k1].convert("RGB").resize((64, 64), Image.Resampling.LANCZOS)
                 img2 = images[k2].convert("RGB").resize((64, 64), Image.Resampling.LANCZOS)
                 diff = sum(
-                    abs(a - b) for p1, p2 in zip(img1.getdata(), img2.getdata())
+                    abs(a - b) for p1, p2 in zip(img1.get_flattened_data(), img2.get_flattened_data())
                     for a, b in zip(p1, p2)
                 )
                 assert diff > 1000, f"{k1} and {k2} look too similar"

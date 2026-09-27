@@ -1,8 +1,8 @@
 """The corner player: Ilya's winning opening from the old Normal, now tested against area curses.
 
-- Frost Shrine on a buildable tile at every path corner (tile diagonal to a waypoint turn, covering both legs)
-- Other offered damage towers packed on free tiles closest to those frost shrines
-- Spend every coin as it comes (build first, then upgrade where the tree allows)
+- Frost Shrine on the inside of every bend of the path (the tile beside both legs)
+- Other offered damage towers packed on free tiles closest to each shrine, bend by bend
+- Spend every coin as it comes: build the plan, upgrade where the tree allows, then pack another round
 - Gates in every arch when offered
 - Smite on a chanting leader's sign when it has the mana
 - Cleanse the most valuable cursed tower
@@ -13,33 +13,23 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
-from typing import Protocol
 
 from hellward.sim.campaign import Location
-from hellward.sim.content import DOOR, MONSTERS, SPELLS, TOWERS, Element, TowerKind
-from hellward.sim.model import DOOR_STOP, JOSTLE, Refused, Tower, World
+from hellward.sim.content import DOOR, TOWERS
+from hellward.sim.model import Refused, World
 from hellward.sim.players.hands import Hands, ready
-from hellward.sim.players.spacing import max_curse_radius, score_with_spacing
 from hellward.sim.skills import SKILLS, can_learn, column_of
-from hellward.sim.sums import float_sum, int_sum
+from hellward.sim.sums import float_sum
 
 
 def path_corners(level) -> list[tuple[int, int]]:
-    """Tiles diagonal to a waypoint turn: corners where the path changes direction."""
+    """The inside of every bend in the path: the tile beside both legs, where a frost nova covers the most of it."""
     corners = []
     waypoints = level.waypoints
-    for i in range(1, len(waypoints) - 1):
-        x0, y0 = waypoints[i - 1]
-        x1, y1 = waypoints[i]
-        x2, y2 = waypoints[i + 1]
-        dx1, dy1 = x1 - x0, y1 - y0
-        dx2, dy2 = x2 - x1, y2 - y1
-        if dx1 == 0 and dy2 == 0:
-            cx, cy = x1 + (1 if dx2 > 0 else -1), y1 + (1 if dy1 > 0 else -1)
-        elif dy1 == 0 and dx2 == 0:
-            cx, cy = x1 + (1 if dx1 > 0 else -1), y1 + (1 if dy2 > 0 else -1)
-        else:
-            continue
+    for (x0, y0), (x1, y1), (x2, y2) in zip(waypoints, waypoints[1:], waypoints[2:]):
+        in_x, in_y = (x1 > x0) - (x1 < x0), (y1 > y0) - (y1 < y0)
+        out_x, out_y = (x2 > x1) - (x2 < x1), (y2 > y1) - (y2 < y1)
+        cx, cy = x1 - in_x + out_x, y1 - in_y + out_y
         if level.buildable(cx, cy):
             corners.append((cx, cy))
     return corners
@@ -110,29 +100,34 @@ class Corner:
             world.call_wave()
 
     def _plan(self, world: World) -> None:
+        """Bend by bend: the frost shrine on the inside, then one of each other damage tower packed round it."""
+        self._frost_tiles = path_corners(world.level)
+        for corner in self._frost_tiles:
+            if "frost" in world.location.arsenal.towers:
+                self._planned.append(("frost", corner))
+            self._pack(world, [corner])
+
+    def _pack(self, world: World, corners: list[tuple[int, int]]) -> bool:
+        """One round: at each corner, one of each other offered damage tower on the free tile nearest the corner that
+        sees the most path, so the gold goes out mixed. Whether it planned anything."""
         level = world.level
-        arsenal = world.location.arsenal
-        self._frost_tiles = path_corners(level)
-        built: set[tuple[int, int]] = set()
-        damage_kinds = [k for k in arsenal.towers if TOWERS[k].attack != "aura"]
-        if "frost" in damage_kinds:
-            damage_kinds.remove("frost")
-        for tile in self._frost_tiles:
-            if "frost" in arsenal.towers and tile not in built and world.level.buildable(*tile):
-                self._planned.append(("frost", tile))
-                built.add(tile)
-        free_tiles = [(x, y) for y in range(level.height) for x in range(level.width)
-                      if level.buildable(x, y) and (x, y) not in built]
-        radius = max_curse_radius(world.location)
-        for kind in damage_kinds:
-            reach = tower_reach(kind, world)
-            free_tiles.sort(key=lambda t: (min(math.hypot(t[0] - ft[0], t[1] - ft[1]) for ft in self._frost_tiles) if self._frost_tiles else 0.0,
-                                           -score_with_spacing(tile_value_for_kind(world.location, kind, t, reach), list(built), t, world.location) if radius > 0 else -tile_value_for_kind(world.location, kind, t, reach)))
-            for tile in free_tiles[:3]:
-                if tile not in built:
-                    self._planned.append((kind, tile))
-                    built.add(tile)
-            free_tiles = [t for t in free_tiles if t not in built]
+        damage_kinds = [k for k in world.location.arsenal.towers
+                        if TOWERS[k].attack not in ("aura", "amplify") and k != "frost"]
+        taken = {tile for _, tile in self._planned} | {t.tile for t in world.towers.values()}
+        free = [(x, y) for y in range(level.height) for x in range(level.width)
+                if level.buildable(x, y) and (x, y) not in taken]
+        before = len(self._planned)
+        for corner in corners:
+            for kind in damage_kinds:
+                if not free:
+                    break
+                reach = tower_reach(kind, world)
+                nearest = min(math.hypot(t[0] - corner[0], t[1] - corner[1]) for t in free)
+                near = [t for t in free if math.hypot(t[0] - corner[0], t[1] - corner[1]) <= nearest + 1.0]
+                tile = max(near, key=lambda t: (tile_value_for_kind(world.location, kind, t, reach), -t[1], -t[0]))
+                self._planned.append((kind, tile))
+                free.remove(tile)
+        return len(self._planned) > before
 
     def _spells(self, hands: Hands) -> None:
         world = hands.world
@@ -176,8 +171,8 @@ class Corner:
                     pass
 
     def _spend(self, world: World) -> bool:
-        """Build the planned towers in order, then raise ranks, every coin as it comes. Whether every planned tower
-        stands."""
+        """Build the planned towers in order, then raise ranks, then plan another round, every coin as it comes.
+        Whether every planned tower stands."""
         while True:
             built = {t.tile for t in world.towers.values()}
             todo = [(kind, tile) for kind, tile in self._planned if tile not in built]
@@ -193,6 +188,8 @@ class Corner:
             upgrades = [(t, c) for t in world.towers.values()
                         if (c := world.upgrade_cost(t)) is not None and world.rank_needs(t) is None]
             if not upgrades:
+                if self._pack(world, self._frost_tiles):
+                    continue
                 return True
             tower, cost = min(upgrades, key=lambda u: (u[0].level, u[0].id))
             if world.gold < cost:

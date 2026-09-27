@@ -357,9 +357,10 @@ class BattleScene(Scene):
         self.spell("orb")
 
     def threat(self) -> Monster | None:
-        """The leader closest to cursing: the chant nearest its end, else the pondering nearest its end."""
+        """The leader closest to cursing whose curse Smite can still break: the chant nearest its end, else the
+        pondering nearest its end. A marking leader's curse lands whatever is struck, so Q passes it by."""
         leaders = self.world.leaders()
-        chanting = [m for m in leaders if m.chant_curse is not None]
+        chanting = [m for m in leaders if m.chant_curse is not None and not m.marking]
         if chanting:
             return min(chanting, key=lambda m: (m.chant_left, m.id))
         pondering = [m for m in leaders if m.asking is not None]

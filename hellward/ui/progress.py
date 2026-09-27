@@ -31,7 +31,7 @@ class Progress:
             return cls(game=game)
         state = data["state"]
         won = state["won"]["normal"] if "difficulty" in state else state["won"]   # a save from before the acts
-        learned = kept(state["learned"])   # the tree may have changed since the save
+        learned = kept(state["learned"], sum(won.values()))   # the tree may have changed since the save
         progress = cls(won=dict(won), learned=learned, at=state["at"], seen=frozenset(state.get("seen", ())), game=game)
         check(progress.learned)
         return progress

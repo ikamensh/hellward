@@ -78,7 +78,7 @@ def test_chants_broken_are_the_broken_chants_among_all_chants_begun_not_the_brok
 def test_the_margin_is_bisected_to_two_percent_inside_its_bracket(monkeypatch, edge):
     played = []
 
-    def up_to_edge(player, location, seed, sigils, *, life, curse_scale=1.0):
+    def up_to_edge(player, location, seed, sigils, *, life, curse_scale=1.0, leaders="smart"):
         played.append(life)
         return {"outcome": "victory" if life <= edge else "defeat", "life": life}
 

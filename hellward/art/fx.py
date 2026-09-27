@@ -82,6 +82,9 @@ def shadow(width: int = 64, height: int = 24) -> Image.Image:
     return Image.fromarray(np.dstack([np.zeros((height, width, 3)), alpha]).astype(np.uint8), "RGBA")
 
 
+SIGIL_RING = 0.47   # the sigil's outer ring, as a fraction of its size: the rune circle's radius
+
+
 def sigil(color: tuple[int, int, int], size: int = 96, seed: int = 3) -> Image.Image:
     """A curse's rune circle: two rings, a triangle and scratched runes between them."""
     ss = 3
@@ -90,7 +93,7 @@ def sigil(color: tuple[int, int, int], size: int = 96, seed: int = 3) -> Image.I
     draw = ImageDraw.Draw(image)
     c = big / 2
     rgba = color + (255,)
-    for r, w in ((0.47, 5), (0.36, 4)):
+    for r, w in ((SIGIL_RING, 5), (0.36, 4)):
         draw.ellipse((c - r * big, c - r * big, c + r * big, c + r * big), outline=rgba, width=w * ss // 2)
     tri = [(c + 0.36 * big * math.cos(a), c + 0.36 * big * math.sin(a)) for a in (-math.pi / 2, math.pi / 6, 5 * math.pi / 6)]
     draw.polygon(tri, outline=rgba, width=4)

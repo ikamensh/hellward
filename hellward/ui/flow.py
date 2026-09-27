@@ -86,8 +86,10 @@ class Flow:
             self._descend()
 
     def _descend(self) -> None:
-        self.game.clear_and_push(MapScene(self, act=1, first=self.progress.sigils == 0))
-        self.sound.music("title")
+        if self.progress.sigils == 0:
+            self._open_map(act=1, first=True)
+        else:
+            self.world_map()
 
     def intro(self, location: Location) -> None:
         """A location's before page on the first arrival, then its intro."""
@@ -151,7 +153,8 @@ class Flow:
             act = world.location.act
             key = LAST_PAGES[act] if world.location.key == ACT_ENDS[act] else f"{world.location.key}/after"
             story = STORIES.get(key)
-            if story is not None and key not in self.progress.seen:
+            finished = world.location.key != ACT_ENDS[act] and self.progress.held(ACT_ENDS[act])
+            if story is not None and key not in self.progress.seen and not finished:   # a finished act's pages wait in the Chronicle
                 self.progress.see(key)
                 if key == LAST_PAGES[1]:
                     dest = self._after(key)

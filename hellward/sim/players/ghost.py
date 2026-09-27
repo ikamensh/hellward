@@ -30,6 +30,9 @@ def _tile(value: Any) -> tuple[int, int]:
 class Ghost:
     """Replays the defence in a battle scene's log (its path, or the log itself)."""
 
+    reaction = (0.0, 0.0)   # the log already holds the person's own timing: the hands add no delay of theirs
+    aim_gap = 0.0
+
     def __init__(self, path_or_dict: str | Path | dict[str, Any]) -> None:
         data: dict[str, Any] = path_or_dict if isinstance(path_or_dict, dict) else json.loads(Path(path_or_dict).read_text())
         if data.get("version") != 1:

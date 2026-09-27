@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 
 import pytest
 
-from hellward.sim.campaign import ACTS, ACT_ENDS, LOCATIONS, Location
-from hellward.sim.content import CURSES, MONSTERS, Curse, Element, LeaderSpec
+from hellward.sim.campaign import ACTS, ACT_ENDS, LOCATIONS
+from hellward.sim.content import MONSTERS, Curse, Element
 from hellward.sim.model import World, Monster
 from hellward.sim.players.hands import Hands
 from hellward.sim.players.ordinary import Ordinary
@@ -341,7 +340,6 @@ class TestBurning:
         world.wave_alive[0] = 1
 
         # Build three towers in range
-        from hellward.sim.content import TOWERS
         world.build("pyre", (10, 5))
         world.build("storm", (11, 5))
         world.build("frost", (12, 5))

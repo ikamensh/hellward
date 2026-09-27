@@ -87,6 +87,17 @@ def test_the_save_ilya_played_before_the_new_tree_loads(game):
     assert progress.free == 17
 
 
+def test_a_save_whose_skills_now_cost_more_than_its_sigils_loads_with_none_owed(game):
+    """Property: whatever a save lists, the loaded tree never spends more sigils than were won, and what it keeps
+    still has every skill above it."""
+    from hellward.sim.skills import SKILLS, check
+    game.save_manager.save("campaign", {"won": {"tristram": 3}, "learned": sorted(SKILLS), "at": "tristram"},
+                           "Progress", summary={})
+    progress = Progress.load(game)
+    assert progress.free >= 0 and progress.learned
+    check(progress.learned)
+
+
 def test_an_old_save_with_a_difficulty_loads_its_normal_sigils(game):
     game.save_manager.save("campaign", {"won": {"normal": {"tristram": 3}, "hell": {}},
                                         "learned": [], "at": "tristram", "difficulty": "hell"},

@@ -28,7 +28,7 @@ from hellward.sim.campaign import Location
 from hellward.sim.content import CURSES, DOOR, MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Curse, Element
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
-from hellward.sim.players.spacing import max_curse_radius, score_with_spacing
+from hellward.sim.players.spacing import score_with_spacing
 from hellward.sim.skills import SKILLS, can_learn, perks, tower_levels
 
 PLANS = Path(__file__).parent / "plans" / "warden.json"

@@ -106,7 +106,7 @@ class WorldView:
         self.towers: dict[int, Standing] = {}
         self.dying: list[Figure] = []
         self.static_lights = self._static_lights()
-        self.torches = [self._sprite_glow("fire", l.x, l.y, 22) for l in self.static_lights if l.color == TORCH]
+        self.torches = [self._sprite_glow("fire", light.x, light.y, 22) for light in self.static_lights if light.color == TORCH]
 
     def _sprite_glow(self, element: str, x: float, y: float, size: float) -> Sprite:
         return self.scene.add_sprite(Sprite(f"fx/glow/{element}", position=(x, y), size=(size, size), layer=RenderLayer.EFFECTS))
