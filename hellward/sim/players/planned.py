@@ -185,7 +185,7 @@ class Planned:
     # -- Spells ----------------------------------------------------------------------------------------
 
     def _aim_ready(self, world: World) -> bool:
-        return world.time - self.last_aim >= AIM_GAP - 1e-9
+        return world.time - self.last_aim >= self.aim_gap - 1e-9
 
     def _can(self, world: World, spell: str, spare: float = 0.0) -> bool:
         return ready(world, spell, spare)

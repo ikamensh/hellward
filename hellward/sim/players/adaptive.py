@@ -634,7 +634,7 @@ class Adaptive:
         world = hands.world
         if "cleanse" in world.location.arsenal.spells:
             self._cleanse(hands)
-        if world.time - self.aimed_at < AIM_GAP - 1e-9 or not world.monsters:
+        if world.time - self.aimed_at < self.aim_gap - 1e-9 or not world.monsters:
             return
         if self._answer(hands) or self._strike(hands):
             self.aimed_at = world.time

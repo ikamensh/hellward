@@ -384,7 +384,7 @@ class Warden:
         spells = world.location.arsenal.spells
         if "cleanse" in spells:
             self._cleanse(hands)
-        if world.time - self.last_aim < AIM_GAP - 1e-9:
+        if world.time - self.last_aim < self.aim_gap - 1e-9:
             return
         if "smite" in spells and self._smite_leaker(hands):
             return
