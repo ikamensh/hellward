@@ -41,7 +41,7 @@ class Theme:
     path: tuple[int, int, int]
     wall_top: tuple[int, int, int]
     wall_face: tuple[int, int, int]
-    pool: str            # "grave", "lava" or "pit": what a pit tile holds
+    pool: str            # "grave", "lava", "pit", "water", "web" or "brazier": what a pit tile holds
     prop: str            # the flat obstacle: "cart", "headstone", "bones", "boulder", "spire"
     pillars: bool        # obstacles stand up as pillar sprites (the cathedral)
     flagstones: bool     # a floor of laid stones, or of earth and rock
@@ -74,22 +74,22 @@ THEMES: dict[str, Theme] = {
                   "the gate of hell seen from above: cracked black obsidian and brimstone ground veined with glowing lava, a "
                   "road of black basalt flagstones along the path stained with blood, walls of jagged obsidian lit red from "
                   "below, pools and rivers of lava, skull piles and brimstone spires"),
-    "docks": Theme((32, 28, 26), (56, 48, 44), (24, 20, 20), (48, 40, 36), "pit", "bones", False, False, "fires",
+    "docks": Theme((32, 28, 26), (56, 48, 44), (24, 20, 20), (48, 40, 36), "water", "bones", False, False, "fires",
                    "Kurast's rotting docks at night: black water and dark wooden planks, a path of weathered boards over the "
                    "piers, walls of crumbling warehouses with lantern light, scattered crates, rope coils and barnacled posts"),
-    "spider_forest": Theme((28, 36, 26), (48, 56, 44), (20, 28, 20), (40, 48, 36), "grave", "headstone", False, False, "moon",
+    "spider_forest": Theme((28, 36, 26), (48, 56, 44), (20, 28, 20), (40, 48, 36), "web", "boulder", False, False, "moon",
                            "the spider forest's canopy floor: dark green moss and black loam, a winding path of root and stone, "
                            "ancient oaks with silver bark forming a druid ring, webs strung between trunks, fallen leaves"),
-    "jungle": Theme((24, 40, 22), (44, 60, 40), (18, 28, 18), (36, 48, 32), "pit", "boulder", False, False, "fires",
+    "jungle": Theme((24, 40, 22), (44, 60, 40), (18, 28, 18), (36, 48, 32), "water", "boulder", False, False, "fires",
                     "the flayer jungle's dense floor: deep green moss and black earth, two long straight roads of packed dirt, "
                     "walls of massive buttress roots and lianas, torchlight from zealot shrines, scattered bones and fetishes"),
-    "drowned_city": Theme((26, 28, 36), (40, 44, 56), (18, 20, 24), (32, 36, 48), "pit", "bones", False, True, "moon",
+    "drowned_city": Theme((26, 28, 36), (40, 44, 56), (18, 20, 24), (32, 36, 48), "water", "bones", False, True, "moon",
                           "Kurast's drowned streets: black water canals reflecting moonlight, flagstone paths along the canals, "
                           "walls of water-stained masonry with green moss, bone pits in the plazas, lanterns on drowned arches"),
-    "travincal": Theme((48, 44, 32), (72, 64, 48), (36, 32, 24), (56, 52, 38), "pit", "spire", True, True, "torches",
+    "travincal": Theme((48, 44, 32), (72, 64, 48), (36, 32, 24), (56, 52, 38), "brazier", "spire", True, True, "torches",
                        "the High Council's terrace: gilt-edged marble flagstones, a wide carpet of crimson and gold, "
                        "pillared arches along the way, braziers burning with pale flame, the mother lamp's light above"),
-    "temple": Theme((42, 38, 32), (60, 56, 48), (30, 26, 22), (50, 46, 40), "pit", "bones", True, True, "torches",
+    "temple": Theme((42, 38, 32), (60, 56, 48), (30, 26, 22), (50, 46, 40), "brazier", "bones", True, True, "torches",
                     "the Temple of Light's nave: worn marble flagstones veined with gold, a dim crimson carpet to the altar, "
                     "tall pillars with bone niches, torch sconces guttering, the mother lamp hanging dim, scattered skulls"),
 }
@@ -313,6 +313,22 @@ def _pits(image: Image.Image, level: Level, seed: int, theme: Theme) -> None:
             for _ in range(6):
                 cx, cy, r = x0 + rng.uniform(10, PX - 10), y0 + rng.uniform(10, PX - 10), rng.uniform(4, 10)
                 draw.ellipse((cx - r, cy - r, cx + r, cy + r), fill=(255, 200, 70, 255))
+        elif theme.pool == "water":   # black water: neighbouring tiles run together into canals and pools
+            draw.rounded_rectangle((x0 - 4, y0 - 4, x0 + PX + 4, y0 + PX + 4), radius=PX // 5, fill=(10, 18, 24, 255))
+            for _ in range(3):
+                cx, cy, r = x0 + rng.uniform(12, PX - 12), y0 + rng.uniform(12, PX - 12), rng.uniform(8, 16)
+                draw.arc((cx - r, cy - r * 0.4, cx + r, cy + r * 0.4), 200, 340, fill=(40, 60, 70, 255), width=2)
+        elif theme.pool == "web":
+            draw.ellipse((x0 + 4, y0 + 4, x0 + PX - 4, y0 + PX - 4), fill=(30, 34, 28, 255))
+            cx, cy = x0 + PX / 2, y0 + PX / 2
+            for k in range(8):
+                a = k * math.pi / 4
+                draw.line((cx, cy, cx + math.cos(a) * PX * 0.46, cy + math.sin(a) * PX * 0.46), fill=(170, 170, 160, 255), width=2)
+            for r in (PX * 0.14, PX * 0.26, PX * 0.38):
+                draw.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(150, 150, 140, 255), width=2)
+        elif theme.pool == "brazier":
+            draw.ellipse((x0 + 8, y0 + 8, x0 + PX - 8, y0 + PX - 8), fill=(60, 48, 30, 255), outline=(150, 120, 60, 255), width=4)
+            draw.ellipse((x0 + 18, y0 + 18, x0 + PX - 18, y0 + PX - 18), fill=(240, 150, 40, 255))
         elif theme.pool == "grave":
             draw.rectangle((x0 + PX * 0.3, y0 + PX * 0.1, x0 + PX * 0.7, y0 + PX * 0.9), fill=(18, 14, 12, 255))
             draw.ellipse((x0 + PX * 0.66, y0 + PX * 0.1, x0 + PX * 0.98, y0 + PX * 0.9), fill=(70, 54, 40, 255))
