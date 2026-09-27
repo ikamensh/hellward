@@ -3,7 +3,7 @@
   144,
   300
  ],
- "cols": 4,
+ "cols": 6,
  "rows": 3,
  "origin": [
   72,
@@ -58,6 +58,24 @@
    }
   },
   {
+   "key": "altar/0",
+   "col": 4,
+   "row": 0,
+   "tags": {
+    "kind": "altar",
+    "rank": 0
+   }
+  },
+  {
+   "key": "grove/0",
+   "col": 5,
+   "row": 0,
+   "tags": {
+    "kind": "grove",
+    "rank": 0
+   }
+  },
+  {
    "key": "pyre/1",
    "col": 0,
    "row": 1,
@@ -94,6 +112,24 @@
    }
   },
   {
+   "key": "altar/1",
+   "col": 4,
+   "row": 1,
+   "tags": {
+    "kind": "altar",
+    "rank": 1
+   }
+  },
+  {
+   "key": "grove/1",
+   "col": 5,
+   "row": 1,
+   "tags": {
+    "kind": "grove",
+    "rank": 1
+   }
+  },
+  {
    "key": "pyre/2",
    "col": 0,
    "row": 2,
@@ -126,6 +162,24 @@
    "row": 2,
    "tags": {
     "kind": "plague",
+    "rank": 2
+   }
+  },
+  {
+   "key": "altar/2",
+   "col": 4,
+   "row": 2,
+   "tags": {
+    "kind": "altar",
+    "rank": 2
+   }
+  },
+  {
+   "key": "grove/2",
+   "col": 5,
+   "row": 2,
+   "tags": {
+    "kind": "grove",
     "rank": 2
    }
   }

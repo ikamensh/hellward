@@ -356,6 +356,52 @@ game stays hard for them too.
 - Spells that grew with the difficulty turned hard fights into spell play, so **spells grow with the location
   only**.
 
+## The tuning record (2026-09-27)
+
+Measured on the compiled simulation, `tools/margin.py PLAYER`, evaluation seeds 1000–1007 for the veteran and
+1000–1003 for the others, against the smart leaders, three sigils for every earlier location. The runs are in
+`~/saga/evidence/hellward/campaign-tuning/`.
+
+**Act I**
+
+| | Tristram | Graveyard | Cathedral | Catacombs | Caves | Hell's Gate |
+|---|---|---|---|---|---|---|
+| life factor | 1.49 | 1.46 | 3.27 | 2.0 | 2.54 | 1.41 |
+| **veteran's M** (target) | **1.50** (1.5) | **2.19** (gentle) | **1.30** (1.3) | **1.24** (1.2) | **1.14** (1.15) | **1.09** (1.1) |
+| apprentice | 1.16 | 1.10 | 0.25 | | | |
+| B\* (warden / adaptive) | 1.50 | 2.31 | 2.07 | 1.99 | 1.57 | 1.23 |
+| corner, area curses | 0.73 | 1.16 | 0.42 | 0.63 | 0.47 | 0.59 |
+| corner, one tile only | 0.75 | 1.20 | 0.47 | 0.67 | 0.47 | 0.61 |
+| veteran against random curses | | | 1.46 | 1.34 | 1.24 | 1.15 |
+
+**Act II**
+
+| | Docks | Spider Forest | Jungle | Drowned City | Travincal | Temple |
+|---|---|---|---|---|---|---|
+| life factor | 4.66 | 3.24 | 3.96 | 2.75 | 2.89 | 0.83 |
+| **veteran's M** (target) | **1.34** (1.4) | **1.37** (1.3) | **1.20** (1.2) | **1.14** (1.15) | **1.10** (1.1) | **1.06** (1.05) |
+| B\* (warden / adaptive) | 1.64 | 2.07 | 1.34 | 1.20 | 1.43 | 2.10 |
+| veteran against random curses | | | 1.29 | 1.15 | 1.08 | 1.49 |
+
+(Act II's B\* row was measured at the first-pass factors of the Docks, 4.21, and the Spider Forest, 3.42.)
+
+**What it says**
+
+- **The veteran meets every target.** Each act's end sits at about 1.05–1.1: it wins there, with little to spare.
+- **The apprentice** wins Tristram and the Graveyard and falls from the Cathedral on, as designed.
+- **The strongest bots** keep at least 1.2 everywhere. The adaptive player's lead at the Cathedral (2.07 against
+  the warden's 1.29) is under the 1.5× line the design sets for a suspected exploit, but only just.
+- **Ilya's opening, as the corner player plays it, loses from the Cathedral on** (0.4–0.7). The area curses cost
+  it only 5–10% against single-tile curses. It is beaten by the rest: the retune, frost's slow following cold
+  resistance, and ranks that must be learned. A curse lands on about one or two of the corner player's towers; the
+  target of 20% was not met.
+- **The leaders' choices are worth 5–15% from each act's third location**, up to 41% at the Temple, where the
+  Bone Priest curses. The Drowned City (1%) and Travincal (−2%) miss the 10% target: there, curses thrown at random
+  hurt the veteran as much as chosen ones. The Inquisitor's marks and the council's crowd leave the planner little
+  to choose.
+- **Still open:** none of it has met a person; the ghost player can measure Ilya's own margin once he has played
+  (`tools/margin.py --replay`). The planned player's Act II builds have not been searched yet.
+
 ## Screens
 
 Title → prologue (first time) → world map (act tabs) ↔ skill tree → the lantern travels → story page (first

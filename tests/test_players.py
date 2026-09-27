@@ -185,7 +185,7 @@ def test_the_adaptive_player_learns_within_its_sigils_and_the_tree(order):
             assert not [key for key in SKILLS if can_learn(learned, key, sigils)]   # nothing left it could buy
 
 
-@pytest.mark.parametrize("name", sorted(set(PLAYERS) - {"planned"}))   # the planned one plays only searched builds
+@pytest.mark.parametrize("name", sorted(PLAYERS))
 def test_every_player_plays_an_act_two_location_with_its_towers_to_an_outcome(name):
     """Kurast Docks offers the Bone Altar; every player defends its first two waves through the hands, whatever it
     makes of the altar (a whole Act II defence per player, uncompiled, is the balance tools' work)."""
