@@ -108,6 +108,7 @@ TRISTRAM = Location(
           "them, and a shaman sings them on.",
     taunt="Huddle your towers together, if it comforts you. When my shaman's curse falls, it falls on all of them.",
     lesson="His curses fall on a tower and the towers beside it: spread your fire and frost.",
+    life=1.49,
 )
 
 GRAVEYARD = Location(
@@ -139,7 +140,7 @@ GRAVEYARD = Location(
           "the fire behind them.",
     lesson="A gate holds the dead in a queue, and Smite on the sign stops a curse before it comes.",
     requires=("tristram",),
-    life=1.15,
+    life=1.46,
 )
 
 CATHEDRAL = Location(
@@ -172,7 +173,7 @@ CATHEDRAL = Location(
           "goatmen do not fear your thunder.",
     lesson="Goatmen shrug off lightning and skeletons venom: mix your towers by what comes.",
     requires=("graveyard",),
-    life=0.8,
+    life=3.27,
 )
 
 CATACOMBS = Location(
@@ -205,7 +206,7 @@ CATACOMBS = Location(
           "still here?",
     lesson="Overlords break gates in seconds; frost weakens their blows and venom seeks the biggest.",
     requires=("cathedral",),
-    life=1.5,
+    life=2.0,
 )
 
 CAVES = Location(
@@ -237,7 +238,7 @@ CAVES = Location(
     taunt="Walls mean nothing to wings. Look up. And tell me, keeper: why do my bones never show your face?",
     lesson="Wings ignore gates, and the lava leaves few places to build.",
     requires=("catacombs",),
-    life=1.9,
+    life=2.54,
 )
 
 HELLS_GATE = Location(
@@ -272,7 +273,7 @@ HELLS_GATE = Location(
     taunt="In every night I have seen, the lamp goes out. I have begun to wonder what I have not seen.",
     lesson="Every curse at once, and Azazel will not burn.",
     requires=("caves",),
-    life=1.2,
+    life=1.41,
 )
 
 
