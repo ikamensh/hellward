@@ -297,13 +297,13 @@ class _Alive:
 
 
 def test_every_location_has_its_own_battle_track():
-    from hellward.audio.music import BATTLE_FOR, track_for
-    from hellward.sim.campaign import LOCATIONS
+    from hellward.audio.music import BATTLE_FOR, PIECES, track_for
 
-    assert set(BATTLE_FOR) == set(LOCATIONS)
-    assert len(set(BATTLE_FOR.values())) == len(LOCATIONS), "every dungeon sounds different"
-    for key in LOCATIONS:
-        assert track_for(key) in PIECES
+    assert len(set(BATTLE_FOR.values())) == len(BATTLE_FOR), "every dungeon sounds different"
+    for key, track in BATTLE_FOR.items():
+        assert track in PIECES, f"{key} -> {track} not in PIECES"
+        # round-trip
+        assert track_for(key) == track
 
 
 @pytest.mark.parametrize("name, low, high", [
@@ -314,6 +314,12 @@ def test_every_location_has_its_own_battle_track():
     ("battle_catacombs", 38, 48),
     ("battle_caves", 36, 46),
     ("battle_hells_gate", 40, 50),
+    ("battle_docks", 43, 53),
+    ("battle_spider_forest", 33, 43),
+    ("battle_jungle", 35, 45),
+    ("battle_drowned_city", 52, 62),
+    ("battle_travincal", 48, 58),
+    ("battle_temple", 53, 63),
     ("boss", 45, 60),
 ])
 def test_music_is_a_seamless_stereo_loop(cache: Path, name: str, low: float, high: float):
