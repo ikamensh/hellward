@@ -143,7 +143,7 @@ class Corner:
         if "smite" in world.location.arsenal.spells:
             threats = hands.threats()
             for sign in threats:
-                if sign.kind == "chant" and world.mana >= world.spell_cost("smite"):
+                if sign.kind == "chant" and ready(world, "smite"):
                     hands.smite(sign.leader)
                     self._last_aim = world.time
                     return
