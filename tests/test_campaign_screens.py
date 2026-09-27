@@ -289,19 +289,23 @@ def test_act_two_tab_opens_after_hells_gate_held(cache, tmp_path):
 
 
 def test_after_act1_ending_map_opens_on_act2_and_walks_to_docks(cache, tmp_path):
-    saves = tmp_path / "saves"
-    g, flow = open_game(cache, saves)
-    # Simulate having won Hell's Gate but not seen the ending
-    flow.progress.won = {key: 1 for key in ACTS[1]}
-    flow.progress.see("act1/end")  # mark ending as seen to skip it
-    flow.world_map()
-    tick(g)
-    map_scene = g.scenes[-1]
-    assert isinstance(map_scene, MapScene)
-    assert map_scene.act == 2
-    # The lantern should walk to Docks on first arrival
-    tick(g, 5)
-    # Should show Docks before page
-    page = g.scenes[-1]
-    assert isinstance(page, StoryScene) and page.pages[page.index].key == "docks-before"
-    g.close()
+    """Hell's Gate held, its ending unseen: the map plays the ending, then shows Act II and walks the lantern to the
+    Docks, whose first-arrival page opens. The next map opening shows the lantern's own act again, and walks nowhere."""
+    g, flow = open_game(cache, tmp_path / "saves")
+    try:
+        flow.progress.won = {key: 1 for key in ACTS[1]}
+        flow.world_map()
+        tick(g)
+        ending = g.scenes[-1]
+        assert isinstance(ending, StoryScene) and ending.pages[0].key == "act1-end-1"
+        for _ in range(2 * len(ending.pages)):
+            press(g, "return")
+        map_scene = g.scenes[-1]
+        assert isinstance(map_scene, MapScene) and map_scene.act == 2
+        tick(g, 6)
+        page = g.scenes[-1]
+        assert isinstance(page, StoryScene) and page.pages[page.index].key == "docks-before"
+    finally:
+        g.close()
+
+

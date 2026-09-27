@@ -123,9 +123,10 @@ def test_the_way_down_opens_one_location_at_a_time_and_the_lantern_walks_it(game
     assert not progress.opened(campaign.LOCATIONS[campaign.ORDER[1]])
     assert progress.next_location(1) == campaign.LOCATIONS[campaign.ORDER[0]]
     for i, key in enumerate(campaign.ORDER):
-        assert progress.next_location(1) == campaign.LOCATIONS[key]
+        act = campaign.LOCATIONS[key].act
+        assert progress.next_location(act) == campaign.LOCATIONS[key]
         assert progress.opened(campaign.LOCATIONS[key])
         if i + 1 < len(campaign.ORDER):
             assert not progress.opened(campaign.LOCATIONS[campaign.ORDER[i + 1]])
         progress.record(key, "victory", 18)
-    assert progress.next_location(1) is None
+    assert progress.next_location(1) is None and progress.next_location(2) is None
