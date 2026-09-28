@@ -273,5 +273,34 @@ check retained 0.924 of the best available choice across six useful decisions.
 Changing the one shared `base_hp` knob to 6 restored 4/4 wins under each policy.
 Mean lives lost are 0.2 without curses, 7.0 with random curses, and 8.0 with smart
 curses. Curse quality is 1.000 across six useful decisions (9 ms mean, 15 ms max).
-The new geometry still requires fresh planned-player builds and full-campaign
-calibration; those results will supersede the first redesign campaign table above.
+The new geometry's Act I and Act II planned builds and Warden builds were retrained.
+The final opening check still gives 4/4 wins for each leader policy with mean lives
+lost of 0.2/7.0/8.0 (none/random/smart), and an eight-moment curse-quality check
+still gives smart 1.000 of the best choice across six useful decisions.
+
+### Earned-sigil campaign on the corridor maps
+
+An eight-seed campaign across all twelve locations and seven scripted defenders
+(`tools/campaign_balance.py --seeds 1000-1007 --jobs 5`) gave each site the sigils
+earned by the better of Adaptive and Warden in the earlier sites. That budget grows
+from 0 in Tristram to only 24 at the Temple. Planned, the searched-build ceiling,
+won 8/8 at each of the first eleven locations and 7/8 at the Temple on that same
+budget, without forged patterns. Ordinary won 8/8 in Tristram but lost all sampled
+Hell's Gate, Jungle, Travincal and Temple defences. Those contrasts show the slow
+curve now asks for better builds as the campaign advances.
+
+The Temple is tight: Adaptive won 3/8 and Warden 0/8 at 24 sigils. Every Adaptive
+defeat leaked the 20-life Bone Priest; the Priest's remaining HP varied too much
+for a small boss-HP cut to solve the underlying build choices. A four-seed HP
+margin sample gave Planned median 0.99 and Adaptive 0.90 at that earned budget.
+This is a measured limit of the scripted defenders, not a claim about human win
+rates. The old Corner build now places towers beside hall bends, but it remains
+weak against the new openings; the first two locations are instead teachable to
+the Ordinary and Apprentice defenders.
+
+The planner stays accurate in the opening, but its late Spider Forest decision
+time is above the 100 ms target. A one-job run found 351 ms at the 95th percentile
+for one seed, while the five-job campaign table's 2064 ms figure also includes
+worker contention. Later rollout performance needs profiling before making a
+quality-for-speed trade. The full campaign table and reproduction commands are
+retained in the stack's `evidence/hellward/corridor-campaign` folder.

@@ -183,7 +183,7 @@ The screen after a story page ignores keys pressed before it opened, so a held E
 
 ## Tuning and verification
 
-The earlier six-location and twelve-location tuning tables were measured before this low-number, branching-hall economy. Their life factors, bot margins, planner gains and timing figures no longer describe the current rules, so they are removed here. The common profile supplies the starting curve; authored roles, wave compositions, entrances and optional packs are calibrated against strong scripted defenders and real replays.
+The earlier six-location and twelve-location tuning tables were measured before this low-number, branching-hall economy. Their life factors, bot margins, planner gains and timing figures no longer describe the current rules. The common profile supplies the starting curve; authored roles, wave compositions, entrances and optional packs were checked with an eight-seed earned-sigil campaign after the corridor revision. The [redesign notes](redesign.md#earned-sigil-campaign-on-the-corridor-maps) summarize that result, including the tight Temple finale and the current planner-latency limit.
 
 `tools/balance.py` compares leader policies and defenders, `tools/curse_quality.py` measures the curse planner, `tools/campaign_balance.py` follows progression, and `tools/margin.py` estimates spare difficulty. The source simulation and mypyc build should agree on events, rewards and outcomes for the same seed, including a breach and a forged loadout. Tests cover route geometry, clone determinism, rewards and replayed commands. Record each balance result with its profile and command so later curve changes remain comparable.
 
