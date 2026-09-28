@@ -1,9 +1,10 @@
-"""The map: a grid of tiles, a main path, optional committed routes, and gate sockets.
+"""The map: build plots, monster halls, committed routes, and gate sockets.
 
 A tile ``(x, y)`` spans ``[x, x+1) × [y, y+1)``; its centre is ``(x + 0.5, y + 0.5)``. Each route is a
 polyline through tile centres, measured by distance ``s`` from its entrance. The original single-path
 queries on :class:`Level` still describe the main route; authored alternatives are :class:`Route`
-values available through :meth:`Level.route`.
+values available through :meth:`Level.route`. A route's centreline stays inside the level's walkable
+hall; monsters never use a buildable tile.
 """
 
 from __future__ import annotations
@@ -96,7 +97,9 @@ class Level:
     obstacles: frozenset[tuple[int, int]] = field(default_factory=frozenset)
     pools: frozenset[tuple[int, int]] = field(default_factory=frozenset)
     extra_routes: tuple[Route, ...] = ()
+    halls: frozenset[tuple[int, int]] | None = None  # authored monster floor; omitted for small legacy arenas
     routes: tuple[Route, ...] = field(init=False, repr=False, compare=False)
+    walkable_tiles: frozenset[tuple[int, int]] = field(init=False, repr=False, compare=False)
     _routes_by_key: dict[str, Route] = field(init=False, repr=False, compare=False)
     _crossings: dict[str, tuple[tuple[int, float], ...]] = field(init=False, repr=False, compare=False)
     # Worked out from the fields above when the level is made (a compiled level has no __dict__ to cache them in):
@@ -144,6 +147,24 @@ class Level:
                 raise ValueError(f"door socket {(x, y)} is not on the path")
             if (x, y - 1) not in path or (x, y + 1) not in path:
                 raise ValueError(f"door socket {(x, y)} is not on a vertical leg: an arch is drawn facing the camera")
+        object.__setattr__(self, "_crossings", {route.key: self._route_crossings(route) for route in routes})
+        route_tiles = set().union(*(route.tiles for route in routes))
+        walkable = route_tiles if self.halls is None else set(self.halls)
+        if missing := route_tiles - walkable:
+            raise ValueError(f"route crosses outside the authored hall at {min(missing)}")
+        if out_of_bounds := {tile for tile in walkable if not (0 <= tile[0] < self.width and 0 <= tile[1] < self.height)}:
+            raise ValueError(f"hall goes outside the map at {min(out_of_bounds)}")
+        entrances = {route.entrance for route in routes}
+        exits = {route.exit for route in routes}
+        if edge := {tile for tile in walkable - entrances - exits
+                    if tile[0] in (0, self.width - 1) or tile[1] in (0, self.height - 1)}:
+            raise ValueError(f"hall opens through an edge wall at {min(edge)}")
+        if blocked := walkable & (self.obstacles | self.pools):
+            raise ValueError(f"hall crosses obstacle or pool at {min(blocked)}")
+        gate_walls = {(x + dx, y) for x, y in self.doors for dx in (-1, 1)}
+        if blocked := walkable & gate_walls:
+            raise ValueError(f"hall crosses gate wall {min(blocked)}")
+        object.__setattr__(self, "walkable_tiles", frozenset(walkable))
         object.__setattr__(self, "grid", self._lay())
         starts, points = self._measure()
         object.__setattr__(self, "_starts", starts)
@@ -154,11 +175,6 @@ class Level:
         # under s is the leg under int(s).
         object.__setattr__(self, "_leg_at", tuple(bisect_right(starts, k) - 1 for k in range(int(starts[-1]) + 1)))
         object.__setattr__(self, "door_s", tuple(self.s_of(d) for d in self.doors))
-        object.__setattr__(self, "_crossings", {route.key: self._route_crossings(route) for route in routes})
-        gate_walls = {(x + dx, y) for x, y in self.doors for dx in (-1, 1)}
-        for route in self.extra_routes:
-            if bad := route.tiles & gate_walls:
-                raise ValueError(f"route {route.key} crosses gate wall {min(bad)}")
         object.__setattr__(self, "_coverage", {})
 
     def route(self, key: str) -> Route:
@@ -215,9 +231,7 @@ class Level:
         return tuple(tiles)
 
     def _lay(self) -> tuple[tuple[Tile, ...], ...]:
-        path = set(self.path_tiles)
-        for route in self.extra_routes:
-            path.update(route.tiles)
+        path = self.walkable_tiles
         doors = set(self.doors)
         flanks = {(x + dx, y) for x, y in self.doors for dx in (-1, 1)} | {(x, y + dy) for x, y in self.doors for dy in (-1, 1)}
         rows = []
@@ -248,6 +262,10 @@ class Level:
 
     def buildable(self, x: int, y: int) -> bool:
         return self.tile(x, y) is Tile.FLOOR
+
+    def walkable(self, x: int, y: int) -> bool:
+        """Whether a monster can stand on this hall tile (including a gate socket)."""
+        return self.tile(x, y) in (Tile.PATH, Tile.DOOR)
 
     # -- The path ----------------------------------------------------------------------
 

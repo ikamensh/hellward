@@ -92,17 +92,37 @@ def g(kind: str, count: int, interval: float = 1.0, start: float = 0.0, *, route
     return Group(kind, count, interval, start, route)
 
 
+def _corridor_level(name: str, width: int, height: int, waypoints: tuple[tuple[int, int], ...],
+                    doors: tuple[tuple[int, int], ...], *,
+                    obstacles: frozenset[tuple[int, int]] = frozenset(),
+                    pools: frozenset[tuple[int, int]] = frozenset(),
+                    extra_routes: tuple[Route, ...] = ()) -> Level:
+    """Carve broad monster halls around authored route loops, leaving the rest for towers."""
+    routes = (Route("main", waypoints), *extra_routes)
+    centres = set().union(*(route.tiles for route in routes))
+    portals = {route.entrance for route in routes} | {route.exit for route in routes}
+    gate_walls = {(x + dx, y) for x, y in doors for dx in (-1, 1)}
+    halls = {(x + dx, y + dy) for x, y in centres
+             for dx, dy in ((0, 0), (-1, 0), (1, 0), (0, -1), (0, 1))
+             if 0 <= x + dx < width and 0 <= y + dy < height
+             and ((0 < x + dx < width - 1 and 0 < y + dy < height - 1)
+                  or (x + dx, y + dy) in portals)}
+    halls.difference_update(obstacles | pools | gate_walls)
+    return Level(name, width, height, waypoints, doors, obstacles, pools, extra_routes,
+                 halls=frozenset(halls))
+
+
 TRISTRAM = Location(
     key="tristram",
     name="Tristram",
-    level=Level(
-        name="Tristram", width=25, height=14,
-        waypoints=((0, 6), (12, 6), (12, 7), (24, 7)),
+    level=_corridor_level(
+        name="Tristram", width=33, height=18,
+        waypoints=((0, 8), (15, 8), (15, 9), (32, 9)),
         doors=(),
-        obstacles=frozenset({(3, 1), (13, 2), (21, 2), (5, 12), (22, 10), (13, 11)}),
+        obstacles=frozenset({(3, 2), (16, 2), (28, 3), (4, 15), (27, 14), (16, 15)}),
         extra_routes=(
-            Route("north", ((0, 6), (4, 4), (9, 4), (15, 6), (24, 7))),
-            Route("south", ((0, 6), (5, 9), (12, 9), (18, 7), (24, 7))),
+            Route("north", ((0, 8), (4, 6), (8, 4), (15, 4), (19, 7), (25, 7), (32, 9))),
+            Route("south", ((0, 8), (5, 11), (10, 13), (18, 13), (22, 10), (32, 9))),
         ),
     ),
     waves=_waves(0,
@@ -126,17 +146,18 @@ TRISTRAM = Location(
 GRAVEYARD = Location(
     key="graveyard",
     name="The Graveyard",
-    level=Level(
-        name="The Graveyard", width=25, height=14,
-        waypoints=((0, 10), (10, 10), (10, 3), (24, 3)),
-        doors=((10, 7),),
-        obstacles=frozenset({(3, 6), (3, 11), (7, 12), (15, 10), (22, 12)}),
-        pools=frozenset({(6, 11), (19, 12)}),
+    level=_corridor_level(
+        name="The Graveyard", width=33, height=18,
+        waypoints=((0, 12), (12, 12), (12, 5), (32, 5)),
+        doors=((12, 8),),
+        obstacles=frozenset({(3, 2), (5, 17), (16, 15), (27, 13), (26, 2)}),
+        pools=frozenset({(6, 17), (29, 15)}),
         extra_routes=(
-            Route("meander", ((0, 10), (4, 8), (5, 3), (12, 2), (18, 11), (23, 3), (24, 3))),
-            Route("side", ((0, 2), (6, 2), (14, 5), (24, 3))),
-            Route("side_detour", ((0, 2), (4, 5), (15, 5), (15, 1), (24, 3))),
-            Route("breach", ((12, 0), (15, 3), (20, 4), (24, 3))),
+            Route("meander", ((0, 12), (3, 9), (6, 9), (6, 15), (11, 15), (11, 12),
+                              (12, 12), (12, 5), (32, 5))),
+            Route("side", ((0, 3), (9, 3), (21, 5), (32, 5))),
+            Route("side_detour", ((0, 3), (4, 6), (7, 1), (18, 1), (24, 5), (32, 5))),
+            Route("breach", ((19, 0), (19, 2), (23, 3), (27, 5), (32, 5))),
         ),
     ),
     waves=_waves(1,
@@ -164,15 +185,15 @@ GRAVEYARD = Location(
 CATHEDRAL = Location(
     key="cathedral",
     name="The Cathedral",
-    level=Level(
-        name="The Desecrated Cathedral", width=25, height=14,
-        waypoints=((0, 2), (11, 2), (11, 10), (24, 10)),
-        doors=((11, 6),),
-        obstacles=frozenset({(2, 5), (8, 1), (21, 2), (22, 6), (2, 12), (20, 12)}),
+    level=_corridor_level(
+        name="The Desecrated Cathedral", width=33, height=18,
+        waypoints=((0, 3), (13, 3), (13, 12), (32, 12)),
+        doors=((13, 8),),
+        obstacles=frozenset({(2, 8), (18, 3), (26, 3), (3, 16), (27, 16), (20, 6)}),
         extra_routes=(
-            Route("meander", ((0, 2), (5, 4), (7, 11), (8, 4), (16, 3), (19, 8), (24, 10))),
-            Route("side", ((0, 11), (6, 11), (15, 8), (24, 10))),
-            Route("side_detour", ((0, 11), (5, 8), (16, 7), (17, 12), (24, 10))),
+            Route("meander", ((0, 3), (3, 6), (7, 6), (7, 1), (12, 1), (13, 3), (13, 12), (32, 12))),
+            Route("side", ((0, 13), (7, 13), (21, 12), (32, 12))),
+            Route("side_detour", ((0, 13), (3, 10), (8, 10), (8, 16), (17, 16), (22, 12), (32, 12))),
         ),
     ),
     waves=_waves(2,
@@ -201,17 +222,19 @@ CATHEDRAL = Location(
 CATACOMBS = Location(
     key="catacombs",
     name="The Catacombs",
-    level=Level(
-        name="The Catacombs", width=25, height=14,
-        waypoints=((4, 0), (4, 8), (12, 8), (12, 11), (20, 11), (20, 13)),
-        doors=((4, 5),),
-        obstacles=frozenset({(1, 3), (8, 1), (14, 3), (1, 11), (23, 1)}),
-        pools=frozenset({(2, 9), (13, 5), (23, 10)}),
+    level=_corridor_level(
+        name="The Catacombs", width=33, height=18,
+        waypoints=((5, 0), (5, 10), (15, 10), (15, 14), (27, 14), (27, 17)),
+        doors=((5, 6),),
+        obstacles=frozenset({(2, 3), (11, 2), (17, 3), (2, 14), (31, 2)}),
+        pools=frozenset({(10, 15), (14, 5), (30, 14)}),
         extra_routes=(
-            Route("meander", ((4, 0), (7, 4), (9, 10), (15, 11), (14, 5), (20, 10), (20, 13))),
-            Route("side", ((17, 0), (17, 5), (15, 8), (20, 13))),
-            Route("side_detour", ((17, 0), (17, 2), (19, 5), (21, 3), (21, 9), (20, 13))),
-            Route("breach", ((24, 6), (21, 7), (20, 13))),
+            Route("meander", ((5, 0), (5, 3), (9, 3), (9, 8), (13, 8), (13, 13),
+                              (19, 13), (19, 8), (27, 8), (27, 17))),
+            Route("side", ((23, 0), (23, 7), (27, 12), (27, 17))),
+            Route("side_detour", ((23, 0), (23, 2), (29, 3), (29, 9), (23, 9), (21, 14),
+                                  (27, 14), (27, 17))),
+            Route("breach", ((32, 8), (30, 8), (28, 11), (27, 17))),
         ),
     ),
     waves=_waves(3,
@@ -240,17 +263,17 @@ CATACOMBS = Location(
 CAVES = Location(
     key="caves",
     name="The Caves",
-    level=Level(
-        name="The Caves", width=25, height=14,
-        waypoints=((12, 0), (12, 6), (21, 6), (21, 4), (24, 4)),
-        doors=((12, 3),),
-        obstacles=frozenset({(3, 3), (8, 2), (18, 2), (2, 12), (22, 11)}),
-        pools=frozenset({(x, y) for x in range(8, 16) for y in (11, 12)}
-                        | {(x, y) for x in range(2, 6) for y in (5, 6)}),
+    level=_corridor_level(
+        name="The Caves", width=33, height=18,
+        waypoints=((16, 0), (16, 9), (27, 9), (27, 5), (32, 5)),
+        doors=((16, 4),),
+        obstacles=frozenset({(3, 3), (10, 2), (24, 2), (3, 16), (30, 14)}),
+        pools=frozenset({(x, y) for x in range(2, 7) for y in range(4, 6)}
+                        | {(x, 16) for x in range(13, 19)}),
         extra_routes=(
-            Route("meander", ((12, 0), (15, 3), (17, 10), (18, 4), (24, 4))),
-            Route("side", ((0, 10), (7, 10), (14, 8), (22, 7), (23, 4), (24, 4))),
-            Route("side_detour", ((0, 10), (5, 8), (16, 8), (14, 10), (19, 5), (24, 4))),
+            Route("meander", ((16, 0), (16, 2), (21, 2), (21, 12), (25, 12), (25, 5), (32, 5))),
+            Route("side", ((0, 13), (9, 13), (18, 11), (28, 11), (28, 5), (32, 5))),
+            Route("side_detour", ((0, 13), (5, 9), (12, 9), (12, 15), (21, 15), (24, 9), (32, 5))),
         ),
     ),
     waves=_waves(4,
@@ -278,17 +301,18 @@ CAVES = Location(
 HELLS_GATE = Location(
     key="hells_gate",
     name="Hell's Gate",
-    level=Level(
-        name="Hell's Gate", width=25, height=14,
-        waypoints=((0, 2), (10, 2), (10, 11), (24, 11)),
-        doors=((10, 6),),
-        obstacles=frozenset({(3, 6), (5, 1), (22, 3), (2, 12), (19, 12)}),
-        pools=frozenset({(4, 11), (14, 6), (3, 9)}),
+    level=_corridor_level(
+        name="Hell's Gate", width=33, height=18,
+        waypoints=((0, 3), (13, 3), (13, 13), (32, 13)),
+        doors=((13, 8),),
+        obstacles=frozenset({(2, 2), (27, 2), (2, 16), (19, 6), (29, 16)}),
+        pools=frozenset({(5, 16), (18, 5), (3, 8)}),
         extra_routes=(
-            Route("meander", ((0, 2), (4, 4), (5, 11), (7, 11), (8, 3), (18, 3), (21, 9), (24, 11))),
-            Route("side", ((0, 10), (7, 10), (15, 8), (24, 11))),
-            Route("side_detour", ((0, 10), (5, 7), (16, 7), (21, 6), (20, 9), (24, 11))),
-            Route("breach", ((13, 0), (16, 3), (20, 6), (23, 9), (23, 11), (24, 11))),
+            Route("meander", ((0, 3), (4, 6), (4, 11), (8, 11), (8, 1), (13, 1),
+                              (13, 13), (32, 13))),
+            Route("side", ((0, 13), (8, 13), (20, 12), (32, 13))),
+            Route("side_detour", ((0, 13), (4, 9), (10, 9), (10, 16), (22, 16), (26, 12), (32, 13))),
+            Route("breach", ((22, 0), (22, 2), (24, 4), (29, 9), (31, 13), (32, 13))),
         ),
     ),
     waves=_waves(5,
@@ -330,16 +354,16 @@ DOCKS = Location(
     key="docks",
     name="Kurast Docks",
     act=2,
-    level=Level(
-        name="Kurast Docks", width=25, height=14,
-        waypoints=((13, 0), (13, 8), (21, 8), (21, 3), (24, 3)),
-        doors=((13, 5),),
-        obstacles=frozenset({(3, 5), (10, 6), (23, 7), (5, 10)}),
-        pools=_water((0, 12, 24, 13), (2, 8, 5, 9), (10, 10, 14, 10)),
+    level=_corridor_level(
+        name="Kurast Docks", width=33, height=18,
+        waypoints=((17, 0), (17, 10), (27, 10), (27, 4), (32, 4)),
+        doors=((17, 5),),
+        obstacles=frozenset({(4, 2), (9, 10), (30, 10), (6, 14)}),
+        pools=_water((0, 16, 32, 17), (2, 11, 5, 13), (11, 14, 15, 15)),
         extra_routes=(
-            Route("meander", ((13, 0), (13, 2), (8, 4), (8, 9), (18, 8), (24, 3))),
-            Route("side", ((0, 3), (7, 3), (18, 3), (24, 3))),
-            Route("side_detour", ((0, 3), (5, 2), (19, 2), (18, 5), (24, 3))),
+            Route("meander", ((17, 0), (17, 2), (12, 2), (12, 8), (20, 8), (20, 4), (32, 4))),
+            Route("side", ((0, 4), (8, 4), (22, 4), (32, 4))),
+            Route("side_detour", ((0, 4), (4, 7), (9, 7), (9, 1), (25, 1), (25, 4), (32, 4))),
         ),
     ),
     waves=_waves(6,
@@ -365,17 +389,19 @@ SPIDER_FOREST = Location(
     key="spider_forest",
     name="The Spider Forest",
     act=2,
-    level=Level(
-        name="The Spider Forest", width=25, height=14,
-        waypoints=((7, 0), (7, 7), (17, 7), (17, 11), (24, 11)),
-        doors=((7, 4),),
-        obstacles=frozenset({(2, 3), (4, 5), (12, 2), (15, 1), (22, 12), (4, 12)}),
-        pools=frozenset({(3, 6), (12, 12), (18, 2)}),
+    level=_corridor_level(
+        name="The Spider Forest", width=33, height=18,
+        waypoints=((9, 0), (9, 9), (22, 9), (22, 14), (32, 14)),
+        doors=((9, 5),),
+        obstacles=frozenset({(3, 3), (4, 6), (17, 2), (5, 17), (29, 16)}),
+        pools=frozenset({(3, 8), (17, 3), (26, 2)}),
         extra_routes=(
-            Route("meander", ((7, 0), (7, 2), (7, 9), (11, 3), (20, 5), (21, 9), (24, 11))),
-            Route("side", ((0, 11), (6, 11), (14, 9), (24, 11))),
-            Route("side_detour", ((0, 11), (4, 8), (13, 8), (17, 5), (20, 10), (24, 11))),
-            Route("breach", ((24, 2), (21, 4), (21, 8), (24, 11))),
+            Route("meander", ((9, 0), (9, 2), (14, 2), (14, 13), (18, 13), (18, 5),
+                              (25, 5), (25, 14), (32, 14))),
+            Route("side", ((0, 14), (8, 14), (21, 13), (32, 14))),
+            Route("side_detour", ((0, 14), (4, 10), (12, 10), (12, 16), (22, 16),
+                                  (25, 13), (32, 14))),
+            Route("breach", ((32, 3), (28, 6), (28, 11), (32, 14))),
         ),
     ),
     waves=_waves(7,
@@ -402,16 +428,18 @@ JUNGLE = Location(
     key="jungle",
     name="The Flayer Jungle",
     act=2,
-    level=Level(
-        name="The Flayer Jungle", width=25, height=14,
-        waypoints=((0, 2), (9, 2), (9, 8), (19, 8), (19, 11), (24, 11)),
-        doors=((9, 5),),
-        obstacles=frozenset({(2, 6), (12, 1), (17, 2), (3, 12), (20, 5)}),
-        pools=frozenset({(12, 5), (22, 5), (6, 12)}),
+    level=_corridor_level(
+        name="The Flayer Jungle", width=33, height=18,
+        waypoints=((0, 3), (12, 3), (12, 10), (25, 10), (25, 14), (32, 14)),
+        doors=((12, 7),),
+        obstacles=frozenset({(3, 8), (18, 3), (28, 3), (4, 17), (28, 16)}),
+        pools=frozenset({(20, 4), (29, 6), (6, 16)}),
         extra_routes=(
-            Route("meander", ((0, 2), (5, 4), (4, 11), (11, 11), (15, 4), (20, 7), (24, 11))),
-            Route("side", ((0, 11), (8, 11), (16, 9), (24, 11))),
-            Route("side_detour", ((0, 11), (5, 8), (15, 7), (16, 11), (21, 9), (24, 11))),
+            Route("meander", ((0, 3), (4, 6), (4, 12), (10, 12), (10, 1), (15, 1),
+                              (15, 8), (25, 8), (25, 14), (32, 14))),
+            Route("side", ((0, 14), (9, 14), (21, 13), (32, 14))),
+            Route("side_detour", ((0, 14), (5, 10), (10, 10), (10, 16), (22, 16),
+                                  (27, 12), (32, 14))),
         ),
     ),
     waves=_waves(8,
@@ -438,17 +466,18 @@ DROWNED_CITY = Location(
     key="drowned_city",
     name="The Drowned City",
     act=2,
-    level=Level(
-        name="The Drowned City", width=25, height=14,
-        waypoints=((8, 0), (8, 8), (17, 8), (17, 3), (24, 3)),
-        doors=((8, 6),),
-        obstacles=frozenset({(3, 6), (12, 6), (2, 8), (1, 1)}),
-        pools=_water((1, 10, 5, 11), (10, 10, 15, 11), (19, 10, 22, 11)),
+    level=_corridor_level(
+        name="The Drowned City", width=33, height=18,
+        waypoints=((11, 0), (11, 10), (23, 10), (23, 4), (32, 4)),
+        doors=((11, 6),),
+        obstacles=frozenset({(3, 12), (7, 2), (20, 3), (28, 15)}),
+        pools=_water((2, 15, 8, 16), (12, 15, 17, 16), (25, 15, 30, 16)),
         extra_routes=(
-            Route("meander", ((8, 0), (8, 8), (11, 9), (16, 1), (20, 8), (23, 3), (24, 3))),
-            Route("side", ((0, 4), (5, 4), (14, 4), (24, 3))),
-            Route("side_detour", ((0, 4), (4, 2), (15, 2), (18, 7), (24, 3))),
-            Route("breach", ((24, 10), (21, 8), (21, 5), (24, 3))),
+            Route("meander", ((11, 0), (11, 2), (16, 2), (16, 14), (21, 14),
+                              (21, 6), (27, 6), (27, 4), (32, 4))),
+            Route("side", ((0, 5), (8, 5), (20, 5), (32, 4))),
+            Route("side_detour", ((0, 5), (4, 8), (8, 8), (8, 1), (22, 1), (25, 6), (32, 4))),
+            Route("breach", ((32, 13), (28, 10), (28, 6), (32, 4))),
         ),
     ),
     waves=_waves(9,
@@ -477,16 +506,18 @@ TRAVINCAL = Location(
     key="travincal",
     name="Travincal",
     act=2,
-    level=Level(
-        name="Travincal", width=25, height=14,
-        waypoints=((6, 0), (6, 7), (16, 7), (16, 12), (24, 12)),
-        doors=((6, 4),),
-        obstacles=frozenset({(2, 3), (13, 2), (22, 4), (2, 12), (11, 5)}),
-        pools=frozenset({(12, 5), (19, 3), (8, 12)}),
+    level=_corridor_level(
+        name="Travincal", width=33, height=18,
+        waypoints=((8, 0), (8, 9), (21, 9), (21, 15), (32, 15)),
+        doors=((8, 5),),
+        obstacles=frozenset({(3, 3), (17, 3), (29, 3), (3, 16), (15, 5)}),
+        pools=frozenset({(16, 6), (26, 2), (6, 17)}),
         extra_routes=(
-            Route("meander", ((6, 0), (6, 2), (6, 10), (10, 3), (18, 5), (21, 9), (24, 12))),
-            Route("side", ((0, 11), (8, 11), (16, 9), (24, 12))),
-            Route("side_detour", ((0, 11), (4, 8), (13, 8), (17, 5), (20, 10), (24, 12))),
+            Route("meander", ((8, 0), (8, 2), (13, 2), (13, 13), (18, 13), (18, 4),
+                              (26, 4), (26, 15), (32, 15))),
+            Route("side", ((0, 14), (9, 14), (20, 13), (32, 15))),
+            Route("side_detour", ((0, 14), (4, 10), (10, 10), (10, 16), (23, 16),
+                                  (26, 12), (32, 15))),
         ),
     ),
     waves=_waves(10,
@@ -518,17 +549,19 @@ TEMPLE = Location(
     key="temple",
     name="The Temple of Light",
     act=2,
-    level=Level(
-        name="The Temple of Light", width=25, height=14,
-        waypoints=((7, 0), (7, 6), (16, 6), (16, 9), (24, 9)),
-        doors=((7, 3),),
-        obstacles=frozenset({(2, 3), (11, 1), (18, 1), (3, 6), (12, 12), (22, 12)}),
-        pools=frozenset({(3, 8), (18, 10)}),
+    level=_corridor_level(
+        name="The Temple of Light", width=33, height=18,
+        waypoints=((9, 0), (9, 8), (21, 8), (21, 12), (32, 12)),
+        doors=((9, 4),),
+        obstacles=frozenset({(3, 3), (17, 3), (28, 2), (4, 16), (27, 16)}),
+        pools=frozenset({(3, 8), (17, 15)}),
         extra_routes=(
-            Route("meander", ((7, 0), (7, 2), (11, 3), (13, 11), (19, 4), (21, 7), (24, 9))),
-            Route("side", ((0, 9), (6, 9), (14, 8), (24, 9))),
-            Route("side_detour", ((0, 9), (5, 11), (17, 11), (16, 8), (24, 9))),
-            Route("breach", ((24, 1), (21, 3), (21, 6), (24, 9))),
+            Route("meander", ((9, 0), (9, 2), (14, 2), (14, 13), (18, 13),
+                              (18, 5), (26, 5), (26, 12), (32, 12))),
+            Route("side", ((0, 12), (8, 12), (20, 11), (32, 12))),
+            Route("side_detour", ((0, 12), (4, 15), (11, 15), (11, 9), (24, 9),
+                                  (27, 12), (32, 12))),
+            Route("breach", ((32, 2), (28, 5), (28, 9), (31, 12), (32, 12))),
         ),
     ),
     waves=_waves(11,

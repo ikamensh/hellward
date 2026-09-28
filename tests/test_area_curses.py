@@ -6,15 +6,18 @@ import pytest
 
 from hellward.sim import campaign, planner
 from hellward.sim.content import CURSES, MONSTERS, Curse, Element, Group, MonsterKind, Wave
+from hellward.sim.level import Level
 from hellward.sim.model import SIM_DT, Monster, Refused, Tower, World
 from hellward.sim.skills import perks
 
-CENTRE = (11, 3)   # open 3x3 build area beside the Jungle's main route
+ARENA = Level("Curse field", 25, 14,
+              ((0, 2), (9, 2), (9, 8), (19, 8), (19, 11), (24, 11)), ((9, 5),))
+CENTRE = (11, 3)   # open 3x3 build area beside this test field's route
 
 
 def waves_of(kind: str) -> campaign.Location:
     pack = Wave((Group(kind, 1, 1.0),), 10)
-    return replace(campaign.JUNGLE, waves=(pack,), wave_names=("pack",), life=1.0)
+    return replace(campaign.JUNGLE, level=ARENA, waves=(pack,), wave_names=("pack",), life=1.0)
 
 
 def world_with_leader(kind: str = "shaman", seed: int = 7) -> World:
@@ -145,7 +148,7 @@ def test_a_cursed_tower_cannot_be_sold():
 
 def chill_world() -> tuple[World, Tower, float]:
     cold = perks({"adept_cold", "glacial_spike", "master_cold", "shatter"}, stage=8)
-    world = World(campaign.JUNGLE, seed=11, perks=cold)
+    world = World(replace(campaign.JUNGLE, level=ARENA), seed=11, perks=cold)
     world.gold = 10000
     tower = world.build("frost", (10, 3))   # one tile nearer the main route than the curse geometry block
     s = next(s for s in (i * 0.25 for i in range(int(world.level.length * 4))) if world.in_reach(tower, s))
@@ -185,7 +188,7 @@ def test_a_cold_immune_monster_is_not_chilled_at_all():
 
 def test_the_planner_prefers_the_spot_whose_circle_holds_more_working_towers():
     pack = Wave((Group("skeleton", 6, 0.6), Group("shaman", 1, 1, start=3.0)), 10)
-    world = World(replace(campaign.JUNGLE, waves=(pack,), wave_names=("pack",), life=1.0))
+    world = World(replace(campaign.JUNGLE, level=ARENA, waves=(pack,), wave_names=("pack",), life=1.0))
     world.gold = 5000
     pair = [(5, 1), (6, 1)]
     single = (3, 4)

@@ -119,3 +119,34 @@ def test_a_side_route_cannot_use_the_wall_beside_a_gate():
     with pytest.raises(ValueError, match="gate wall"):
         Level("yard", 9, 9, ((0, 4), (4, 4), (4, 7), (8, 7)), ((4, 5),),
               extra_routes=(Route("flank", ((0, 1), (5, 3), (5, 5), (7, 5), (7, 7), (8, 7))),))
+
+
+def test_authored_hall_separates_monster_space_from_tower_plots():
+    """A hall can be wider than a route, but neither hall nor route tiles accept towers."""
+    hall = frozenset((x, 4) for x in range(9)) | frozenset(
+        (x, y) for x in range(1, 8) for y in (3, 5))
+    level = Level("split floor", 9, 9, ((0, 4), (8, 4)), (), halls=hall)
+
+    assert level.walkable_tiles == hall
+    assert level.tile(4, 3) is Tile.PATH
+    assert level.walkable(4, 3) and not level.buildable(4, 3)
+    assert level.tile(4, 2) is Tile.FLOOR
+    assert level.buildable(4, 2) and not level.walkable(4, 2)
+    assert all(level.walkable(math.floor(level.point(s)[0]), math.floor(level.point(s)[1]))
+               for s in (level.length * i / 100 for i in range(101)))
+
+
+def test_a_route_cannot_leave_an_authored_hall():
+    """An omitted hall tile must not silently become a monster path over a tower plot."""
+    hall = frozenset((x, 4) for x in range(9) if x != 5)
+    with pytest.raises(ValueError, match="outside.*hall"):
+        Level("broken hall", 9, 9, ((0, 4), (8, 4)), (), halls=hall)
+
+
+def test_an_authored_hall_keeps_gate_walls_closed():
+    """A wider hall must not turn a gate's flanking wall into monster floor."""
+    path = frozenset({(x, 4) for x in range(5)} | {(4, y) for y in range(4, 8)} |
+                     {(x, 7) for x in range(4, 9)})
+    with pytest.raises(ValueError, match="gate wall"):
+        Level("open flank", 9, 9, ((0, 4), (4, 4), (4, 7), (8, 7)), ((4, 5),),
+              halls=path | {(5, 5)})

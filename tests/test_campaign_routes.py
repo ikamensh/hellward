@@ -1,6 +1,7 @@
-"""Open campaign fields have two ordinary entrances and reserved bonus breaches."""
+"""Campaign hall networks have two ordinary entrances and reserved bonus breaches."""
 
 from dataclasses import replace
+import math
 
 import pytest
 
@@ -68,3 +69,23 @@ def test_graveyard_wave_uses_both_entrances_but_keeps_its_breach_sealed():
     assert by_kind["zombie"] <= {"main", "meander"} and by_kind["zombie"]
     assert by_kind["skeleton"] <= {"side", "side_detour"} and by_kind["skeleton"]
     assert all(m.route != "breach" for m in world.monsters)
+
+
+@pytest.mark.parametrize("key", ORDER)
+def test_campaign_routes_stay_in_wide_monster_halls_away_from_tower_plots(key):
+    """Every authored route is confined to visible hall floor; tower plots never share it."""
+    level = LOCATIONS[key].level
+    assert level.halls is not None
+    assert level.width >= 33 and level.height >= 18
+    assert all(level.walkable(*tile) and not level.buildable(*tile)
+               for route in level.routes for tile in route.tiles)
+    assert all(level.walkable(math.floor(route.point(route.length * i / 100)[0]),
+                              math.floor(route.point(route.length * i / 100)[1]))
+               for route in level.routes for i in range(101))
+    route_tiles = {tile for route in level.routes for tile in route.tiles}
+    assert level.walkable_tiles > route_tiles  # halls have room beside the route centerlines
+    assert all(not level.buildable(*tile) for tile in level.walkable_tiles)
+    build_near_hall = sum(level.buildable(x, y) and any(level.walkable(x + dx, y + dy)
+                                                      for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)))
+                          for y in range(level.height) for x in range(level.width))
+    assert build_near_hall >= 20

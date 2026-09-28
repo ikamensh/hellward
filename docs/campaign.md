@@ -8,7 +8,7 @@ This campaign began as six compact locations, then gained a second act, area cur
 
 Each location opens after the previous one is held. Victories earn one, two or three sigils by sanctuary life left: at least 1, 10 or 18 of 20. Only an improvement over that location's best result adds sigils. A perfect campaign yields 36; the nine-column skill tree costs 65. Skills can be reset freely, but later skills stay locked until their location opens.
 
-A location has 5–8 waves on a 25 × 14 field. Tristram has one entrance and three trails. Every later location has two ordinary entrances, each with a direct and a longer detour. From the Graveyard onward, one arch may hold a gate; a route that goes around that arch bypasses it. Obstacles and hazards leave broad buildable ground instead of forcing a long folded corridor. The six breach locations have a third, sealed entrance that opens only by choice.
+A location has 5–8 waves on a 33 × 18 map. Walkable monster halls are roughly three tiles wide around their route centerlines and branch into loops around buildable tower islands. Monster routes never cross tower plots. Tristram has one entrance and three routes. Every later location has two ordinary entrances, each with a direct route and a longer loop. From the Graveyard onward, one arch may hold a gate; a route through another hall bypasses it. The six breach locations have a third, sealed entrance that opens only by choice.
 
 | # | Location | New usable power | Area damage |
 |---:|---|---|---|
@@ -116,7 +116,7 @@ A Fetish Shaman raises a nearby dead Flayer once unless a burst leaves nothing t
 
 ## Locations
 
-Each map keeps its theme and story but now has open approaches. A gate covers only the trails that cross its single arch; other trails may bypass it. The side entrance changes approach direction, and a breach adds an optional third threat on six maps.
+Each map keeps its theme and story in a distinct network of halls and tower plots. A gate covers only the routes that cross its single arch; other halls may bypass it. The side entrance changes approach direction, and a breach adds an optional third threat on six maps.
 
 **Act I — The Descent**
 
@@ -183,7 +183,7 @@ The screen after a story page ignores keys pressed before it opened, so a held E
 
 ## Tuning and verification
 
-The earlier six-location and twelve-location tuning tables were measured before this low-number, open-route economy. Their life factors, bot margins, planner gains and timing figures no longer describe the current rules, so they are removed here. The common profile supplies the starting curve; authored roles, wave compositions, entrances and optional packs are calibrated against strong scripted defenders and real replays.
+The earlier six-location and twelve-location tuning tables were measured before this low-number, branching-hall economy. Their life factors, bot margins, planner gains and timing figures no longer describe the current rules, so they are removed here. The common profile supplies the starting curve; authored roles, wave compositions, entrances and optional packs are calibrated against strong scripted defenders and real replays.
 
 `tools/balance.py` compares leader policies and defenders, `tools/curse_quality.py` measures the curse planner, `tools/campaign_balance.py` follows progression, and `tools/margin.py` estimates spare difficulty. The source simulation and mypyc build should agree on events, rewards and outcomes for the same seed, including a breach and a forged loadout. Tests cover route geometry, clone determinism, rewards and replayed commands. Record each balance result with its profile and command so later curve changes remain comparable.
 

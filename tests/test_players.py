@@ -20,6 +20,10 @@ from hellward.sim.players.planned import PLANS, load
 from hellward.sim.players.warden import fingerprint, load_plans
 from hellward.sim.skills import SKILLS, can_learn, check, cost
 
+GRAVEYARD_SIGNS = Level("Sign timing", 25, 14, ((0, 10), (10, 10), (10, 3), (24, 3)), ((10, 7),))
+CATACOMBS_SIGNS = Level("Broken chants", 25, 14,
+                        ((4, 0), (4, 8), (12, 8), (12, 11), (20, 11), (20, 13)), ((4, 5),))
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import plan_player  # noqa: E402
 import warden_plans  # noqa: E402
@@ -68,7 +72,8 @@ def test_warden_plan_is_invalidated_when_the_walkable_hall_changes():
 
 def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():
     pack = Wave((g("skeleton", 4), g("priest", 2, 4.0, start=1.0)), 10)
-    world = World(replace(LOCATIONS["graveyard"], waves=(pack,), wave_names=("pack",)), seed=3, planner=planner.smart)
+    world = World(replace(LOCATIONS["graveyard"], level=GRAVEYARD_SIGNS,
+                          waves=(pack,), wave_names=("pack",)), seed=3, planner=planner.smart)
     hands = Hands(world, react=0.6)
     world.gold = 1000
     world.build("arrow", (9, 9))
@@ -95,7 +100,8 @@ def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():
 def test_the_record_tells_a_broken_chant_from_a_broken_pondering():
     """Chants broken are counted among the chants begun: a pondering a spell breaks never became one."""
     pack = Wave((g("priest", 2, 3.0),), 10)
-    world = World(replace(LOCATIONS["catacombs"], waves=(pack,), wave_names=("pack",)), seed=3, planner=planner.smart)
+    world = World(replace(LOCATIONS["catacombs"], level=CATACOMBS_SIGNS,
+                          waves=(pack,), wave_names=("pack",)), seed=3, planner=planner.smart)
     hands = Hands(world, react=0.6)
     world.gold = 1000
     world.build("pyre", (6, 5))
