@@ -29,7 +29,7 @@ Offering a tower does not grant its upgrades. A learned rank still costs battle 
 
 ## The common combat scale and gold
 
-`sim/balance.py` is the starting point for global tuning. Base enemy life is 7, multiplied by its role, `1.055 ^ location_index`, `1.05 ^ wave_index`, and any exceptional encounter factor. The first Fallen has 7 life and a rank-I Arrow hits for 2. Arrow ranks hit for 2, 3 and 4. Rank-I Arrow costs 12 in Tristram. Local gold units rise at the same 5.5% location rate; starting gold is three units in Tristram (36 gold) and adds half a unit per later location to cover more entrances. A wave's kills and clear bonus together pay `1 + 0.5 × wave_index` local Arrow-price units, starting at one unit and reaching three by Tristram's fifth wave. The old area-focused swarm counts scale by `max(0.4, 1 / (1 + 0.5 × max(location_index − 1, 0)))`, preserving the authored mix while making single-target defence viable.
+`sim/balance.py` is the starting point for global tuning. Base enemy life is 6, multiplied by its role, `1.055 ^ location_index`, `1.05 ^ wave_index`, and any exceptional encounter factor. The first Fallen has 6 life and a rank-I Arrow hits for 2. Arrow ranks hit for 2, 3 and 4. Rank-I Arrow costs 12 in Tristram. Local gold units rise at the same 5.5% location rate; starting gold is three units in Tristram (36 gold) and adds half a unit per later location to cover more entrances. A wave's kills and clear bonus together pay `1 + 0.5 × wave_index` local Arrow-price units, starting at one unit and reaching three by Tristram's fifth wave. The old area-focused swarm counts scale by `max(0.4, 1 / (1 + 0.5 × max(location_index − 1, 0)))`, preserving the authored mix while making single-target defence viable.
 
 A wave has one gold budget, with a share divided across its monsters and the rest paid on clearing it. Enemy type weights affect each kill's share, but adding bodies does not multiply total income. Leaked monsters forfeit their kill gold. Tower prices are role ratios of the local unit. At the Tristram price scale, rank-I values are 12 for Arrow, 18 for Pyre and Plague, 17 for Frost, 20 for Storm, and 19 for either support tower; later locations actually offer those other families. Rank prices follow the same three-rank profile and rise with location. A gate starts at the local Arrow price and base 70 life before local and skill scaling.
 
@@ -101,18 +101,18 @@ The Bone Altar amplifies the thickest knot of enemies in reach without dealing d
 
 The Druid Grove gives nearby towers the best available aura, without stacking. Its ranks lend +10%, +15% and +20% damage within 1.5, 1.5 and 2.3 tiles. Weaken lowers that bonus and Bone Prison disables it. Its pull toward clustering competes with area curses.
 
-Ordinary Act II roles keep different defenses and movement on the smaller scale. Their base life below is multiplied by location and wave factors; gold bounty in a battle comes from the wave budget, not a fixed per-species price.
+Ordinary Act II roles keep different defenses and movement on the smaller scale. Multiply each role factor below by the profile's `base_hp`, then by location and wave growth; gold bounty in a battle comes from the wave budget, not a fixed per-species price.
 
-| Enemy | Base life | Pace | Role |
+| Enemy | Life factor | Pace | Role |
 |---|---:|---:|---|
-| Flayer | 6 | 1.45 | Direct runner; a Fetish Shaman can raise it once at half life |
-| Zealot | 13 | 1.0 | Direct, resists lightning and fire |
-| Spider | 10 | 1.35 | Wanders, immune to poison and weak to cold |
-| Blood Bat | 6 | 1.9 | Direct flyer, passes gates |
-| Thorned Hulk | 35 | 0.55 | Wandering gatebreaker, two sanctuary lives, poison immune |
-| Drowned | 15 | 0.7 | Wanders, cold and poison resistant, lightning weak |
+| Flayer | 0.85 | 1.45 | Direct runner; a Fetish Shaman can raise it once at half life |
+| Zealot | 1.8 | 1.0 | Direct, resists lightning and fire |
+| Spider | 1.4 | 1.35 | Wanders, immune to poison and weak to cold |
+| Blood Bat | 0.8 | 1.9 | Direct flyer, passes gates |
+| Thorned Hulk | 5.0 | 0.55 | Wandering gatebreaker, two sanctuary lives, poison immune |
+| Drowned | 2.2 | 0.7 | Wanders, cold and poison resistant, lightning weak |
 
-A Fetish Shaman raises a nearby dead Flayer once unless a burst leaves nothing to raise. An Inquisitor's curse arrives as a visible mark that Smite and Orb cannot break. The Bone Priest is the Temple's boss: base life 168 before location and wave growth, 20 sanctuary lives if he leaks, four curses with wider reach, and mana burn per caught tower.
+A Fetish Shaman raises a nearby dead Flayer once unless a burst leaves nothing to raise. An Inquisitor's curse arrives as a visible mark that Smite and Orb cannot break. The Bone Priest is the Temple's boss: life factor 24 (144 before location and wave growth at the current profile), 20 sanctuary lives if he leaks, four curses with wider reach, and mana burn per caught tower.
 
 ## Locations
 
@@ -140,7 +140,7 @@ Each map keeps its theme and story in a distinct network of halls and tower plot
 | Travincal | The High Council gathers leaders and swarms from multiple approaches. |
 | Temple of Light | The Bone Priest's widened curses and mana burn test the player's chosen build. |
 
-Act I descends in reds and brown stone. Act II moves through piers, webs, jungle, black water and gilt toward the mother lamp. Every location has its own intro, wave names, taunt and painted floor theme.
+Act I descends in reds and brown stone. Act II moves through piers, webs, jungle, black water and gilt toward the mother lamp. Every location has its own intro, wave names, taunt and terrain theme.
 
 ## The story
 

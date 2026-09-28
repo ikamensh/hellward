@@ -1,7 +1,8 @@
-# Hellward: open-ground progression redesign
+# Hellward: hall-network progression redesign
 
-Status: implemented and verified on 2026-09-28. Painted floors with old road geometry are
-held back by a layout fingerprint; the current procedural ground draws the new paths.
+Status: implemented and under final campaign calibration on 2026-09-28. Painted floors with old
+road geometry are held back by a layout fingerprint; image-generated terrain materials and the
+current ground renderer draw the bounded monster halls.
 The opening baseline was measured on 2026-09-28 from `3d2911c` with the compiled simulation.
 The current rules are also described in [design.md](design.md) and [campaign.md](campaign.md).
 
@@ -10,10 +11,10 @@ The current rules are also described in [design.md](design.md) and [campaign.md]
 1. Before a defence, choose learned skills and equip at most one forged pattern for each tower
    family. A pattern changes every tower of that family built in this defence. Rank unlocks remain
    skills; towers and their upgrades still cost battle gold.
-2. Build a few cheap, single-target towers around an open field. Ordinary enemies may take one of
-   several visibly different trails from multiple entrances; a runner heads directly for the
-   sanctuary. Position, range and approach direction matter more than a folded corridor's triple
-   coverage.
+2. Build a few cheap, single-target towers beside the monster halls. Ordinary enemies may take
+   one of several visibly different trails from multiple entrances; a runner heads directly for
+   the sanctuary. Position, range and approach direction matter more than a folded corridor's
+   triple coverage.
 3. Kills immediately pay gold and sometimes drop salvage. During a break, sell held salvage for
    gold now or carry it toward a future pattern. The sale cannot be undone within that defence.
 4. On specified breaks, a sealed side entrance offers a **breach**: decline, take a gold cache, or
