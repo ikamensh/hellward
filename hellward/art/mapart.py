@@ -11,8 +11,11 @@ this picture (:func:`ground`) replaces it when ``hellward/assets/painted/ground-
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 import random
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -21,7 +24,7 @@ from PIL import Image, ImageDraw, ImageFilter
 from dataclasses import dataclass
 
 from hellward.art.rig import DENSITY, TILE
-from hellward.sim.level import Level, Tile
+from hellward.sim.level import Level, Route, Tile
 
 PAINTED = Path(__file__).resolve().parent.parent / "assets" / "painted"
 PX = TILE * DENSITY          # pixels per tile in the picture
@@ -95,6 +98,11 @@ THEMES: dict[str, Theme] = {
 }
 
 
+def _visible_routes(level: Level) -> tuple[Route, ...]:
+    """Wanderers can cross open ground; only entrances and committed roads are painted as trails."""
+    return tuple(route for route in level.routes if route.key != "meander" and not route.key.endswith("_detour"))
+
+
 def _noise(width: int, height: int, scale: int, seed: int) -> np.ndarray:
     """Smooth value noise in [0, 1], upsampled from a coarse random grid."""
     rng = np.random.default_rng(seed)
@@ -109,10 +117,11 @@ def _stone(level: Level, seed: int, theme: Theme) -> Image.Image:
     rng = random.Random(seed)
     base = np.zeros((h, w, 3), dtype=np.float32)
     floor, path = np.array(theme.floor, dtype=np.float32), np.array(theme.path, dtype=np.float32)
+    roads = {tile for route in _visible_routes(level) for tile in route.tiles}
     for y in range(level.height):
         for x in range(level.width):
             tile = level.tile(x, y)
-            color = path if tile in (Tile.PATH, Tile.DOOR) else floor
+            color = path if (x, y) in roads or tile is Tile.DOOR else floor
             tint = rng.uniform(0.86, 1.1)
             warm = rng.uniform(-4, 6)
             base[y * PX:(y + 1) * PX, x * PX:(x + 1) * PX] = color * tint + np.array((warm, 0, -warm * 0.5))
@@ -252,19 +261,21 @@ def _gore(image: Image.Image, level: Level, seed: int) -> None:
 
 
 def _portal(image: Image.Image, level: Level) -> None:
-    """The hell portal the path starts from, and the sanctuary gate it ends at."""
-    x, y = level.waypoints[0]
-    cx, cy = (x + 0.5) * PX, (y + 0.5) * PX
-    glow = Image.new("RGBA", image.size, (0, 0, 0, 0))
-    draw = ImageDraw.Draw(glow)
-    for i in range(14, 0, -1):
-        r = PX * 0.12 * i
-        draw.ellipse((cx - r * 0.55, cy - r, cx + r * 0.55, cy + r), fill=(255, 60 + i * 6, 20, 18))
-    draw.ellipse((cx - PX * 0.42, cy - PX * 0.72, cx + PX * 0.42, cy + PX * 0.72), fill=(40, 4, 6, 255))
-    for i in range(3):
-        r = PX * (0.62 - i * 0.16)
-        draw.arc((cx - r * 0.6, cy - r, cx + r * 0.6, cy + r), 20 + i * 90, 280 + i * 90, fill=(255, 120 - i * 30, 30, 255), width=5)
-    image.paste(glow, (0, 0), glow)
+    """A portal at each open entrance and the common sanctuary gate."""
+    entrances = dict.fromkeys(route.entrance for route in _visible_routes(level) if not route.key.startswith("breach"))
+    for x, y in entrances:
+        cx, cy = (x + 0.5) * PX, (y + 0.5) * PX
+        glow = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(glow)
+        for i in range(14, 0, -1):
+            r = PX * 0.12 * i
+            draw.ellipse((cx - r * 0.55, cy - r, cx + r * 0.55, cy + r), fill=(255, 60 + i * 6, 20, 18))
+        draw.ellipse((cx - PX * 0.42, cy - PX * 0.72, cx + PX * 0.42, cy + PX * 0.72), fill=(40, 4, 6, 255))
+        for i in range(3):
+            r = PX * (0.62 - i * 0.16)
+            draw.arc((cx - r * 0.6, cy - r, cx + r * 0.6, cy + r), 20 + i * 90, 280 + i * 90,
+                     fill=(255, 120 - i * 30, 30, 255), width=5)
+        image.paste(glow, (0, 0), glow)
     x, y = level.waypoints[-1]
     cx, cy = (x + 0.5) * PX, (y + 0.5) * PX
     holy = Image.new("RGBA", image.size, (0, 0, 0, 0))
@@ -284,20 +295,52 @@ def _road(image: Image.Image, level: Level, seed: int, theme: Theme) -> None:
     """The way the monsters walk, where there is no carpet: worn ground or flags, darker at the edges."""
     rng = random.Random(seed)
     draw = ImageDraw.Draw(image)
-    points = [((x + 0.5) * PX, (y + 0.5) * PX) for x, y in level.waypoints]
-    half = PX * 0.36
-    edge = tuple(int(c * 0.6) for c in theme.path)
-    for width, color in ((half + 5, edge), (half, theme.path)):
-        for (x0, y0), (x1, y1) in zip(points, points[1:]):
-            draw.rectangle((min(x0, x1) - width, min(y0, y1) - width, max(x0, x1) + width, max(y0, y1) + width), fill=color)
-    for _ in range(int(level.length * 5)):   # stones, ruts and stains along it
-        s = rng.uniform(0, level.length)
-        px, py = level.point(s)
-        ox, oy = rng.uniform(-0.3, 0.3) * PX, rng.uniform(-0.3, 0.3) * PX
-        r = rng.uniform(3, 8)
-        shade = rng.uniform(0.7, 1.25)
-        draw.ellipse((px * PX + ox - r, py * PX + oy - r * 0.7, px * PX + ox + r, py * PX + oy + r * 0.7),
-                     fill=tuple(int(min(255, c * shade)) for c in theme.path))
+    for route in _visible_routes(level):
+        half = PX * (0.36 if route.key == "main" else 0.24 if not route.key.startswith("breach") else 0.17)
+        path = theme.path if not route.key.startswith("breach") else tuple(int(c * 0.72) for c in theme.path)
+        edge = tuple(int(c * 0.6) for c in path)
+        points = [((x + 0.5) * PX, (y + 0.5) * PX) for x, y in route.waypoints]
+        for width, color in ((half + 5, edge), (half, path)):
+            stroke = round(width * 2)
+            draw.line(points, fill=color, width=stroke, joint="curve")
+            for x, y in points:
+                draw.ellipse((x - width, y - width, x + width, y + width), fill=color)
+        for _ in range(int(route.length * (5 if route.key == "main" else 3))):
+            s = rng.uniform(0, route.length)
+            px, py = route.point(s)
+            ox, oy = rng.uniform(-0.3, 0.3) * PX, rng.uniform(-0.3, 0.3) * PX
+            r = rng.uniform(3, 8)
+            shade = rng.uniform(0.7, 1.25)
+            draw.ellipse((px * PX + ox - r, py * PX + oy - r * 0.7, px * PX + ox + r, py * PX + oy + r * 0.7),
+                         fill=tuple(int(min(255, c * shade)) for c in path))
+
+
+def _wander_lanes(image: Image.Image, level: Level, seed: int, theme: Theme) -> None:
+    """Scuffed patches identify unbuildable detours without turning them into paved roads."""
+    visible = {tile for route in _visible_routes(level) for tile in route.tiles}
+    wandering = {tile for route in level.routes
+                 if route.key == "meander" or route.key.endswith("_detour") for tile in route.tiles}
+    tiles = sorted(wandering - visible)
+    if not tiles:
+        return
+    rng = random.Random(seed)
+    wear = Image.new("L", image.size, 0)
+    mask = ImageDraw.Draw(wear)
+    for x, y in tiles:
+        cx = (x + 0.5 + rng.uniform(-0.09, 0.09)) * PX
+        cy = (y + 0.5 + rng.uniform(-0.09, 0.09)) * PX
+        rx = PX * rng.uniform(0.3, 0.4)
+        ry = PX * rng.uniform(0.2, 0.28)
+        mask.ellipse((cx - rx, cy - ry, cx + rx, cy + ry), fill=130)
+    image.paste(Image.new("RGB", image.size, theme.path), (0, 0), wear.filter(ImageFilter.GaussianBlur(PX * 0.06)))
+    draw = ImageDraw.Draw(image)
+    scuff = tuple(round(a * 0.45 + b * 0.55) for a, b in zip(theme.floor, theme.path))
+    for x, y in tiles:
+        for _ in range(4):
+            px = (x + rng.uniform(0.22, 0.78)) * PX
+            py = (y + rng.uniform(0.3, 0.7)) * PX
+            rx = rng.uniform(2, 5)
+            draw.ellipse((px - rx, py - rx * 0.45, px + rx, py + rx * 0.45), fill=scuff)
 
 
 def _pits(image: Image.Image, level: Level, seed: int, theme: Theme) -> None:
@@ -369,10 +412,11 @@ def _props(image: Image.Image, level: Level, seed: int, theme: Theme) -> None:
 def stand_in(level: Level, theme: Theme = THEMES["cathedral"], seed: int = 11) -> Image.Image:
     image = _stone(level, seed, theme)
     _gore(image, level, seed + 1)
+    _wander_lanes(image, level, seed + 6, theme)
+    _road(image, level, seed + 2, theme)
     if theme is THEMES["cathedral"]:
         _carpet(image, level, seed + 2)
     else:
-        _road(image, level, seed + 2, theme)
         _pits(image, level, seed + 4, theme)
         _props(image, level, seed + 5, theme)
     _walls(image, level, seed + 3, theme)
@@ -387,9 +431,45 @@ def painted(key: str) -> Path:
     return PAINTED / f"ground-{key}.png"
 
 
+def layout_fingerprint(level: Level) -> str:
+    """Identity of everything that fixes a floor's paths, portals, and unbuildable tiles."""
+    layout = {
+        "version": 1,
+        "size": (level.width, level.height),
+        "routes": [(route.key, route.waypoints) for route in level.routes],
+        "doors": sorted(level.doors),
+        "obstacles": sorted(level.obstacles),
+        "pools": sorted(level.pools),
+    }
+    data = json.dumps(layout, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(data).hexdigest()[:16]
+
+
+def painted_layout(key: str) -> Path:
+    """The geometry recorded when a painted floor was installed."""
+    return PAINTED / f"ground-{key}.layout.json"
+
+
+def painted_matches(key: str, level: Level) -> bool:
+    """A floor without a layout stamp is old art, even if its dimensions match."""
+    stamp = painted_layout(key)
+    if not painted(key).exists() or not stamp.exists():
+        return False
+    return json.loads(stamp.read_text(encoding="utf-8"))["fingerprint"] == layout_fingerprint(level)
+
+
+def record_painted_layout(key: str, level: Level) -> None:
+    """Mark a newly installed floor as matching the current authored geometry."""
+    if not painted(key).exists():
+        raise FileNotFoundError(painted(key))
+    painted_layout(key).write_text(json.dumps({"fingerprint": layout_fingerprint(level)}) + "\n", encoding="utf-8")
+
+
 def ground(key: str, level: Level, theme: Theme) -> Image.Image:
-    """A location's floor: its painting when there is one, else the stand-in."""
-    if painted(key).exists():
+    """A location's floor: use its painting only when it matches the authored map."""
+    if painted_matches(key, level):
         image = Image.open(painted(key)).convert("RGB")
         return image.resize((level.width * PX, level.height * PX), Image.LANCZOS)
+    if painted(key).exists():
+        warnings.warn(f"painted floor for {key} has old geometry; drawing the current stand-in", stacklevel=2)
     return stand_in(level, theme)

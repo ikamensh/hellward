@@ -1,8 +1,4 @@
-"""The Act II towers: the Bone Altar's amplification, the Druid Grove's aura, their skills and Salvation's ward.
-
-The Act II monsters and locations are a later task, so these play out on Act I maps, with the new
-towers put in the location's arsenal by hand.
-"""
+"""The Bone Altar's amplification, Druid Grove's aura, their skills and Salvation's ward."""
 
 from dataclasses import replace
 
@@ -11,15 +7,17 @@ import pytest
 from hellward.sim import campaign
 from hellward.sim.campaign import g
 from hellward.sim.content import TOWERS, Curse, Element, Group, Wave
+from hellward.sim.level import Level
 from hellward.sim.model import SIM_DT, Refused, World
 from hellward.sim.skills import perks
 
 
 def act2_world(*groups: Group, learned=(), seed=0) -> World:
-    """The cathedral with the Act II towers in its arsenal and these waves instead of its own."""
+    """A short open field with buildable tiles next to the route."""
     arsenal = replace(campaign.CATHEDRAL.arsenal,
                       towers=campaign.CATHEDRAL.arsenal.towers + ("altar", "grove"))
-    location = replace(campaign.CATHEDRAL, arsenal=arsenal,
+    level = Level("Act II tower field", 12, 9, ((0, 4), (11, 4)), ())
+    location = replace(campaign.CATHEDRAL, level=level, arsenal=arsenal,
                        waves=(Wave(tuple(groups), 10),), wave_names=("test",))
     world = World(location, perks=perks(learned), seed=seed)
     world.gold = 5000
@@ -63,7 +61,7 @@ def test_an_altar_amplifies_the_thickest_knot_and_everything_hurts_it_more():
     assert tower_id == altar.id and struck
     for m in world.monsters:
         if m.id in struck:
-            assert m.amplified > 0 and m.amplify == pytest.approx(0.30)
+            assert m.amplified > 0 and m.amplify == pytest.approx(altar.stats.damage)
 
 
 def test_amplification_multiplies_a_pyres_damage_but_not_after_it_lapses():
@@ -71,13 +69,14 @@ def test_amplification_multiplies_a_pyres_damage_but_not_after_it_lapses():
     spawned(world, 1)
     m = world.monsters[0]
     m.amplified, m.amplify = 5.0, 0.3
+    blow = m.hp / 4
     hp = m.hp
-    world._hurt(m, 24.0, Element.FIRE)
-    assert hp - m.hp == pytest.approx(24.0 * 1.3)
+    world._hurt(m, blow, Element.FIRE)
+    assert hp - m.hp == pytest.approx(blow * 1.3)
     m.amplified = 0.0
     hp = m.hp
-    world._hurt(m, 24.0, Element.FIRE)
-    assert hp - m.hp == pytest.approx(24.0)
+    world._hurt(m, blow, Element.FIRE)
+    assert hp - m.hp == pytest.approx(blow)
 
 
 def test_amplification_does_not_stack():
@@ -86,14 +85,15 @@ def test_amplification_does_not_stack():
     spawned(world, 2)
     a, b = world.monsters
     a.s = b.s = 4.0
-    a.amplified, a.amplify = 5.0, 0.6   # already more amplified than the altar's 0.3 lays
+    a.amplified, a.amplify = 5.0, 0.6   # already stronger than the altar's pulse
     altar.cooldown = 0.0
     world.events.clear()
     world.step(SIM_DT)
     assert any(e[0] == "amplify" for e in world.events)
     assert a.amplify == pytest.approx(0.6)   # the greater holds, not the sum and not the lesser
     assert a.amplified == pytest.approx(5.0 - SIM_DT)
-    assert b.amplify == pytest.approx(0.3) and b.amplified == pytest.approx(2.0 - SIM_DT)
+    assert b.amplify == pytest.approx(altar.stats.damage)
+    assert b.amplified == pytest.approx(altar.stats.lasting - SIM_DT)
 
 
 def test_an_immune_monster_stays_immune_amplified():
@@ -108,50 +108,50 @@ def test_an_immune_monster_stays_immune_amplified():
 
 def test_a_grove_next_to_a_pyre_makes_its_bolt_hit_harder():
     world = act2_world(g("fallen", 1))
-    world.build("pyre", (4, 3))
-    world.build("grove", (5, 3))
-    assert first_bolt(world).damage == pytest.approx(24.0 * 1.2)
+    pyre = world.build("pyre", (4, 3))
+    grove = world.build("grove", (5, 3))
+    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage * (1 + grove.stats.damage))
 
 
 def test_a_grove_three_tiles_away_lends_nothing():
     world = act2_world(g("fallen", 1))
-    world.build("pyre", (4, 3))
+    pyre = world.build("pyre", (4, 3))
     world.build("grove", (7, 3))
-    assert first_bolt(world).damage == pytest.approx(24.0)
+    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage)
 
 
 def test_two_groves_do_not_stack():
     world = act2_world(g("fallen", 1))
-    world.build("pyre", (4, 3))
-    world.build("grove", (5, 3))
-    world.build("grove", (4, 4))
-    assert first_bolt(world).damage == pytest.approx(24.0 * 1.2)
+    pyre = world.build("pyre", (4, 3))
+    grove = world.build("grove", (5, 3))
+    world.build("grove", (3, 3))
+    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage * (1 + grove.stats.damage))
 
 
 def test_a_weakened_grove_lends_a_third_and_a_caged_one_nothing():
     world = act2_world(g("fallen", 1))
-    world.build("pyre", (4, 3))
+    pyre = world.build("pyre", (4, 3))
     grove = world.build("grove", (5, 3))
     grove.curses[Curse.WEAKEN] = 5.0
-    assert first_bolt(world).damage == pytest.approx(24.0 * (1 + 0.2 * 0.35))
+    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage * (1 + grove.stats.damage * grove.damage_mult()))
 
     world = act2_world(g("fallen", 1))
-    world.build("pyre", (4, 3))
+    pyre = world.build("pyre", (4, 3))
     grove = world.build("grove", (5, 3))
     grove.curses[Curse.BONE_PRISON] = 5.0   # caged: the aura is switched off
-    assert first_bolt(world).damage == pytest.approx(24.0)
+    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage)
 
 
 def test_dim_vision_does_nothing_to_an_aura():
     world = act2_world(g("fallen", 1))
-    world.build("pyre", (4, 3))
+    pyre = world.build("pyre", (4, 3))
     grove = world.build("grove", (5, 3))
     grove.curses[Curse.DIM_VISION] = 5.0
-    assert first_bolt(world).damage == pytest.approx(24.0 * 1.2)
+    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage * (1 + grove.stats.damage))
 
 
 def test_corpse_explosion_bursts_once_and_does_not_chain():
-    world = act2_world(g("fallen", 3, 0.1), learned=("adept_bone", "corpse_explosion"))
+    world = act2_world(g("fallen", 3, 0.1), learned=("adept_bone", "master_bone", "life_tap", "corpse_explosion"))
     spawned(world, 3)
     a, b, c = world.monsters
     a.s = b.s = c.s = 4.0
@@ -173,7 +173,7 @@ def test_life_tap_pays_a_fifth_of_the_bounty_in_mana():
     m.amplified, m.amplify = 5.0, 0.3
     world.mana = 10.0
     world._hurt(m, 10000.0, None)
-    assert world.mana == pytest.approx(10.0 + m.kind.bounty / 5)
+    assert world.mana == pytest.approx(10.0 + m.bounty / 5)
 
 
 def test_hurricane_slows_a_walker_near_a_grove():
@@ -227,14 +227,16 @@ def test_salvation_wards_an_uncursed_tower_and_otherwise_it_stays_refused():
         plain.cleanse(pyre.id)
 
 
-def test_the_new_towers_have_the_spec_numbers_blurbs_and_ranks():
+def test_the_new_towers_fit_the_price_scale_and_keep_rank_skills():
     assert TOWERS["altar"].name == "Bone Altar" and TOWERS["altar"].element is Element.BONE
     assert TOWERS["altar"].attack == "amplify"
-    assert TOWERS["altar"].levels[0].cost == 90 and TOWERS["altar"].levels[2].cost == 160
-    assert TOWERS["altar"].levels[2].damage == pytest.approx(0.60)
     assert TOWERS["grove"].name == "Druid Grove" and TOWERS["grove"].element is Element.NATURE
     assert TOWERS["grove"].attack == "aura"
-    assert [level.cost for level in TOWERS["grove"].levels] == [100, 110, 170]
+    for key in ("altar", "grove"):
+        levels = TOWERS[key].levels
+        assert len(levels) == len(TOWERS["arrow"].levels)
+        assert all(level.cost > TOWERS["arrow"].levels[rank].cost for rank, level in enumerate(levels))
+        assert 0 < levels[0].damage < levels[1].damage < levels[2].damage < 1
     world = act2_world(g("fallen", 1), learned=("adept_bone", "adept_nature"))
     assert world.rank_needs(world.build("altar", (4, 3))) is None
     assert world.rank_needs(world.build("grove", (5, 3))) is None

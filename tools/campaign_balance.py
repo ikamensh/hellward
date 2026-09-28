@@ -98,7 +98,7 @@ class Timed:
 def leaders_spawned(world: World) -> int:
     """Leaders that walked onto the map: every one in the waves called, but those still to come."""
     called = [g.kind for w in world.waves[:world.wave + 1] for g in w.groups for _ in range(g.count)]
-    waiting = [kind for _, kind in world.schedule]
+    waiting = [kind for _, kind, _ in world.schedule]
     return sum(MONSTERS[k].leader is not None for k in called) - sum(MONSTERS[k].leader is not None for k in waiting)
 
 

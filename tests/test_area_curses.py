@@ -7,13 +7,14 @@ import pytest
 from hellward.sim import campaign, planner
 from hellward.sim.content import CURSES, MONSTERS, Curse, Element, Group, MonsterKind, Wave
 from hellward.sim.model import SIM_DT, Monster, Refused, Tower, World
+from hellward.sim.skills import perks
 
-CENTRE = (12, 2)   # every tile of the 3x3 block around it is bare floor on the cathedral
+CENTRE = (11, 3)   # open 3x3 build area beside the Jungle's main route
 
 
 def waves_of(kind: str) -> campaign.Location:
     pack = Wave((Group(kind, 1, 1.0),), 10)
-    return replace(campaign.CATHEDRAL, waves=(pack,), wave_names=("pack",), life=1.0)
+    return replace(campaign.JUNGLE, waves=(pack,), wave_names=("pack",), life=1.0)
 
 
 def world_with_leader(kind: str = "shaman", seed: int = 7) -> World:
@@ -45,7 +46,7 @@ def test_weaken_catches_a_3x3_block_and_no_tower_two_tiles_away():
     world = world_with_leader("shaman")
     block = [(CENTRE[0] + dx, CENTRE[1] + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)]
     assert all(world.level.buildable(*tile) for tile in block)
-    far = next(t for t in [(14, 2), (12, 4), (10, 2)] if world.level.buildable(*t))
+    far = next(t for t in [(13, 3), (11, 5), (9, 3)] if world.level.buildable(*t))
     assert (far[0] - CENTRE[0]) ** 2 + (far[1] - CENTRE[1]) ** 2 == 4
     for tile in block:
         world.build("pyre", tile)
@@ -143,9 +144,10 @@ def test_a_cursed_tower_cannot_be_sold():
 
 
 def chill_world() -> tuple[World, Tower, float]:
-    world = World(campaign.CATHEDRAL, seed=11)
+    cold = perks({"adept_cold", "glacial_spike", "master_cold", "shatter"}, stage=8)
+    world = World(campaign.JUNGLE, seed=11, perks=cold)
     world.gold = 10000
-    tower = world.build("frost", (4, 3))
+    tower = world.build("frost", (10, 3))   # one tile nearer the main route than the curse geometry block
     s = next(s for s in (i * 0.25 for i in range(int(world.level.length * 4))) if world.in_reach(tower, s))
     return world, tower, s
 
@@ -161,8 +163,10 @@ def test_frost_chill_follows_cold_resistance():
     world, tower, s = chill_world()
     fallen = chill_monster(world, s, MONSTERS["fallen"], 101)
     skeleton = chill_monster(world, s, MONSTERS["skeleton"], 102)
-    world.step(SIM_DT)
-    assert [e[0] for e in world.events if e[0] == "nova"] == ["nova"]
+    while not any(e[0] == "impact" for e in world.events):
+        world.step(SIM_DT)
+        assert world.time < 2
+    assert len([e for e in world.events if e[0] == "impact"]) == 1
     assert fallen.chill == pytest.approx(tower.stats.chill)
     assert skeleton.chill == pytest.approx(tower.stats.chill * 0.75)
     assert fallen.chill_left > 0 and skeleton.chill_left > 0
@@ -172,17 +176,19 @@ def test_a_cold_immune_monster_is_not_chilled_at_all():
     world, _, s = chill_world()
     immune = replace(MONSTERS["fallen"], key="icebound", name="Icebound", resist={Element.COLD: 1.0})
     monster = chill_monster(world, s, immune, 103)
-    world.step(SIM_DT)
+    while not any(e[0] == "impact" for e in world.events):
+        world.step(SIM_DT)
+        assert world.time < 2
     assert monster.chill == 0.0
     assert monster.chill_left == 0.0
 
 
 def test_the_planner_prefers_the_spot_whose_circle_holds_more_working_towers():
     pack = Wave((Group("skeleton", 6, 0.6), Group("shaman", 1, 1, start=3.0)), 10)
-    world = World(replace(campaign.CATHEDRAL, waves=(pack,), wave_names=("pack",), life=1.0))
+    world = World(replace(campaign.JUNGLE, waves=(pack,), wave_names=("pack",), life=1.0))
     world.gold = 5000
-    pair = [(6, 1), (7, 1)]
-    single = (4, 3)
+    pair = [(5, 1), (6, 1)]
+    single = (3, 4)
     for tile in (*pair, single):
         world.build("pyre", tile)
     world.call_wave()

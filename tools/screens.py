@@ -48,7 +48,7 @@ def main() -> None:
     art = build(game, cache)
     progress = Progress.load(game)
     progress.won = {"tristram": 3, "graveyard": 2, "cathedral": 1}
-    progress.learned = frozenset({"adept_fire", "fire_ball", "holy_shield", "warmth"})
+    progress.learned = frozenset({"adept_fire", "master_fire", "holy_shield", "warmth"})
     progress.at = "cathedral"
     flow = Flow(game, art, sound=Silent(), planner=planner.smart, settings=None,
                 progress=progress, demo_player=Ordinary, seed=args.seed)

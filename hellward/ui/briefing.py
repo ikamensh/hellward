@@ -22,7 +22,7 @@ from hellward.ui.story import INPUT_GUARD, image_size, story_image
 if TYPE_CHECKING:
     from hellward.ui.flow import Flow
 
-ARSENAL = ("pyre", "storm", "frost", "plague", "altar", "grove", "gate", "cleanse", "smite", "meteor", "orb")
+ARSENAL = ("arrow", "pyre", "storm", "frost", "plague", "altar", "grove", "gate", "cleanse", "smite", "meteor", "orb")
 
 
 class BriefingScene(Scene):
@@ -47,6 +47,7 @@ class BriefingScene(Scene):
         self._guarded = (defend, back)
         self.ui.add(Row(defend,
                         Button("Skills", shortcut="K", on_click=lambda: self.flow.skills(self.location), width=170),
+                        Button("Forge", shortcut="F", on_click=self.flow.forge, width=170),
                         story, back,
                         anchor=Anchor.BOTTOM, margin=(0, 16), spacing=14))
 
@@ -180,7 +181,7 @@ class BriefingScene(Scene):
         self._heading("Your arsenal", y)
         index = ORDER.index(self.location.key)
         before = LOCATIONS[ORDER[index - 1]] if index > 0 else None
-        learned = perks(self.flow.progress.learned)
+        learned = perks(self.flow.progress.learned, index)
         x = 96
         for thing in ARSENAL:
             if not offers(self.location, thing):
@@ -223,7 +224,9 @@ class BriefingScene(Scene):
             need = SIGIL_LIVES[won]
             text = "Hold the sanctuary to win the first." if won == 0 else f"The next: keep {need} of {START_LIVES} lives."
             self.draw_text(text, x, y + 86, font_size=12, color=style.DIM, anchor_x="center", anchor_y="center")
-        wasted = sum(SKILLS[key].cost for key in progress.learned if idle(self.location, SKILLS[key].needs))
+        stage = ORDER.index(self.location.key)
+        wasted = sum(skill.cost for skill in (SKILLS[key] for key in progress.learned)
+                     if skill.first_location > stage or idle(self.location, skill.needs))
         if wasted:
             what = "1 sigil sits in a skill that does" if wasted == 1 else f"{wasted} sigils sit in skills that do"
             self.draw_text(f"{what} nothing here.", x, y + 20, font_size=12, color=style.BLOOD, anchor_x="center",

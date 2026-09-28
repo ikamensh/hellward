@@ -7,13 +7,21 @@ from hellward.sim import campaign, planner
 from hellward.sim.players.hands import Hands
 from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.content import Group, Wave
+from hellward.sim.level import Level
 from hellward.sim.model import SIM_DT, World
+from tools.curse_quality import moments
 
 
 def skeleton_pack() -> World:
-    """Skeletons walking the first corridor with a shaman behind them, past a plague totem and a pyre."""
+    """A focused curse arena with an immune pack passing a plague totem and a Pyre."""
     pack = Wave((Group("skeleton", 6, 0.6), Group("shaman", 1, 1, start=3.0)), 10)
-    world = World(replace(campaign.CATHEDRAL, waves=(pack,), wave_names=("pack",), life=1.0))
+    level = Level("curse arena", 25, 14,
+                  ((0, 2), (8, 2), (8, 6), (3, 6), (3, 11), (12, 11), (12, 4), (18, 4), (18, 10), (24, 10)),
+                  ((3, 9), (12, 7), (18, 8)),
+                  frozenset({(15, 1), (21, 2), (22, 6), (1, 12), (21, 12), (10, 1)}))
+    arsenal = replace(campaign.CATHEDRAL.arsenal, towers=("arrow", "pyre", "storm", "plague"))
+    world = World(replace(campaign.CATHEDRAL, level=level, arsenal=arsenal, waves=(pack,),
+                          wave_names=("pack",), life=1.0), hardness=10.0)
     world.gold = 1000
     world.build("plague", (2, 3))   # right beside the shaman's path: the nearest tower
     world.build("pyre", (6, 1))     # further off, over the skeletons' heads
@@ -57,9 +65,10 @@ def test_every_considered_tower_is_within_reach_when_the_chant_ends():
 
 
 def test_smart_curses_are_close_to_the_best_and_beat_the_naive_ones():
-    """Property: at real decision moments, the rollout choice keeps most of the best possible gain.
+    """Property: at real decision moments, the live planner's preferred target keeps most of the best gain.
 
-    The truth here is every option played out at the game's own step for longer than the planner looks.
+    The truth here is every option played out at the game's own step. The live planner also judges
+    whether waiting is better, so a decision to wait still exposes its best immediate target.
     """
     found: list[tuple[World, int]] = []
 
@@ -85,7 +94,7 @@ def test_smart_curses_are_close_to_the_best_and_beat_the_naive_ones():
         best = max(truth.values())
         if best <= 1:
             continue
-        smart = planner.decide(moment, leader_id, timing=False)
+        smart = planner.smart(moment, leader_id).result()
         pick = smart.cast or smart.options[0]
         shares["smart"].append(max(0.0, truth[(pick.curse, pick.spot)]) / best)
         naive = planner.nearest(moment, leader_id).result().cast
@@ -95,3 +104,21 @@ def test_smart_curses_are_close_to_the_best_and_beat_the_naive_ones():
     assert shares["smart"]
     assert statistics.mean(shares["smart"]) >= 0.85
     assert statistics.mean(shares["smart"]) > statistics.mean(shares["nearest"])
+
+
+def test_smart_tristram_curses_keep_most_of_the_best_gain():
+    """Across real Arrow defences, the chosen curses retain the campaign quality target."""
+    shares = []
+    for moment, leader_id in moments(8, 3, "tristram"):
+        options = planner.candidates(moment, moment.monster(leader_id))
+        base = planner.rollout(moment, leader_id, None, 16.0, SIM_DT)
+        gains = {(option.curse, option.spot): planner.rollout(moment, leader_id, option, 16.0, SIM_DT) - base
+                 for option in options}
+        best = max(gains.values())
+        if best <= 1.0:
+            continue
+        choice = planner.smart(moment, leader_id).result()
+        picked = choice.cast or choice.options[0]
+        shares.append(max(0.0, gains[picked.curse, picked.spot]) / best)
+    assert shares
+    assert statistics.mean(shares) >= 0.85

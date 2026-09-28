@@ -24,12 +24,12 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from hellward.sim.campaign import Location
-from hellward.sim.content import CURSES, DOOR, MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Curse, Element
+from hellward.sim.campaign import ORDER, Location
+from hellward.sim.content import CURSES, MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Curse, Element
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.players.spacing import score_with_spacing
-from hellward.sim.skills import SKILLS, can_learn, perks, tower_levels
+from hellward.sim.skills import SKILLS, can_learn, kept, perks, tower_levels
 
 PLANS = Path(__file__).parent / "plans" / "warden.json"
 THINK = 0.25          # seconds between two looks at the gold
@@ -94,7 +94,8 @@ def plan_key(location: Location, sigils: int) -> str:
 def fingerprint(location: Location) -> str:
     """The map and arsenal a plan was searched on: a stored plan for a map that has changed since is not played."""
     level, arsenal = location.level, location.arsenal
-    text = repr((level.width, level.height, level.waypoints, level.doors, sorted(level.obstacles), sorted(level.pools),
+    text = repr((level.width, level.height, level.waypoints, level.extra_routes, level.doors,
+                 sorted(level.obstacles), sorted(level.pools),
                  arsenal.towers, arsenal.gates, arsenal.spells))
     return hashlib.sha1(text.encode()).hexdigest()[:12]
 
@@ -163,15 +164,11 @@ def draft_skills(location: Location, sigils: int) -> frozenset[str]:
     if len(arsenal.spells) > 2:
         wanted += ["spell_mastery"]
     learned: frozenset[str] = frozenset()
+    stage = ORDER.index(location.key)
     for key in [*wanted, *SKILLS]:
-        if can_learn(learned, key, sigils):
+        if can_learn(learned, key, sigils, stage):
             learned |= {key}
     return learned
-
-
-def queue_points(location: Location) -> list[float]:
-    """Where on the path the queue behind each arch stands."""
-    return [s - DOOR_STOP - JOSTLE / 2 for s in location.level.door_s]
 
 
 def _inside(s: float, spans: tuple[tuple[float, float], ...]) -> bool:
@@ -183,9 +180,13 @@ def _inside(s: float, spans: tuple[tuple[float, float], ...]) -> bool:
 
 def tile_value(location: Location, kind: str, tile: tuple[int, int], reach: float) -> float:
     """A tower's use on a tile: the path it watches, and the queues it watches most of all."""
-    spans = location.level.coverage(tile, reach)
-    length = sum(b - a for a, b in spans)
-    queues = sum(QUEUE_FALLOFF ** i for i, q in enumerate(sorted(queue_points(location))) if _inside(q, spans))
+    length = 0.0
+    queues = 0.0
+    for route in location.level.routes:
+        spans = route.coverage(tile, reach)
+        length += sum(b - a for a, b in spans)
+        queues += sum(QUEUE_FALLOFF ** i for i, (_, s) in enumerate(location.level.crossings(route.key))
+                      if _inside(s - DOOR_STOP - JOSTLE / 2, spans))
     if kind == "frost":
         return 10.0 * queues + (0.6 if not location.level.doors else 0.2) * length
     if kind == "plague":
@@ -207,7 +208,7 @@ def tile_value_spaced(location: Location, kind: str, tile: tuple[int, int], reac
 def draft_build(location: Location, learned: frozenset[str], towers: int = 14) -> tuple[Step, ...]:
     """The build a veteran lays out from the intro: gates, towers on the best tiles by element, then ranks."""
     level = location.level
-    p = perks(learned)
+    p = perks(learned, ORDER.index(location.key))
     kinds = list(location.arsenal.towers)
     worths = {k: worth(location, k) for k in kinds}
     share = dict(worths)
@@ -276,8 +277,10 @@ class Warden:
         return Plan(learned, draft_build(location, learned))
 
     def skills(self, location: Location, sigils: int) -> frozenset[str]:
-        self.chosen = self.choose(location, sigils)
-        return self.chosen.skills
+        plan = self.choose(location, sigils)
+        learned = kept(plan.skills, sigils, ORDER.index(location.key))
+        self.chosen = plan if learned == plan.skills else Plan(learned, plan.steps, plan.early, plan.map)
+        return learned
 
     def act(self, hands: Hands) -> None:
         world = hands.world
@@ -295,11 +298,10 @@ class Warden:
     def _watch(self, world: World) -> None:
         """What each tower has had to shoot at: the monsters in its reach, as a person watching would count."""
         for t in world.towers.values():
-            spans = world.level.coverage(t.tile, t.stats.range)
             element = t.kind.element
             busy = 0.0
             for m in world.monsters:
-                if _inside(m.s, spans):
+                if world.in_reach(t, m.s, m.route):
                     busy += max(0.0, m.kind.taken(element))
             self.work[t.id] = self.work.get(t.id, 0.0) + busy * THINK
 
@@ -308,9 +310,9 @@ class Warden:
         assert self.chosen is not None
         steps = self.chosen.steps
         for door in world.doors:
-            if door.built or door.rubble or world.gold < DOOR.cost or Step("gate", door=door.index) not in steps[:self.done]:
+            if door.built or door.rubble or world.gold < world.door_cost or Step("gate", door=door.index) not in steps[:self.done]:
                 continue
-            if _clear(world, door.s):
+            if _clear(world, door.index):
                 world.build_door(door.index)
 
     def _spend(self, world: World) -> None:
@@ -321,7 +323,7 @@ class Warden:
             if step.what == "gate":
                 door = world.doors[step.door]
                 if not door.built and not door.rubble:   # a rubbled arch waits for the wave's end (_gates)
-                    if world.gold < DOOR.cost or not _clear(world, door.s):
+                    if world.gold < world.door_cost or not _clear(world, door.index):
                         return
                     world.build_door(step.door)
             elif step.what == "build":
@@ -408,7 +410,8 @@ class Warden:
         if not ready(world, "smite"):
             return
         damage = SPELLS["smite"].damage * world.power()
-        target = max(world.monsters, key=lambda m: (m.kind.leader is not None, min(m.hp, damage), m.s))
+        target = max(world.monsters, key=lambda m: (m.kind.leader is not None, min(m.hp, damage),
+                                                    -world.remaining(m)))
         hands.smite(target.id)
         self.last_aim = world.time
 
@@ -470,10 +473,9 @@ class Warden:
         if not ready(world, "smite"):
             return False
         damage = SPELLS["smite"].damage * world.power()
-        end = world.level.length
-        for m in world.monsters:   # furthest along first
-            if m.s < end - LEAK_SMITE * m.kind.speed:
-                break
+        for m in sorted(world.monsters, key=world.remaining):
+            if world.remaining(m) > LEAK_SMITE * m.kind.speed:
+                continue
             if m.hp <= damage:
                 hands.smite(m.id)
                 self.last_aim = world.time
@@ -488,7 +490,7 @@ class Warden:
         bosses = [m for m in world.monsters if m.kind.lives >= BOSS]
         if not bosses:
             return False
-        hands.smite(max(bosses, key=lambda m: m.s).id)
+        hands.smite(min(bosses, key=world.remaining).id)
         self.last_aim = world.time
         return True
 
@@ -506,10 +508,12 @@ class Warden:
             blows = sum(m.kind.door_dps * ((1.0 - m.chill) if m.chill_left > 0 else 1.0) for m in batterers)
             if door.hp > blows * 1.5:
                 continue
-            queue = [m for m in world.monsters if not m.kind.flying and door.s - 2.5 < m.s < door.s]
+            queue = [m for m in world.monsters if not m.kind.flying and any(
+                index == door.index and crossing - 2.5 < m.s < crossing
+                for index, crossing in world.level.crossings(m.route))]
             if sum(m.hp for m in queue) < GATE_CROWD * world.power():
                 continue
-            x, y = world.level.point(door.s - DOOR_STOP - JOSTLE / 2)
+            x, y = world.position(batterers[0])
             hands.orb(x, y)
             self.last_aim = world.time
             return True
@@ -544,12 +548,11 @@ class Warden:
 def _tower_value(world: World, tower: Tower) -> float:
     """How much a tower is about to do: its strength times the monsters in or coming into its reach."""
     stats = tower.stats
-    spans = world.level.coverage(tower.tile, stats.range)
-    widened = tuple((a - ARRIVING, b) for a, b in spans)
     element = tower.kind.element
     load = 0.0
     for m in world.monsters:
-        if _inside(m.s, widened):
+        spans = world.level.route(m.route).coverage(tower.tile, stats.range)
+        if _inside(m.s, tuple((a - ARRIVING, b) for a, b in spans)):
             load += max(0.0, m.kind.taken(element))
     attack = tower.kind.attack
     if attack == "nova":
@@ -563,15 +566,18 @@ def _tower_value(world: World, tower: Tower) -> float:
     return stats.damage * stats.rate * min(load, cap)
 
 
-def _clear(world: World, s: float) -> bool:
-    """No walker stands in the arch at ``s``: a gate can be set there."""
-    return not any(not m.kind.flying and abs(m.s - s) < 0.6 for m in world.monsters)
+def _clear(world: World, index: int) -> bool:
+    """No walker stands at this gate socket, regardless of its entrance route."""
+    x, y = world.level.doors[index]
+    cx, cy = x + 0.5, y + 0.5
+    return not any(not m.kind.flying and (world.position(m)[0] - cx) ** 2
+                   + (world.position(m)[1] - cy) ** 2 < 0.6 ** 2 for m in world.monsters)
 
 
 def _near(world: World, x: float, y: float, radius: float) -> list[Monster]:
     found: list[Monster] = []
     for m in world.monsters:
-        mx, my = world.level.point(m.s)
+        mx, my = world.position(m)
         if (mx - x) ** 2 + (my - y) ** 2 <= radius * radius:
             found.append(m)
     return found
@@ -582,8 +588,8 @@ def _ahead(world: World, m: Monster, seconds: float) -> tuple[float, float]:
     walking = max(0.0, seconds - max(0.0, m.frozen))
     s = m.s + (m.kind.speed * (1.0 - m.chill) if m.chill_left > 0 else m.kind.speed) * walking
     if not m.kind.flying:
-        for d in world.doors:
-            if d.built and d.s > m.s:   # a queue's depth is unseen until it forms: its middle
-                s = min(s, max(m.s, d.s - DOOR_STOP - JOSTLE / 2))
+        for index, crossing in world.level.crossings(m.route):
+            if world.doors[index].built and crossing > m.s:   # a queue's depth is unseen until it forms
+                s = min(s, max(m.s, crossing - DOOR_STOP - JOSTLE / 2))
                 break
-    return world.level.point(s)
+    return world.level.route(m.route).point(s)

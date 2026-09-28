@@ -14,8 +14,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from hellward.sim.campaign import Location
-from hellward.sim.content import DOOR, TOWERS
+from hellward.sim.campaign import ORDER, Location
+from hellward.sim.content import TOWERS
 from hellward.sim.model import Refused, World
 from hellward.sim.players.hands import Hands, ready
 from hellward.sim.skills import SKILLS, can_learn, column_of
@@ -23,15 +23,16 @@ from hellward.sim.sums import float_sum
 
 
 def path_corners(level) -> list[tuple[int, int]]:
-    """The inside of every bend in the path: the tile beside both legs, where a frost nova covers the most of it."""
+    """Buildable tiles beside the bends of every entrance route."""
     corners = []
-    waypoints = level.waypoints
-    for (x0, y0), (x1, y1), (x2, y2) in zip(waypoints, waypoints[1:], waypoints[2:]):
-        in_x, in_y = (x1 > x0) - (x1 < x0), (y1 > y0) - (y1 < y0)
-        out_x, out_y = (x2 > x1) - (x2 < x1), (y2 > y1) - (y2 < y1)
-        cx, cy = x1 - in_x + out_x, y1 - in_y + out_y
-        if level.buildable(cx, cy):
-            corners.append((cx, cy))
+    for route in level.routes:
+        waypoints = route.waypoints
+        for (x0, y0), (x1, y1), (x2, y2) in zip(waypoints, waypoints[1:], waypoints[2:]):
+            in_x, in_y = (x1 > x0) - (x1 < x0), (y1 > y0) - (y1 < y0)
+            out_x, out_y = (x2 > x1) - (x2 < x1), (y2 > y1) - (y2 < y1)
+            cx, cy = x1 - in_x + out_x, y1 - in_y + out_y
+            if level.buildable(cx, cy) and (cx, cy) not in corners:
+                corners.append((cx, cy))
     return corners
 
 
@@ -41,15 +42,14 @@ def tower_reach(kind: str, world: World) -> float:
 
 
 def tile_value_for_kind(location: Location, kind: str, tile: tuple[int, int], reach: float) -> float:
-    spans = location.level.coverage(tile, reach)
-    length = float_sum(b - a for a, b in spans)
+    level = location.level
+    length = float_sum(b - a for route in level.routes for a, b in route.coverage(tile, reach))
     queues = 0.0
-    for door in location.level.doors:
-        ds = location.level.s_of(door)
-        for a, b in spans:
-            if a <= ds <= b:
+    for route in level.routes:
+        spans = route.coverage(tile, reach)
+        for _, ds in level.crossings(route.key):
+            if any(a <= ds <= b for a, b in spans):
                 queues += 1.0
-                break
     if kind == "frost":
         return 10.0 * queues + 0.5 * length
     if kind == "plague":
@@ -73,6 +73,7 @@ class Corner:
     THINK: float = 0.5
 
     def skills(self, location: Location, sigils: int) -> frozenset[str]:
+        stage = ORDER.index(location.key)
         arsenal = location.arsenal
         kinds = (["frost"] if "frost" in arsenal.towers else []) + [k for k in arsenal.towers if k != "frost"]
         order = [key for kind in kinds for key in sorted((k for k, skill in SKILLS.items() if skill.column == column_of(kind)),
@@ -82,7 +83,7 @@ class Corner:
         order += ["warmth", "soul_harvest", "spell_mastery"]
         learned: frozenset[str] = frozenset()
         for key in [*order, *(k for k in SKILLS if k not in order)]:
-            if can_learn(learned, key, sigils):
+            if can_learn(learned, key, sigils, stage):
                 learned |= {key}
         return learned
 
@@ -161,7 +162,7 @@ class Corner:
             hands.cleanse(best.id)
 
     def _gates(self, world: World) -> None:
-        if not world.location.arsenal.gates or world.gold < DOOR.cost:
+        if not world.location.arsenal.gates or world.gold < world.door_cost:
             return
         for door in world.doors:
             if not door.built and not door.rubble:

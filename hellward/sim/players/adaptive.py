@@ -39,9 +39,9 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from hellward.sim.campaign import Location
+from hellward.sim.campaign import ORDER, Location
 from hellward.sim.content import (
-    CURSES, DOOR, MONSTERS, SPELLS, TOWERS, Curse, Element, MonsterKind, TowerLevel,
+    CURSES, MONSTERS, SPELLS, TOWERS, Curse, Element, Group, MonsterKind, TowerLevel,
 )
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Refused, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
@@ -138,10 +138,11 @@ def learn(location: Location, sigils: int, order: tuple[str, ...]) -> frozenset[
     every = [*order, *(k for k in SKILLS if k not in order)]
     every.sort(key=lambda k: not useful(location, k))   # a stable sort: the useful first, each in its order
     learned: frozenset[str] = frozenset()
+    stage = ORDER.index(location.key)
     while True:
         before = learned
         for key in every:
-            if can_learn(learned, key, sigils):
+            if can_learn(learned, key, sigils, stage):
                 learned |= {key}
         if learned == before:
             return learned
@@ -155,7 +156,7 @@ class Trail:
     seconds: dict[int, float] = field(default_factory=dict)
     near: dict[int, float] = field(default_factory=dict)    # seconds × monsters within a bin
     around: dict[int, float] = field(default_factory=dict)  # seconds × monsters within three bins
-    s: float = 0.0
+    remaining: float = 0.0
 
 
 class Picture:
@@ -233,7 +234,7 @@ class Adaptive:
         self.watched: dict[int, float] = {}   # per tower: seconds it stood while monsters walked
         self.aimed_at = -1e9
         self.endgame = False                  # the last wave has sent every monster it has
-        self.host: list[str] = []             # this wave's monsters in the order they come
+        self.host: list[tuple[str, str]] = []  # this wave's kinds and authored entrances, in spawn order
         self.gate_hp: dict[int, float] = {}   # per gate: its life at the last look
         self.battered: dict[int, float] = {}  # per gate: life it lost a second since the look before
 
@@ -250,10 +251,12 @@ class Adaptive:
 
     def act(self, hands: Hands) -> None:
         world = hands.world
-        if self.study is None:
+        if self.study is None or self.study.side_included != bool(_announced_breach_groups(world)):
             self.study = Study(world)
-            self.picture = Picture(self.study.bins)
-            self.lives_at_wave = world.lives
+            self.view = None
+            if self.picture is None:
+                self.picture = Picture(self.study.bins)
+                self.lives_at_wave = world.lives
         if world.time >= self.sample_at - 1e-9:
             self.sample_at = world.time + SAMPLE
             self._watch(world)
@@ -282,7 +285,7 @@ class Adaptive:
         study = self.study
         counts = [0] * study.bins
         for m in world.monsters:
-            counts[study.bin(m.s)] += 1
+            counts[study.bin(m.s, m.route)] += 1
         prefix = [0]
         for c in counts:
             prefix.append(prefix[-1] + c)
@@ -292,14 +295,15 @@ class Adaptive:
             trail = self.trails.get(m.id)
             if trail is None:
                 trail = self.trails[m.id] = Trail(m.kind)
-            b = study.bin(m.s)
+            b = study.bin(m.s, m.route)
             weight = SAMPLE * (0.3 + 0.7 * m.hp / m.max_hp)
-            near = prefix[min(study.bins, b + 2)] - prefix[max(0, b - 1)]
-            around = prefix[min(study.bins, b + 4)] - prefix[max(0, b - 3)]
+            start, end = study.bounds(m.route)
+            near = prefix[min(end, b + 2)] - prefix[max(start, b - 1)]
+            around = prefix[min(end, b + 4)] - prefix[max(start, b - 3)]
             trail.seconds[b] = trail.seconds.get(b, 0.0) + weight
             trail.near[b] = trail.near.get(b, 0.0) + weight * near
             trail.around[b] = trail.around.get(b, 0.0) + weight * around
-            trail.s = m.s
+            trail.remaining = world.remaining(m)
         if world.monsters:
             for t in world.towers.values():
                 self.watched[t.id] = self.watched.get(t.id, 0.0) + SAMPLE
@@ -307,7 +311,7 @@ class Adaptive:
                     self.cursed[t.id] = self.cursed.get(t.id, 0.0) + SAMPLE * max(SEVERITY[c] for c in t.curses)
         for key in [k for k in self.trails if k not in alive]:
             trail = self.trails.pop(key)
-            self.picture.fold(trail, leaked=trail.s + trail.kind.speed * SAMPLE * 2 >= study.length)
+            self.picture.fold(trail, leaked=trail.remaining <= trail.kind.speed * SAMPLE * 2)
         for d in world.doors:
             self.battered[d.index] = max(0.0, self.gate_hp.get(d.index, d.hp) - d.hp) / SAMPLE
             self.gate_hp[d.index] = d.hp
@@ -320,10 +324,14 @@ class Adaptive:
         self.picture.fade(FADE)
         self.view = None
         groups = world.location.waves[world.wave].groups
-        self.host = [kind for _, kind in sorted((group.start + i * group.interval, group.kind)
-                                                 for group in groups for i in range(group.count))]
+        spec = world.breach_spec
+        if spec is not None and world.breach_opened and world.wave == spec.after_wave + 1:
+            groups = (*groups, *spec.groups)
+        self.host = [(kind, route) for _, kind, route in sorted(
+            (group.start + i * group.interval, group.kind, group.route)
+            for group in groups for i in range(group.count))]
 
-    def _to_come(self, world: World) -> list[str]:
+    def _to_come(self, world: World) -> list[tuple[str, str]]:
         """The kinds this wave has still to send: the last of its host, as many as the panel's count of monsters
         abroad has beyond those on the map."""
         left = len(world.schedule)   # what the panel adds to the monsters on the map
@@ -337,9 +345,11 @@ class Adaptive:
         bins = study.bins
         coming: dict[str, list[float]] = {}
         for m in world.monsters:
-            coming.setdefault(m.kind.key, [0.0] * bins)[study.bin(m.s)] += 1.0
-        for key in self._to_come(world):
-            coming.setdefault(key, [0.0] * bins)[0] += 1.0
+            coming.setdefault(m.kind.key, [0.0] * bins)[study.bin(m.s, m.route)] += 1.0
+        for key, route in self._to_come(world):
+            choices = study.spawn_routes(key, route)
+            for choice in choices:
+                coming.setdefault(key, [0.0] * bins)[study.bin(0.0, choice)] += 1.0 / len(choices)
         seconds = [0.0] * bins
         worth = {e: [0.0] * bins for e in ELEMENTS}
         venom = [0.0] * bins
@@ -356,10 +366,14 @@ class Adaptive:
                 here = [h + past * t for h, t in zip(here, seen)]
             starts = coming.get(key)
             if starts is not None:
-                walking = 0.0
-                for b in range(bins):
-                    walking += starts[b]
-                    here[b] += NOW * walking * usual[b]
+                for route in study.routes:
+                    walking = 0.0
+                    start, end = study.bounds(route.key)
+                    share = study.route_share[key][route.key]
+                    for b in range(start, end):
+                        walking += starts[b]
+                        if walking > 0:
+                            here[b] += NOW * walking * usual[b] / share
             leaked = picture.leaked.get(key, 0.0) / came if came > 0 else 0.0
             value = (1.0 + LEAKY * leaked) * (LEADER if kind.leader is not None else 1.0)
             size = kind.hp ** 3
@@ -399,7 +413,8 @@ class Adaptive:
 
     def _urgency(self, b: int) -> float:
         assert self.study is not None
-        return 1.0 + (URGENCY + 0.1 * self.lost_last) * b / self.study.bins
+        start, end = self.study.bin_bounds[b]
+        return 1.0 + (URGENCY + 0.1 * self.lost_last) * (b - start) / (end - start)
 
     def _density(self, world: World, kind: str, stats: TowerLevel, b: int) -> float:
         """Worth of the damage a tower of this kind and rank deals per wave from one bin of path it reaches."""
@@ -534,25 +549,28 @@ class Adaptive:
             dwell = [1.0 / kind.speed] * bins
             if not kind.flying:
                 for d in gates:
-                    dwell[study.queue_bins[d.index]] += QUEUE_GUESS
-            total = 0.0
+                    for queue_bin in study.queue_bins[d.index]:
+                        dwell[queue_bin] += QUEUE_GUESS
             ahead = [0.0] * bins
-            for b in range(bins - 1, -1, -1):
-                total += dwell[b] * sum(hurt[e][b] * taken[e] for e in ELEMENTS) / view.around[b] ** 0.5
-                ahead[b] = total
+            for route in study.routes:
+                total = 0.0
+                start, end = study.bounds(route.key)
+                for b in range(end - 1, start - 1, -1):
+                    total += dwell[b] * sum(hurt[e][b] * taken[e] for e in ELEMENTS) / view.around[b] ** 0.5
+                    ahead[b] = total
             self.ahead[key] = ahead
 
     def threat(self, m: Monster) -> float:
         """Life a monster is likely to carry into the sanctuary; zero or less if the towers ahead should kill it."""
         assert self.study is not None
-        return m.hp - self.ahead[m.kind.key][self.study.bin(m.s)]
+        return m.hp - self.ahead[m.kind.key][self.study.bin(m.s, m.route)]
 
     def pressing(self, m: Monster) -> bool:
         """A monster that would get through and has already walked past most of the towers' fire (a person trusts
         the towers with a monster at the portal), or one that costs many lives."""
         assert self.study is not None
         ahead = self.ahead[m.kind.key]
-        passed = ahead[self.study.bin(m.s)] <= PASSED * ahead[0]
+        passed = ahead[self.study.bin(m.s, m.route)] <= PASSED * ahead[self.study.bin(0.0, m.route)]
         return self.threat(m) > 0 and (passed or m.kind.lives >= BOSS)
 
     # -- Gold ----------------------------------------------------------------------------------------
@@ -586,9 +604,9 @@ class Adaptive:
         if not self.endgame or not world.monsters:
             return
         assert self.study is not None
-        rear = min(m.s for m in world.monsters)
-        behind = [t for t in world.towers.values()   # a cursed tower cannot be sold
-                  if not t.curses and max(b for b, _ in self.study.cover(t.tile, t.stats.range)) + 1 < rear]
+        behind = [t for t in world.towers.values() if not t.curses and all(
+            all(b + 1 < m.s for _, b in world.level.route(m.route).coverage(t.tile, t.stats.range))
+            for m in world.monsters)]
         for t in behind:
             world.sell(t.id)
         if behind:
@@ -604,18 +622,18 @@ class Adaptive:
         """Gold held back for a gate that is down or failing, where towers watch its queue."""
         for d in world.doors:
             if self._guarded(d.index) and (not d.built or d.hp < world.gate_life * 0.35):
-                return DOOR.cost
+                return world.door_cost
         return 0
 
     def _guarded(self, index: int) -> bool:
         assert self.study is not None
-        return bool(self.firepower) and self.firepower[self.study.queue_bins[index]] > 0
+        return bool(self.firepower) and any(self.firepower[b] > 0 for b in self.study.queue_bins[index])
 
     def _gates(self, world: World) -> None:
-        if not world.location.arsenal.gates or world.gold < DOOR.cost:
+        if not world.location.arsenal.gates or world.gold < world.door_cost:
             return
         for d in world.doors:
-            if not d.built and not d.rubble and self._guarded(d.index) and world.gold >= DOOR.cost:
+            if not d.built and not d.rubble and self._guarded(d.index) and world.gold >= world.door_cost:
                 try:
                     world.build_door(d.index)
                 except Refused:   # monsters stand in the arch: it goes up once they have passed
@@ -643,7 +661,7 @@ class Adaptive:
         """Mana kept for Smite while a leader walks or is still to come in this wave."""
         if "smite" not in world.location.arsenal.spells:
             return 0.0
-        coming = any(MONSTERS[key].leader is not None for key in self._to_come(world))
+        coming = any(MONSTERS[key].leader is not None for key, _ in self._to_come(world))
         walking = any(m.kind.leader is not None for m in world.monsters)
         return world.spell_cost("smite") if coming or walking else 0.0
 
@@ -683,9 +701,10 @@ class Adaptive:
                 hands.smite(m.id)
                 return True
         assert self.study is not None
-        rescue = [m for m in world.monsters if 0 < self.threat(m) <= blow and m.s > self.study.length * 0.5]
+        rescue = [m for m in world.monsters if 0 < self.threat(m) <= blow
+                  and world.remaining(m) < world.level.route(m.route).length * 0.5]
         if rescue:
-            hands.smite(max(rescue, key=lambda m: (m.kind.lives, m.s)).id)
+            hands.smite(max(rescue, key=lambda m: (m.kind.lives, -world.remaining(m))).id)
             return True
         return False
 
@@ -706,7 +725,7 @@ class Adaptive:
         options: list[tuple[float, str, int | tuple[float, float]]] = []
         if self._can(world, "smite") and (spare >= world.spell_cost("smite") or full):
             blow = SPELLS["smite"].damage * power
-            m = max(world.monsters, key=lambda m: (min(blow, m.hp) * weight(m), m.s))
+            m = max(world.monsters, key=lambda m: (min(blow, m.hp) * weight(m), -world.remaining(m)))
             options.append((min(blow, m.hp) * weight(m) / world.spell_cost("smite"), "smite", m.id))
         if self._can(world, "meteor") and (spare >= world.spell_cost("meteor") or full):
             spec = SPELLS["meteor"]
@@ -717,7 +736,7 @@ class Adaptive:
         if self._can(world, "orb") and (spare >= world.spell_cost("orb") or full):
             spec = SPELLS["orb"]
             at, got, _ = self._crowd(world, spec.radius * 0.9, 0.0, spec.damage * power, Element.COLD, weight)
-            if at is not None and self.firepower[self.study.bin(self._s_at(at))] <= 0:
+            if at is not None and self.firepower[self.study.nearest_bin(at)] <= 0:
                 at = None   # frozen where no tower fires, a monster only waits
             gate = self._failing_gate(world)
             if gate is not None:
@@ -742,7 +761,7 @@ class Adaptive:
 
     def _crowd(self, world: World, radius: float, delay: float, blow: float, element: Element, weight) -> tuple:
         """Where a spell falling ``delay`` from now does the most weighted damage: (where, weighted damage, damage)."""
-        ahead = [(m, world.level.point(_landing(m, delay))) for m in world.monsters]
+        ahead = [(m, world.level.route(m.route).point(_landing(world, m, delay))) for m in world.monsters]
         best, best_raw, best_at = 0.0, 0.0, None
         for _, at in ahead:
             got = raw = 0.0
@@ -755,21 +774,15 @@ class Adaptive:
                 best, best_raw, best_at = got, raw, at
         return best_at, best, best_raw
 
-    def _s_at(self, at: tuple[float, float]) -> float:
-        """The path's nearest point to a spot on the floor, as ``s``."""
-        assert self.study is not None
-        level = self.study.level
-        return min((level.s_of(tile) for tile in level.path_tiles),
-                   key=lambda s: (level.point(s)[0] - at[0]) ** 2 + (level.point(s)[1] - at[1]) ** 2)
-
     def _failing_gate(self, world: World) -> tuple[float, float] | None:
         """The queue at a gate whose health bar, falling as fast as it did since the last look, empties within two
         seconds, when enough monsters batter it."""
         for d in world.doors:
             if not d.built or d.hp >= self.battered[d.index] * 2.0:
                 continue
-            if sum(1 for m in world.monsters if m.door == d.index) >= ORB_CROWD:
-                return world.level.point(d.s - DOOR_STOP - JOSTLE / 2)
+            batterers = [m for m in world.monsters if m.door == d.index]
+            if len(batterers) >= ORB_CROWD:
+                return world.position(batterers[0])
         return None
 
     def _cleanse(self, hands: Hands) -> None:
@@ -785,7 +798,7 @@ class Adaptive:
             if left < 2.5:
                 continue
             harm = self._share(t.id) * max(SEVERITY[c] for c in t.curses) * left / 8.0
-            if harm > best_harm and any(world.in_reach(t, m.s) for m in world.monsters):
+            if harm > best_harm and any(world.in_reach(t, m.s, m.route) for m in world.monsters):
                 best, best_harm = t, harm
         spare = world.mana - cost - self._reserve(world) * 0.5
         if best is not None and (best_harm >= CLEANSE_SHARE and spare >= 0 or world.mana >= world.mana_max - 5):
@@ -801,45 +814,106 @@ def _slowed(chill: float) -> float:
     return chill / (1.0 - chill)
 
 
-def _landing(m: Monster, delay: float) -> float:
+def _landing(world: World, m: Monster, delay: float) -> float:
     if m.door >= 0 or m.frozen >= delay:
         return m.s
-    return m.s + m.speed * delay
+    s = m.s + m.speed * delay
+    if not m.kind.flying:
+        for index, crossing in world.level.crossings(m.route):
+            if world.doors[index].built and crossing > m.s:
+                return min(s, max(m.s, crossing - DOOR_STOP - JOSTLE / 2))
+    return s
 
 
 def _dist(a: tuple[float, float], b: tuple[float, float]) -> float:
     return math.hypot(a[0] - b[0], a[1] - b[1])
 
 
+def _announced_breach_groups(world: World) -> tuple[Group, ...]:
+    """The accepted side pack while it is upcoming or still visible on the map."""
+    spec = world.breach_spec
+    if spec is None or not world.breach_opened:
+        return ()
+    if spec.after_wave <= world.wave <= spec.after_wave + 1 or any(m.route == "breach" for m in world.monsters):
+        return spec.groups
+    return ()
+
+
 class Study:
-    """The map as a person reads it before the first wave: the bins, the tiles, what each tile's reach covers,
-    and a first guess at where each kind of the roster will spend its time."""
+    """One independent run of bins per entrance route, and a first guess at where monsters spend time."""
 
     def __init__(self, world: World) -> None:
         level = world.level
+        side_groups = _announced_breach_groups(world)
+        self.side_included = bool(side_groups)
         self.level = level
-        self.length = level.length
-        self.bins = math.ceil(level.length) + 1
+        self.routes = level.routes
+        self.route_bounds: dict[str, tuple[int, int]] = {}
+        self.bin_bounds: list[tuple[int, int]] = []
+        self.centres: list[tuple[float, float]] = []
+        for route in self.routes:
+            start = len(self.centres)
+            count = math.ceil(route.length) + 1
+            end = start + count
+            self.route_bounds[route.key] = start, end
+            self.bin_bounds.extend([(start, end)] * count)
+            self.centres.extend(route.point(min(route.length, s + 0.5)) for s in range(count))
+        self.bins = len(self.centres)
         self.tiles = [(x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y)]
-        self.queue_bins = [self.bin(d.s - DOOR_STOP - JOSTLE / 2) for d in world.doors]
+        self.queue_bins: dict[int, tuple[int, ...]] = {
+            door.index: tuple(self.bin(s - DOOR_STOP - JOSTLE / 2, route.key)
+                              for route in self.routes for index, s in level.crossings(route.key)
+                              if index == door.index)
+            for door in world.doors}
         self._cover: dict[tuple, tuple[tuple[int, float], ...]] = {}
-        self.roster = world.location.monsters
+        self.roster = tuple(dict.fromkeys((*world.location.monsters, *(group.kind for group in side_groups))))
         gates = world.location.arsenal.gates
+        counts: dict[tuple[str, str], float] = {}
+        groups = (group for wave in world.waves for group in wave.groups)
+        for group in (*groups, *side_groups):
+            choices = self.spawn_routes(group.kind, group.route)
+            for route in choices:
+                pair = group.kind, route
+                counts[pair] = counts.get(pair, 0.0) + group.count / len(choices)
+        self.route_share: dict[str, dict[str, float]] = {}
         self.guess: dict[str, list[float]] = {}
         for key in self.roster:
             kind = MONSTERS[key]
-            seconds = [1.0 / kind.speed] * self.bins
-            if gates and not kind.flying:
-                for b in self.queue_bins:
-                    seconds[b] += QUEUE_GUESS
+            total = sum(counts.get((key, route.key), 0.0) for route in self.routes)
+            assert total > 0
+            seconds = [0.0] * self.bins
+            self.route_share[key] = {}
+            for route in self.routes:
+                start, end = self.bounds(route.key)
+                share = counts.get((key, route.key), 0.0) / total
+                self.route_share[key][route.key] = share
+                for b in range(start, end):
+                    seconds[b] = share / kind.speed
+                if gates and not kind.flying:
+                    for _, s in level.crossings(route.key):
+                        seconds[self.bin(s - DOOR_STOP - JOSTLE / 2, route.key)] += QUEUE_GUESS * share
             self.guess[key] = seconds
         self.guess_seconds = [sum(self.guess[k][b] for k in self.roster) for b in range(self.bins)]
-        queues = set(self.queue_bins) if gates else set()
+        queues = {b for bins in self.queue_bins.values() for b in bins} if gates else set()
         self.guess_near = [4.0 if b in queues else 1.5 for b in range(self.bins)]
         self.guess_around = [5.0 if b in queues else 3.0 for b in range(self.bins)]
 
-    def bin(self, s: float) -> int:
-        return min(self.bins - 1, max(0, int(s)))
+    def spawn_routes(self, kind: str, authored: str) -> tuple[str, ...]:
+        if MONSTERS[kind].movement != "wander":
+            return (authored,)
+        entrance = self.level.route(authored).entrance
+        return tuple(route.key for route in self.routes if route.entrance == entrance)
+
+    def bounds(self, route: str) -> tuple[int, int]:
+        return self.route_bounds[route]
+
+    def bin(self, s: float, route: str = "main") -> int:
+        start, end = self.bounds(route)
+        return min(end - 1, max(start, start + int(s)))
+
+    def nearest_bin(self, at: tuple[float, float]) -> int:
+        return min(range(self.bins), key=lambda b: (self.centres[b][0] - at[0]) ** 2
+                   + (self.centres[b][1] - at[1]) ** 2)
 
     def cover(self, tile: tuple[int, int], reach: float) -> tuple[tuple[int, float], ...]:
         """The bins a tile's reach covers, each with the length of path in it that is covered."""
@@ -847,10 +921,12 @@ class Study:
         found = self._cover.get(key)
         if found is None:
             shares: dict[int, float] = {}
-            for a, b in self.level.coverage(tile, reach):
-                k = int(a)
-                while k < b:
-                    shares[k] = shares.get(k, 0.0) + min(b, k + 1) - max(a, k)
-                    k += 1
-            found = self._cover[key] = tuple((self.bin(k), v) for k, v in sorted(shares.items()))
+            for route in self.routes:
+                for a, b in route.coverage(tile, reach):
+                    k = int(a)
+                    while k < b:
+                        index = self.bin(k, route.key)
+                        shares[index] = shares.get(index, 0.0) + min(b, k + 1) - max(a, k)
+                        k += 1
+            found = self._cover[key] = tuple(sorted(shares.items()))
         return found

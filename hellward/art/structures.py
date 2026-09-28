@@ -1,7 +1,7 @@
 """Towers, gates, arches and pillars as low-poly stand-ins, drawn with the monsters' camera.
 
 A tower stands on one tile: its model origin is the tile's centre on the ground. Each tower kind has
-three ranks that grow taller and grander; the fire, the crystal, the ice and the venom glow drawn here
+three ranks that grow taller and grander; the bow, fire, crystal, ice and venom drawn here
 are the resting look, and the scene lays live light and particles over them.
 
 A gate spans a corridor that runs down the screen; its origin is the door tile's centre. The arch
@@ -18,7 +18,7 @@ from PIL import Image
 from sagaforge import render3d as r3
 from sagaforge.render3d import Mesh
 
-from hellward.art.rig import DENSITY, PROJECTION, move, pitch, rod, roll, yaw
+from hellward.art.rig import DENSITY, PROJECTION, blade, move, pitch, rod, roll, yaw
 
 STONE = (92, 86, 84)
 STONE_DARK = (62, 58, 60)
@@ -26,7 +26,6 @@ IRON = (58, 52, 52)
 GOLD = (206, 164, 72)
 BONE = (214, 204, 176)
 
-TOWER_KINDS = ("pyre", "storm", "frost", "plague", "altar", "grove")
 GATE_LOOKS = ("intact", "damaged", "broken")
 
 
@@ -37,6 +36,41 @@ def plinth(rank: int, color=STONE, top=STONE_DARK) -> Mesh:
         for x in (-0.3, 0.3):
             for y in (-0.26, 0.26):
                 mesh += r3.cone((x, y, 0.14), 0.05, 0.12 + 0.06 * rank, (70, 64, 64), sides=5)
+    return mesh
+
+
+def arrow(rank: int) -> Mesh:
+    """A single loaded ballista, with a longer stock and wider bow at each rank."""
+    oak, dark_oak, steel = (116, 77, 46), (72, 47, 34), (132, 136, 135)
+    height = (0.70, 0.98, 1.27)[rank]
+    spread = (0.32, 0.40, 0.47)[rank]
+    top = 0.22 + height
+    mesh = plinth(rank, color=(98, 88, 76), top=(65, 61, 57))
+    mesh += r3.cylinder((0, 0, 0.22), 0.12 + 0.01 * rank, height, oak, sides=6)
+    mesh += r3.box((0, 0, top - 0.10), (0.34, 0.30, 0.08), IRON)
+    if rank >= 1:
+        for side in (-1, 1):
+            mesh += rod((0, 0, 0.43), (side * 0.23, 0, top - 0.13), 0.045, dark_oak)
+    if rank == 2:
+        mesh += r3.cylinder((0, 0, top - 0.34), 0.15, 0.06, GOLD, sides=8)
+
+    z = top + 0.08
+    mesh += rod((0, -0.23, z), (0, 0.30 + 0.04 * rank, z), 0.11, dark_oak, depth=0.09)
+    mesh += r3.box((0, -0.11, z + 0.055), (0.13, 0.15, 0.035), steel)
+    for side in (-1, 1):
+        elbow = (side * spread * 0.58, 0.04, z + 0.07)
+        tip = (side * spread, -0.06, z + 0.03)
+        mesh += rod((0, 0.07, z), elbow, 0.07, oak)
+        mesh += rod(elbow, tip, 0.055, dark_oak)
+        mesh += rod(tip, (0, -0.20, z + 0.06), 0.012, BONE)
+        if rank == 2:
+            mesh += r3.sphere(elbow, 0.045, GOLD, rings=4, sides=6)
+
+    # One visible bolt on the rail makes the tower's single-target role plain.
+    mesh += rod((0, -0.21, z + 0.11), (0, 0.28, z + 0.11), 0.022, BONE)
+    mesh += blade((0, 0.20, z + 0.11), (0, 0.38 + 0.04 * rank, z + 0.11), 0.10, steel)
+    for side in (-1, 1):
+        mesh += blade((0, -0.16, z + 0.11), (side * 0.06, -0.27, z + 0.11), 0.035, (182, 53, 42))
     return mesh
 
 
@@ -223,8 +257,8 @@ def grove(rank: int) -> Mesh:
     return mesh
 
 
-TOWER_KINDS = ("pyre", "storm", "frost", "plague", "altar", "grove")
-TOWER_BUILDERS = {"pyre": pyre, "storm": storm, "frost": frost, "plague": plague, "altar": altar, "grove": grove}
+TOWER_KINDS = ("arrow", "pyre", "storm", "frost", "plague", "altar", "grove")
+TOWER_BUILDERS = {"arrow": arrow, "pyre": pyre, "storm": storm, "frost": frost, "plague": plague, "altar": altar, "grove": grove}
 
 
 def gate(look: str) -> Mesh:
@@ -317,6 +351,7 @@ def pillar_image() -> Image.Image:
 def tower_top(kind: str, rank: int) -> float:
     """Height in tiles of the tower's burning, glowing or grinning top: where its magic leaves from."""
     return {
+        "arrow": 0.22 + (0.70, 0.98, 1.27)[rank] + 0.19,
         "pyre": 0.22 + (0.95, 1.25, 1.55)[rank] + 0.3,
         "storm": 0.22 + (1.3, 1.65, 2.0)[rank] + 0.45,
         "frost": 0.22 + 0.62 * (1.7, 2.1, 2.5)[rank] * 1.02,

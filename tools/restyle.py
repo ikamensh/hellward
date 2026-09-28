@@ -4,7 +4,7 @@
     uv run python tools/restyle.py --subjects mon-skeleton,towers refresh DIR
     uv run python tools/restyle.py dump DIR | render DIR | cut DIR [--force] | preview DIR
     uv run python tools/restyle.py ground DIR                     # every location's floor, painted over its stand-in
-    uv run python tools/restyle.py --locations caves ground DIR   # one location's floor (a painted one is kept)
+    uv run python tools/restyle.py --locations caves ground DIR   # refresh one location's painted floor
     uv run python tools/restyle.py worldmap DIR                   # the world map, painted over its stand-in
     uv run python tools/restyle.py keyart DIR                     # the title screen's painting, from words alone
 
@@ -147,15 +147,16 @@ def tower_subject() -> Subject:
     sheet = restyle.Sheet.layout(keys, cols=len(kinds), cell=(canvas[0] * DENSITY, canvas[1] * DENSITY),
                                  origin=(origin[0] * DENSITY, origin[1] * DENSITY), scale=DENSITY)
     images = {key: structures.tower_image(tags["kind"], tags["rank"]) for key, tags in keys}
-    layout = ("Columns, left to right: a fire pyre (a stone pillar carrying an iron brazier of roaring flame); a storm obelisk (a "
+    layout = ("Columns, left to right: an arrow tower (a wooden ballista on a stone plinth, with one loaded bolt and a wider "
+              "bow at each rank); a fire pyre (a stone pillar carrying an iron brazier of roaring flame); a storm obelisk (a "
               "dark basalt obelisk with glowing blue runes and a floating blue crystal, copper coils from the second rank); a frost "
               "shrine (a cluster of pale blue ice crystals on a stone plinth); a plague totem (a bone pole of stacked skulls with "
               "glowing green eyes and a horned ram skull on top, over a pool of green venom); a bone altar (a stone slab piled with "
               "skulls and ribs, a violet-green flame growing with rank); a druid grove (a ring of standing stones around a twisted oak, "
               "leafier with each rank). Rows, top to bottom: the first, second and third rank of each; every rank is taller and grander "
               "than the one above it, on purpose.")
-    prompt = _prompt(sheet, layout, "the six magical defence towers of a gothic cathedral, each standing on its own square stone plinth",
-                     "Paint carved gothic stone, wrought iron and bone in place of the blocky shapes, keeping each tower's outline.")
+    prompt = _prompt(sheet, layout, "the seven defence towers of a gothic cathedral, each standing on its own square stone plinth",
+                     "Paint carved gothic stone, dark wood, wrought iron and bone in place of the blocky shapes, keeping each tower's outline.")
     return Subject("towers", sheet, images, prompt, "towers", [k for k, _ in keys])
 
 
@@ -367,14 +368,16 @@ def _paint(source: Path, prompt: str, out: Path, provider: str, aspect: str) -> 
 def _ground(directory: Path, key: str, provider: str) -> str:
     location = LOCATIONS[key]
     theme = mapart.THEMES[location.theme]
+    layout = mapart.layout_fingerprint(location.level)
     image = mapart.stand_in(location.level, theme)
     small = image.resize((image.width // 2, image.height // 2), Image.LANCZOS)
     source = directory / f"ground-{key}.input.png"
     small.save(source)
-    out = directory / f"ground-{key}" / f"{provider}.png"
+    out = directory / f"ground-{key}" / f"{provider}-{layout}.png"
     _paint(source, GROUND_PROMPT.format(w=small.width, h=small.height, words=theme.words), out, provider, "16:9")
     painted = Image.open(out).convert("RGB").resize(image.size, Image.LANCZOS)
     painted.save(mapart.painted(key))
+    mapart.record_painted_layout(key, location.level)
     Image.blend(image, painted, 0.5).save(directory / f"ground-{key}-overlay.png")
     return f"installed {mapart.painted(key)}; compare {directory / f'ground-{key}-overlay.png'}"
 
@@ -382,7 +385,7 @@ def _ground(directory: Path, key: str, provider: str) -> str:
 def cmd_ground(args: argparse.Namespace) -> None:
     args.dir.mkdir(parents=True, exist_ok=True)
     PAINTED.mkdir(parents=True, exist_ok=True)
-    keys = sorted(args.locations) if args.locations else [k for k in LOCATIONS if not mapart.painted(k).exists()]
+    keys = sorted(args.locations) if args.locations else [k for k in LOCATIONS if not mapart.painted_matches(k, LOCATIONS[k].level)]
     with ThreadPoolExecutor(args.jobs) as pool:
         for line in pool.map(lambda key: _ground(args.dir, key, args.provider), keys):
             print(line, flush=True)

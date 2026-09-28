@@ -4,7 +4,7 @@ When a leader's curse is ready it considers every tower it could reach and every
 estimate (:func:`candidates`) says how much damage the curse would stop that tower dealing while it lasts,
 from where each monster will walk and what it resists. A curse falls on a spot, so each candidate is a
 (curse, spot) pair priced by every unwarded tower its circle catches. The best few go to **rollouts**: the world is cloned
-and played forward a little past the curse's end at a coarse step, once with nothing cast and once per
+and played forward a little past the curse's end at the game's step, once with nothing cast and once per
 option, and each option's *gain* is how much more life the pack keeps (the life of the monsters still
 standing, monsters that reached the sanctuary at twice their life, and the life knocked off doors).
 
@@ -25,11 +25,11 @@ from typing import Final
 
 from hellward.sim.content import CURSES, Curse, CurseSpec, LeaderSpec
 from hellward.sim.model import (
-    CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, ForcedCurse, Monster, Tower, World, curse_radius,
+    CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, SIM_DT, ForcedCurse, Monster, Tower, World, curse_radius,
 )
 from hellward.sim.sums import add, float_sum, settle
 
-ROLLOUT_DT: Final = 0.1
+ROLLOUT_DT: Final = SIM_DT
 HORIZON_PAD: Final = 3.0      # seconds a rollout runs past the curse's end, to see what it changed
 SHORTLIST: Final = 10         # (curse, spot) pairs that get a rollout
 DELAYS: Final = (2.0, 4.0)    # later moments tried for the best targets
@@ -103,7 +103,7 @@ def reachable(world: World, leader: Monster, delay: float = 0.0) -> list[Tower]:
     spec = _spec(leader)
     lands = DECIDE_DELAY + _voiced(spec) + delay
     s = leader.s + leader.speed * lands
-    x, y = world.level.point(s)
+    x, y = world.level.route(leader.route).point(s)
     limit = spec.cast_range + CAST_SLACK * 0.5
     found = []
     for t in world.towers.values():
@@ -119,9 +119,9 @@ def _trajectory(world: World, m: Monster, times: list[float]) -> list[float]:
     """Where a monster will be at each time, walking at its current pace and stopping at standing doors."""
     stop = None
     if not m.kind.flying:
-        for d in world.doors:
-            if d.built and d.s > m.s:
-                stop = d.s - DOOR_STOP - m.jostle
+        for door_index, s in world.level.crossings(m.route):
+            if world.doors[door_index].built and s > m.s:
+                stop = s - DOOR_STOP - m.jostle
                 break
     speed = m.kind.speed * (1.0 - m.chill) if m.chill_left > 0 else m.kind.speed
     out = []
@@ -134,17 +134,18 @@ def _trajectory(world: World, m: Monster, times: list[float]) -> list[float]:
 
 
 def _damage_in(tower: Tower, reach: float, world: World, tracks: list[tuple[Monster, list[float]]], index: int,
-               allowed: tuple[tuple[float, float], ...] | None = None) -> float:
+               allowed: dict[str, tuple[tuple[float, float], ...]] | None = None) -> float:
     """Damage per second a tower would deal, at one sample, to the monsters within ``reach``; with ``allowed``, only
     to those also on those stretches of the path (an altar's reach, whose amplification it lends to)."""
-    spans = world.level.coverage(tower.tile, reach)
+    spans = {route.key: (world.level.coverage(tower.tile, reach) if route.key == "main"
+                         else route.coverage(tower.tile, reach)) for route in world.level.routes}
     element = tower.kind.element
     taken = []
     for m, track in tracks:
         s = track[index]
-        if allowed is not None and not any(a <= s <= b for a, b in allowed):
+        if allowed is not None and not any(a <= s <= b for a, b in allowed[m.route]):
             continue
-        for a, b in spans:
+        for a, b in spans[m.route]:
             if a <= s <= b:
                 if tower.kind.attack != "venom" or m.kind.taken(element) > 0:   # venom seeks only what it can poison
                     taken.append(m.kind.taken(element))
@@ -269,8 +270,11 @@ def _altar_damage(tower: Tower, world: World, times: list[float], tracks: list[t
     if not others:
         return 0.0
     begin, end = start + left, start + spec.duration
-    near_spans = world.level.coverage(tower.tile, full)
-    far_spans = world.level.coverage(tower.tile, after_reach) if after_reach != full else near_spans
+    near_spans = {route.key: (world.level.coverage(tower.tile, full) if route.key == "main"
+                              else route.coverage(tower.tile, full)) for route in world.level.routes}
+    far_spans = ({route.key: (world.level.coverage(tower.tile, after_reach) if route.key == "main"
+                              else route.coverage(tower.tile, after_reach)) for route in world.level.routes}
+                 if after_reach != full else near_spans)
     lent, lent_error = 0.0, 0.0
     kept, kept_error = 0.0, 0.0
     for i in range(len(times)):
@@ -436,6 +440,6 @@ def nearest(world: World, leader_id: int) -> Inline:
     towers = reachable(world, leader)
     if not towers:
         return Inline(Decision(leader_id, None, retry=QUIET_RETRY, reason="nearest: nothing in reach"))
-    x, y = world.level.point(leader.s)
+    x, y = world.position(leader)
     tower = min(towers, key=lambda t: ((t.centre[0] - x) ** 2 + (t.centre[1] - y) ** 2, t.id))
     return Inline(Decision(leader_id, Option(_spec(leader).curses[0], tower.tile), reason="nearest"))

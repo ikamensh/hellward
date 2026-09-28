@@ -8,8 +8,10 @@ from pathlib import Path
 import pytest
 
 from hellward.sim import planner
-from hellward.sim.campaign import LOCATIONS, g
+from hellward.sim.breaches import BREACHES
+from hellward.sim.campaign import LOCATIONS, ORDER, g
 from hellward.sim.content import Wave
+from hellward.sim.level import Level, Route
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.adaptive import ORDERS, Adaptive
@@ -20,6 +22,7 @@ from hellward.sim.skills import SKILLS, can_learn, check, cost
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import plan_player  # noqa: E402
+import warden_plans  # noqa: E402
 
 
 @pytest.mark.parametrize("key", list(LOCATIONS))
@@ -37,6 +40,12 @@ def test_the_warden_holds_tristram():
     assert record.landed > 0
 
 
+def test_warden_search_starts_at_real_difficulty_when_the_draft_loses():
+    assert warden_plans.starting_life(None, [0.0, 0.0, 0.0, 0.0]) == 1.0
+    with pytest.raises(ValueError, match="positive"):
+        warden_plans.starting_life(0.0, [0.0])
+
+
 def test_every_stored_warden_plan_is_for_todays_map_and_its_sigils():
     """A plan searched on a map that has changed since is not played: search it again (tools/warden_plans.py)."""
     for key, plan in load_plans().items():
@@ -52,7 +61,7 @@ def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():
     world = World(replace(LOCATIONS["graveyard"], waves=(pack,), wave_names=("pack",)), seed=3, planner=planner.smart)
     hands = Hands(world, react=0.6)
     world.gold = 1000
-    world.build("pyre", (7, 4))
+    world.build("arrow", (9, 9))
     world.call_wave()
     seen_at = {}
     signed_at = {}
@@ -79,7 +88,7 @@ def test_the_record_tells_a_broken_chant_from_a_broken_pondering():
     world = World(replace(LOCATIONS["catacombs"], waves=(pack,), wave_names=("pack",)), seed=3, planner=planner.smart)
     hands = Hands(world, react=0.6)
     world.gold = 1000
-    world.build("pyre", (5, 5))
+    world.build("pyre", (6, 5))
     world.call_wave()
     smitten: dict[str, int] = {}
     while len(smitten) < 2:
@@ -119,15 +128,17 @@ def test_a_player_reads_no_leaders_mind_and_no_future(path):
 
 
 def test_the_planned_player_holds_tristram_with_its_searched_build():
-    world, _ = defend(LOCATIONS["tristram"], PLAYERS["planned"](1), seed=1, sigils=0, planner=planner.smart)
-    assert world.outcome == "victory"
-    assert world.lives >= 18
+    """The stored build wins on evaluation seeds it did not see during its search."""
+    for seed in range(1000, 1008):
+        world, _ = defend(LOCATIONS["tristram"], PLAYERS["planned"](seed), seed=seed, sigils=0,
+                          planner=planner.smart)
+        assert world.outcome == "victory", seed
 
 
 def test_the_adaptive_player_holds_tristram():
     world, record = defend(LOCATIONS["tristram"], PLAYERS["adaptive"](1), seed=1, sigils=0, planner=planner.smart)
     assert world.outcome == "victory"
-    assert world.lives >= 18
+    assert world.lives >= 10   # the open-field opening still earns at least two sigils
 
 
 def test_the_apprentice_holds_tristram():
@@ -172,16 +183,134 @@ def test_the_plan_search_only_ever_makes_plans_that_fit(key):
             assert_fits(plan, location)
 
 
+def test_plan_search_scores_build_tiles_beside_a_second_entrance():
+    level = Level("Two approaches", 9, 9, ((0, 4), (8, 4)), (),
+                  extra_routes=(Route("side", ((0, 6), (4, 6), (8, 4))),
+                                Route("breach", ((4, 0), (4, 2), (8, 4)))))
+    location = replace(LOCATIONS["tristram"], level=level)
+    assert level.buildable(2, 7) and level.buildable(3, 1)
+    assert not level.route("main").coverage((2, 7), 1.1)
+    assert level.route("side").coverage((2, 7), 1.1)
+    assert level.route("breach").coverage((3, 1), 1.1)
+    ranked = plan_player.ranked_tiles(location, 1.1, 0.0)
+    assert (2, 7) in ranked
+    assert (3, 1) not in ranked   # the optional entrance is sealed in an ordinary search defence
+
+
+def test_planned_player_spends_sigils_only_on_skills_open_at_the_location():
+    from hellward.sim.players.planned import Plan, Planned
+
+    plan = Plan(["adept_fire", "master_fire", "fire_ball", "warmth", "soul_harvest"], [], [])
+    early = Planned(plan=plan).skills(LOCATIONS["cathedral"], 6)
+    assert early == frozenset({"adept_fire", "master_fire", "warmth", "soul_harvest"})
+    late = Planned(plan=plan).skills(LOCATIONS["jungle"], 6)
+    assert late == frozenset({"adept_fire", "master_fire", "fire_ball", "warmth"})
+
+
+def test_warden_draft_and_search_mutations_cannot_buy_future_skills():
+    from hellward.sim.players.warden import Plan, Warden, draft_skills
+
+    location = LOCATIONS["cathedral"]
+    assert all(SKILLS[key].first_location <= 2 for key in draft_skills(location, 6))
+    chosen = Warden(plan=Plan(frozenset({"adept_fire", "master_fire", "fire_ball"}), ())).skills(location, 6)
+    assert chosen == frozenset({"adept_fire", "master_fire"})
+    mutated = warden_plans.reskill(frozenset({"adept_fire", "master_fire", "fire_ball"}), 6,
+                                   random.Random(1), stage=2)
+    assert all(SKILLS[key].first_location <= 2 for key in mutated)
+    stale = Plan(frozenset({"adept_fire", "master_fire", "fire_ball"}), ())
+    assert all(SKILLS[key].first_location <= 2
+               for key in warden_plans.mutate(stale, location, 6, random.Random(2)).skills)
+
+
+def test_scripted_players_wait_for_the_local_gate_price(monkeypatch):
+    from hellward.sim.content import DOOR
+    from hellward.sim.players.planned import Plan as PlannedPlan, Planned
+    from hellward.sim.players.warden import Plan as WardenPlan, Step, Warden
+
+    location = LOCATIONS["catacombs"]
+    world = World(location)
+    world.gold = DOOR.cost
+    assert world.gold < world.door_cost
+
+    planned = Planned(plan=PlannedPlan([], [("gate", 0)], [100.0] * len(location.waves)))
+    planned._build(world)
+    warden = Warden(plan=WardenPlan(frozenset(), (Step("gate", door=0),)))
+    warden.skills(location, 0)
+    warden._spend(world)
+
+    adaptive = Adaptive("mixed")
+    monkeypatch.setattr(adaptive, "_guarded", lambda index: True)
+    assert adaptive._keep(world) == world.door_cost
+    monkeypatch.setattr(world, "build_door", lambda index: pytest.fail("gate attempted before its local price"))
+    adaptive._gates(world)
+    assert not world.doors[0].built
+
+
+@pytest.mark.parametrize("site", ("graveyard", "catacombs"))
+def test_adaptive_forecasts_announced_breach_foes_and_prices_their_route(site):
+    spec = BREACHES[site]
+    wave = Wave((g("skeleton", 1),), 0)
+    location = replace(LOCATIONS[site], waves=(wave,) * (spec.after_wave + 3),
+                       wave_names=tuple(f"wave {i}" for i in range(spec.after_wave + 3)))
+    world = World(location, seed=4)
+    bot = Adaptive("mixed")
+    bot.think_at = float("inf")   # drive the short fixture's waves ourselves
+    hands = Hands(world, react=0.6)
+    bot.act(hands)
+    assert bot.study is not None and spec.elite.kind not in bot.study.roster
+
+    for _ in range(spec.after_wave + 1):
+        world.call_wave()
+        while world.schedule:
+            world.step()
+        for monster in list(world.monsters):
+            world._hurt(monster, monster.hp, None)
+        world.step()
+        bot.act(hands)
+    assert world.breach_offered
+    world.choose_breach("trophy")
+    bot.act(hands)
+    assert bot.study is not None and spec.elite.kind in bot.study.roster
+    assert bot.study.route_share[spec.elite.kind]["breach"] > 0
+    for group in spec.pack:
+        assert bot.study.route_share[group.kind]["breach"] > 0
+
+    world.call_wave()
+    bot.act(hands)
+    announced = bot._to_come(world)
+    assert len(announced) == len(world.schedule)
+    assert (spec.elite.kind, "breach") in announced
+    while not any(monster.route == "breach" for monster in world.monsters):
+        world.step()
+        assert world.wave_time < 6
+    bot.act(hands)
+    side = next(monster for monster in world.monsters if monster.route == "breach")
+    assert side.kind.key in bot.ahead
+    assert bot.threat(side) > 0
+
+    while world.schedule:
+        world.step()
+    for monster in list(world.monsters):
+        world._hurt(monster, monster.hp, None)
+    world.step()
+    world.call_wave()
+    bot.act(hands)
+    assert bot.study is not None and spec.elite.kind not in bot.study.roster
+    assert all(route != "breach" for _, route in bot._to_come(world))
+
+
 @pytest.mark.parametrize("order", ["", *ORDERS])
 def test_the_adaptive_player_learns_within_its_sigils_and_the_tree(order):
     """Every themed order, and the planned one (empty), buys a set the tree allows, and leaves no sigil it could
     still spend, at every budget and place."""
-    for location in LOCATIONS.values():
+    for stage, location_key in enumerate(ORDER):
+        location = LOCATIONS[location_key]
         for sigils in range(0, 37):
             learned = Adaptive(order).skills(location, sigils)
             check(learned)
             assert cost(learned) <= sigils
-            assert not [key for key in SKILLS if can_learn(learned, key, sigils)]   # nothing left it could buy
+            assert all(SKILLS[key].first_location <= stage for key in learned)
+            assert not [key for key in SKILLS if can_learn(learned, key, sigils, stage)]
 
 
 @pytest.mark.parametrize("name", sorted(PLAYERS))
@@ -209,13 +338,13 @@ def test_the_veteran_drafts_its_build_and_never_reads_the_wardens_stored_plans()
     assert veteran.skills(LOCATIONS["cathedral"], 6) == draft_skills(LOCATIONS["cathedral"], 6)
 
 
-def test_the_corner_player_puts_frost_on_the_corners_of_tristrams_road():
+def test_the_corner_player_puts_arrows_on_the_corners_of_tristrams_roads():
     from hellward.sim.players.corner import path_corners
     corner = PLAYERS["corner"](1)
     world, _ = defend(LOCATIONS["tristram"], corner, seed=1, sigils=0, planner=planner.smart)
-    frosts = {t.tile for t in world.towers.values() if t.kind.key == "frost"}
+    arrows = {t.tile for t in world.towers.values() if t.kind.key == "arrow"}
     corners = set(path_corners(LOCATIONS["tristram"].level))
-    assert corners and frosts & corners
+    assert corners and arrows & corners
 
 
 def test_spacing_marks_down_a_tile_beside_a_tower_where_a_curse_would_catch_both():
@@ -230,8 +359,8 @@ def test_spacing_marks_down_a_tile_beside_a_tower_where_a_curse_would_catch_both
 def test_a_curse_scale_of_zero_curses_only_the_marked_tile():
     world = World(LOCATIONS["tristram"], seed=1, curse_scale=0.0)
     world.gold = 1000
-    for tile in ((5, 5), (6, 5), (6, 6)):
-        world.build("pyre", tile)
+    for tile in ((5, 5), (6, 5), (7, 5)):
+        world.build("arrow", tile)
     from hellward.sim.model import curse_radius
     from hellward.sim.content import Curse, MONSTERS
     assert [t.tile for t in world.caught((5, 5), curse_radius(Curse.WEAKEN, MONSTERS["shaman"], world.curse_scale))] == [(5, 5)]

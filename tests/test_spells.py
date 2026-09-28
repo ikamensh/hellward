@@ -6,14 +6,23 @@ import pytest
 
 from hellward.sim import campaign, planner
 from hellward.sim.campaign import g
-from hellward.sim.content import MONSTERS, SPELLS, Curse, Group, Wave
+from hellward.sim.content import MONSTERS, SPELLS, TOWERS, Curse, Group, Wave
+from hellward.sim.level import Level
 from hellward.sim.model import SIM_DT, ForcedCurse, Refused, World
 from hellward.sim.skills import perks
 
 
-def world_of(*groups: Group, location: campaign.Location = campaign.CATACOMBS, **kwargs) -> World:
+ARENA = Level("Spell field", 16, 11, ((0, 6), (4, 6), (4, 8), (10, 8), (10, 6), (15, 6)), ((4, 7),))
+
+
+def world_of(*groups: Group, location: campaign.Location | None = None, **kwargs) -> World:
+    base = location if location is not None else campaign.CATACOMBS
+    level = base.level if location is not None else ARENA
+    if location is None:
+        arsenal = replace(base.arsenal, towers=tuple(TOWERS), spells=tuple(SPELLS), gates=True)
+        base = replace(base, arsenal=arsenal)
     waves = (Wave(tuple(groups), 10),)
-    return World(replace(location, waves=waves, wave_names=("test",)), **kwargs)
+    return World(replace(base, level=level, waves=waves, wave_names=("test",)), **kwargs)
 
 
 def run(world: World, seconds: float) -> None:
@@ -55,19 +64,20 @@ def test_a_broken_leader_grows_resolute_and_its_next_curse_lands_whatever_strike
     """Smite and Frozen Orb stop at most every other curse of a leader: once broken, its next curse is voiced as a
     mark, pondering and all, and lands through every spell; after it, the leader can be broken again."""
     world, leader = chanting_leader(hardness=20.0)   # a priest the spells cannot kill
-    level = world.level
-    for x, y in [(x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y) and world.tower_at((x, y)) is None][::3]:
-        world.gold = 1000
-        world.build("pyre", (x, y))   # a tower in reach wherever it walks
+    for tile in ((9, 9), (12, 5)):
+        world.build("pyre", tile)   # a target for the next curse as the priest advances
     world.mana = 100
     world.smite(leader)
     priest = world.monster(leader)
     assert priest.resolute
     world.events.clear()
     while not events(world, "mark"):
-        if priest.asking is not None and world.recharge.get("smite", 0.0) <= 0:
-            world.mana = 100
-            world.smite(leader)   # a resolute pondering does not break
+        if priest.asking is not None:
+            priest.asking = planner.Inline(planner.Decision(
+                leader, planner.Option(Curse.WEAKEN, (9, 9))))
+            if world.recharge.get("smite", 0.0) <= 0:
+                world.mana = 100
+                world.smite(leader)   # a resolute pondering does not break
         world.step()
         assert world.outcome is None and world.time < 60
     assert priest.marking and not priest.resolute

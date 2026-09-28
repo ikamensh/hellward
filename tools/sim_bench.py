@@ -66,6 +66,8 @@ def canon(value: Any) -> str:
         return float(value).hex() if float(value) == value else repr(value)
     if isinstance(value, (tuple, list)):
         return "(" + ",".join(canon(v) for v in value) + ")"
+    if isinstance(value, (set, frozenset)):
+        return type(value).__name__ + "(" + ",".join(sorted(canon(v) for v in value)) + ")"
     if isinstance(value, dict):
         return "{" + ",".join(f"{canon(k)}:{canon(v)}" for k, v in value.items()) + "}"
     if hasattr(value, "getstate"):   # the world's random stream

@@ -14,7 +14,7 @@ from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.content import DOOR, TOWERS
 from hellward.sim.model import SIM_DT
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
-from hellward.ui.hud import BUILD, SLOT, SLOT_X, TOP
+from hellward.ui.hud import BUILD, SLOT, SLOT_X, TOP, slot_size
 from hellward.ui.view import MAP_X, MAP_Y, T
 
 
@@ -53,7 +53,8 @@ def test_a_scripted_defence_plays_through_the_scene(game):
 
 def slot_centre(key: str) -> tuple[int, int]:
     i = BUILD.index(key)
-    return SLOT_X + i * (SLOT + 10) + SLOT // 2, TOP + 16 + SLOT // 2
+    size, step = slot_size(len(BUILD))
+    return int(SLOT_X + i * step + size / 2), int(TOP + 16 + SLOT / 2)
 
 
 def tile_centre(x: int, y: int) -> tuple[int, int]:
@@ -65,25 +66,27 @@ def test_a_player_builds_a_tower_and_a_gate_by_clicking(game):
     scene = BattleScene(art, seed=0, planner=planner.smart)
     g.push(scene)
     g.tick(SIM_DT)
+    tile = next((x, y) for y in range(scene.world.level.height) for x in range(scene.world.level.width)
+                if scene.world.level.buildable(x, y))
     g.backend.inject_click(*slot_centre("pyre"))
     g.tick(SIM_DT)
-    g.backend.inject_click(*tile_centre(4, 3))
+    g.backend.inject_click(*tile_centre(*tile))
     g.tick(SIM_DT)
-    tower = scene.world.tower_at((4, 3))
+    tower = scene.world.tower_at(tile)
     assert tower is not None and tower.kind is TOWERS["pyre"]
-    g.backend.inject_key("5")
+    g.backend.inject_key(str(BUILD.index("gate") + 1))
     g.tick(SIM_DT)
-    door = scene.world.level.doors[1]
+    door = scene.world.level.doors[0]
     g.backend.inject_click(*tile_centre(*door))
     g.tick(SIM_DT)
-    assert scene.world.doors[1].built and scene.world.doors[1].hp == DOOR.hp
-    g.backend.inject_click(*tile_centre(4, 3))
+    assert scene.world.doors[0].built and scene.world.doors[0].hp == scene.world.gate_life
+    g.backend.inject_click(*tile_centre(*tile))
     g.tick(SIM_DT)
     assert scene.selected is tower
     gold = scene.world.gold
     g.backend.inject_key("s")
     g.tick(SIM_DT)
-    assert scene.world.tower_at((4, 3)) is None and scene.world.gold > gold
+    assert scene.world.tower_at(tile) is None and scene.world.gold > gold
     assert_text_fits(g)
 
 

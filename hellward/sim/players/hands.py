@@ -22,8 +22,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from hellward.sim.campaign import Location
+from hellward.sim.campaign import ORDER, Location
 from hellward.sim.content import Curse
+from hellward.sim.items import EMPTY_LOADOUT
 from hellward.sim.model import SIM_DT, Planner, Refused, World, curse_radius
 from hellward.sim.skills import cost, perks
 from hellward.sim.sums import int_sum
@@ -212,7 +213,8 @@ def defend(location: Location, player: Player, *, seed: int, sigils: int,
     learned = player.skills(location, sigils)
     if cost(learned) > sigils:
         raise ValueError(f"{player.name} learned {cost(learned)} sigils' worth of skills with {sigils}")
-    world = World(location, hardness=hp, perks=perks(learned), seed=seed, planner=planner, curse_scale=curse_scale)
+    world = World(location, hardness=hp, perks=perks(learned, ORDER.index(location.key)), seed=seed, planner=planner,
+                  curse_scale=curse_scale, loadout=getattr(player, "loadout", EMPTY_LOADOUT))
     world.record = True
     if lives is not None:
         world.lives = lives
@@ -231,4 +233,3 @@ def defend(location: Location, player: Player, *, seed: int, sigils: int,
         where = f"{location.key}, seed {seed}"
         raise RuntimeError(f"{player.name} on {where}: undecided after {world.time:.0f} s")
     return world, hands.record
-

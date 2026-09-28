@@ -19,8 +19,8 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from hellward.sim.campaign import Location
-from hellward.sim.content import CURSES, DOOR, SPELLS, Curse, Element
+from hellward.sim.campaign import ORDER, Location
+from hellward.sim.content import CURSES, SPELLS, Curse, Element
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.skills import can_learn
@@ -63,14 +63,14 @@ class Plan:
         data["steps"] = [_step(step) for step in data["steps"]]
         return cls(**data)
 
-    def learn(self, sigils: int) -> frozenset[str]:
+    def learn(self, sigils: int, stage: int) -> frozenset[str]:
         """The skills of the plan's list that fit in ``sigils``, each as soon as the one above it is learned."""
         learned: frozenset[str] = frozenset()
         grew = True
         while grew:
             grew = False
             for key in self.skills:
-                if can_learn(learned, key, sigils):
+                if can_learn(learned, key, sigils, stage):
                     learned, grew = learned | {key}, True
         return learned
 
@@ -106,7 +106,7 @@ class Planned:
     def skills(self, location: Location, sigils: int) -> frozenset[str]:
         if self.plan is None:
             self.plan = load(location.key)
-        return self.plan.learn(sigils)
+        return self.plan.learn(sigils, ORDER.index(location.key))
 
     def act(self, hands: Hands) -> None:
         world = hands.world
@@ -130,7 +130,7 @@ class Planned:
         if plan.rebuild == "now" or (plan.rebuild == "break" and world.break_left is not None):
             for index in sorted(self.gates):
                 door = world.doors[index]
-                if not door.built and not door.rubble and world.gold >= DOOR.cost and _arch_clear(world, index):
+                if not door.built and not door.rubble and world.gold >= world.door_cost and _arch_clear(world, index):
                     world.build_door(index)
         steps = plan.steps
         while self.next < len(steps):
@@ -154,7 +154,7 @@ class Planned:
             else:
                 door = world.doors[step[1]]
                 if not door.built and not door.rubble:   # a rubbled arch waits for the wave's end
-                    if world.gold < DOOR.cost or not _arch_clear(world, step[1]):
+                    if world.gold < world.door_cost or not _arch_clear(world, step[1]):
                         return
                     world.build_door(step[1])
                 self.gates.add(step[1])
@@ -208,7 +208,7 @@ class Planned:
         leader = world.monster(best.leader)
         assert leader is not None
         if self._can(world, "orb"):
-            x, y = world.level.point(leader.s)
+            x, y = world.position(leader)
             crowd = _orb_value(world, x, y, _positions(world, 0.0))
             if crowd >= self.plan.orb_worth * _orb_damage(world) * 0.5:
                 hands.orb(x, y)
@@ -274,7 +274,7 @@ class Planned:
                 continue
             blows = sum(m.kind.door_dps * (1.0 - m.chill if m.chill_left > 0 else 1.0) for m in batterers)
             if door.hp < blows * 2.0:
-                x, y = world.level.point(door.s - DOOR_STOP - JOSTLE / 2)
+                x, y = world.position(batterers[0])
                 hands.orb(x, y)
                 self.last_aim = world.time
                 return True
@@ -283,13 +283,12 @@ class Planned:
     def _stop_leak(self, hands: Hands) -> bool:
         """A walker about to reach the sanctuary that a Smite would kill: the lives it would take are saved."""
         world = hands.world
-        end = world.level.length
         smite = _smite_damage(world)
         leaking = [m for m in world.monsters
-                   if m.hp <= smite and end - m.s <= LEAK_SOON * max(m.kind.speed, 0.3)]
+                   if m.hp <= smite and world.remaining(m) <= LEAK_SOON * max(m.kind.speed, 0.3)]
         if not leaking:
             return False
-        target = max(leaking, key=lambda m: (m.kind.lives, m.s))
+        target = max(leaking, key=lambda m: (m.kind.lives, -world.remaining(m)))
         hands.smite(target.id)
         self.last_aim = world.time
         return True
@@ -315,11 +314,10 @@ def _share(tower: Tower, curse: Curse) -> float:
 
 def _busy(world: World, tower: Tower) -> bool:
     """Whether monsters walk in the tower's reach or a step outside it."""
-    spans = world.level.coverage(tower.tile, tower.stats.range + 1.5)
     for m in world.monsters:
-        for a, b in spans:
-            if a <= m.s <= b:
-                return True
+        spans = world.level.route(m.route).coverage(tower.tile, tower.stats.range + 1.5)
+        if any(a <= m.s <= b for a, b in spans):
+            return True
     return False
 
 
@@ -333,16 +331,15 @@ def _ahead(world: World, m: Monster, t: float) -> float:
     speed = m.kind.speed * (1.0 - m.chill) if m.chill_left > 0 else m.kind.speed
     s = m.s + speed * moving
     if not m.kind.flying:
-        for d in world.doors:
-            if d.built and d.s > m.s:
-                s = min(s, max(m.s, d.s - DOOR_STOP - JOSTLE / 2))
+        for index, crossing in world.level.crossings(m.route):
+            if world.doors[index].built and crossing > m.s:
+                s = min(s, max(m.s, crossing - DOOR_STOP - JOSTLE / 2))
                 break
     return s
 
 
 def _positions(world: World, t: float) -> list[tuple[Monster, float, float]]:
-    point = world.level.point
-    return [(m, *point(_ahead(world, m, t))) for m in world.monsters]
+    return [(m, *world.level.route(m.route).point(_ahead(world, m, t))) for m in world.monsters]
 
 
 def _struck(near: list[tuple[Monster, float, float]], cx: float, cy: float, r2: float) -> list[Monster]:
@@ -394,5 +391,7 @@ def _smite_damage(world: World) -> float:
 
 
 def _arch_clear(world: World, index: int) -> bool:
-    s = world.doors[index].s
-    return not any(not m.kind.flying and abs(m.s - s) < ARCH_CLEAR for m in world.monsters)
+    x, y = world.level.doors[index]
+    cx, cy = x + 0.5, y + 0.5
+    return not any(not m.kind.flying and (world.position(m)[0] - cx) ** 2
+                   + (world.position(m)[1] - cy) ** 2 < ARCH_CLEAR ** 2 for m in world.monsters)

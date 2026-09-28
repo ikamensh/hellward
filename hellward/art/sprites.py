@@ -6,7 +6,7 @@ into a cache (in parallel: forty seconds of rendering on one core) and read from
 ``HELLWARD_ART=procedural`` ignores the paintings. Towers, gates and the ground work the same way.
 
 Names: ``mon/<kind>/<facing>/<frame>`` with the facings ``front``, ``back``, ``right``, ``left``;
-``tower/<kind>/<rank>``; ``gate/<look>``; ``arch``; ``pillar``; ``ground/<location>`` (:func:`ground`).
+``tower/<kind>/<rank>``; ``gate/<look>``; ``arch``; ``pillar``; ``ground/<location>/<layout>`` (:func:`ground`).
 """
 
 from __future__ import annotations
@@ -165,7 +165,7 @@ def register(game: Game, cache_dir: Path) -> Art:
 
 def ground(game: Game, location: Location) -> str:
     """Register a location's floor the first time a defence there begins; its image name."""
-    name = f"ground/{location.key}"
+    name = f"ground/{location.key}/{mapart.layout_fingerprint(location.level)}"
     if not game.assets.has_image(name):
         level = location.level
         theme = mapart.THEMES[location.theme]

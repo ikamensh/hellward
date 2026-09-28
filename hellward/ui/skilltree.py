@@ -1,4 +1,4 @@
-"""The skill tree: tower columns of four skills and two columns of three, learned with sigils.
+"""The skill tree: seven tower columns and two support columns, learned with sigils.
 
 Opened from the world map or from a location's intro (then the columns that do nothing there are greyed). A
 click learns a skill whose parent is learned and that the free sigils pay for; Unlearn all gives every sigil back.
@@ -10,17 +10,17 @@ from typing import TYPE_CHECKING
 
 from saga2d import Anchor, Button, Column, Scene
 
-from hellward.sim.campaign import Location, idle
+from hellward.sim.campaign import LOCATIONS, ORDER, Location, idle
 from hellward.sim.skills import COLUMNS, SKILLS, Skill, above, can_learn
 from hellward.ui import style, widgets
 
 if TYPE_CHECKING:
     from hellward.ui.flow import Flow
 
-ICONS = {"fire": ("tower/pyre/2", 150 / 72), "lightning": ("tower/storm/2", 150 / 72), "cold": ("tower/frost/2", 150 / 72),
+ICONS = {"arrow": ("tower/arrow/2", 150 / 72), "fire": ("tower/pyre/2", 150 / 72), "lightning": ("tower/storm/2", 150 / 72), "cold": ("tower/frost/2", 150 / 72),
          "poison": ("tower/plague/2", 150 / 72), "bone": ("tower/altar/2", 150 / 72), "nature": ("tower/grove/2", 150 / 72),
          "warding": ("gate/intact", 80 / 60), "sorcery": ("ui/orb/mana/30", 1.0)}
-COLOURS = {"fire": (255, 130, 50), "lightning": (140, 190, 255), "cold": (160, 225, 255), "poison": (130, 230, 70),
+COLOURS = {"arrow": (217, 185, 126), "fire": (255, 130, 50), "lightning": (140, 190, 255), "cold": (160, 225, 255), "poison": (130, 230, 70),
            "bone": (214, 204, 176), "nature": (120, 230, 60), "warding": (255, 222, 140), "sorcery": (120, 150, 255)}
 TIER_Y = (196, 336, 476, 616)
 NODE_H = 128
@@ -67,7 +67,7 @@ class SkillTreeScene(Scene):
         progress = self.progress
         self.spots = []
         self.draw_text("Skills", 640, 46, style="banner", anchor_x="center", anchor_y="center")
-        where = f"  ·  greyed: nothing to work on in {self.location.called}" if self.location is not None else ""
+        where = f"  ·  greyed: no effect in {self.location.called}" if self.location is not None else ""
         free = f"{progress.free} sigil{'' if progress.free == 1 else 's'} free"
         self.draw_text(f"{free} of {progress.sigils} won. Unlearning is free.{where}", 640, 88, font_size=15,
                        color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
@@ -99,8 +99,10 @@ class SkillTreeScene(Scene):
         progress = self.progress
         x, y = cx - node_w / 2, TIER_Y[skill.tier - 1]
         learned = skill.key in progress.learned
-        learnable = can_learn(progress.learned, skill.key, progress.sigils)
-        dormant = self.location is not None and idle(self.location, skill.needs)
+        learnable = can_learn(progress.learned, skill.key, progress.sigils, progress.stage)
+        locked = progress.stage < skill.first_location
+        gated_here = self.location is not None and ORDER.index(self.location.key) < skill.first_location
+        dormant = self.location is not None and (idle(self.location, skill.needs) or gated_here)
         parent = above(skill)
         colour = COLOURS[skill.column]
         if parent is not None:   # the line down from the skill it needs
@@ -127,14 +129,21 @@ class SkillTreeScene(Scene):
             state = "Learned."
         elif learnable:
             state = f"Click to learn it for {skill.cost} sigil{'s' if skill.cost > 1 else ''}."
+        elif locked:
+            state = f"Opens in {LOCATIONS[ORDER[skill.first_location]].name}."
         elif parent is not None and parent.key not in progress.learned:
             state = f"Needs {parent.name} first."
         else:
             state = f"Costs {skill.cost} sigils; {progress.free} are free."
-        note = "\nNothing to work on here." if dormant else ""
+        if gated_here:
+            assert self.location is not None
+            note = (f"\nInactive in {self.location.called}; takes effect from "
+                    f"{LOCATIONS[ORDER[skill.first_location]].called}.")
+        else:
+            note = "\nNothing to work on here." if dormant else ""
         self.spots.append(widgets.Hotspot(skill.key, (x, y, node_w, NODE_H), learnable, f"{skill.name}\n{skill.blurb}\n{state}{note}"))
 
 
 def _glow(column: str) -> str:
-    return {"fire": "fire", "lightning": "lightning", "cold": "cold", "poison": "poison", "bone": "curse",
+    return {"arrow": "holy", "fire": "fire", "lightning": "lightning", "cold": "cold", "poison": "poison", "bone": "curse",
             "nature": "poison", "warding": "holy", "sorcery": "curse"}[column]

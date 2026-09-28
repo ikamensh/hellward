@@ -30,7 +30,7 @@ from hellward.audio.music import BATTLE_FOR, PIECES
 from saga2d import Game
 from sagaforge.synth import write_wav
 
-VERSION = "5"
+VERSION = "7"
 SOUNDS, MUSIC = "sounds", "music"
 #: The composer's order: the title plays first, then the dungeons in the campaign's order, the boss last.
 COMPOSE_ORDER = ("title",) + tuple(BATTLE_FOR.values()) + ("boss",)

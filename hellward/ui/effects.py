@@ -21,7 +21,7 @@ from hellward.ui import style
 from hellward.ui.lighting import Light
 from hellward.ui.view import T, WorldView, px
 
-ELEMENT_OF = {"pyre": "fire", "storm": "lightning", "frost": "cold", "plague": "poison", "altar": "curse",
+ELEMENT_OF = {"arrow": "holy", "pyre": "fire", "storm": "lightning", "frost": "cold", "plague": "poison", "altar": "curse",
               "grove": "poison"}
 BLOOD = {"skeleton": "fx/dust", "gargoyle": "fx/dust", "zombie": "fx/ichor"}
 
@@ -201,9 +201,12 @@ class Effects:
         head = self.scene.add_sprite(Sprite(f"fx/glow/{element}", position=origin, size=(size, size), layer=RenderLayer.EFFECTS))
         trail = self.scene.add_sprite(Sprite(f"fx/trail/{element}", position=origin, size=(size * 2.2, size * 0.65),
                                              layer=RenderLayer.EFFECTS, opacity=220))
+        spark = ("fx/spark" if element in ("fire", "holy") else "fx/shard" if element == "cold"
+                 else f"fx/venom/{bolt.id % 3}")
         sparks = self.scene.add_emitter(ParticleEmitter(
-            "fx/spark" if element == "fire" else f"fx/venom/{bolt.id % 3}", origin, speed=(5, 25), lifetime=(0.2, 0.45),
-            size=(7, 7) if element == "fire" else (12, 12), layer=RenderLayer.EFFECTS, shrink=True, rng=self.rng).continuous(40))
+            spark, origin, speed=(5, 25), lifetime=(0.2, 0.45),
+            size=(7, 7) if element in ("fire", "holy", "cold") else (12, 12),
+            layer=RenderLayer.EFFECTS, shrink=True, rng=self.rng).continuous(40))
         self.missiles[bolt.id] = Missile(bolt, head, trail, sparks, max(bolt.left, 0.05), origin=origin, target=origin)
         standing = self.view.towers.get(bolt.tower)
         if standing is not None:
@@ -229,6 +232,13 @@ class Effects:
             else:
                 self.burst("fx/spark", x, y, 10, speed=(40, 120), size=(5, 5))
             self.light(x, y, 150 if big else 90, (255, 130, 40), 1.2 if big else 0.8, 0.35)
+        elif bolt.kind == "arrow":
+            self.bloom("fx/soft/holy", x, y, 8, 26, 0.18, opacity=100)
+            self.burst("fx/dust", x, y, 3, speed=(8, 30), size=(5, 5))
+        elif bolt.kind == "frost":
+            self.bloom("fx/glow/cold", x, y, 10, 34, 0.3)
+            self.burst("fx/shard", x, y, 5, speed=(20, 65), size=(7, 7), shrink=False)
+            self.light(x, y, 65, (150, 220, 255), 0.7, 0.3)
         else:
             self.bloom("fx/glow/poison", x, y, 12, 34, 0.35)
             self.burst([f"fx/venom/{i}" for i in range(3)], x, y, 6, speed=(10, 45), life=(0.4, 0.8), size=(16, 16))
@@ -280,7 +290,9 @@ class Effects:
     def on_twister(self, grove_id: int, monster_id: int) -> None:
         """Twister: a small grey-green whirl where the walker is rooted."""
         m = self.world.monster(monster_id)
-        x, y = self.view.chest(m) if m is not None else px(*self.world.level.point(0.0))
+        if m is None:
+            return
+        x, y = self.view.chest(m)
         self.bloom("fx/soft/poison", x, y, 10, 60, 0.8, opacity=200, spin=300)
         self.burst("fx/shard", x, y, 8, speed=(40, 110), life=(0.3, 0.6), size=(7, 7), shrink=False)
         self.light(x, y, 80, (150, 200, 140), 0.8, 0.5)
@@ -316,7 +328,8 @@ class Effects:
 
     def on_leak(self, monster_id: int, key: str, lives: int) -> None:
         figure = self.view.figures.get(monster_id)
-        x, y = (figure.x, figure.y) if figure is not None else px(*self.world.level.point(self.world.level.length))
+        x, y = (self.view.monster_point(figure.monster) if figure is not None
+                else px(*self.world.level.route("main").point(self.world.level.route("main").length)))
         self.view.vanish(monster_id)
         self.bloom("fx/glow/blood", x, y - 20, 30, 140, 0.6)
         self.say(f"-{lives} life" if lives == 1 else f"-{lives} lives", x - 20, y - 50, style.BLOOD, size=18, life=1.8)
@@ -639,6 +652,10 @@ class Effects:
             x, y = missile.head.position
             if missile.bolt.kind == "pyre":
                 out.append(Light(x, y, 70, (255, 140, 50), 0.9))
+            elif missile.bolt.kind == "arrow":
+                continue
+            elif missile.bolt.kind == "frost":
+                out.append(Light(x, y, 45, (150, 220, 255), 0.55))
             else:
                 out.append(Light(x, y, 40, (120, 230, 60), 0.5))
         return out

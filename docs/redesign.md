@@ -1,8 +1,9 @@
 # Hellward: open-ground progression redesign
 
-Status: implementation plan. The running game still follows [design.md](design.md) and
-[campaign.md](campaign.md) until each stage below lands. The opening baseline was measured on
-2026-09-28 from `3d2911c` with the compiled simulation.
+Status: implemented and verified on 2026-09-28. Painted floors with old road geometry are
+held back by a layout fingerprint; the current procedural ground draws the new paths.
+The opening baseline was measured on 2026-09-28 from `3d2911c` with the compiled simulation.
+The current rules are also described in [design.md](design.md) and [campaign.md](campaign.md).
 
 ## The intended loop
 
@@ -18,6 +19,7 @@ Status: implementation plan. The running game still follows [design.md](design.m
 4. On specified breaks, a sealed side entrance offers a **breach**: decline, take a gold cache, or
    seek a trophy. Opening it adds an announced, harder pack and a named elite to the next wave.
    The chosen reward is earned only if every side enemy dies. A leaked side enemy voids it.
+   Battle cash pays as soon as the pack is clear; a trophy is banked only on victory.
 5. A victory banks unsold salvage and any trophy earned, then awards the existing best-result
    sigils. The next defence can turn those scarce resources into stronger ranks or a pattern.
 
@@ -33,35 +35,44 @@ The opening attack is an **Arrow Tower**, one arrow at one enemy. It is always a
 offers no damaging area attack; neither an upgrade, skill, spell, nor a crafted pattern bypasses
 that rule. All first-location monster HP and individual hit damage are in the 1–20 range.
 
-Use one frozen balance profile to generate the common scale. These are starting calibration
-values, not twelve hand-tuned life factors:
+Use one frozen balance profile to generate the common scale. These are the current
+profile values, not twelve hand-tuned life factors:
 
-| Knob | Initial value | What it controls |
+| Knob | Current value | What it controls |
 | --- | ---: | --- |
 | `base_hp` | 7 | HP of the opening common enemy |
-| `location_growth` | 1.08 | HP and gold unit growth per location |
+| `location_growth` | 1.055 | HP and gold unit growth per location |
 | `wave_growth` | 1.05 | HP growth within a location |
 | `arrow_hit` | 2 | Rank-I Arrow damage; ranks add 1 each |
 | `base_gold_unit` | 12 | Rank-I Arrow price and the unit for other prices/rewards |
 | `starting_units` | 3 | Starting gold in Arrow-equivalent towers |
-| `wave_income_units` | about 1 | Kill gold plus clear reward for an ordinary wave |
+| `starting_units_growth` | 0.5 | Extra opening Arrow units per location to cover more approaches |
+| `wave_density_decay` | 0.5 | How quickly old area-attack swarm counts shrink |
+| `minimum_wave_density` | 0.4 | The late-campaign floor on that shrinkage |
+| `wave_income_units` | 1 | Kill gold plus clear reward in the first ordinary wave |
+| `wave_income_growth_units` | 0.5 | Extra local gold units in each later wave |
+| `salvage_budget` | 3 | Maximum ordinary salvage drops in one defence |
+| `breach_pack_income_units` | 0.5 | Extra kill gold shared by a side pack |
+| `breach_cache_units` | 0.8 | Immediate cash reward for clearing a side pack |
 
 `HP = round(base_hp × role_hp × location_growth^location_index ×
 wave_growth^wave_index × encounter_factor)`. The first Fallen is 7 HP and the first
 Shaman, with `role_hp` near 2, is about 14–17 HP even in Tristram's late waves. The
-same common enemy is about 23 HP in the last location's final wave. A basic Arrow goes
-from four hits to twelve; invested ranks and overlapping coverage close that gap. The
+same common enemy is about 20 HP in the last location's final wave. A basic Arrow goes
+from four hits to ten; invested ranks and overlapping coverage close that gap. The
 curve raises pressure without inflating every tower automatically. Bosses and named
 breach elites have authored role factors and abilities, but their HP still derives from
 the profile. Door HP, spell damage, rank prices and wave gold budgets derive from the
 same opening units, with small authored role ratios rather than unrelated large tables.
 
-The first pass aims for a three-Arrow opening and approximately one Arrow-equivalent
-from the first wave if everything dies. Gold is allocated across that wave's enemies
-and clear reward, so adding swarm bodies does not silently multiply income. Leaks
-forfeit their kill gold. A breach pack pays its ordinary kill gold, but the cache is
-paid only when its whole pack is killed. A player who sells salvage receives useful
-same-run gold and gives up that salvage for forging.
+The opening has three Arrow-equivalents, adding half a local Arrow unit per later
+location to cover more entrances. The first wave pays one local Arrow-equivalent
+if everything dies, and each later wave adds half a unit. Gold is allocated across
+each wave's enemies and clear reward, so adding swarm bodies does not silently
+multiply income. Leaks forfeit their kill gold. A breach pack shares an extra half
+unit of kill gold, but the cash cache is paid only when its whole pack is killed.
+A player who sells salvage receives useful same-run gold and gives up that salvage
+for forging.
 
 The campaign teaches power slowly:
 
@@ -75,14 +86,14 @@ The campaign teaches power slowly:
 | 6 Hell's Gate | single-target Storm; third breach | none |
 | 7 Docks | possible small Pyre blast if three trophies and salvage were saved | optional, costly |
 | 8 Spider Forest | fourth breach; support and rank choices | optional, costly |
-| 9 Jungle | Frost nova can be learned and bought without trophies | first reliable access |
+| 9 Jungle | small Fire Ball and Shatter bursts can be learned without trophies | first reliable access |
 | 10 Drowned City | fifth breach; chain recipe | additional costly choice |
 | 11 Travincal | high single-target damage recipe | additional costly choice |
 | 12 Temple | sixth breach; final test of the chosen build | no automatic grant |
 
 This is an unlock order, not a promise that every player receives every power. Early
 Pyre ranks remain single-target. Storm begins with zero jumps. Frost begins as a
-single-target chill attack and becomes a nova only through its late unlock. Fire Ball,
+single-target chill attack and gains a small burst only through its late unlock. Fire Ball,
 Contagion, Shatter, Corpse Explosion, Meteor and Frozen Orb must be moved or changed so
 they cannot grant early area damage. Smite is a modest single-target interrupt, not a
 100-damage early nuke. Enemy leader curses may still cover several towers; that is the
@@ -102,7 +113,7 @@ positions and a bounded set of route variants through the field. Route intersect
 are allowed. Route geometry is immutable and validated when the level loads.
 
 Each spawned monster receives a committed route from its entrance. **Wanderers** get a
-seeded choice among at least three spatially distinct, bounded detours. **Runners**
+seeded choice between a direct trail and an open-ground detour from their entrance. **Runners**
 take the shortest route and have the speed/HP tradeoff that makes the direct approach
 their identity. A choice belongs to the spawn, not a combat-dependent global random
 draw; the same seed and spawn ordinal choose the same route in a normal world and a
@@ -123,16 +134,15 @@ the planner estimate, scripted players, view interpolation, gate checks and repl
 serialization against it before migrating all twelve locations. The curse planner's
 exact rollout stays the game's own deterministic world. Its cheap candidate estimate
 must project route-specific future positions; the quality tool verifies that it still
-shortlists good curses. Painted grounds are invalidated by a geometry fingerprint and
-repainted after the open layouts are final, so an old corridor painting never silently
-covers a new route.
+shortlists good curses. Painted grounds are invalidated by a geometry fingerprint, so
+the current procedural ground is drawn whenever an old corridor painting does not fit.
 
 ## Breaches and loot
 
 Six authored breaches are offered at locations 2, 4, 6, 8, 10 and 12, each on a
 specified break. The UI shows the next wave, side entrance, named elite, pack roles,
 and the two possible rewards before the decision. The breach command records its
-reward mode (`cash` or `trophy`) in the replay. The side pack joins the next ordinary
+reward mode (`decline`, `cash` or `trophy`) in the replay. The side pack joins the next ordinary
 wave, carries an encounter ID, and can contain enemies otherwise absent from that
 location. These named elites need distinct behavior, not just a larger HP number;
 start with direct runners, gate bypassers or leader support and show their role in the
@@ -145,8 +155,9 @@ profile-defined exchange rate. Unsold salvage is banked only on victory. Progres
 records the best banked salvage per location and credits only the improvement on a
 replay. That gives items to ordinary monsters without a repeatable grind.
 
-A named side elite visibly drops its trophy on death, but the trophy or cash cache is
-earned only after the full side pack dies and the defence ends in victory. On the first
+A named side elite is marked in the battle, but the trophy or cash cache is
+earned only after the full side pack dies. The trophy is banked only if the defence ends
+in victory; the cash cache pays immediately after that pack clears. On the first
 successful clear, choosing cash forfeits that breach's one permanent trophy. Later
 replays may still earn the run-only cash cache. A failed defence commits neither the
 trophy nor its forfeiture. Cash is about 0.8 of a rank-I tower price at that stage;
@@ -194,7 +205,7 @@ route reaches the sanctuary, and every elite either dies or leaks before victory
 1. Land this design and the current baseline. Build the central curve, Arrow Tower and
    early single-target unlocks as one playable vertical slice. Verify opening HP/hit
    ranges, a real battle, source/mypyc parity, and a screenshot of the new tower.
-2. Land the route interface and one open arena. Verify three seeded wander variants,
+2. Land the route interface and one open arena. Verify seeded wander routes,
    a shortest runner, gate crossing/bypass, actual-range targeting on two routes,
    clone/replay determinism and the planner's decision time.
 3. Land one breach and its HUD/replay command, then generalize to six authored
@@ -228,3 +239,26 @@ curses, 18.2 with random leaders, 23.8 with smart leaders; smart won 2/4.
 tristram --moments 8 --jobs 2`: smart share of best 0.962 across eight useful
 decisions (small sample). Today the first Fallen is `48 × 1.49 = 71.5` HP and the
 opening Frost Shrine already attacks an area.
+
+### Measured redesign
+
+With the `1.055` location-growth profile, `tools/balance.py --location tristram
+--policies none,random,smart --defenders 4 --jobs 2` reports 4/4 wins under
+each policy. Mean lives lost are 3.8 without curses, 8.8 with random leaders,
+and 8.8 with smart leaders. `tools/curse_quality.py --location tristram
+--moments 8 --jobs 2` gives the smart planner 1.000 share of the best curse
+across five useful sampled decisions, at 15 ms on average (29 ms maximum).
+These are small, seeded checks of the new opening, not general win-rate claims.
+A separate 16-moment Cathedral check retained 0.958 of the best curse across
+eleven useful decisions.
+
+An eight-seed earned-sigil campaign (`tools/campaign_balance.py --players
+veteran,adaptive --seeds 1000-1007 --margin --leaders --jobs 4`) found the
+adaptive defender winning all eight defences at all twelve locations without
+forged patterns. The apprentice also won 8/8 in each of the first two locations.
+The strong defender's median HP difficulty margin was 1.10 in Tristram, 1.20
+at Hell's Gate, 2.15 at the Act II opening in the Docks, and 1.14 at the Temple.
+That measures a gentler middle Act II and a tight final battle; a less capable
+veteran defender still lost every sampled Spider Forest, Hell's Gate and Temple
+defence. The former uniform margin targets are not met on every location.
+Future tuning can narrow the Act II middle without moving area attacks earlier.

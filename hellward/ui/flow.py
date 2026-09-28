@@ -18,8 +18,9 @@ from hellward.sim.skills import perks
 from hellward.story import LAST_PAGES, STORIES
 from hellward.ui.battle import BattleScene
 from hellward.ui.briefing import BriefingScene
+from hellward.ui.forge import ForgeScene
 from hellward.ui.mapscreen import MapScene
-from hellward.ui.progress import Progress
+from hellward.ui.progress import Progress, RewardGain
 from hellward.ui.skilltree import SkillTreeScene
 from hellward.ui.story import ChronicleScene, PrologueScene, StoryScene
 from hellward.ui.title import ReckoningScene, TitleScene
@@ -37,6 +38,7 @@ class Flow:
         self.demo_player = demo_player
         self.seed = seed
         self.gained = 0   # the sigils the last defence added
+        self.reward = RewardGain()
 
     def title(self) -> None:
         self.game.clear_and_push(TitleScene(self))
@@ -121,12 +123,16 @@ class Flow:
     def skills(self, location: Location | None = None) -> None:
         self.game.push(SkillTreeScene(self, location))
 
+    def forge(self) -> None:
+        self.game.push(ForgeScene(self))
+
     def defend(self, location: Location) -> None:
         if not self.progress.opened(location):
             self.world_map()   # the way there is not open
             return
         self.game.clear_and_push(BattleScene(
-            self.art, location, perks=perks(self.progress.learned), learned=self.progress.learned,
+            self.art, location, perks=perks(self.progress.learned, ORDER.index(location.key)), learned=self.progress.learned,
+            loadout=self.progress.loadout, breach_claim=self.progress.breach_claims.get(location.key),
             seed=self.seed, planner=self.planner, sound=self.sound, on_outcome=self.keep, on_end=self.reckon,
             settings=self.settings, restart=lambda: self.defend(location), to_title=self.title, to_map=self.world_map))
 
@@ -138,14 +144,17 @@ class Flow:
         the sigils won on the way there buy."""
         player = self.demo_player()
         learned = player.skills(CATHEDRAL, 3 * ORDER.index(CATHEDRAL.key))
-        return BattleScene(self.art, CATHEDRAL, perks=perks(learned), learned=learned, seed=self.seed, planner=self.planner,
+        return BattleScene(self.art, CATHEDRAL, perks=perks(learned, ORDER.index(CATHEDRAL.key)), learned=learned, seed=self.seed, planner=self.planner,
                            sound=self.sound, autopilot=player,
                            on_end=lambda world: self.title(), settings=self.settings, restart=self.demo, to_title=self.title,
                            to_map=self.world_map)
 
     def keep(self, world: World) -> None:
-        """The moment a defence is decided: its sigils are won, even if the player leaves before the reckoning."""
-        self.gained = self.progress.record(world.location.key, world.outcome, world.lives)
+        """Keep the run's sigils, unsold drops and side trophy at the outcome boundary."""
+        self.reward = self.progress.record_result(world.location.key, world.outcome, world.lives,
+                                                   salvage=world.salvage_held, breach_mode=world.breach_mode,
+                                                   breach_cleared=world.breach_cleared)
+        self.gained = self.reward.sigils
 
     def reckon(self, world: World) -> None:
         self.game.push(ReckoningScene(self, world, self.gained))

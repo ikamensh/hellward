@@ -1,119 +1,36 @@
-# Hellward — design
+# Hellward — one defence
 
-A tower defence under a desecrated gothic cathedral. Demons walk from a hell portal to the
-sanctuary; the player builds towers of four kinds of magic beside their way and bars the arches
-with warded gates. What is new: some monsters are **leaders**, and a leader curses the player's
-towers, choosing which tower and which curse by playing the fight ahead in its head.
+Hellward is a gothic tower defence about protecting a sanctuary lamp. Demons approach across an open field, and their leaders curse the towers defending it. A leader chooses its curse by simulating the fight ahead. [The campaign](campaign.md) connects twelve defences across two acts; [the story](story.md) gives their cast and stakes.
 
-This page is the rules of one defence and how a leader chooses. Around it is a campaign of six
-locations with a skill tree, spells and a world map: [campaign](campaign.md).
+Ilya's original brief (2026-09-24) asked for Diablo-inspired monsters and magic, doors that hold enemies while they break, and leaders whose curses are almost optimal rather than arbitrary. The later progression redesign starts much smaller: a few arrows against enemies with single-digit life, then hard choices about when to buy power and when to save resources for future fights.
 
-The brief (Ilya, 2026-09-24): "a TD game where enemy has leaders who curse your towers
-strategically ... either fast simulation or smart heuristics to make their curses almost optimal,
-otherwise a normal TD game. Diablo-themed graphics and monster kinds, towers are different kinds of
-magic, also Diablo-themed. Doors at key positions that take some time for monsters to destroy. Just
-enough content in high visual and audio quality to make an impressive demo."
+## A defence
 
-The stack's [making a game](../../docs/making-a-game.md) puts a feel build in front of Ilya before any
-painted art or generated sound. This brief asked for a finished-looking demo in one go, so the look and
-sound passes ran in the same session; the feel-build clip was still recorded, and Ilya's verdict on the
-loop goes here when he has played it.
+- **Map and movement.** Each 25 × 14 field has a sanctuary and authored trails through open build space. Tristram has several trails from one entrance. Every later location has two ordinary entrances, direct and detour trails from each, and some have a sealed third entrance. A monster commits to one trail when it spawns. Fallen, skeletons, zombies, goatmen, spiders, hulks and drowned may take a seeded detour; fast enemies and leaders run their authored direct trail. Trails can meet or cross. A tower attacks by actual distance, and enemies on different trails are ordered by how far they remain from the sanctuary.
+- **Opening power.** Tristram offers only the single-target Arrow Tower and Cleanse. An Arrow costs 12 gold at the opening and hits for 2; its later ranks hit for 3 and 4. The first Fallen has 7 life. The first Shaman has 14 before wave growth. All opening hits and enemy life use the 1–20 scale.
+- **Growth.** `sim/balance.py` holds the common knobs: base life 7, 5.5% growth per location, 5% growth per wave, Arrow hit 2, and a starting budget of three rank-I Arrows plus half an Arrow unit per later location. Legacy swarm sizes shrink with campaign depth and stop shrinking at 40%, keeping single-target play viable. Enemy roles and tower roles multiply the common scale. A wave's gold budget starts at one local Arrow-price unit and grows by half a unit per wave; kills and the clear reward share it, so a larger swarm does not create unlimited money. Prices rise with the local gold unit. Bosses and optional elites add encounter multipliers.
+- **Towers.** Arrow, Pyre, Storm Obelisk, Frost Shrine and Plague Totem attack or afflict one target at first. Pyre's blast, Storm's jump, Frost's burst, and the major spells arrive later through skills, forging, or location unlocks. Bone Altar marks a knot of enemies to take more damage; Druid Grove lends a nearby tower a damage bonus. Neither support tower deals damage directly. Every tower has three ranks; skills unlock the upper ranks, and battle gold pays for them. The [campaign](campaign.md) lists the unlock order.
+- **Resistances and gates.** Skeletons ignore poison; zombies are vulnerable to fire; goatmen resist lightning; gargoyles and bats fly over gates. A warded gate costs one local Arrow-price unit and has base 70 life before location and skill scaling. It stops only walkers whose trail crosses its arch; others can go around. A standing gate mends after a wave. A broken gate cannot be rebuilt until the wave break.
+- **Leaders and counterplay.** A curse falls on a marked spot and catches every unwarded tower in its radius. Weaken cuts damage, Decrepify cuts attack rate, Dim Vision cuts reach, and Bone Prison silences. Cleanse clears one tower. Smite interrupts one leader's pondering or chant for modest direct damage. Frozen Orb can also interrupt once it unlocks. A broken leader becomes resolute: its next curse is a mark that neither spell can break. Killing the leader before that mark lands still stops it.
+- **Optional risk.** At six locations, a sealed breach can add a named elite and harder pack to the next wave. The player declines, chooses a battle-gold cache, or seeks a forging trophy. Kills pay gold immediately. A few ordinary enemies also drop salvage: selling it during a break buys power now; banking it on victory moves a forged tower pattern closer. See [campaign](campaign.md) for the persistent rewards and recipes.
 
-## The loop
-
-- **One map at a time, five to eight waves** ([campaign](campaign.md) has the six). The Cathedral's
-  path is 56 tiles long and folds back on itself twice, so a tower in a fold covers three stretches of
-  it. Three **door sockets** sit in arches on the path.
-- **Towers** (`sim/content.py`), three ranks each:
-  - **Pyre** (fire): firebolts; fireballs with a blast from the second rank.
-  - **Storm Obelisk** (lightning): chain lightning that leaps two to five times.
-  - **Frost Shrine** (cold): a nova that chills everything in reach. A chilled monster walks slower
-    and batters doors more weakly.
-  - **Plague Totem** (poison): venom that seeks the strongest monster, stacking up to four times.
-- **Monsters** carry Diablo-style resistances. Skeletons are immune to poison. Zombies burn easily
-  and shrug off poison. Goatmen resist lightning. Gargoyles fly over gates. Overlords break gates
-  fast. Azazel the Flayer, the boss of Hell's Gate, is immune to fire.
-- **Warded gates** (60 gold, 650 life) stop walkers at the arch. Walkers queue and batter the gate
-  until it breaks, which is where fireballs, novas and chain lightning pay off. A gate that stands
-  mends by half when a wave is cleared; a broken one can be rebuilt.
-- **Leaders** walk with their pack:
-  - the **Fallen Shaman** casts Weaken (a third of the damage);
-  - the **Bone Priest** casts Bone Prison (silenced for 4.5 s) or Dim Vision (half the reach);
-  - the **Blood Witch** casts Decrepify (40% attack speed) or Weaken.
-
-  A curse lasts 8 s, 4.5 s for Bone Prison.
-- **Counterplay:** the blue orb is mana. **Cleanse** (35 mana) burns every curse off one tower;
-  **Smite** and **Frozen Orb** break a leader's pondering or chant, so the curse never comes; killing a
-  leader mid-chant makes it fizzle too. The spells are in [campaign](campaign.md).
+The opening has no damaging area attack. The earliest optional Pyre blast requires saved trophies and salvage at the Docks; the first skill route to area damage and Frozen Orb opens in the Jungle. Strong damage remains concentrated in invested ranks and scarce patterns.
 
 ## How a leader chooses (`sim/planner.py`)
 
-When its curse is ready, a leader asks its planner. The world is copied at a step boundary and the
-decision is read half a second of game time later (the leader visibly ponders). In the game a
-worker process computes it, and the answer is the same one an inline call returns, so a seed
-replays exactly.
+When its curse is ready, a leader asks its planner. The world is copied at a step boundary and the decision is read after a visible pondering delay. The game computes the answer in a worker process; the same seed and state give the same answer inline or in a replay.
 
-1. **Candidates:** every tower the leader will still reach when its chant ends, times every curse it
-   knows.
-2. **Estimate:** for each candidate, the damage the curse would stop the tower dealing while it lasts.
-   It uses where each monster will walk, stops at standing gates, and what each monster resists.
-   This ranks the candidates and picks the ten that get rolled out.
-3. **Rollouts:** the world is cloned and played forward at 0.1 s steps, once casting nothing and
-   once per candidate, for the curse's length plus three seconds (plus four more for timing). A
-   candidate's gain is how much more the pack keeps. The score counts:
-   - the life of monsters still standing;
-   - monsters that reached the sanctuary, at twice their life;
-   - life knocked off gates;
-   - half the pack's life averaged over the look-ahead. A curse that only delays deaths still
-     buys ground, and without this term every curse against the fast-dying Fallen scored zero.
-4. **Timing:** the best three are also tried two and four seconds later. The leader holds its curse
-   while waiting is worth 1.2 times the best curse now plus 5 life; it thinks again a second later.
+1. **Candidates:** each curse the leader knows at every reachable tower's spot. The spot's radius includes nearby unwarded towers.
+2. **Estimate:** project each monster on its committed trail, including gate stops, and estimate the damage each candidate prevents. The ten strongest candidates proceed.
+3. **Rollouts:** clone the real world and step it at 0.1 s for the curse and a short aftermath, once without a curse and once per candidate. Compare monster life still on the field, life leaked to the sanctuary, damage to gates, and how long the pack stays alive.
+4. **Timing:** also try the best candidates two and four seconds later. Hold a curse only when waiting has enough measured value.
 
-A rollout sees everything the estimate misses: the fireball that would hit the whole queue at a gate,
-the frost that keeps a gate standing, the leader's own life, the curses other leaders have already
-cast, and the wave still spawning. It is the game's own rules at a coarser step (`World.clone`,
-`World.step`), so there is no second model of the game to keep in sync.
-
-**How close to optimal** (`tools/curse_quality.py`, 40 decision moments from whole defences). Each
-moment's truth is every legal curse played out at the game's own step for 16 s:
-
-| policy | share of the best gain | top pick |
-|---|---|---|
-| rollouts (the game's) | 0.91 | 77% |
-| the estimate alone | 0.66 | 38% |
-| the nearest tower | 0.51 | 26% |
-| random | 0.44 | — |
-
-A decision costs about 60 ms (7 rollouts), at most about 180 ms. Of the moments where the leader
-chose to wait, waiting beat casting at once in 10 of 13.
-
-**What it does to a defence** (`tools/balance.py`, 12 scripted defenders, uncapped lives): with
-no curses, and with random curses, they lose 0 lives. Against the planner they lose 17.9 on
-average and 3 of the 12 fall. The scripted defender cleanses by a fixed rule; a player who reads
-the leaders' minds does better.
+The rollout shares the game's rules for route movement, tower reach, gates, resistances, forged patterns, salvage and optional packs. The estimate is cheaper; `tools/curse_quality.py` checks how well its shortlist and the final choice perform. Compare quality and balance measurements only when they use the same profile and campaign rules; earlier tables predate this redesign.
 
 ## Showing the leaders' minds
 
-- A leader pondering shows dots over its head.
-- A chant draws a violet beam growing from the leader's staff to the tower, and the tower glows.
-- The chronicle (top right) says what the leader weighed, its choice and the life it expects to
-  spare its pack, or that it holds its curse because waiting is worth more.
-- **Leaders' minds** (Tab, on by default) writes each weighed tower's gain over it for three
-  seconds, with the chosen curse named.
-- A cursed tower wears a spinning sigil per curse and is tinted by it.
-- Hovering a monster shows Diablo's bar at the top of the screen: name, life, resistances, and for
-  a leader its curses.
+A pondering leader shows dots. A chant draws a growing violet sign at its target; a mark burns on its spot before it lands. The chronicle names the leader's choice and estimated gain, and the optional leaders' minds overlay writes candidate gains by the towers. A cursed tower wears a spinning sigil. Hovering a monster shows its name, life, resistances and, for a leader, its curses.
 
 ## Look and sound
 
-- **Figures:** posed low-poly rigs (`art/figures.py`, `art/structures.py`), painted by Codex's image
-  tool through `tools/restyle.py`. Monsters walk (4 frames), batter gates (3) and, if they lead,
-  chant (2), in three facings; left is the right facing mirrored. The painter got the rig's poses,
-  the subject in words and a style paragraph. Sheets are padded to 3:2, and five of the first
-  thirteen came back on a dark vignette instead of the magenta key and were painted again.
-- **Map:** the cathedral floor is one picture painted over its stand-in
-  (`hellward/assets/painted/ground.png`).
-- **Lighting:** darkness with pools of light (`ui/lighting.py`): one small picture stretched over
-  the map each frame, below the effects and above everything that stands.
-- **Effects** (`ui/effects.py`): layered procedural glows, jagged lightning, rings and particles.
-- **Sound:** see [audio](audio.md).
+Figures use posed low-poly stand-ins and painted sheets; effects layer glows, rings, lightning and particles over the field. The lighting draws a darkness layer with pools around sources. Each location has its own floor theme; route geometry and painted ground must agree when a map is repainted. The restrained Arrow release joins the magical tower cues. See [audio](audio.md) for the sound system.

@@ -21,8 +21,9 @@ import pytest
 
 from hellward.sim import fastsim, planner
 from hellward.sim.campaign import LOCATIONS
-from hellward.sim.content import Curse
-from hellward.sim.model import World
+from hellward.sim.content import Curse, Element, MONSTERS
+from hellward.sim.items import Loadout
+from hellward.sim.model import Bolt, DOOR_STOP, Hazard, Monster, World
 from hellward.sim.players.hands import Hands
 from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.skills import SKILLS, perks
@@ -98,51 +99,62 @@ def test_a_compiled_world_survives_pickling(compiled: dict) -> None:
 
 
 def busy_world() -> World:
-    """Hell's Gate with the whole skill tree, at a moment when its fight is full: towers of every kind,
-    gates under blows, venom and frost on the monsters, bolts in flight and burning floor, two waves on the map and
-    one still coming. Then a meteor is cast (in the air), a frozen orb (monsters frozen) and a smite, and a warded
-    tower, two cursed ones and a leader chanting are set by hand. Like a clone, it has no planner and no leader
-    waiting for one."""
-    arsenal = replace(LOCATIONS["hells_gate"].arsenal,
-                      towers=LOCATIONS["hells_gate"].arsenal.towers + ("altar", "grove"))
-    place = replace(LOCATIONS["hells_gate"], arsenal=arsenal)
-    world = World(place, perks=perks(SKILLS), seed=5, planner=planner.smart)
-    world.lives = 10_000   # the ordinary player would fall long before the fight fills
-    player, hands = Ordinary(), Hands(world, react=0.6)
+    """A dense late defence with a forged loadout and an opened side entrance.
 
-    def full() -> bool:
-        m = world.monsters
-        return (world.wave >= 2 and bool(world.leaders()) and bool(world.bolts) and bool(world.hazards)
-                and any(x.door >= 0 for x in m) and any(x.poison for x in m) and any(x.chill_left > 0 for x in m))
-
-    while not full():
-        assert world.outcome is None
-        player.act(hands)
-        world.step()
-        hands.observe(world.events)
-        world.events.clear()
+    The fixture starts at the authored breach wave and places a few threats beside a gate so
+    clone and compiled parity exercise the active state without depending on a bot's build.
+    """
+    world = World(LOCATIONS["temple"], perks=perks(SKILLS), seed=5, hardness=4.0,
+                  loadout=Loadout(("execution_bow", "blast_chamber", "forked_coil")))
+    world.lives = 10_000
+    world.gold = 10_000
+    free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
+            if world.level.buildable(x, y)]
+    towers = [world.build(kind, tile) for kind, tile in zip(
+        ("arrow", "pyre", "storm", "frost", "plague", "altar", "grove"), free)]
+    world.build_door(0)
+    spec = world.breach_spec
+    assert spec is not None
+    world.wave = spec.after_wave
+    world.wave_alive[world.wave] = 0
+    world.break_left = 10.0
+    world.choose_breach("trophy")
     world.call_wave()
-    world.planner = None
-    for m in world.monsters:
-        m.asking, m.ask_left = None, 0.0
+    for _ in range(20):
+        world.step()
+    assert world.schedule and world.breach_opened
+
+    zombie = MONSTERS["zombie"]
+    batterer = Monster(world._id(), zombie, world.wave, 0.0, 0.0, zombie.hp * 4, 0.0)
+    batterer.s = world.doors[0].s - DOOR_STOP
+    batterer.door = 0
+    batterer.poison.append([1.0, 4.0])
+    batterer.chill_left = 3.0
+    batterer.frozen = 0.5
+    world.monsters.append(batterer)
+    priest = MONSTERS["priest"]
+    leader = Monster(world._id(), priest, world.wave, 0.0, 0.0, priest.hp * 4, priest.leader.first_cast)
+    leader.s = batterer.s + 1
+    world.monsters.append(leader)
+    world.wave_alive[world.wave] += 2
+    world.doors[0].hp -= 1.0
+    world.bolts.append(Bolt(world._id(), towers[0].id, "arrow", leader.id, 0.4,
+                            towers[0].stats.damage, Element.PHYSICAL, 0.0, 0.0, 0.0,
+                            towers[0].centre, world.position(leader), leader_bonus=towers[0].stats.leader_bonus))
+    lx, ly = world.position(leader)
+    world.hazards.append(Hazard(lx, ly, 1.0, 1.0, 3.0))
     world.mana = world.mana_max
-    world.meteor(*world.position(world.monsters[0]))
+    world.meteor(lx, ly)
     world.mana = world.mana_max
-    world.orb(*world.position(next(m for m in reversed(world.monsters) if m.door < 0)))
+    world.orb(lx, ly)
     world.mana = world.mana_max
-    world.smite(world.monsters[1].id)
-    towers = sorted(world.towers.values(), key=lambda t: t.id)
+    world.smite(leader.id)
+    batterer.door = 0
     towers[0].curses[Curse.DECREPIFY] = 5.0
     towers[1].curses[Curse.BONE_PRISON] = 3.0
     towers[2].ward = 4.0
-    leader = world.leaders()[0]
     leader.chant_curse, leader.chant_spot, leader.chant_left = Curse.WEAKEN, towers[3].tile, 0.8
-    world.gold = 10000
-    free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
-            if world.level.buildable(x, y) and world.tower_at((x, y)) is None]
-    world.build("altar", free[0])
-    grove = world.build("grove", free[1])
-    grove.timer = 3.5   # its twister about to root
+    towers[-1].timer = 3.5
     for m in world.monsters[:3]:
         m.amplified, m.amplify = 2.0, 0.3
     return world
@@ -160,7 +172,7 @@ def test_a_clone_steps_as_its_world() -> None:
     """Everything a world carries, a clone carries: stepped side by side, the two stay the same world. A field that
     ``clone()`` or a ``copy()`` forgets shows here, since the state is read from every attribute there is."""
     world = busy_world()
-    assert world.meteors and world.hazards and world.bolts and world.schedule and len(world.unpaid) == 2
+    assert world.meteors and world.hazards and world.bolts and world.schedule and world.breach_opened
     assert any(m.frozen > 0 for m in world.monsters) and any(m.door >= 0 for m in world.monsters)
     assert any(d.built and d.hp < world.gate_life for d in world.doors)
     world.record = False
@@ -173,52 +185,9 @@ def test_a_clone_steps_as_its_world() -> None:
 
 def busy_act2_world() -> World:
     """Temple (Act II) with Act II monsters: a risen Flayer, a marking Inquisitor, a Bone Priest burning mana."""
-    arsenal = replace(LOCATIONS["temple"].arsenal,
-                      towers=LOCATIONS["temple"].arsenal.towers)
-    place = replace(LOCATIONS["temple"], arsenal=arsenal)
-    world = World(place, perks=perks(SKILLS), seed=7, planner=planner.smart)
-    world.lives = 10_000
-    player, hands = Ordinary(), Hands(world, react=0.6)
-
-    def full() -> bool:
-        m = world.monsters
-        return (world.wave >= 2 and bool(world.leaders()) and bool(world.bolts) and bool(world.hazards)
-                and any(x.door >= 0 for x in m) and any(x.poison for x in m) and any(x.chill_left > 0 for x in m))
-
-    while not full():
-        assert world.outcome is None
-        player.act(hands)
-        world.step()
-        hands.observe(world.events)
-        world.events.clear()
-    world.call_wave()
-    world.planner = None
-    for m in world.monsters:
-        m.asking, m.ask_left = None, 0.0
-    world.mana = world.mana_max
-    world.meteor(*world.position(world.monsters[0]))
-    world.mana = world.mana_max
-    world.orb(*world.position(next(m for m in reversed(world.monsters) if m.door < 0)))
-    world.mana = world.mana_max
-    world.smite(world.monsters[1].id)
+    world = busy_world()
     towers = sorted(world.towers.values(), key=lambda t: t.id)
-    towers[0].curses[Curse.DECREPIFY] = 5.0
-    towers[1].curses[Curse.BONE_PRISON] = 3.0
-    towers[2].ward = 4.0
-    leader = world.leaders()[0]
-    leader.chant_curse, leader.chant_spot, leader.chant_left = Curse.WEAKEN, towers[3].tile, 0.8
-    world.gold = 10000
-    free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
-            if world.level.buildable(x, y) and world.tower_at((x, y)) is None]
-    world.build("altar", free[0])
-    grove = world.build("grove", free[1])
-    grove.timer = 3.5
-    for m in world.monsters[:3]:
-        m.amplified, m.amplify = 2.0, 0.3
-
     # Add Act II specific state: a risen flayer and a marking inquisitor
-    from hellward.sim.content import MONSTERS
-    from hellward.sim.model import Monster
     flayer = MONSTERS["flayer"]
     flayer_hp = flayer.hp * world.waves[world.wave].hp * world.location.life
     risen_flayer = Monster(world._id(), flayer, world.wave, 0.0, 0.0, flayer_hp * 0.5, 0.0)
@@ -226,6 +195,7 @@ def busy_act2_world() -> World:
     risen_flayer.risen = True
     risen_flayer.frozen = 0.5
     world.monsters.append(risen_flayer)
+    world.wave_alive[world.wave] += 1
 
     inquisitor = MONSTERS["inquisitor"]
     inq_hp = inquisitor.hp * world.waves[world.wave].hp * world.location.life
@@ -236,6 +206,7 @@ def busy_act2_world() -> World:
     marking_inq.chant_left = 0.8
     marking_inq.marking = True
     world.monsters.append(marking_inq)
+    world.wave_alive[world.wave] += 1
 
     return world
 

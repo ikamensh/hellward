@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from hellward.sim.campaign import Location, idle
+from hellward.sim.campaign import ORDER, Location, idle
 from hellward.sim.model import Refused
 from hellward.sim.players.hands import Hands
 from hellward.sim.players.ordinary import Ordinary
@@ -32,12 +32,13 @@ class Apprentice(Ordinary):
     name: str = "apprentice"
 
     def skills(self, location: Location, sigils: int) -> frozenset[str]:
+        stage = ORDER.index(location.key)
         order = [*FIRST, *(key for key in SKILLS if key not in FIRST)]
         learned: set[str] = set()
         for key in order:
             if idle(location, SKILLS[key].needs):
                 continue
-            if can_learn(frozenset(learned), key, sigils):
+            if can_learn(frozenset(learned), key, sigils, stage):
                 learned.add(key)
         return frozenset(learned)
 
@@ -66,7 +67,7 @@ class Apprentice(Ordinary):
     def _crowd(self, hands: Hands) -> tuple[float, float] | None:
         """The first monster with at least four others within reach, aimed at its own spot."""
         world = hands.world
-        spots = [world.level.point(m.s) for m in world.monsters]
+        spots = [world.position(m) for m in world.monsters]
         for i in range(len(spots)):
             near = 0
             for j in range(len(spots)):

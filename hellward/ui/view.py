@@ -29,9 +29,9 @@ MAP_X, MAP_Y = 40, 0
 T = TILE
 Z = PROJECTION.z_scale        # logical pixels per tile of height
 TOWER_SCALE = 1.3             # towers stand taller than their stand-ins: the painted ones were cut to the stand-ins' height
-ELEMENT_LIGHT = {"pyre": ELEMENT_COLORS["fire"], "storm": ELEMENT_COLORS["lightning"], "frost": ELEMENT_COLORS["cold"],
+ELEMENT_LIGHT = {"arrow": ELEMENT_COLORS["holy"], "pyre": ELEMENT_COLORS["fire"], "storm": ELEMENT_COLORS["lightning"], "frost": ELEMENT_COLORS["cold"],
                  "plague": ELEMENT_COLORS["poison"], "altar": (214, 204, 176), "grove": ELEMENT_COLORS["poison"]}
-ELEMENT_OF_VIEW = {"pyre": "fire", "storm": "lightning", "frost": "cold", "plague": "poison", "altar": "curse",
+ELEMENT_OF_VIEW = {"arrow": "holy", "pyre": "fire", "storm": "lightning", "frost": "cold", "plague": "poison", "altar": "curse",
                    "grove": "poison"}
 CURSE_TINT = {Curse.WEAKEN: (0.9, 0.55, 0.55), Curse.DECREPIFY: (0.8, 0.72, 0.55), Curse.DIM_VISION: (0.55, 0.5, 0.75),
               Curse.BONE_PRISON: (0.6, 0.6, 0.6)}
@@ -105,6 +105,14 @@ class WorldView:
         self.figures: dict[int, Figure] = {}
         self.towers: dict[int, Standing] = {}
         self.dying: list[Figure] = []
+        self.breach_lit = world.breach_opened
+        open_entrances = {route.entrance for route in level.routes if not route.key.startswith("breach")}
+        sealed_routes = ({route.entrance: route for route in level.routes
+                          if route.key.startswith("breach") and route.entrance not in open_entrances}
+                         if not self.breach_lit else {})
+        self.seals = [scene.add_sprite(Sprite("fx/sigil/curse", position=px(*route.point(0.6)),
+                                               size=(T * 0.9, T * 0.9), layer=RenderLayer.OBJECTS, opacity=170))
+                      for _, route in sorted(sealed_routes.items())]
         self.static_lights = self._static_lights()
         self.torches = [self._sprite_glow("fire", light.x, light.y, 22) for light in self.static_lights if light.color == TORCH]
 
@@ -113,10 +121,11 @@ class WorldView:
 
     def _static_lights(self) -> list[Light]:
         level = self.level
+        lit_routes = [route for route in level.routes if self.breach_lit or not route.key.startswith("breach")]
         lights = []
-        x, y = level.waypoints[0]
-        lights.append(Light(*px(x + 0.5, y + 0.5), 190, (255, 60, 30), 1.1))
-        x, y = level.waypoints[-1]
+        for x, y in dict.fromkeys(route.entrance for route in lit_routes):
+            lights.append(Light(*px(x + 0.5, y + 0.5), 190, (255, 60, 30), 1.1))
+        x, y = level.route("main").exit
         lights.append(Light(*px(x + 0.5, y + 0.5), 170, (255, 214, 140), 1.1))
         rng = random.Random(level.name)
         kind = self.theme.lights
@@ -146,11 +155,16 @@ class WorldView:
                         lights.append(Light(*px(x + 0.5, y + 0.2), 90, (255, 190, 110), 0.7))
         for x, y in level.doors:
             lights.append(Light(*px(x + 0.5, y + 0.3), 60, (255, 210, 140), 0.45))
-        s = 2.5
-        while s < level.length - 1:   # candles along the carpet, so the way the monsters walk is never black
-            x, y = level.point(s)
-            lights.append(Light(*px(x, y), 85, (255, 170, 90), 0.45))
-            s += 4.0
+        candles: set[tuple[int, int]] = set()
+        for route in lit_routes:
+            s = 2.5
+            while s < route.length - 1:   # light every walked trail, including the wandering branches
+                x, y = route.point(s)
+                tile = int(x), int(y)
+                if tile not in candles:
+                    lights.append(Light(*px(x, y), 85, (255, 170, 90), 0.45))
+                    candles.add(tile)
+                s += 4.0
         return lights
 
     # -- Keeping up with the rules ------------------------------------------------------------
@@ -161,13 +175,17 @@ class WorldView:
 
     def spawn(self, monster: Monster) -> None:
         cell = self.art.monster[monster.kind.key]
-        sprite = self.scene.add_sprite(placed(f"mon/{monster.kind.key}/right/walk1", cell, *px(*self.level.point(0.0))))
+        x, y = self.monster_point(monster)
+        facing = facing_of(*self.level.route(monster.route).heading(monster.s))
+        sprite = self.scene.add_sprite(placed(f"mon/{monster.kind.key}/{facing}/walk1", cell, x, y))
         size = monster.kind.size
-        shadow = self.scene.add_sprite(Sprite("fx/shadow", size=(T * size * 1.1, T * size * 0.4), layer=RenderLayer.OBJECTS))
+        shadow = self.scene.add_sprite(Sprite("fx/shadow", position=(x, y + 2),
+                                              size=(T * size * 1.1, T * size * 0.4), layer=RenderLayer.OBJECTS))
         aura = None
         if monster.kind.leader is not None:
-            aura = self.scene.add_sprite(Sprite("fx/ring/curse", size=(T * 0.9, T * 0.5), layer=RenderLayer.OBJECTS, opacity=150))
-        self.figures[monster.id] = Figure(monster, sprite, shadow, 0.0, aura)
+            aura = self.scene.add_sprite(Sprite("fx/ring/curse", position=(x, y + 1),
+                                                size=(T * 0.9, T * 0.5), layer=RenderLayer.OBJECTS, opacity=150))
+        self.figures[monster.id] = Figure(monster, sprite, shadow, monster.s, aura, x=x, y=y)
 
     def kill(self, monster_id: int) -> Figure | None:
         figure = self.figures.pop(monster_id, None)
@@ -192,7 +210,7 @@ class WorldView:
         figure = self.figures.get(monster_id)
         if figure is not None:
             figure.flash = 0.09
-            figure.flash_tint = {"fire": (1.0, 0.7, 0.45), "lightning": (0.75, 0.85, 1.0), "cold": (0.7, 0.9, 1.0),
+            figure.flash_tint = {"physical": (1.0, 0.93, 0.76), "fire": (1.0, 0.7, 0.45), "lightning": (0.75, 0.85, 1.0), "cold": (0.7, 0.9, 1.0),
                                  "poison": (0.7, 1.0, 0.55), "holy": (1.0, 0.95, 0.7)}[element]
 
     def build(self, tower: Tower) -> None:
@@ -233,10 +251,10 @@ class WorldView:
     def monster_point(self, monster: Monster, s: float | None = None) -> tuple[float, float]:
         """Where a monster's feet are drawn, with its place across the corridor."""
         s = monster.s if s is None else s
-        level = self.level
-        x, y = level.point(s)
-        ax, ay = level.heading(max(0.0, s - 0.35))
-        bx, by = level.heading(min(level.length - 1e-6, s + 0.35))
+        route = self.level.route(monster.route)
+        x, y = route.point(s)
+        ax, ay = route.heading(max(0.0, s - 0.35))
+        bx, by = route.heading(min(route.length - 1e-6, s + 0.35))
         nx, ny = -(ay + by) / 2, (ax + bx) / 2
         return px(x + nx * monster.lane, y + ny * monster.lane)
 
@@ -251,7 +269,12 @@ class WorldView:
 
     def sync(self, alpha: float, dt: float) -> None:
         self.clock += dt
-        level = self.level
+        if self.world.breach_opened and not self.breach_lit:
+            self.breach_lit = True
+            for seal in self.seals:
+                seal.remove()
+            self.seals.clear()
+            self.static_lights = self._static_lights()
         for figure in self.figures.values():
             m = figure.monster
             s = figure.prev + (m.s - figure.prev) * alpha
@@ -261,7 +284,7 @@ class WorldView:
             else:
                 y_draw = y
             figure.x, figure.y = x, y
-            hx, hy = level.heading(s)
+            hx, hy = self.level.route(m.route).heading(s)
             facing = facing_of(hx, hy)
             if m.door >= 0:
                 phase = (self.clock * 1.2 + m.id * 0.37) % 1.0

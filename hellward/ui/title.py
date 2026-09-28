@@ -123,3 +123,13 @@ class ReckoningScene(Scene):
         if self.opened is not None:
             self.draw_text(f"The way down to {self.opened.called} is open.", 640, 482, font_size=17, color=style.HOLY,
                            anchor_x="center", anchor_y="center")
+        reward = self.flow.reward
+        if reward.salvage:
+            self.draw_text(f"+{reward.salvage} salvage banked for the tower forge.", 640, 518,
+                           font_size=16, color=style.GOLD, anchor_x="center", anchor_y="center")
+        if reward.trophy:
+            self.draw_text(f"The {world.breach_spec.name} trophy is yours. Rare patterns need trophies.", 640, 546,
+                           font_size=16, color=style.UNIQUE, anchor_x="center", anchor_y="center")
+        elif world.breach_cleared and world.breach_mode == "cash":
+            self.draw_text("The side cache paid gold during the defence; this site yields no trophy.", 640, 546,
+                           font_size=15, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")

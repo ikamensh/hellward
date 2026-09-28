@@ -19,7 +19,7 @@ from hellward.sim.players.ghost import Ghost
 from hellward.sim.players.hands import Hands, defend, react_for
 from hellward.sim.skills import perks
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
-from hellward.ui.hud import BUILD, SLOT, SLOT_X, TOP
+from hellward.ui.hud import BUILD, SLOT, SLOT_X, TOP, slot_size
 from hellward.ui.view import MAP_X, MAP_Y, T
 
 
@@ -37,7 +37,8 @@ def game(cache, tmp_path):
 
 def slot_centre(key: str) -> tuple[int, int]:
     i = BUILD.index(key)
-    return SLOT_X + i * (SLOT + 10) + SLOT // 2, TOP + 16 + SLOT // 2
+    size, step = slot_size(len(BUILD))
+    return int(SLOT_X + i * step + size / 2), int(TOP + 16 + SLOT / 2)
 
 
 def tile_centre(x: int, y: int) -> tuple[int, int]:
@@ -46,21 +47,22 @@ def tile_centre(x: int, y: int) -> tuple[int, int]:
 
 def test_a_persons_defence_is_logged_to_a_replay_file(game):
     g, art, tmp_path = game
-    scene = BattleScene(art, LOCATIONS["tristram"], perks=perks({"adept_fire"}), learned={"adept_fire"},
-                        seed=1, planner=planner.smart)
+    scene = BattleScene(art, LOCATIONS["tristram"], seed=1, planner=planner.smart)
     g.push(scene)
     g.tick(SIM_DT)
-    g.backend.inject_click(*slot_centre("pyre"))
+    tiles = [(x, y) for y in range(scene.world.level.height) for x in range(scene.world.level.width)
+             if scene.world.level.buildable(x, y)][:2]
+    g.backend.inject_click(*slot_centre("arrow"))
     g.tick(SIM_DT)
-    g.backend.inject_click(*tile_centre(7, 5))
+    g.backend.inject_click(*tile_centre(*tiles[0]))
     g.tick(SIM_DT)
-    g.backend.inject_click(*slot_centre("frost"))
+    g.backend.inject_click(*slot_centre("arrow"))
     g.tick(SIM_DT)
-    g.backend.inject_click(*tile_centre(8, 6))
+    g.backend.inject_click(*tile_centre(*tiles[1]))
     g.tick(SIM_DT)
-    assert scene.world.tower_at((7, 5)) is not None and scene.world.tower_at((8, 6)) is not None
+    assert all(scene.world.tower_at(tile) is not None for tile in tiles)
     path_tile = scene.world.level.path_tiles[5]   # refused: towers stand on the bare floor
-    g.backend.inject_click(*slot_centre("pyre"))
+    g.backend.inject_click(*slot_centre("arrow"))
     g.tick(SIM_DT)
     g.backend.inject_click(*tile_centre(*path_tile))
     g.tick(SIM_DT)
@@ -77,38 +79,37 @@ def test_a_persons_defence_is_logged_to_a_replay_file(game):
     files = sorted((tmp_path / "replays").glob("*-tristram.json"))
     assert len(files) == 1
     log = json.loads(files[0].read_text())
-    assert log["version"] == 1
-    assert log["location"] == "tristram" and log["seed"] == 1 and log["skills"] == ["adept_fire"]
+    assert log["version"] == 2
+    assert log["location"] == "tristram" and log["seed"] == 1 and log["skills"] == [] and log["loadout"] == []
     assert log["outcome"] == scene.world.outcome and log["lives"] == scene.world.lives
     assert log["time"] == scene.world.time
     builds = [c for c in log["commands"] if c[1] == "build"]
-    assert [c[2] for c in builds] == ["pyre", "frost"]
-    assert [tuple(c[3]) for c in builds] == [(7, 5), (8, 6)]
+    assert [c[2] for c in builds] == ["arrow", "arrow"]
+    assert [tuple(c[3]) for c in builds] == tiles
     assert not [c for c in builds if tuple(c[3]) == tuple(path_tile)]   # refused commands are not recorded
     assert any(c[1] == "call_wave" for c in log["commands"])
     assert [c[0] for c in log["commands"]] == sorted(c[0] for c in log["commands"])
 
 
-TILES = [(7, 6), (11, 8), (15, 8), (19, 7), (11, 9), (15, 9), (16, 8), (18, 7),
-         (19, 6), (7, 5), (8, 6), (10, 8), (16, 9), (18, 6)]
-
-
 class Recorder:
-    """A simple Tristram defence, logged as it plays: a Pyre and a Frost Shrine early, then more of
-    both as the gold comes in, ranks with what is left, and the next wave whenever the break allows."""
+    """A simple opening defence, logged as it plays: a few Arrow Towers and early wave calls."""
 
     name = "recorder"
 
     def __init__(self) -> None:
         self.commands: list = []
+        self.tiles: list[tuple[int, int]] | None = None
 
     def skills(self, location, sigils):
         return frozenset()
 
     def act(self, hands):
         world = hands.world
-        for i, tile in enumerate(TILES):
-            kind = "pyre" if i % 2 == 0 else "frost"
+        if self.tiles is None:
+            self.tiles = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
+                          if world.level.buildable(x, y)][:3]
+        for tile in self.tiles:
+            kind = "arrow"
             if world.tower_at(tile) is None:
                 if world.gold >= world.cost(kind):
                     try:
@@ -118,17 +119,6 @@ class Recorder:
                     else:
                         self.commands.append([world.time, "build", kind, list(tile)])
                 break
-        else:
-            for tower in sorted(world.towers.values(), key=lambda t: t.id):
-                price = world.upgrade_cost(tower)
-                if price is not None and world.gold >= price:
-                    try:
-                        world.upgrade(tower.id)
-                    except Refused:
-                        pass
-                    else:
-                        self.commands.append([world.time, "upgrade", list(tower.tile)])
-                    break
         if world.can_call_wave and world.break_left is not None and world.break_left < WAVE_BREAK - 2:
             world.call_wave()
             self.commands.append([world.time, "call_wave"])
@@ -137,7 +127,7 @@ class Recorder:
 def test_a_ghost_replays_a_logged_tristram_defence_the_same_way():
     recorder = Recorder()
     original, _ = defend(LOCATIONS["tristram"], recorder, seed=1, sigils=0, planner=planner.smart)
-    log = {"version": 1, "location": "tristram", "seed": 1, "skills": [],
+    log = {"version": 2, "location": "tristram", "seed": 1, "skills": [], "loadout": [],
            "outcome": original.outcome, "lives": original.lives, "time": original.time,
            "commands": recorder.commands}
     replayed, _ = defend(LOCATIONS["tristram"], Ghost(log), seed=1, sigils=0, planner=planner.smart, hp=1.0)
@@ -146,13 +136,14 @@ def test_a_ghost_replays_a_logged_tristram_defence_the_same_way():
 
 
 def test_a_refused_command_is_retried_then_dropped_without_an_error():
-    path_tile = list(LOCATIONS["tristram"].level.path_tiles[5])
-    log = {"version": 1, "location": "tristram", "seed": 1, "skills": ["adept_fire"], "outcome": "victory",
+    level = LOCATIONS["tristram"].level
+    path_tile = list(level.path_tiles[5])
+    tile = next((x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y))
+    log = {"version": 2, "location": "tristram", "seed": 1, "skills": [], "loadout": [], "outcome": "victory",
            "lives": 20, "time": 12.0,
-           "commands": [[0.0, "build", "pyre", path_tile],   # nowhere to stand: refused for ten seconds, then let go
-                        [11.0, "build", "pyre", [7, 5]],
-                        [12.0, "upgrade", [7, 5]]]}
-    world = World(LOCATIONS["tristram"], perks=perks({"adept_fire"}), seed=1)
+           "commands": [[0.0, "build", "arrow", path_tile],   # nowhere to stand: refused for ten seconds, then let go
+                        [11.0, "build", "arrow", list(tile)]]}
+    world = World(LOCATIONS["tristram"], seed=1)
     hands = Hands(world, react_for(1))
     ghost = Ghost(log)
     while world.time < 30.0:
@@ -160,14 +151,14 @@ def test_a_refused_command_is_retried_then_dropped_without_an_error():
         world.step(SIM_DT)
         hands.observe(world.events)
         world.events.clear()
-    tower = world.tower_at((7, 5))
-    assert tower is not None and tower.level == 1   # the dropped command held nothing back
+    tower = world.tower_at(tile)
+    assert tower is not None and tower.level == 0   # the dropped command held nothing back
 
 
 def test_a_ghost_learns_its_logs_skills_or_says_they_cost_too_much():
-    log = {"version": 1, "location": "tristram", "seed": 1, "skills": ["adept_fire", "fire_ball"],
+    log = {"version": 2, "location": "tristram", "seed": 1, "skills": ["adept_arrow"], "loadout": [],
            "outcome": "victory", "lives": 20, "time": 0.0, "commands": []}
     ghost = Ghost(log)
-    assert ghost.skills(LOCATIONS["tristram"], 3) == frozenset({"adept_fire", "fire_ball"})
+    assert ghost.skills(LOCATIONS["tristram"], 3) == frozenset({"adept_arrow"})
     with pytest.raises(ValueError):
         ghost.skills(LOCATIONS["tristram"], 0)

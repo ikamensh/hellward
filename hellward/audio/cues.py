@@ -21,7 +21,7 @@ from sagaforge.synth import AH, DARK, OH, OO, SAMPLE_RATE, formant, level, lowpa
 
 #: Loudness targets: the loudest 50 ms of a cue has this RMS (see :func:`loudness`).  Four battle
 #: cues landing together stay under full scale; interface cues sit well under the fight.
-UI, ACTION, BATTLE, ALERT = 0.06, 0.1, 0.12, 0.16
+UI, ACTION, BATTLE, ALERT = 0.06, 0.1, 0.11, 0.16
 #: Budget classes and their highest peak: ``battle`` cues share the bank's voice budget, so up to four
 #: land together and each keeps its peak low; the rest always play, one or two at a time.
 PEAKS = {"ui": 0.5, "action": 0.8, "battle": 0.55, "alert": 0.9}
@@ -200,6 +200,25 @@ def door_break(take: int) -> np.ndarray:
 
 
 # -- Towers ----------------------------------------------------------------------------------------
+
+
+def arrow_cast(take: int) -> np.ndarray:
+    """A taut string snaps free with a little wood and feather, without a magical tail."""
+    length = 0.15
+    string = glide(690 + 45 * take, 240 + 20 * take, length,
+                   partials=((1, 1.0), (2, 0.35), (3, 0.15)), seed=700 + take)
+    string *= np.exp(-seconds(length) / 0.025)
+    wood = thump(520, 170, 0.12, attack=0.0005, tau=0.022)
+    feather = noise(0.11, 1300, 5200, attack=0.001, tau=0.022, seed=710 + take)
+    return mix(string * 0.45, wood * 0.5, feather * 0.17)
+
+
+def arrow_hit(take: int) -> np.ndarray:
+    """A small dry shaft impact and a muted point strike."""
+    point = thump(660 + 40 * take, 220, 0.13, attack=0.0005, tau=0.025)
+    shaft = noise(0.11, 500, 3300, attack=0.0008, tau=0.018, seed=720 + take)
+    body = thump(210, 95, 0.12, attack=0.001, tau=0.03)
+    return mix(point * 0.55, shaft * 0.25, body * 0.25)
 
 
 def fire_cast(take: int) -> np.ndarray:
@@ -471,6 +490,8 @@ CUES: dict[str, Cue] = {
     "chant": Cue(chant, 1, "alert", ACTION),
     "curse": Cue(curse, 1, "alert", ALERT),
     "fizzle": Cue(fizzle, 1, "alert", ACTION * 0.8),
+    "arrow_cast": Cue(arrow_cast, 3, "battle", BATTLE * 0.58, pitch=0.04, yields=1),
+    "arrow_hit": Cue(arrow_hit, 3, "battle", BATTLE * 0.7, pitch=0.04, yields=1),
     "fire_cast": Cue(fire_cast, 3, "battle", BATTLE * 0.8, pitch=0.04, yields=1),
     "fire_hit": Cue(fire_hit, 3, "battle", BATTLE, pitch=0.04, yields=1),
     "fireball": Cue(fireball, 3, "battle", BATTLE * 1.1, pitch=0.04, yields=1),

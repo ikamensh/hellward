@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 
 import pytest
 
 from hellward.sim.campaign import ACTS, ACT_ENDS, LOCATIONS
 from hellward.sim.content import MONSTERS, Curse, Element
+from hellward.sim.level import Level
 from hellward.sim.model import World, Monster
 from hellward.sim.players.hands import Hands
 from hellward.sim.players.ordinary import Ordinary
@@ -17,68 +19,58 @@ from hellward.sim.skills import NO_PERKS, perks
 class TestAct2Monsters:
     """Tests for the new Act II monster kinds."""
 
+    def test_act2_roles_fit_the_small_combat_scale(self) -> None:
+        ordinary = ("flayer", "bat", "spider", "zealot", "drowned")
+        assert all(1 <= MONSTERS[key].hp <= 20 for key in ordinary)
+        assert MONSTERS["bat"].hp < MONSTERS["spider"].hp < MONSTERS["drowned"].hp
+        assert MONSTERS["flayer"].hp < MONSTERS["zealot"].hp < MONSTERS["hulk"].hp
+        assert MONSTERS["bone_priest"].hp > MONSTERS["hulk"].hp
+        assert all(MONSTERS[key].bounty > 0 for key in ordinary + ("hulk", "fetish", "inquisitor"))
+        assert MONSTERS["bone_priest"].bounty == 0
+        assert MONSTERS["hulk"].door_dps > MONSTERS["drowned"].door_dps > MONSTERS["flayer"].door_dps
+
     def test_flayer_exists(self) -> None:
         m = MONSTERS["flayer"]
-        assert m.hp == 60
         assert m.speed == 1.45
-        assert m.bounty == 4
-        assert m.door_dps == 8
         assert m.resist == {Element.FIRE: 0.25}
         assert m.size == 0.5
 
     def test_zealot_exists(self) -> None:
         m = MONSTERS["zealot"]
-        assert m.hp == 190
         assert m.speed == 1.0
-        assert m.bounty == 10
-        assert m.door_dps == 16
         assert m.resist == {Element.LIGHTNING: 0.4, Element.FIRE: 0.25}
         assert m.size == 0.85
 
     def test_spider_exists(self) -> None:
         m = MONSTERS["spider"]
-        assert m.hp == 120
         assert m.speed == 1.35
-        assert m.bounty == 8
-        assert m.door_dps == 10
         assert m.resist == {Element.POISON: 1.0, Element.COLD: -0.25}
         assert m.size == 0.7
 
     def test_bat_exists(self) -> None:
         m = MONSTERS["bat"]
-        assert m.hp == 55
         assert m.speed == 1.9
-        assert m.bounty == 5
         assert m.flying is True
         assert m.resist == {Element.COLD: 0.5, Element.POISON: 0.25}
         assert m.size == 0.5
 
     def test_hulk_exists(self) -> None:
         m = MONSTERS["hulk"]
-        assert m.hp == 760
         assert m.speed == 0.55
-        assert m.bounty == 30
         assert m.lives == 2
-        assert m.door_dps == 70
         assert m.resist == {Element.POISON: 1.0, Element.COLD: 0.25, Element.FIRE: -0.25}
         assert m.size == 1.1
 
     def test_drowned_exists(self) -> None:
         m = MONSTERS["drowned"]
-        assert m.hp == 320
         assert m.speed == 0.7
-        assert m.bounty == 14
-        assert m.door_dps == 22
         assert m.resist == {Element.COLD: 0.5, Element.POISON: 0.5, Element.LIGHTNING: -0.25}
         assert m.size == 0.85
 
     def test_fetish_exists(self) -> None:
         m = MONSTERS["fetish"]
-        assert m.hp == 150
         assert m.speed == 1.1
-        assert m.bounty == 35
         assert m.lives == 2
-        assert m.door_dps == 4
         assert m.resist == {Element.FIRE: 0.25}
         assert m.size == 0.6
         assert m.leader is not None
@@ -89,11 +81,8 @@ class TestAct2Monsters:
 
     def test_inquisitor_exists(self) -> None:
         m = MONSTERS["inquisitor"]
-        assert m.hp == 280
         assert m.speed == 0.95
-        assert m.bounty == 45
         assert m.lives == 2
-        assert m.door_dps == 6
         assert m.resist == {Element.LIGHTNING: 0.4, Element.FIRE: 0.25}
         assert m.size == 0.9
         assert m.leader is not None
@@ -103,11 +92,8 @@ class TestAct2Monsters:
 
     def test_bone_priest_exists(self) -> None:
         m = MONSTERS["bone_priest"]
-        assert m.hp == 6000
         assert m.speed == 0.45
-        assert m.bounty == 0
         assert m.lives == 20
-        assert m.door_dps == 150
         assert m.resist == {Element.POISON: 1.0, Element.COLD: 0.25, Element.FIRE: 0.25, Element.LIGHTNING: 0.25}
         assert m.size == 1.6
         assert m.leader is not None
@@ -332,17 +318,17 @@ class TestBurning:
 
     def test_bone_priest_burns_mana(self) -> None:
         """Bone Priest's curse that catches three towers burns 15 mana."""
-        location = LOCATIONS["temple"]
+        location = replace(LOCATIONS["temple"], level=Level("Burning field", 16, 9, ((0, 4), (15, 4)), ()))
         world = World(location, seed=7, perks=NO_PERKS, planner=None, record=True)
         world.lives = 10000
         world.mana = 100
         world.wave = 0
         world.wave_alive[0] = 1
+        world.gold = 3 * world.cost("arrow")
 
         # Build three towers in range
-        world.build("pyre", (10, 5))
-        world.build("storm", (11, 5))
-        world.build("frost", (12, 5))
+        for tile in ((8, 3), (9, 3), (10, 3)):
+            world.build("arrow", tile)
 
         from hellward.sim.model import Monster
         bone_priest = MONSTERS["bone_priest"]
@@ -352,7 +338,7 @@ class TestBurning:
         world.monsters.append(leader)
 
         # Force a curse on the spot covering the three towers
-        decision = Decision(leader=leader.id, cast=Option(Curse.WEAKEN, (11, 5)), retry=0, options=(), later=None, reason="")
+        decision = Decision(leader=leader.id, cast=Option(Curse.WEAKEN, (9, 3)), retry=0, options=(), later=None, reason="")
         leader.asking = Inline(decision)
         leader.ask_left = 0.0
 

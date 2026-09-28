@@ -10,27 +10,31 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from hellward.sim.campaign import Location
-from hellward.sim.content import DOOR, WAVE_BREAK
+from hellward.sim.content import WAVE_BREAK
 from hellward.sim.model import DOOR_STOP, JOSTLE, Refused, Tower, World
 from hellward.sim.players.hands import Hands, REACT, AIM_GAP
 from hellward.sim.sums import float_sum, int_sum
 
-ROTATION = ("pyre", "frost", "storm", "plague", "pyre", "storm", "plague", "pyre", "frost", "storm")
+ROTATION = ("arrow", "pyre", "frost", "storm", "plague", "arrow", "pyre", "storm", "plague", "arrow")
 DOOR_BONUS = 4.0     # path tiles a door queue in reach is worth when ranking a tile
 THINK = 0.5          # seconds between the defender's decisions
 
 
 def tile_scores(world: World, reach: float = 3.0) -> list[tuple[float, tuple[int, int]]]:
     level = world.level
-    queues = [d.s - DOOR_STOP - JOSTLE / 2 for d in world.doors]
+    queues = [(route.key, s - DOOR_STOP - JOSTLE / 2)
+              for route in level.routes for _, s in level.crossings(route.key)]
     scored = []
     for y in range(level.height):
         for x in range(level.width):
             if not level.buildable(x, y):
                 continue
-            spans = level.coverage((x, y), reach)
-            score = float_sum(b - a for a, b in spans)
-            score += DOOR_BONUS * int_sum(1 for q in queues if any(a <= q <= b for a, b in spans))
+            score = 0.0
+            for route in level.routes:
+                spans = route.coverage((x, y), reach)
+                score += float_sum(b - a for a, b in spans)
+                score += DOOR_BONUS * int_sum(1 for key, q in queues
+                                              if key == route.key and any(a <= q <= b for a, b in spans))
             scored.append((score, (x, y)))
     scored.sort(key=lambda item: (-item[0], item[1]))
     return scored
@@ -68,7 +72,7 @@ class Ordinary:
             self._cleanse(hands)
         if self.doors and world.location.arsenal.gates and world.wave >= 1:
             for door in world.doors:
-                if not door.built and not door.rubble and world.gold >= DOOR.cost + 20:
+                if not door.built and not door.rubble and world.gold >= world.door_cost + world.cost("arrow"):
                     try:
                         world.build_door(door.index)
                     except Refused:
@@ -104,9 +108,7 @@ class Ordinary:
         busy: list[Tower] = []
         for t in world.towers.values():
             if t.curses and max(t.curses.values()) > 3.0:
-                full = world.level.coverage(t.tile, t.stats.range)
-                if any(any(a <= m.s <= b for a, b in full) for m in world.monsters):
+                if any(world.in_reach(t, m.s, m.route) for m in world.monsters):
                     busy.append(t)
         if busy:
             hands.cleanse(max(busy, key=lambda t: (t.spent, -t.id)).id)
-

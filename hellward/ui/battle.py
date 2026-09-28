@@ -21,6 +21,7 @@ from hellward.art.sprites import Art
 from hellward.audio.music import track_for
 from hellward.sim.campaign import CATHEDRAL, Location, first_offering, offers
 from hellward.sim.content import CURSES, DOOR, MONSTERS, SPELLS
+from hellward.sim.items import EMPTY_LOADOUT, Loadout
 from hellward.sim.model import SIM_DT, Monster, Refused, Tower, World
 from hellward.sim.players.hands import Hands, Player
 from hellward.sim.skills import NO_PERKS, SKILLS, Perks
@@ -45,14 +46,16 @@ class Silent:
 class BattleScene(Scene):
     background_color = (8, 6, 8, 255)
     controls = {
-        "1": "slot_1", "2": "slot_2", "3": "slot_3", "4": "slot_4", "5": "slot_5", "6": "slot_6", "7": "slot_7",
+        "1": "slot_1", "2": "slot_2", "3": "slot_3", "4": "slot_4", "5": "slot_5", "6": "slot_6", "7": "slot_7", "8": "slot_8",
         "space": "call_wave", "f": "toggle_speed", "p": "toggle_pause", "tab": "toggle_thoughts",
         "u": "upgrade", "s": "sell", "c": "cleanse", "escape": "cancel",
         "q": "spell_smite", "w": "spell_meteor", "e": "spell_orb",
+        "v": "sell_salvage",
     }
 
     def __init__(self, art: Art, location: Location = CATHEDRAL, *, perks: Perks = NO_PERKS,
-                 learned: frozenset[str] | None = None,
+                 learned: frozenset[str] | None = None, loadout: Loadout = EMPTY_LOADOUT,
+                 breach_claim: str | None = None,
                  seed: int = 0, planner: Callable | None = None, sound: Any = None,
                  autopilot: Player | None = None, on_end: Callable[[World], None] | None = None,
                  on_outcome: Callable[[World], None] | None = None,
@@ -62,6 +65,8 @@ class BattleScene(Scene):
         self.location = location
         self.perks = perks
         self.learned = frozenset(learned) if learned is not None else frozenset()
+        self.loadout = loadout
+        self.breach_claim = breach_claim
         self.replay: list[list] = []     # the person's commands, [time, name, args...], for a ghost to replay
         self._replay_written = False
         self.settings = settings
@@ -85,10 +90,10 @@ class BattleScene(Scene):
 
     def on_enter(self) -> None:
         self.camera = Camera((WIDTH, HEIGHT))
-        self.world = World(self.location, perks=self.perks, seed=self.seed, planner=self.planner)
+        self.world = World(self.location, perks=self.perks, seed=self.seed, planner=self.planner, loadout=self.loadout)
         self.view = WorldView(self, self.world, self.art)
         self.fx = Effects(self, self.view, self.world)
-        self.hud = Hud(self, self.world)
+        self.hud = Hud(self, self.world, breach_claim=self.breach_claim)
         self.lighting = Lighting(self, (MAP_X, MAP_Y), (self.world.level.width * T, self.world.level.height * T))
         self.hands = Hands(self.world, react=0.6)
         if self.settings is not None:
@@ -174,10 +179,13 @@ class BattleScene(Scene):
                 self.hud.banner("The wave is broken", f"+{e[2]} gold.{mend}", life=2.4)
             sound.play("cleared")
         elif kind == "bolt":
-            sound.play("fire_cast" if e[1].kind == "pyre" else "venom_cast", volume=0.6)
+            cue = {"arrow": "arrow_cast", "pyre": "fire_cast", "frost": "frost", "plague": "venom_cast"}[e[1].kind]
+            sound.play(cue, volume=0.6)
         elif kind == "impact":
             bolt = e[1]
-            sound.play(("fireball" if bolt.splash > 0 else "fire_hit") if bolt.kind == "pyre" else "venom_hit", volume=0.7)
+            cue = ("fireball" if bolt.splash > 0 else "fire_hit") if bolt.kind == "pyre" else (
+                "arrow_hit" if bolt.kind == "arrow" else "frost" if bolt.kind == "frost" else "venom_hit")
+            sound.play(cue, volume=0.7)
         elif kind == "chain":
             sound.play("lightning", volume=0.7)
         elif kind == "nova":
@@ -190,8 +198,28 @@ class BattleScene(Scene):
             sound.play("fire_hit", volume=0.8)
         elif kind == "death":
             sound.play(f"death_{e[2]}", volume=0.8)
-            if e[5] >= 20:
+            if e[5] >= 3:
                 sound.play("gold")
+        elif kind == "salvage":
+            self.hud.note(f"Salvage recovered ({world.salvage_held}). Bank it after victory or sell during a break.", style.GOLD)
+        elif kind == "salvage_sold":
+            self.hud.note(f"Sold {e[1]} salvage for {e[2]} battle gold.", style.GOLD)
+            sound.play("gold")
+        elif kind == "breach_choice":
+            if e[1] == "decline":
+                self.hud.note("The side entrance stays sealed.", style.DIM)
+            else:
+                self.hud.note(f"The side entrance opens for {'a trophy' if e[1] == 'trophy' else 'a cash cache'}.", style.UNIQUE)
+        elif kind == "breach_elite":
+            self.hud.banner(e[2], "An elite comes from the side entrance.", color=style.UNIQUE)
+        elif kind == "breach_cleared":
+            reward = "Its trophy is yours after a victory." if e[1] == "trophy" else "Its cash cache pays now."
+            self.hud.note(f"Side pack defeated. {reward}", style.HOLY)
+        elif kind == "breach_failed":
+            self.hud.note("A side monster escaped. Its cache is lost.", style.BLOOD)
+        elif kind == "breach_cash":
+            self.hud.note(f"Side cache: +{e[1]} gold.", style.GOLD)
+            sound.play("gold")
         elif kind == "leak":
             sound.play("leak")
             self.hud.note(f"{MONSTERS[e[2]].name} reached the sanctuary. -{e[3]} life.", style.BLOOD)
@@ -257,7 +285,7 @@ class BattleScene(Scene):
     # -- Commands --------------------------------------------------------------------------------
 
     def cost(self, key: str) -> int:
-        return DOOR.cost if key == "gate" else self.world.cost(key)
+        return self.world.door_cost if key == "gate" else self.world.cost(key)
 
     def _route(self) -> None:
         """Hand the world's events to the effects and the sound, and clear them."""
@@ -297,8 +325,9 @@ class BattleScene(Scene):
             n += 1
             path = folder / f"{stamp}-{self.location.key}-{n}.json"
         world = self.world
-        path.write_text(json.dumps({"version": 1, "location": self.location.key, "seed": self.seed,
-                                    "skills": sorted(self.learned), "outcome": world.outcome,
+        path.write_text(json.dumps({"version": 2, "location": self.location.key, "seed": self.seed,
+                                    "skills": sorted(self.learned), "loadout": list(world.loadout.equipped),
+                                    "outcome": world.outcome,
                                     "lives": world.lives, "time": world.time, "commands": self.replay}))
 
     def pick(self, key: str) -> None:
@@ -423,10 +452,21 @@ class BattleScene(Scene):
     def slot_7(self) -> None:
         self._slot(6)
 
+    def slot_8(self) -> None:
+        self._slot(7)
+
     def call_wave(self) -> None:
         if self.world.can_call_wave:
             if self._try(self.world.call_wave):
                 self._record("call_wave")
+
+    def choose_breach(self, mode: str) -> None:
+        if self._try(lambda: self.world.choose_breach(mode)):
+            self._record("breach", mode)
+
+    def sell_salvage(self) -> None:
+        if self.world.salvage_held and self._try(lambda: self.world.sell_salvage(1)):
+            self._record("sell_salvage", 1)
 
     def toggle_speed(self) -> None:
         self.speed = 1.0 if self.speed > 1 else 2.0
@@ -568,6 +608,10 @@ class BattleScene(Scene):
             self.pick(key)
         elif name == "call":
             self.call_wave()
+        elif kind == "breach":
+            self.choose_breach(key)
+        elif name == "salvage:sell":
+            self.sell_salvage()
         elif name == "speed":
             self.toggle_speed()
         elif name == "menu":

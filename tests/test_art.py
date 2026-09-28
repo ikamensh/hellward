@@ -68,6 +68,28 @@ class TestTowerRigs:
                 img = structures.tower_image(kind, rank)
                 assert img.width > 0 and img.height > 0, f"{kind}/rank{rank}: empty image"
 
+    def test_arrow_tower_has_three_visible_ranks(self):
+        """The starting tower has a visible stand-in at every upgrade rank."""
+        assert "arrow" in structures.TOWER_KINDS
+        images = [structures.tower_image("arrow", rank) for rank in range(3)]
+        assert all(image.getbbox() is not None for image in images)
+        assert len({image.tobytes() for image in images}) == 3
+        assert all(structures.tower_top("arrow", rank) < structures.tower_top("arrow", rank + 1)
+                   for rank in range(2))
+
+    def test_arrow_tower_loads_as_a_game_asset(self, tmp_path):
+        """The art registry exposes the new tower even while the painted sheet has only older towers."""
+        from saga2d import Game
+        from hellward.art import sprites
+
+        game = Game("Hellward art test", backend="mock", asset_path=tmp_path / "cache", save_dir=tmp_path / "saves")
+        try:
+            sprites.register(game, tmp_path / "cache")
+            for rank in range(3):
+                assert game.assets.has_image(f"tower/arrow/{rank}")
+        finally:
+            game.close()
+
 
 class TestAct2TowerRigs:
     """Act II towers (altar, grove) have proper rigs."""
@@ -119,13 +141,15 @@ class TestRestyleSubjects:
         for kind in crude_kinds:
             assert kind in FIXES, f"{kind}: missing FIXES entry for crude parts"
 
-    def test_tower_subject_includes_act2(self):
+    def test_tower_subject_includes_every_tower(self):
         from tools.restyle import tower_subject
         subj = tower_subject()
-        # Should have 6 towers * 3 ranks = 18 cells
-        assert len(subj.sheet.cells) == 18
+        assert len(subj.sheet.cells) == len(structures.TOWER_KINDS) * 3
         keys = [c.key for c in subj.sheet.cells]
-        for kind in ("altar", "grove"):
+        assert keys[:len(structures.TOWER_KINDS)] == [f"{kind}/0" for kind in structures.TOWER_KINDS]
+        assert "arrow tower" in subj.prompt.lower()
+        assert "seven" in subj.prompt.lower()
+        for kind in structures.TOWER_KINDS:
             for rank in range(3):
                 assert f"{kind}/{rank}" in keys, f"tower subject missing {kind}/{rank}"
 

@@ -15,6 +15,7 @@ from dataclasses import dataclass, replace
 from typing import Final
 
 from hellward.sim.content import DOOR, MANA_MAX, MANA_REGEN, SPELLS, TOWERS, TowerLevel
+from hellward.sim.items import EMPTY_LOADOUT, Loadout
 from hellward.sim.sums import int_sum
 
 
@@ -27,32 +28,35 @@ class Skill:
     cost: int
     blurb: str
     needs: tuple[str, ...] = ()   # what it works on (a tower kind, "gate" or a spell): it does nothing where none is offered
+    first_location: int = 0        # zero-based campaign stage; learned only when this location opens
 
 
-COLUMNS: dict[str, str] = {"fire": "Fire", "lightning": "Lightning", "cold": "Cold", "poison": "Poison",
-                           "bone": "Bone", "nature": "Nature", "warding": "Warding", "sorcery": "Sorcery"}
+COLUMNS: dict[str, str] = {"arrow": "Arrow", "fire": "Fire", "lightning": "Lightning", "cold": "Cold",
+                           "poison": "Poison", "bone": "Bone", "nature": "Nature", "warding": "Warding", "sorcery": "Sorcery"}
 
 SKILLS: dict[str, Skill] = {s.key: s for s in (
+    Skill("adept_arrow", "Adept of Arrows", "arrow", 1, 2, "Arrow Towers can be raised to the second rank.", ("arrow",)),
+    Skill("master_arrow", "Master of Arrows", "arrow", 2, 3, "Arrow Towers can be raised to the third rank.", ("arrow",)),
     Skill("adept_fire", "Adept of Fire", "fire", 1, 1, "Pyres can be raised to the second rank.", ("pyre",)),
-    Skill("fire_ball", "Fire Ball", "fire", 2, 2, "A Pyre's first rank bursts into fireballs too, and every blast is 0.3 wider.", ("pyre",)),
-    Skill("master_fire", "Master of Fire", "fire", 3, 2, "Pyres can be raised to the third rank.", ("pyre",)),
-    Skill("blaze", "Blaze", "fire", 4, 3, "Fireballs leave the floor burning for 2 seconds.", ("pyre",)),
+    Skill("master_fire", "Master of Fire", "fire", 2, 2, "Pyres can be raised to the third rank.", ("pyre",)),
+    Skill("fire_ball", "Fire Ball", "fire", 3, 2, "Pyre bolts burst into fireballs. Unlocked in the Jungle.", ("pyre",), 8),
+    Skill("blaze", "Blaze", "fire", 4, 3, "Fireballs leave the floor burning for 2 seconds.", ("pyre",), 8),
     Skill("adept_lightning", "Adept of Storms", "lightning", 1, 1, "Storm Obelisks can be raised to the second rank.", ("storm",)),
-    Skill("chain_lightning", "Chain Lightning", "lightning", 2, 2, "One more leap at every rank, and a leap keeps 95% of its strength.", ("storm",)),
-    Skill("master_lightning", "Master of Storms", "lightning", 3, 2, "Storm Obelisks can be raised to the third rank.", ("storm",)),
-    Skill("static_field", "Static Field", "lightning", 4, 3, "Lightning strikes a leader in reach first, and leaps to leaders first.", ("storm",)),
+    Skill("master_lightning", "Master of Storms", "lightning", 2, 2, "Storm Obelisks can be raised to the third rank.", ("storm",)),
+    Skill("static_field", "Static Field", "lightning", 3, 2, "Lightning strikes a leader in reach first, and leaps to leaders first.", ("storm",)),
+    Skill("chain_lightning", "Chain Lightning", "lightning", 4, 3, "Storm bolts gain one leap. Unlocked in the Drowned City.", ("storm",), 9),
     Skill("adept_cold", "Adept of Cold", "cold", 1, 1, "Frost Shrines can be raised to the second rank.", ("frost",)),
-    Skill("glacial_spike", "Glacial Spike", "cold", 2, 2, "Frost novas reach 0.4 further and hit 50% harder.", ("frost",)),
+    Skill("glacial_spike", "Glacial Spike", "cold", 2, 2, "Frost bolts reach 0.4 further and hit 50% harder.", ("frost",)),
     Skill("master_cold", "Master of Cold", "cold", 3, 2, "Frost Shrines can be raised to the third rank.", ("frost",)),
-    Skill("shatter", "Shatter", "cold", 4, 3, "A monster that dies chilled bursts: a tenth of its life as cold to those around it.", ("frost",)),
+    Skill("shatter", "Shatter", "cold", 4, 3, "Frost bolts burst near their target. A chilled death shatters nearby foes. Unlocked in the Jungle.", ("frost",), 8),
     Skill("adept_poison", "Adept of Poison", "poison", 1, 1, "Plague Totems can be raised to the second rank.", ("plague",)),
-    Skill("contagion", "Contagion", "poison", 2, 2, "When a poisoned monster dies, its venom leaps to the nearest monster.", ("plague",)),
-    Skill("master_poison", "Master of Poison", "poison", 3, 2, "Plague Totems can be raised to the third rank.", ("plague",)),
-    Skill("lower_resist", "Lower Resist", "poison", 4, 3, "A poisoned monster resists everything 25 points less. Immunities hold.", ("plague",)),
+    Skill("master_poison", "Master of Poison", "poison", 2, 2, "Plague Totems can be raised to the third rank.", ("plague",)),
+    Skill("lower_resist", "Lower Resist", "poison", 3, 2, "A poisoned monster resists everything 25 points less. Immunities hold.", ("plague",)),
+    Skill("contagion", "Contagion", "poison", 4, 3, "When a poisoned monster dies, its venom leaps to the nearest monster.", ("plague",), 8),
     Skill("adept_bone", "Adept of Bone", "bone", 1, 1, "Bone Altars can be raised to the second rank.", ("altar",)),
-    Skill("corpse_explosion", "Corpse Explosion", "bone", 2, 2, "A monster that dies amplified bursts for 15% of its life, unresisted, within 1.2.", ("altar",)),
-    Skill("master_bone", "Master of Bone", "bone", 3, 2, "Bone Altars can be raised to the third rank.", ("altar",)),
-    Skill("life_tap", "Life Tap", "bone", 4, 3, "A monster that dies amplified gives a fifth of its bounty in mana.", ("altar",)),
+    Skill("master_bone", "Master of Bone", "bone", 2, 2, "Bone Altars can be raised to the third rank.", ("altar",)),
+    Skill("life_tap", "Life Tap", "bone", 3, 2, "A monster that dies amplified gives a fifth of its bounty in mana.", ("altar",)),
+    Skill("corpse_explosion", "Corpse Explosion", "bone", 4, 3, "A monster that dies amplified bursts for 15% of its life, unresisted, within 1.2.", ("altar",), 9),
     Skill("adept_nature", "Adept of Nature", "nature", 1, 1, "Druid Groves can be raised to the second rank.", ("grove",)),
     Skill("hurricane", "Hurricane", "nature", 2, 2, "Walkers within 2.5 tiles of a grove move 20% slower.", ("grove",)),
     Skill("master_nature", "Master of Nature", "nature", 3, 2, "Druid Groves can be raised to the third rank.", ("grove",)),
@@ -80,20 +84,21 @@ def cost(learned: Iterable[str]) -> int:
     return int_sum(SKILLS[key].cost for key in learned)
 
 
-def can_learn(learned: frozenset[str], key: str, sigils: int) -> bool:
+def can_learn(learned: frozenset[str], key: str, sigils: int, stage: int | None = None) -> bool:
     skill = SKILLS[key]
     needed = above(skill)
-    return key not in learned and (needed is None or needed.key in learned) and cost(learned) + skill.cost <= sigils
+    return (key not in learned and (needed is None or needed.key in learned) and cost(learned) + skill.cost <= sigils
+            and (stage is None or stage >= skill.first_location))
 
 
-def kept(learned: Iterable[str], sigils: int) -> frozenset[str]:
+def kept(learned: Iterable[str], sigils: int, stage: int | None = None) -> frozenset[str]:
     """The learned skills a save from an older tree keeps: those the tree still has, each with every skill above it
     in its column learned too (a skill the tree lost, or moved above one learned, takes those below it along), top
     tier first while the sigils pay for them (a skill whose price rose is unlearned rather than owed)."""
     have = {key for key in learned if key in SKILLS}
     out: frozenset[str] = frozenset()
     for skill in sorted((SKILLS[key] for key in have), key=lambda s: (s.tier, s.key)):
-        if can_learn(out, skill.key, sigils):
+        if can_learn(out, skill.key, sigils, stage):
             out |= {skill.key}
     return out
 
@@ -107,6 +112,7 @@ def check(learned: frozenset[str]) -> None:
 
 
 RANK_SKILL: Final[dict[str, tuple[str, str]]] = {
+    "arrow": ("adept_arrow", "master_arrow"),
     "pyre": ("adept_fire", "master_fire"),
     "storm": ("adept_lightning", "master_lightning"),
     "frost": ("adept_cold", "master_cold"),
@@ -162,9 +168,12 @@ class Perks:
 NO_PERKS: Final = Perks()
 
 
-def perks(learned: Iterable[str]) -> Perks:
+def perks(learned: Iterable[str], stage: int | None = None) -> Perks:
     chosen = frozenset(learned)
     check(chosen)
+    if stage is not None:
+        chosen = frozenset(key for key in chosen if SKILLS[key].first_location <= stage)
+        check(chosen)
     p = NO_PERKS
     tops: dict[str, int] = {}
     for kind, (adept, master) in RANK_SKILL.items():
@@ -213,28 +222,39 @@ def perks(learned: Iterable[str]) -> Perks:
     return p
 
 
-_BAKED: Final[dict[Perks, dict[str, tuple[TowerLevel, ...]]]] = {}
+_BAKED: Final[dict[tuple[Perks, Loadout], dict[str, tuple[TowerLevel, ...]]]] = {}
 
 
-def baked(p: Perks) -> dict[str, tuple[TowerLevel, ...]]:
+def baked(p: Perks, loadout: Loadout = EMPTY_LOADOUT) -> dict[str, tuple[TowerLevel, ...]]:
     """Every tower kind's ranks with the perks in them, worked out once per set of perks: every world begins with
     them, and so does every clone the planner looks ahead in. Nothing changes them."""
-    found = _BAKED.get(p)
+    key = (p, loadout)
+    found = _BAKED.get(key)
     if found is None:
-        found = _BAKED[p] = {kind: tower_levels(kind, p) for kind in TOWERS}
+        found = _BAKED[key] = {kind: tower_levels(kind, p, loadout) for kind in TOWERS}
     return found
 
 
-def tower_levels(kind: str, p: Perks) -> tuple[TowerLevel, ...]:
+def tower_levels(kind: str, p: Perks, loadout: Loadout = EMPTY_LOADOUT) -> tuple[TowerLevel, ...]:
     """A tower kind's ranks with the perks baked in."""
     ranks = TOWERS[kind].levels
-    if kind == "pyre":
+    if kind == "arrow":
+        trained = tuple(ranks)
+    elif kind == "pyre":
         splash = [0.8, ranks[1].splash + 0.3, ranks[2].splash + 0.3] if p.fire_ball else [r.splash for r in ranks]
-        return tuple(replace(r, splash=splash[i]) for i, r in enumerate(ranks))
-    if kind == "storm":
-        return tuple(replace(r, chains=r.chains + p.extra_leaps) for r in ranks)
-    if kind == "frost":
-        return tuple(replace(r, damage=r.damage * p.frost_damage, range=r.range + p.frost_reach) for r in ranks)
-    if kind in ("plague", "altar", "grove"):
-        return tuple(ranks)
-    raise KeyError(kind)
+        trained = tuple(replace(r, splash=splash[i]) for i, r in enumerate(ranks))
+    elif kind == "storm":
+        trained = tuple(replace(r, chains=r.chains + p.extra_leaps) for r in ranks)
+    elif kind == "frost":
+        trained = tuple(replace(r, damage=r.damage * p.frost_damage, range=r.range + p.frost_reach,
+                                splash=0.9 if p.shatter else 0.0) for r in ranks)
+    elif kind in ("plague", "altar", "grove"):
+        trained = tuple(ranks)
+    else:
+        raise KeyError(kind)
+    pattern = loadout.for_family(kind)
+    if pattern is None:
+        return trained
+    return tuple(replace(r, damage=r.damage + pattern.damage_delta[i], splash=r.splash + pattern.splash_delta[i],
+                         chains=r.chains + pattern.chain_delta[i], rate=r.rate * pattern.rate_factor,
+                         leader_bonus=pattern.leader_damage_bonus) for i, r in enumerate(trained))

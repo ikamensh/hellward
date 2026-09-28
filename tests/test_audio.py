@@ -19,10 +19,10 @@ from hellward.audio.music import PIECES
 from hellward.sim.content import MONSTERS
 from saga2d import Game
 from sagaforge.foley import mono, read_wav
-from sagaforge.synth import SAMPLE_RATE
+from sagaforge.synth import SAMPLE_RATE, write_wav
 
 SCENE_CUES = {"click", "refuse", "build", "upgrade", "sell", "door_build", "door_hit", "door_break", "wave", "cleared", "leak",
-              "gold", "cleanse", "ponder", "chant", "curse", "fizzle", "fire_cast", "fire_hit", "fireball", "lightning", "frost",
+              "gold", "cleanse", "ponder", "chant", "curse", "fizzle", "arrow_cast", "arrow_hit", "fire_cast", "fire_hit", "fireball", "lightning", "frost",
               "venom_cast", "venom_hit", "victory", "defeat", "smite", "meteor_fall", "meteor", "orb", "ward", "broken"}
 STEMS = list(files())
 
@@ -95,7 +95,7 @@ def test_every_cue_file_is_a_clean_sound(cache: Path, stem: str):
 
 
 def test_several_takes_of_what_plays_often():
-    for cue in ("door_hit", "fire_hit", "fire_cast", "lightning", "frost", "venom_hit", "gold") + tuple(f"death_{kind}" for kind in MONSTERS):
+    for cue in ("door_hit", "arrow_cast", "arrow_hit", "fire_hit", "fire_cast", "lightning", "frost", "venom_hit", "gold") + tuple(f"death_{kind}" for kind in MONSTERS):
         assert CUES[cue].takes >= 2, cue
 
 
@@ -127,6 +127,17 @@ def test_a_fireball_booms_more_than_a_fire_bolt(cache: Path):
 def test_frost_and_lightning_ring_brighter_than_fire(cache: Path):
     fire = max(centroid(sound(cache, stem)) for stem in takes("fire_hit") + takes("fireball"))
     assert min(centroid(sound(cache, stem)) for stem in takes("frost") + takes("lightning")) > 2 * fire
+
+
+def test_an_arrow_has_a_short_dry_release_and_a_restrained_impact():
+    """The opening tower sounds physical and leaves room for the fight's magic."""
+    release = CUES["arrow_cast"].render(0)
+    impact = CUES["arrow_hit"].render(0)
+    fire = CUES["fire_hit"].render(0)
+    assert 0.07 <= len(release) / SAMPLE_RATE <= 0.3
+    assert 0.07 <= len(impact) / SAMPLE_RATE <= 0.3
+    assert 0 < loudness(release) < loudness(fire)
+    assert 0 < loudness(impact) < loudness(fire)
 
 
 def test_the_wave_bell_rings_on(cache: Path):
@@ -196,6 +207,33 @@ def test_every_cue_plays_through_the_game(game: Game):
     assert len(game.backend.sounds_played) == len(CUES)
     with pytest.raises(KeyError):
         bank.play("trumpet")
+
+
+def test_arrow_release_and_impact_play_as_distinct_rotating_sounds(tmp_path: Path):
+    """Repeated arrows reach the mock game's audio backend with varied takes."""
+    sounds = tmp_path / "sounds"
+    sounds.mkdir()
+    stems = [stem for cue in ("arrow_cast", "arrow_hit") for stem in takes(cue)]
+    renderers = files()
+    for stem in stems:
+        write_wav(sounds / f"{stem}.wav", renderers[stem]())
+    (sounds / "VERSION").write_text(VERSION)
+    game = Game("Hellward arrow test", backend="mock", resolution=(800, 600), asset_path=tmp_path)
+    try:
+        clock = Clock()
+        bank = SoundBank(game, clock=clock, seed=9)
+        for _ in range(3):
+            assert bank.play("arrow_cast")
+            clock.now += 0.2
+            assert bank.play("arrow_hit")
+            clock.now += 0.2
+        names = {game.assets.sound(stem): stem for stem in stems}
+        heard = [names[p["handle"]] for p in game.backend.sounds_played]
+        assert all(stem.startswith("arrow_cast") for stem in heard[::2])
+        assert all(stem.startswith("arrow_hit") for stem in heard[1::2])
+        assert len(set(heard[::2])) >= 2 and len(set(heard[1::2])) >= 2
+    finally:
+        game.close()
 
 
 def test_the_voice_budget_holds_battle_cues_back(game: Game):

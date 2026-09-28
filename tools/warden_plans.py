@@ -19,10 +19,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import random
 import statistics
 import sys
 import time
+from collections.abc import Iterable
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
@@ -35,7 +37,7 @@ from hellward.sim.players.hands import Hands, defend, react_for  # noqa: E402
 from hellward.sim.players.warden import (  # noqa: E402
     PLANS, Plan, Step, Warden, draft_build, draft_skills, fingerprint, plan_key, tile_value,
 )
-from hellward.sim.skills import SKILLS, above, can_learn, perks, tower_levels  # noqa: E402
+from hellward.sim.skills import SKILLS, above, can_learn, kept, perks, tower_levels  # noqa: E402
 
 LEADERS = {"smart": planner.smart, "greedy": planner.greedy}
 UNCAPPED = 100_000
@@ -56,7 +58,7 @@ def lost(row: dict, key: str, sigils: int, seed: int, hp: float, leaders: str) -
     location = LOCATIONS[key]
     player = Warden(plan=Plan.of(row))
     learned = player.skills(location, sigils)
-    world = World(location, hardness=hp, perks=perks(learned), seed=seed, planner=LEADERS[leaders])
+    world = World(location, hardness=hp, perks=perks(learned, ORDER.index(location.key)), seed=seed, planner=LEADERS[leaders])
     world.lives = UNCAPPED
     hands = Hands(world, react_for(seed))
     while world.outcome is None and world.time < LIMIT:
@@ -114,13 +116,14 @@ def tidy(steps: list[Step], location: Location) -> list[Step]:
     return out
 
 
-def reskill(learned: frozenset[str], sigils: int, rng: random.Random) -> frozenset[str]:
+def reskill(learned: frozenset[str], sigils: int, rng: random.Random, stage: int) -> frozenset[str]:
     """Unlearn a skill nothing below needs, then learn at random until the sigils run out."""
+    learned = kept(learned, sigils, stage)
     leaves = [k for k in learned if not any(above(SKILLS[o]) is SKILLS[k] for o in learned)]
     if leaves:
         learned = learned - {rng.choice(sorted(leaves))}
     while True:
-        options = [k for k in SKILLS if can_learn(learned, k, sigils)]
+        options = [k for k in SKILLS if can_learn(learned, k, sigils, stage)]
         if not options:
             return learned
         learned = learned | {rng.choice(options)}
@@ -128,7 +131,8 @@ def reskill(learned: frozenset[str], sigils: int, rng: random.Random) -> frozens
 
 def mutate(plan: Plan, location: Location, sigils: int, rng: random.Random) -> Plan:
     steps = list(plan.steps)
-    skills, early = plan.skills, plan.early
+    stage = ORDER.index(location.key)
+    skills, early = kept(plan.skills, sigils, stage), plan.early
     kinds = location.arsenal.towers
     level = location.level
     tiles = [(x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y)]
@@ -173,7 +177,7 @@ def mutate(plan: Plan, location: Location, sigils: int, rng: random.Random) -> P
             if step.what == "build":
                 steps = [s for s in steps if not (s.what == "up" and s.tile == step.tile)]
         elif move == "skills":
-            skills = reskill(skills, sigils, rng)
+            skills = reskill(skills, sigils, rng, stage)
         elif move == "early":
             early = rng.choice(EARLY)
     return Plan(skills, tuple(tidy(steps, location)), early, plan.map)
@@ -208,6 +212,15 @@ def score(pool: ProcessPoolExecutor, rows: list[dict], key: str, sigils: int, se
     return [sum(lives[i * len(seeds):(i + 1) * len(seeds)]) for i in range(len(rows))]
 
 
+def starting_life(requested: float | None, margins: Iterable[float]) -> float:
+    """Start at ordinary life when a draft loses every seed; raising zero life cannot progress."""
+    if requested is not None:
+        if not math.isfinite(requested) or requested <= 0:
+            raise ValueError("starting life must be finite and positive")
+        return requested
+    return max(1.0, statistics.median(margins))
+
+
 def search(args: argparse.Namespace) -> None:
     key = args.location
     sigils = args.sigils if args.sigils is not None else 3 * ORDER.index(key)
@@ -216,11 +229,13 @@ def search(args: argparse.Namespace) -> None:
     rng = random.Random(args.rng)
     rows, row = stored(key, sigils)
     best = draft(location, sigils) if args.fresh else Plan.of(row)
+    best = Plan(kept(best.skills, sigils, ORDER.index(key)), best.steps, best.early, fingerprint(location))
     evaluated = 0
     started = time.time()
     with ProcessPoolExecutor(args.jobs) as pool:
-        hp = args.hp or statistics.median(pool.map(margin, *zip(*[(best.row(), key, sigils, s, args.leaders)
-                                                                   for s in seeds])))
+        margins = (pool.map(margin, *zip(*[(best.row(), key, sigils, s, args.leaders)
+                                          for s in seeds])) if args.hp is None else ())
+        hp = starting_life(args.hp, margins)
         best_score = score(pool, [best.row()], key, sigils, seeds, hp, args.leaders)[0]
         print(f"{key} sigils {sigils}: start at life x{hp:.2f}, {best_score} lives lost", flush=True)
         for round_ in range(args.rounds):

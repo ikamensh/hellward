@@ -13,21 +13,22 @@ from typing import Callable
 from saga2d import Scene
 
 from hellward.art.fx import ORB_LEVELS
+from hellward.sim.balance import BALANCE
 from hellward.sim.campaign import first_offering, offers
-from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, START_LIVES, TOWERS, Element, MonsterKind
+from hellward.sim.content import CURSES, MONSTERS, SELL_REFUND, SPELLS, START_LIVES, TOWERS, Element, MonsterKind
 from hellward.sim.model import Monster, Tower, World
 from hellward.sim.skills import SKILLS
 from hellward.ui import style, widgets
 
 TOP = 672
 SLOT = 68
-BUILD = ("pyre", "storm", "frost", "plague", "gate")
+BUILD = ("arrow", "pyre", "storm", "frost", "plague", "gate")
 NEW_TOWERS = ("altar", "grove")   # drawn after the gate, but only where a location offers them
 SLOT_X = 146
 SPELL_BAR = ("smite", "meteor", "orb")       # Cleanse is C, and the button on a selected tower
 SPELL_KEYS = {"smite": "Q", "meteor": "W", "orb": "E"}
 SPELL_X = 918
-ELEMENT_NAMES = {Element.FIRE: "Fire", Element.LIGHTNING: "Lightning", Element.COLD: "Cold", Element.POISON: "Poison",
+ELEMENT_NAMES = {Element.PHYSICAL: "Physical", Element.FIRE: "Fire", Element.LIGHTNING: "Lightning", Element.COLD: "Cold", Element.POISON: "Poison",
                  Element.BONE: "Bone", Element.NATURE: "Nature"}
 DISC = {"altar": (214, 204, 176, 255), "grove": (120, 230, 60, 255)}   # a coloured rune disc while a kind has no sprite
 
@@ -36,7 +37,7 @@ BUILD_WIDTH = 402   # from SLOT_X to the centre panel
 
 
 def slot_size(count: int) -> tuple[float, float]:
-    """A build slot's size and the step from one to the next: full size for the five of Act I, smaller when a location
+    """A build slot's size and the step from one to the next: full size for a short arsenal, smaller when a location
     offers the Act II towers too, so the bar ends before the centre panel."""
     if count * (SLOT + 10) - 10 <= BUILD_WIDTH:
         return float(SLOT), float(SLOT + 10)
@@ -82,6 +83,7 @@ class Banner:
 class Hud:
     scene: Scene
     world: World
+    breach_claim: str | None = None
     controls: list[Control] = field(default_factory=list)
     log: list[tuple[float, str, tuple]] = field(default_factory=list)
     banners: list[Banner] = field(default_factory=list)
@@ -124,6 +126,8 @@ class Hud:
                 self._monster_bar(hovered)
             self._chronicle()
             self._banners()
+            self._salvage()
+            self._breach_offer()
         if mouse is not None:
             control = self.hit(*mouse)
             if control is not None and control.tip:
@@ -328,9 +332,9 @@ class Hud:
             status = f"Wave {world.wave + 1} of {len(world.waves)}" + (f": {status}" if status else "")
         scene.draw_text(scene.fit_text(status, 340, font_size=14), x0, y0 + 40, font_size=14, color=style.BONE, anchor_y="center")
         if world.can_call_wave:
-            bonus = int(world.break_left) if world.break_left is not None and world.wave >= 0 else 0
+            bonus = world.early_call_bonus
             label = "Summon the next wave" + (f"  +{bonus}" if bonus else "")
-            self._button("call", x0, TOP + 86, 250, 28, label, tip="[Space] Call the next wave now; gold for every second you spare.")
+            self._button("call", x0, TOP + 86, 250, 28, label, tip="[Space] Call the next wave now for the shown gold bonus.")
 
     def _gold(self) -> None:
         scene = self.scene
@@ -341,16 +345,68 @@ class Hud:
         scene.draw_circle(x - width - 13, TOP + 29, 8, (200, 160, 60, 255))
         scene.draw_circle(x - width - 13, TOP + 29, 5, (240, 204, 110, 255))
 
+    def _salvage(self) -> None:
+        world = self.world
+        if world.salvage_held == 0 or world.outcome is not None:
+            return
+        scene = self.scene
+        x, y = 58, 45
+        scene.draw_rect(x, y, 210, 54, (13, 10, 12, 225), border_color=style.GOLD, border_width=1, radius=5)
+        scene.draw_text(f"Salvage held: {world.salvage_held}", x + 9, y + 14, font_size=14, color=style.PALE_GOLD,
+                        anchor_y="center")
+        if world.break_left is not None:
+            gold = BALANCE.salvage_sale_gold(world.stage)
+            self._button("salvage:sell", x + 7, y + 25, 196, 24, f"Sell 1 for {gold} gold [V]",
+                         tip="Take battle gold now. Unsold salvage is banked after a victory for tower patterns.")
+        else:
+            scene.draw_text("Bank on victory · sell at a break", x + 9, y + 40, font_size=11,
+                            color=style.DIM, anchor_y="center")
+
+    def _breach_offer(self) -> None:
+        world = self.world
+        if not world.breach_offered:
+            return
+        spec = world.breach_spec
+        assert spec is not None
+        scene = self.scene
+        x, y, width = 314, 62, 632
+        scene.draw_rect(x, y, width, 164, (15, 9, 16, 240), border_color=style.UNIQUE,
+                        border_width=2, radius=7)
+        scene.draw_text(f"Sealed entrance: {spec.name}", x + width / 2, y + 23, font_size=22,
+                        color=style.UNIQUE, font=style.TITLE_FONT, anchor_x="center", anchor_y="center")
+        scene.draw_text(scene.fit_text(spec.blurb, width - 32, font_size=14), x + width / 2, y + 52,
+                        font_size=14, color=style.BONE, anchor_x="center", anchor_y="center")
+        roster = f"Next wave {spec.after_wave + 2}: {spec.elite_name} ({MONSTERS[spec.elite.kind].name})"
+        roster += " · " + ", ".join(f"{group.count} {MONSTERS[group.kind].name}" for group in spec.pack)
+        scene.draw_text(scene.fit_text(roster, width - 32, font_size=13), x + width / 2, y + 75,
+                        font_size=13, color=style.BONE, anchor_x="center", anchor_y="center")
+        scene.draw_text("Clear every side enemy for the chosen reward; a trophy is kept only on victory.",
+                        x + width / 2, y + 99, font_size=12, color=style.PALE_GOLD,
+                        anchor_x="center", anchor_y="center")
+        cache = BALANCE.breach_cache(world.stage)
+        self._button("breach:cash", x + 12, y + 119, 190, 32, f"Open · +{cache} gold",
+                     tip="Clear the side pack for its kill gold and a battle cash cache. The first clear fixes this site's reward.")
+        trophy_available = self.breach_claim is None
+        trophy_label = "Open · trophy" if trophy_available else (
+            "Trophy forfeited" if self.breach_claim == "cash" else "Trophy already claimed")
+        self._button("breach:trophy", x + 216, y + 119, 190, 32, trophy_label,
+                     enabled=trophy_available,
+                     tip="Clear the side pack and win to keep a unique forging trophy. Forged patterns can make towers stronger later."
+                     if trophy_available else "This site's permanent reward was already settled on an earlier defence.",
+                     accent=style.UNIQUE)
+        self._button("breach:decline", x + 420, y + 119, 200, 32, "Keep sealed",
+                     tip="Skip the harder side pack. Calling the next wave without choosing also keeps it sealed.")
+
     def _monster_bar(self, m: Monster) -> None:
         """Diablo's bar at the top of the screen: the name, the life left, and what it resists."""
         scene = self.scene
         kind = m.kind
         max_hp = m.max_hp
         w, x, y = 300, 640 - 150, 10
-        color = style.BOSS if kind.key == "azazel" else style.UNIQUE if kind.leader else style.BONE
+        color = style.BOSS if kind.key == "azazel" else style.UNIQUE if kind.leader or m.elite_name else style.BONE
         scene.draw_rect(x, y, w, 24, (40, 6, 8, 230), border_color=(120, 30, 30, 255), border_width=1.5)
         scene.draw_rect(x + 2, y + 2, (w - 4) * max(0.0, m.hp / max_hp), 20, (150, 16, 20, 255))
-        scene.draw_text(kind.name, 640, y + 12, font_size=16, color=color, font=style.TITLE_FONT, anchor_x="center", anchor_y="center")
+        scene.draw_text(m.elite_name or kind.name, 640, y + 12, font_size=16, color=color, font=style.TITLE_FONT, anchor_x="center", anchor_y="center")
         notes = monster_notes(kind)
         if kind.leader:
             notes.append("Leader: curses " + " and ".join(CURSES[c].name for c in kind.leader.curses))

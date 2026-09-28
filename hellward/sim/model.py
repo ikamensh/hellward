@@ -2,7 +2,7 @@
 
 The scene steps a :class:`World` in whole :data:`SIM_DT` s. The leaders' planner clones the world and steps
 the clones at a coarser ``dt`` to look ahead, so a step must be cheap, deterministic and free of anything
-the clone does not carry. Randomness only decides where in the corridor a monster walks (``lane``) and how
+the clone does not carry. Randomness chooses a wanderer's committed route, its visual lane, and how
 far back from a door it queues (``jostle``); it comes from the world's own seeded stream.
 
 A world is one :class:`~hellward.sim.campaign.Location`, with the player's learned skills
@@ -22,13 +22,17 @@ import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Final
 
-from hellward.sim.campaign import CATHEDRAL, Location
+from hellward.sim.balance import BALANCE
+from hellward.sim.breaches import BREACHES
+from hellward.sim.campaign import CATHEDRAL, ORDER, Location
 from hellward.sim.content import (
     BURN_RADIUS, CONTAGION_REACH, CORPSE_RADIUS, CORPSE_SHARE, CURSES, DOOR, EARLY_CALL_GOLD, HURRICANE_RADIUS,
     HURRICANE_SLOW, MANA_START, MAX_POISON_STACKS, MONSTERS, SELL_REFUND, SHATTER_RADIUS, SHATTER_SHARE, SOUL, SPELLS,
     START_LIVES, THORNS, TOWERS, TWISTER_HELD, TWISTER_PERIOD, TWISTER_RADIUS, WARD, WAVE_BREAK, Curse, Element,
     MonsterKind, TowerKind, TowerLevel,
 )
+from hellward.sim.items import EMPTY_LOADOUT, Loadout, PATTERNS
+from hellward.sim.level import Level
 from hellward.sim.skills import NO_PERKS, RANK_SKILL, SKILLS, Perks, baked
 
 if TYPE_CHECKING:
@@ -51,16 +55,25 @@ class Refused(Exception):
 
 
 class Monster:
-    __slots__ = ("id", "kind", "hp", "max_hp", "s", "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
+    __slots__ = ("id", "kind", "hp", "max_hp", "s", "route", "bounty", "salvage", "breach", "elite_name", "speed_factor",
+                 "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
                  "cooldown", "asking", "ask_left", "chant_curse", "chant_spot", "chant_left", "door",
                  "amplified", "amplify", "risen", "marking", "resolute")
 
-    def __init__(self, id: int, kind: MonsterKind, wave: int, lane: float, jostle: float, hp: float, cooldown: float) -> None:
+    def __init__(self, id: int, kind: MonsterKind, wave: int, lane: float, jostle: float, hp: float, cooldown: float,
+                 route: str = "main", bounty: int | None = None, salvage: int = 0, breach: bool = False,
+                 elite_name: str = "", speed_factor: float = 1.0) -> None:
         self.id = id
         self.kind = kind
         self.hp = hp
         self.max_hp = hp
         self.s = 0.0
+        self.route = route
+        self.bounty = kind.bounty if bounty is None else bounty
+        self.salvage = salvage
+        self.breach = breach
+        self.elite_name = elite_name
+        self.speed_factor = speed_factor
         self.lane = lane
         self.jostle = jostle
         self.chill = 0.0
@@ -83,7 +96,8 @@ class Monster:
 
     def copy(self) -> Monster:
         """Everything but a leader's pending question to its planner."""
-        m = Monster(self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown)
+        m = Monster(self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown, self.route,
+                    self.bounty, self.salvage, self.breach, self.elite_name, self.speed_factor)
         m.max_hp, m.s, m.chill, m.chill_left, m.frozen = self.max_hp, self.s, self.chill, self.chill_left, self.frozen
         m.poison = [stack[:] for stack in self.poison]
         m.chant_curse, m.chant_spot, m.chant_left, m.door = self.chant_curse, self.chant_spot, self.chant_left, self.door
@@ -92,13 +106,15 @@ class Monster:
         return m
 
     def __reduce__(self) -> tuple[Any, ...]:
-        return Monster, (self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown), self.__getstate__()
+        return Monster, (self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown, self.route,
+                         self.bounty, self.salvage, self.breach, self.elite_name, self.speed_factor), self.__getstate__()
 
     @property
     def speed(self) -> float:
         if self.frozen > 0:
             return 0.0
-        return self.kind.speed * (1.0 - self.chill) if self.chill_left > 0 else self.kind.speed
+        return (self.kind.speed * self.speed_factor * (1.0 - self.chill) if self.chill_left > 0
+                else self.kind.speed * self.speed_factor)
 
     @property
     def chanting(self) -> bool:
@@ -198,11 +214,13 @@ class Bolt:
     given. It is a class of its own rather than a dataclass, whose ``__init__`` runs interpreted when compiled."""
 
     __slots__ = ("id", "tower", "kind", "target", "left", "damage", "element", "splash", "poison", "poison_time",
+                 "chill", "chill_time", "leader_bonus",
                  "origin", "last")
 
     def __init__(self, id: int, tower: int, kind: str, target: int, left: float, damage: float, element: Element,
                  splash: float, poison: float, poison_time: float, origin: tuple[float, float],
-                 last: tuple[float, float]) -> None:
+                 last: tuple[float, float], chill: float = 0.0, chill_time: float = 0.0,
+                 leader_bonus: float = 0.0) -> None:
         self.id = id
         self.tower = tower
         self.kind = kind                # the tower kind's key
@@ -213,12 +231,16 @@ class Bolt:
         self.splash = splash
         self.poison = poison
         self.poison_time = poison_time
+        self.chill = chill
+        self.chill_time = chill_time
+        self.leader_bonus = leader_bonus
         self.origin = origin
         self.last = last                # the target's last known position
 
     def __reduce__(self) -> tuple[Any, ...]:
         return Bolt, (self.id, self.tower, self.kind, self.target, self.left, self.damage, self.element, self.splash,
-                      self.poison, self.poison_time, self.origin, self.last)
+                      self.poison, self.poison_time, self.origin, self.last, self.chill, self.chill_time,
+                      self.leader_bonus)
 
 
 @dataclass(frozen=True)
@@ -268,15 +290,28 @@ Planner = Callable[["World", int], Any]   # returns a handle with .result() -> D
 
 class World:
     def __init__(self, location: Location = CATHEDRAL, *, hardness: float = 1.0, perks: Perks = NO_PERKS,
-                 seed: int = 0, planner: Planner | None = None, record: bool = True, curse_scale: float = 1.0) -> None:
+                 seed: int = 0, planner: Planner | None = None, record: bool = True, curse_scale: float = 1.0,
+                 loadout: Loadout = EMPTY_LOADOUT) -> None:
         self.location = location
+        self.stage = ORDER.index(location.key)
         self.level = location.level
         self.waves = location.waves
         self.perks = perks
-        self.tower_levels = baked(perks)
+        self.loadout = Loadout(tuple(key for key in loadout.equipped if PATTERNS[key].first_location <= self.stage + 1))
+        self.tower_levels = baked(perks, self.loadout)
         self.hardness = hardness   # every monster's life is multiplied by this; the spells are not
         self.curse_scale = curse_scale  # multiplies every curse radius (0 = only the marked tile)
         self.rng = random.Random(seed)
+        self.route_rng = random.Random(seed ^ 0x51DE)
+        ordinary_spawns = 0
+        for wave in self.waves:
+            for group in wave.groups:
+                ordinary_spawns += group.count
+        self.loot_ordinals = frozenset(random.Random(seed ^ 0x5A17).sample(
+            range(ordinary_spawns), min(BALANCE.salvage_budget, ordinary_spawns)))
+        self.spawn_ordinal = 0
+        self.salvage_held = 0
+        self.salvage_sold = 0
         self.planner = planner
         self.record = record
         self.events: list[tuple] = []
@@ -286,12 +321,20 @@ class World:
         self.mana = min(MANA_START, perks.mana_max)
         self.towers: dict[int, Tower] = {}
         self.doors = [Door(i, tile, s) for i, (tile, s) in enumerate(zip(self.level.doors, self.level.door_s))]
-        self.monsters: list[Monster] = []     # alive and on the map, furthest along first
+        self.monsters: list[Monster] = []     # alive and on the map, nearest the sanctuary first
         self.bolts: list[Bolt] = []
         self.meteors: list[Meteor] = []
         self.hazards: list[Hazard] = []
         self.wave = -1                        # index of the latest wave called
-        self.schedule: list[tuple[float, str]] = []   # (seconds after the wave began, monster kind), soonest last
+        self.schedule: list[tuple[float, str, str]] = []   # (wave time, monster kind, authored route), soonest last
+        self.gold_schedule: list[int] = []     # each scheduled spawn's allocated gold, soonest last
+        self.breach_schedule: list[bool] = []
+        self.elite_schedule: list[bool] = []
+        self.breach_spec = BREACHES.get(location.key)
+        self.breach_mode: str | None = None
+        self.breach_remaining = 0
+        self.breach_failed = False
+        self.breach_cleared = False
         self.wave_time = 0.0
         self.break_left: float | None = FIRST_WAVE_BREAK
         self.wave_alive: dict[int, int] = {}
@@ -311,8 +354,12 @@ class World:
 
     def clone(self) -> World:
         """A private copy to look ahead in: no events, no planner, its own random stream."""
-        w = World(self.location, hardness=self.hardness, perks=self.perks, record=False, curse_scale=self.curse_scale)
+        w = World(self.location, hardness=self.hardness, perks=self.perks, record=False, curse_scale=self.curse_scale,
+                  loadout=self.loadout)
         w.rng.setstate(self.rng.getstate())
+        w.route_rng.setstate(self.route_rng.getstate())
+        w.loot_ordinals, w.spawn_ordinal = self.loot_ordinals, self.spawn_ordinal
+        w.salvage_held, w.salvage_sold = self.salvage_held, self.salvage_sold
         w.time, w.gold, w.lives, w.mana = self.time, self.gold, self.lives, self.mana
         w.towers = {i: t.copy() for i, t in self.towers.items()}
         w.doors = [d.copy() for d in self.doors]
@@ -322,6 +369,10 @@ class World:
         w.hazards = [h.copy() for h in self.hazards]
         w.recharge = dict(self.recharge)
         w.wave, w.schedule, w.wave_time, w.break_left = self.wave, list(self.schedule), self.wave_time, self.break_left
+        w.gold_schedule = list(self.gold_schedule)
+        w.breach_schedule, w.elite_schedule = list(self.breach_schedule), list(self.elite_schedule)
+        w.breach_mode, w.breach_remaining = self.breach_mode, self.breach_remaining
+        w.breach_failed, w.breach_cleared = self.breach_failed, self.breach_cleared
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
         w.leaked_life, w.forced, w.outcome, w.kills, w._next_id = self.leaked_life, [], self.outcome, self.kills, self._next_id
         w.curses_landed, w.cleanses, w.spells_cast, w.chants_broken = self.curses_landed, self.cleanses, self.spells_cast, self.chants_broken
@@ -344,7 +395,13 @@ class World:
         return None
 
     def position(self, m: Monster) -> tuple[float, float]:
-        return self.level.point(m.s)
+        return self.level.route(m.route).point(m.s)
+
+    def heading(self, m: Monster) -> tuple[float, float]:
+        return self.level.route(m.route).heading(m.s)
+
+    def remaining(self, m: Monster) -> float:
+        return self.level.route(m.route).length - m.s
 
     def tower_at(self, tile: tuple[int, int]) -> Tower | None:
         for t in self.towers.values():
@@ -362,11 +419,20 @@ class World:
         found.sort(key=lambda t: t.id)
         return found
 
-    def in_reach(self, tower: Tower, s: float) -> bool:
-        for a, b in self.level.coverage(tower.tile, tower.reach):
+    def in_reach(self, tower: Tower, s: float, route: str = "main") -> bool:
+        spans = (self.level.coverage(tower.tile, tower.reach) if route == "main"
+                 else self.level.route(route).coverage(tower.tile, tower.reach))
+        for a, b in spans:
             if a <= s <= b:
                 return True
         return False
+
+    def _tower_covers(self, tower: Tower, monster: Monster, spans: tuple[tuple[float, float], ...], reach: float) -> bool:
+        if monster.route == "main":
+            return _inside(monster.s, spans)
+        x, y = self.position(monster)
+        cx, cy = tower.centre
+        return (x - cx) ** 2 + (y - cy) ** 2 <= reach * reach
 
     @property
     def spawning(self) -> bool:
@@ -375,6 +441,31 @@ class World:
     @property
     def can_call_wave(self) -> bool:
         return self.outcome is None and not self.schedule and self.wave + 1 < len(self.waves)
+
+    @property
+    def early_call_bonus(self) -> int:
+        """Gold shown and paid for ending the current break early."""
+        return int(self.break_left * EARLY_CALL_GOLD) if self.break_left is not None and self.wave >= 0 else 0
+
+    @property
+    def breach_offered(self) -> bool:
+        spec = self.breach_spec
+        return (spec is not None and self.outcome is None and self.breach_mode is None
+                and self.wave == spec.after_wave and self.break_left is not None
+                and not self.schedule and self.wave_alive.get(self.wave, 0) == 0)
+
+    @property
+    def breach_opened(self) -> bool:
+        return self.breach_mode in ("cash", "trophy")
+
+    def choose_breach(self, mode: str) -> None:
+        """Choose a side pack and reward, or leave its entrance sealed this run."""
+        if not self.breach_offered:
+            raise Refused("No sealed side entrance is offered at this break.")
+        if mode not in ("decline", "cash", "trophy"):
+            raise Refused("Choose cash, trophy, or decline the side entrance.")
+        self.breach_mode = mode
+        self._emit("breach_choice", mode)
 
     def leaders(self) -> list[Monster]:
         return [m for m in self.monsters if m.kind.leader is not None]
@@ -385,7 +476,14 @@ class World:
 
     @property
     def gate_life(self) -> float:
-        return self.perks.gate_life
+        return self.perks.gate_life * BALANCE.location_growth ** self.stage
+
+    def _price(self, opening_cost: int) -> int:
+        return round(opening_cost * BALANCE.gold_unit(self.stage) / BALANCE.base_gold_unit)
+
+    @property
+    def door_cost(self) -> int:
+        return self._price(DOOR.cost)
 
     def spell_cost(self, key: str) -> float:
         if key == "cleanse":
@@ -397,7 +495,7 @@ class World:
         return self.waves[max(self.wave, 0)].hp * self.location.life * self.perks.spell_power
 
     def cost(self, kind: str) -> int:
-        return self.tower_levels[kind][0].cost
+        return self._price(self.tower_levels[kind][0].cost)
 
     # -- Commands -----------------------------------------------------------------------
 
@@ -410,11 +508,12 @@ class World:
         if self.tower_at(tile) is not None:
             raise Refused("A tower already stands there.")
         levels = self.tower_levels[kind]
-        cost = levels[0].cost
+        cost = self.cost(kind)
         if self.gold < cost:
             raise Refused(f"{tower_kind.name} costs {cost} gold.")
         self.gold -= cost
         tower = Tower(self._id(), tower_kind, levels, tile)
+        tower.spent = cost
         self.towers[tower.id] = tower
         self._emit("built", tower.id)
         return tower
@@ -422,7 +521,7 @@ class World:
     def upgrade_cost(self, tower: Tower) -> int | None:
         if tower.level + 1 >= len(tower.levels):
             return None
-        return tower.levels[tower.level + 1].cost
+        return self._price(tower.levels[tower.level + 1].cost)
 
     def rank_needs(self, tower: Tower) -> str | None:
         """The skill that would allow the tower's next rank, or None when it may be bought (or is at its top)."""
@@ -461,6 +560,19 @@ class World:
         self._emit("sold", tower.id, tower.tile, refund)
         return refund
 
+    def sell_salvage(self, count: int) -> int:
+        """Take battle gold now in place of banking these drops after a victory."""
+        if self.outcome is not None or self.break_left is None:
+            raise Refused("Salvage can be sold only during a wave break.")
+        if type(count) is not int or count <= 0 or count > self.salvage_held:
+            raise Refused("You do not hold that much salvage.")
+        gold = count * BALANCE.salvage_sale_gold(self.stage)
+        self.salvage_held -= count
+        self.salvage_sold += count
+        self.gold += gold
+        self._emit("salvage_sold", count, gold)
+        return gold
+
     def build_door(self, index: int) -> None:
         if not self.location.arsenal.gates:
             raise Refused(f"There are no arches to ward in {self.location.called}.")
@@ -469,12 +581,14 @@ class World:
             raise Refused("The gate already stands.")
         if door.rubble:
             raise Refused("The arch lies in rubble until the fight dies down between waves.")
-        if self.gold < DOOR.cost:
-            raise Refused(f"A warded gate costs {DOOR.cost} gold.")
+        if self.gold < self.door_cost:
+            raise Refused(f"A warded gate costs {self.door_cost} gold.")
         for m in self.monsters:
-            if not m.kind.flying and abs(m.s - door.s) < 0.6:
-                raise Refused("Monsters stand in the arch.")
-        self.gold -= DOOR.cost
+            if not m.kind.flying:
+                for crossing_index, s in self.level.crossings(m.route):
+                    if crossing_index == index and abs(m.s - s) < 0.6:
+                        raise Refused("Monsters stand in the arch.")
+        self.gold -= self.door_cost
         door.built, door.hp = True, self.gate_life
         self._emit("door_built", index)
 
@@ -515,7 +629,7 @@ class World:
         if m is None or m.hp <= 0:
             raise Refused("There is nothing there to smite.")
         self._spend("smite")
-        self._emit("smite", m.id, self.level.point(m.s))
+        self._emit("smite", m.id, self.position(m))
         if m.chant_curse is not None or m.asking is not None:
             self._break(m)
         self._hurt(m, SPELLS["smite"].damage * self.power(), None)
@@ -551,11 +665,10 @@ class World:
 
     def _around(self, x: float, y: float, radius: float, *, flyers: bool) -> list[Monster]:
         found = []
-        level = self.level
         for m in self.monsters:
             if m.hp <= 0 or (m.kind.flying and not flyers):
                 continue
-            mx, my = level.point(m.s)
+            mx, my = self.position(m)
             if (mx - x) ** 2 + (my - y) ** 2 <= radius * radius:
                 found.append(m)
         return found
@@ -563,22 +676,48 @@ class World:
     def call_wave(self) -> None:
         if not self.can_call_wave:
             raise Refused("The next wave cannot be called yet.")
-        if self.break_left is not None and self.wave >= 0:
-            bonus = int(self.break_left * EARLY_CALL_GOLD)
-            self.gold += bonus
+        self.gold += self.early_call_bonus
         self._start_wave()
 
     def _start_wave(self) -> None:
+        if self.breach_offered:
+            self.choose_breach("decline")
         self.wave += 1
         self.break_left = None
         self.wave_time = 0.0
-        schedule = []
+        tagged: list[tuple[float, str, str, bool, bool]] = []
         for group in self.waves[self.wave].groups:
+            self.level.route(group.route)   # an authored wave must name a route on this map
             for i in range(group.count):
-                schedule.append((group.start + i * group.interval, group.kind))
-        schedule.sort(reverse=True)
-        self.schedule = schedule
-        self.wave_alive[self.wave] = len(schedule)
+                tagged.append((group.start + i * group.interval, group.kind, group.route, False, False))
+        spec = self.breach_spec
+        if spec is not None and self.breach_opened and self.wave == spec.after_wave + 1:
+            for group_index, group in enumerate(spec.groups):
+                self.level.route(group.route)
+                for i in range(group.count):
+                    tagged.append((group.start + i * group.interval, group.kind, group.route,
+                                   True, group_index == 0))
+            self.breach_remaining = spec.count
+        tagged.sort(reverse=True)
+        self.schedule = [(when, kind, route) for when, kind, route, _, _ in tagged]
+        self.breach_schedule = [side for _, _, _, side, _ in tagged]
+        self.elite_schedule = [elite for _, _, _, _, elite in tagged]
+        ordinary_weights = tuple(MONSTERS[kind].bounty for _, kind, _, side, _ in reversed(tagged) if not side)
+        side_weights = tuple(MONSTERS[kind].bounty for _, kind, _, side, _ in reversed(tagged) if side)
+        ordinary_gold = BALANCE.wave_payouts(self.stage, self.wave, ordinary_weights)
+        side_gold = BALANCE.breach_payouts(self.stage, side_weights)
+        ordinary_index = 0
+        side_index = 0
+        payouts: list[int] = []
+        for _, _, _, side, _ in reversed(tagged):
+            if side:
+                payouts.append(side_gold[side_index])
+                side_index += 1
+            else:
+                payouts.append(ordinary_gold[ordinary_index])
+                ordinary_index += 1
+        self.gold_schedule = list(reversed(payouts))
+        self.wave_alive[self.wave] = len(tagged)
         self.unpaid.append(self.wave)
         self._emit("wave", self.wave)
 
@@ -621,13 +760,33 @@ class World:
             return
         self.wave_time += dt
         while self.schedule and self.schedule[-1][0] <= self.wave_time:
-            _, key = self.schedule.pop()
+            _, key, authored_route = self.schedule.pop()
+            bounty = self.gold_schedule.pop()
+            side = self.breach_schedule.pop()
+            elite = self.elite_schedule.pop()
+            salvage = 0
+            if not side:
+                salvage = int(self.spawn_ordinal in self.loot_ordinals)
+                self.spawn_ordinal += 1
             kind = MONSTERS[key]
             cooldown = kind.leader.first_cast if kind.leader is not None else 0.0
+            route_key = authored_route
+            if kind.movement == "wander":
+                entrance = self.level.route(authored_route).entrance
+                choices = [route.key for route in self.level.routes if route.entrance == entrance]
+                if len(choices) > 1:
+                    route_key = self.route_rng.choice(choices)
+            spec = self.breach_spec
+            hp_factor = spec.elite_hp_factor if elite and spec is not None else 1.0
+            speed_factor = spec.elite_speed_factor if elite and spec is not None else 1.0
+            elite_name = spec.elite_name if elite and spec is not None else ""
             m = Monster(self._id(), kind, self.wave, self.rng.uniform(-0.28, 0.28), self.rng.uniform(0.0, JOSTLE),
-                        kind.hp * self.waves[self.wave].hp * self.location.life * self.hardness, cooldown)
+                        kind.hp * self.waves[self.wave].hp * self.location.life * self.hardness * hp_factor, cooldown,
+                        route_key, bounty, salvage, side, elite_name, speed_factor)
             self.monsters.append(m)
             self._emit("spawn", m.id)
+            if elite:
+                self._emit("breach_elite", m.id, elite_name)
 
     def _leaders(self, dt: float) -> None:
         for fc in self.forced:
@@ -697,7 +856,7 @@ class World:
             self._emit("fizzle", leader_id, spot)
             return
         spec = leader.kind.leader
-        x, y = self.level.point(leader.s)
+        x, y = self.position(leader)
         cx, cy = spot[0] + 0.5, spot[1] + 0.5
         if spec is None or _hypot(cx - x, cy - y) > spec.cast_range + CAST_SLACK:
             self._emit("fizzle", leader_id, spot)
@@ -724,8 +883,7 @@ class World:
         leader.marking = False
 
     def _move(self, dt: float) -> None:
-        doors = [d for d in self.doors if d.built]
-        end = self.level.length
+        level = self.level
         monsters = self.monsters
         groves: list[tuple[float, float]] = []
         if self.perks.hurricane:
@@ -733,8 +891,9 @@ class World:
                 if t.kind.key == "grove" and not t.silenced:
                     groves.append((t.tile[0] + 0.5, t.tile[1] + 0.5))
         leaked = False
-        ordered, last = True, math.inf   # whether those still on the map run furthest first, as they did
+        ordered, last = True, -math.inf   # whether those still on the map remain nearest the sanctuary first
         for m in monsters:
+            route = level.route(m.route)
             if m.frozen > 0:
                 m.frozen -= dt
                 m.door = -1
@@ -743,11 +902,11 @@ class World:
             else:
                 if m.chill_left > 0:
                     m.chill_left -= dt
-                    speed = m.kind.speed * (1.0 - m.chill)
+                    speed = m.kind.speed * m.speed_factor * (1.0 - m.chill)
                 else:
-                    speed = m.kind.speed
+                    speed = m.kind.speed * m.speed_factor
                 if groves and not m.kind.flying:
-                    mx, my = self.level.point(m.s)
+                    mx, my = self.position(m)
                     for gx, gy in groves:
                         dx, dy = mx - gx, my - gy
                         if dx * dx + dy * dy <= HURRICANE_RADIUS * HURRICANE_RADIUS:
@@ -756,28 +915,32 @@ class World:
                 s = m.s + speed * dt
                 m.door = -1
                 if not m.kind.flying:
-                    for d in doors:
-                        stop = d.s - DOOR_STOP - m.jostle
-                        if m.s <= stop + 1e-9 < s or stop - 1e-9 <= m.s < d.s:
+                    for door_index, crossing in level.crossings(m.route):
+                        d = self.doors[door_index]
+                        if not d.built:
+                            continue
+                        stop = crossing - DOOR_STOP - m.jostle
+                        if m.s <= stop + 1e-9 < s or stop - 1e-9 <= m.s < crossing:
                             s = min(s, stop)
                             if s >= stop - 1e-6:
                                 m.door = d.index
                             break
                 m.s = s
-                if s >= end:
+                if s >= route.length:
                     self.lives -= m.kind.lives
                     self.leaked_life += m.max_hp * LEAK_WEIGHT
                     self._count_off(m)
                     self._emit("leak", m.id, m.kind.key, m.kind.lives)
                     leaked = True
                     continue
-            if m.s > last:
+            remaining = route.length - m.s
+            if remaining < last:
                 ordered = False
-            last = m.s
+            last = remaining
         if leaked:   # through the sanctuary gate: those that walked to the path's end, and only they
-            monsters = self.monsters = [m for m in monsters if m.s < end]
+            monsters = self.monsters = [m for m in monsters if m.s < level.route(m.route).length]
         if not ordered:   # someone overtook
-            _furthest_first(monsters)
+            _furthest_first(monsters, level)
         if self.lives <= 0 and self.outcome is None:
             self.lives = 0
             self.outcome = "defeat"
@@ -795,7 +958,6 @@ class World:
                 if d.hp <= 0 and d.built:
                     d.built, d.hp, d.rubble = False, 0.0, True
                     self._emit("door_broken", d.index)
-                    doors = [x for x in doors if x.built]
 
     def _aura_mult(self, tower: Tower) -> float:
         """How much harder a tower strikes under the groves: 1 plus the best aura on it.
@@ -828,28 +990,30 @@ class World:
         for m in self.monsters:
             if m.hp <= 0 or m.kind.flying or m.kind.lives >= 2:
                 continue
-            x, y = self.level.point(m.s)
+            x, y = self.position(m)
             dx, dy = x - gx, y - gy
-            if dx * dx + dy * dy <= TWISTER_RADIUS * TWISTER_RADIUS and (best is None or m.s > best.s):
+            if dx * dx + dy * dy <= TWISTER_RADIUS * TWISTER_RADIUS and (best is None or self.remaining(m) < self.remaining(best)):
                 best = m
         if best is not None:
             best.frozen = max(best.frozen, TWISTER_HELD)
             best.door = -1
             self._emit("twister", t.id, best.id)
 
-    def _altar(self, t: Tower, stats: TowerLevel, spans: tuple[tuple[float, float], ...], near: float, far: float) -> None:
+    def _altar(self, t: Tower, stats: TowerLevel, spans: tuple[tuple[float, float], ...], near: float,
+               reach: float) -> None:
         """An altar's pulse: amplify the thickest knot of monsters in reach.
 
         Among the monsters in reach that are not amplified, the centre whose circle of the knot
-        radius holds the most of their life (ties: furthest along the path) lends its circle every
+        radius holds the most of their life (ties: nearest the sanctuary) lends its circle every
         monster in it — flyers too — the bonus for the lasting. It does not stack."""
         monsters = self.monsters
         level = self.level
+        single_route = len(level.routes) == 1
         cand: list[Monster] = []
         for m in monsters:
-            if m.s < near:
+            if single_route and m.s < near:
                 break
-            if m.hp > 0 and m.s <= far and m.amplified <= 0 and _inside(m.s, spans):
+            if m.hp > 0 and m.amplified <= 0 and self._tower_covers(t, m, spans, reach):
                 cand.append(m)
         if not cand:
             t.cooldown = 0.0   # no monster in reach: no cast, the timer waits
@@ -858,7 +1022,7 @@ class World:
         knot2 = knot * knot
         centres: list[tuple[Monster, float, float]] = []
         for m in cand:
-            x, y = level.point(m.s)
+            x, y = self.position(m)
             centres.append((m, x, y))
         best_c: Monster | None = None
         best_x, best_y, best_life = 0.0, 0.0, -1.0
@@ -870,7 +1034,7 @@ class World:
                     total += m.hp
             if best_c is None:
                 best_c, best_x, best_y, best_life = c, cx, cy, total
-            elif total > best_life or (total == best_life and c.s > best_c.s):
+            elif total > best_life or (total == best_life and self.remaining(c) < self.remaining(best_c)):
                 best_c, best_x, best_y, best_life = c, cx, cy, total
         if best_c is None:
             t.cooldown = 0.0
@@ -881,7 +1045,7 @@ class World:
         for m in monsters:
             if m.hp <= 0:
                 continue
-            x, y = level.point(m.s)
+            x, y = self.position(m)
             dx, dy = x - best_x, y - best_y
             if dx * dx + dy * dy <= knot2 + 1e-9:
                 if m.amplified <= 0 or m.amplify < bonus:   # a lapsed amplification takes the new one as it is
@@ -900,6 +1064,7 @@ class World:
                 t.cooldown = max(0.0, t.cooldown - dt)
             return
         level = self.level
+        single_route = len(level.routes) == 1
         static = self.perks.static_field
         for t in self.towers.values():
             if t.cooldown > 0:
@@ -919,37 +1084,36 @@ class World:
             if reach != t.spans_reach:
                 t.spans, t.spans_reach = level.coverage(t.tile, reach), reach
             spans = t.spans
-            if not spans:
+            if not spans and single_route:
                 t.cooldown = 0.0
                 continue
-            # The monsters run furthest first and the spans along the path: none past the last span's end can be in
-            # reach, and after the first short of the first span's start, none is.
-            near, far = spans[0][0], spans[-1][1]
+            # On a single route, the ordered monsters can stop the scan before the first covered interval.
+            near = spans[0][0] if spans else 0.0
             if attack == "amplify":
-                self._altar(t, stats, spans, near, far)
+                self._altar(t, stats, spans, near, reach)
                 continue
             if attack == "nova":
                 hit = []
                 for m in monsters:
-                    if m.s < near:
+                    if single_route and m.s < near:
                         break
-                    if m.hp > 0 and m.s <= far and _inside(m.s, spans):
+                    if m.hp > 0 and self._tower_covers(t, m, spans, reach):
                         hit.append(m)
             elif attack == "venom":   # the strongest it can poison
                 best = None
                 for m in monsters:
-                    if m.s < near:
+                    if single_route and m.s < near:
                         break
-                    if (m.hp > 0 and m.s <= far and (best is None or m.hp > best.hp) and m.kind.taken(Element.POISON) > 0
-                            and _inside(m.s, spans)):
+                    if (m.hp > 0 and (best is None or m.hp > best.hp) and m.kind.taken(Element.POISON) > 0
+                            and self._tower_covers(t, m, spans, reach)):
                         best = m
                 hit = [best] if best is not None else []
             else:
                 hit = []
                 for m in monsters:
-                    if m.s < near:
+                    if single_route and m.s < near:
                         break
-                    if m.hp > 0 and m.s <= far and _inside(m.s, spans):
+                    if m.hp > 0 and self._tower_covers(t, m, spans, reach):
                         if not hit:
                             hit = [m]
                             if not (static and attack == "chain") or m.kind.leader is not None:
@@ -978,28 +1142,28 @@ class World:
             else:
                 target = hit[0]
                 origin = t.centre
-                last = self.level.point(target.s)
+                last = self.position(target)
                 distance = _hypot(last[0] - origin[0], last[1] - origin[1])
                 bolt = Bolt(self._id(), t.id, t.kind.key, target.id, distance / t.kind.bolt_speed, damage, t.kind.element,
-                            stats.splash, stats.poison * aura, stats.poison_time, origin, last)
+                            stats.splash, stats.poison * aura, stats.poison_time, origin, last, stats.chill, stats.chill_time,
+                            stats.leader_bonus)
                 self.bolts.append(bolt)
                 self._emit("bolt", bolt)
 
     def _chain(self, tower: Tower, first: Monster, damage: float, jumps: int) -> None:
-        level = self.level
         static = self.perks.static_field
         struck = [first]
         struck_ids = {first.id}
-        where = [level.point(first.s)]
+        where = [self.position(first)]
         current, pos = first, where[0]
         for _ in range(jumps):
             best, best_d, best_leader = None, CHAIN_JUMP, False
             for m in self.monsters:
                 if m.hp <= 0 or m.id in struck_ids:
                     continue
-                if abs(m.s - current.s) > CHAIN_JUMP * 4:   # the path winds, but never that tightly
+                if m.route == current.route and abs(m.s - current.s) > CHAIN_JUMP * 4:
                     continue
-                x, y = level.point(m.s)
+                x, y = self.position(m)
                 d = _hypot(x - pos[0], y - pos[1])
                 if d >= CHAIN_JUMP:
                     continue
@@ -1010,7 +1174,7 @@ class World:
                 break
             struck.append(best)
             struck_ids.add(best.id)
-            pos = level.point(best.s)
+            pos = self.position(best)
             where.append(pos)
             current = best
         self._emit("chain", tower.id, [m.id for m in struck], where)
@@ -1026,11 +1190,11 @@ class World:
             target = self.monster(b.target)
             if target is not None and target.hp <= 0:
                 target = None
-            last = self.level.point(target.s) if target is not None else b.last
+            last = self.position(target) if target is not None else b.last
             left = b.left - dt
             if left > 0:
                 flying.append(Bolt(b.id, b.tower, b.kind, b.target, left, b.damage, b.element, b.splash, b.poison,
-                                   b.poison_time, b.origin, last))
+                                   b.poison_time, b.origin, last, b.chill, b.chill_time, b.leader_bonus))
                 continue
             struck: list[Monster] = []
             if b.splash > 0:
@@ -1043,7 +1207,16 @@ class World:
             for m in struck:
                 if b.poison > 0:
                     self._poison(m, b.poison, b.poison_time)
-                self._hurt(m, b.damage if m is target or b.splash <= 0 else b.damage * 0.6, b.element)
+                if b.chill > 0:
+                    chill = b.chill * m.kind.taken(Element.COLD)
+                    if chill > 0:
+                        if chill >= m.chill or m.chill_left <= 0:
+                            m.chill = chill
+                        m.chill_left = max(m.chill_left, b.chill_time)
+                blow = b.damage if m is target or b.splash <= 0 else b.damage * 0.6
+                if m.kind.leader is not None:
+                    blow *= 1.0 + b.leader_bonus
+                self._hurt(m, blow, b.element)
         self.bolts = flying
 
     def _meteors(self) -> None:
@@ -1124,8 +1297,8 @@ class World:
                 if leader.hp > 0 and leader.kind.leader is not None:
                     spec = leader.kind.leader
                     if spec.raises == raise_kind:
-                        lx, ly = self.level.point(leader.s)
-                        mx, my = self.level.point(m.s)
+                        lx, ly = self.position(leader)
+                        mx, my = self.position(m)
                         if (lx - mx) ** 2 + (ly - my) ** 2 <= spec.raise_reach ** 2:
                             # Raise the monster
                             m.risen = True
@@ -1140,13 +1313,16 @@ class World:
             m.marking = False
             m.chant_curse, m.chant_spot, m.chant_left = None, (-1, -1), 0.0
 
-        self.gold += m.kind.bounty
+        self.gold += m.bounty
         self.kills += 1
-        where = self.level.point(m.s)
-        self._emit("death", m.id, m.kind.key, element, where, m.kind.bounty)
+        where = self.position(m)
+        self._emit("death", m.id, m.kind.key, element, where, m.bounty)
+        if m.salvage:
+            self.salvage_held += m.salvage
+            self._emit("salvage", m.id, where, m.salvage)
         amplified = m.amplified > 0
         if amplified and self.perks.life_tap:
-            self.mana = min(self.perks.mana_max, self.mana + m.kind.bounty / 5)
+            self.mana = min(self.perks.mana_max, self.mana + m.bounty / 5)
         if m.kind.leader is not None and self.perks.soul_harvest:
             self.mana = min(self.perks.mana_max, self.mana + SOUL)
         if self.perks.contagion and m.poison:
@@ -1168,7 +1344,7 @@ class World:
         for o in self.monsters:
             if o is m or o.hp <= 0 or o.kind.taken(Element.POISON) <= 0:
                 continue
-            x, y = self.level.point(o.s)
+            x, y = self.position(o)
             d = (x - where[0]) ** 2 + (y - where[1]) ** 2
             if d <= best_d:
                 best, best_d = o, d
@@ -1186,6 +1362,20 @@ class World:
 
     def _count_off(self, m: Monster) -> None:
         self.wave_alive[m.wave] -= 1
+        if m.breach:
+            self.breach_remaining -= 1
+            if m.hp > 0:
+                self.breach_failed = True
+            if self.breach_remaining == 0:
+                if self.breach_failed:
+                    self._emit("breach_failed")
+                else:
+                    self.breach_cleared = True
+                    self._emit("breach_cleared", self.breach_mode)
+                    if self.breach_mode == "cash":
+                        cache = BALANCE.breach_cache(self.stage)
+                        self.gold += cache
+                        self._emit("breach_cash", cache)
 
     def _curses(self, dt: float) -> None:
         if any(m.hp <= 0 for m in self.monsters):
@@ -1230,14 +1420,13 @@ _ASK: Final = object()   # a leader that has decided to ask, for the end of this
 _hypot: Final = math.hypot   # looked up once: compiled, it is a call into Python, and a chain calls it for each leap
 
 
-def _furthest_first(monsters: list[Monster]) -> None:
-    """Sort by s, furthest first, keeping the order of equals: what ``sort(key=s, reverse=True)`` makes of the
-    list, by insertion, since between two steps only a few monsters overtake (compiled, a key function is a call
-    into Python for every monster)."""
+def _furthest_first(monsters: list[Monster], level: Level) -> None:
+    """Sort by remaining route distance, nearest the sanctuary first, keeping equal order."""
     for i in range(1, len(monsters)):
         m = monsters[i]
+        remaining = level.route(m.route).length - m.s
         j = i - 1
-        while j >= 0 and monsters[j].s < m.s:
+        while j >= 0 and level.route(monsters[j].route).length - monsters[j].s > remaining:
             monsters[j + 1] = monsters[j]
             j -= 1
         monsters[j + 1] = m

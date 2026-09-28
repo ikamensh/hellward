@@ -7,16 +7,20 @@ from dataclasses import replace
 import pytest
 
 from hellward.sim import campaign
-from hellward.sim.content import DOOR, MONSTERS, SPELLS, START_LIVES, Curse, Group, Wave
-from hellward.sim.level import Tile
+from hellward.sim.content import MONSTERS, SPELLS, START_LIVES, TOWERS, Curse, Group, Wave
+from hellward.sim.level import Level, Tile
 from hellward.sim.model import SIM_DT, Refused, World
 
-CATHEDRAL = campaign.CATHEDRAL.level
+ARENA = Level("Rules field", 20, 12,
+              ((0, 5), (3, 5), (3, 7), (9, 7), (9, 5), (15, 5), (15, 7), (19, 7)),
+              ((3, 6), (9, 6), (15, 6)))
 
 
 def with_waves(*waves: Wave) -> campaign.Location:
-    """The cathedral with these waves instead of its own, at its monsters' own life: the rules, not the tuning."""
-    return replace(campaign.CATHEDRAL, waves=waves, wave_names=tuple(f"wave {i}" for i in range(len(waves))), life=1.0)
+    """An authored arena with these waves at their base life, independent of campaign layouts and unlocks."""
+    arsenal = replace(campaign.CATHEDRAL.arsenal, towers=tuple(TOWERS), spells=tuple(SPELLS), gates=True)
+    return replace(campaign.CATHEDRAL, level=ARENA, arsenal=arsenal, waves=waves,
+                   wave_names=tuple(f"wave {i}" for i in range(len(waves))), life=1.0)
 
 
 def wave_of(kind: str, count: int = 1, interval: float = 1.0) -> campaign.Location:
@@ -38,12 +42,12 @@ def test_coverage_is_the_path_within_reach():
     """Property: s is covered exactly when the path point at s lies within reach of the tile's centre."""
     rng = random.Random(4)
     for _ in range(40):
-        tile = (rng.randrange(CATHEDRAL.width), rng.randrange(CATHEDRAL.height))
+        tile = (rng.randrange(ARENA.width), rng.randrange(ARENA.height))
         reach = rng.uniform(0.8, 4.0)
-        spans = CATHEDRAL.coverage(tile, reach)
+        spans = ARENA.coverage(tile, reach)
         for i in range(400):
-            s = CATHEDRAL.length * i / 399
-            x, y = CATHEDRAL.point(s)
+            s = ARENA.length * i / 399
+            x, y = ARENA.point(s)
             inside = math.hypot(x - tile[0] - 0.5, y - tile[1] - 0.5) <= reach
             covered = any(a - 1e-6 <= s <= b + 1e-6 for a, b in spans)
             near_edge = abs(math.hypot(x - tile[0] - 0.5, y - tile[1] - 0.5) - reach) < 1e-3
@@ -51,14 +55,14 @@ def test_coverage_is_the_path_within_reach():
 
 
 def test_door_sockets_are_arches_on_the_path():
-    for x, y in CATHEDRAL.doors:
-        assert CATHEDRAL.tile(x, y) is Tile.DOOR
-        assert {CATHEDRAL.tile(x - 1, y), CATHEDRAL.tile(x + 1, y)} == {Tile.WALL}
+    for x, y in ARENA.doors:
+        assert ARENA.tile(x, y) is Tile.DOOR
+        assert {ARENA.tile(x - 1, y), ARENA.tile(x + 1, y)} == {Tile.WALL}
 
 
 def test_an_unopposed_monster_walks_the_path_and_costs_its_lives():
     world = started(World(wave_of("overlord")))
-    run(world, CATHEDRAL.length / MONSTERS["overlord"].speed + 2)
+    run(world, ARENA.length / MONSTERS["overlord"].speed + 2)
     assert world.lives == START_LIVES - MONSTERS["overlord"].lives
 
 
@@ -67,11 +71,11 @@ def test_a_gate_holds_walkers_until_they_break_it():
     world.gold = 1000
     world.build_door(0)
     started(world)
-    door_s = CATHEDRAL.door_s[0]
+    door_s = ARENA.door_s[0]
     run(world, door_s / MONSTERS["zombie"].speed + 6)
     assert world.doors[0].built
-    assert world.doors[0].hp < DOOR.hp
-    assert all(m.s < door_s for m in world.monsters)
+    assert world.doors[0].hp < world.gate_life
+    assert all(m.s <= door_s for m in world.monsters)
     run(world, 200)
     assert not world.doors[0].built
     assert world.lives == START_LIVES - 3
@@ -83,21 +87,22 @@ def test_flyers_pass_over_a_gate():
     for i in range(3):
         world.build_door(i)
     started(world)
-    run(world, CATHEDRAL.length / MONSTERS["gargoyle"].speed + 2)
+    run(world, ARENA.length / MONSTERS["gargoyle"].speed + 2)
     assert world.lives == START_LIVES - 1
-    assert all(d.hp == DOOR.hp for d in world.doors)
+    assert all(d.hp == world.gate_life for d in world.doors)
 
 
 def kill_time(curse: Curse | None) -> float:
     world = World(wave_of("zombie"))
     world.gold = 1000
-    tower = world.build("pyre", (4, 3))
+    tower = world.build("pyre", (7, 8))
     if curse is not None:
         tower.curses[curse] = 1000.0
     started(world)
     while world.monsters or world.schedule:
         world.step()
         assert world.time < 300
+    assert world.kills == 1 and world.lives == START_LIVES
     return world.time
 
 
@@ -110,7 +115,7 @@ def test_every_curse_but_none_slows_a_kill():
 def test_bone_prison_silences_and_cleanse_lifts_it():
     world = World(wave_of("zombie"))
     world.gold = 1000
-    tower = world.build("pyre", (4, 3))
+    tower = world.build("pyre", (4, 4))
     tower.curses[Curse.BONE_PRISON] = 1000.0   # held open while the zombie walks into reach
     started(world)
     run(world, 6)   # well inside the pyre's reach by now
@@ -126,9 +131,9 @@ def test_bone_prison_silences_and_cleanse_lifts_it():
 
 
 def test_commands_refuse_what_the_rules_forbid():
-    world = World()
+    world = World(wave_of("fallen"))
     with pytest.raises(Refused):
-        world.build("pyre", CATHEDRAL.path_tiles[3])
+        world.build("pyre", ARENA.path_tiles[3])
     world.build("pyre", (4, 3))
     with pytest.raises(Refused):
         world.build("frost", (4, 3))
@@ -141,19 +146,21 @@ def test_commands_refuse_what_the_rules_forbid():
 
 def test_selling_refunds_most_of_what_was_spent():
     from hellward.sim.skills import perks
-    world = World(perks=perks({"adept_lightning"}))
+    world = World(wave_of("fallen"), perks=perks({"adept_lightning"}))
+    world.gold = 3 * world.cost("storm")
+    initial_gold = world.gold
     tower = world.build("storm", (4, 3))
     world.upgrade(tower.id)
-    spent = campaign.CATHEDRAL.start_gold - world.gold
+    spent = initial_gold - world.gold
     refund = world.sell(tower.id)
     assert 0.6 * spent <= refund < spent
     assert not world.towers
 
 
 def test_a_clone_plays_on_exactly_like_its_original_and_leaves_it_alone():
-    world = World(seed=5)
+    world = World(with_waves(Wave((Group("overlord", 4, 3.0), Group("zombie", 10, 1.0)), 10)), seed=5)
     world.gold = 2000
-    for kind, tile in (("pyre", (4, 3)), ("storm", (7, 8)), ("frost", (10, 9)), ("plague", (14, 6))):
+    for kind, tile in (("pyre", (4, 3)), ("storm", (7, 8)), ("frost", (10, 9)), ("plague", (13, 6))):
         world.build(kind, tile)
     world.build_door(1)
     started(world)
@@ -217,6 +224,7 @@ def test_a_monster_a_spell_kills_between_steps_walks_no_further():
     run(world, 2)
     fallen = world.monsters[0]
     world.mana = 100
+    fallen.hp = min(fallen.hp, SPELLS["smite"].damage * world.power())
     world.smite(fallen.id)
     assert not world.monsters
     lives = world.lives

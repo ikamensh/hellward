@@ -3,6 +3,7 @@
 import pytest
 
 from hellward.sim.campaign import ACT_ENDS, LOCATIONS, ORDER, SIGIL_LIVES, sigils
+from hellward.sim.balance import BALANCE
 from hellward.sim.content import MONSTERS, SPELLS, START_LIVES, TOWERS
 from hellward.sim.level import Tile
 
@@ -46,3 +47,19 @@ def test_sigils_grow_with_the_life_kept_and_a_fall_earns_none():
     earned = [sigils("victory", lives) for lives in range(1, START_LIVES + 1)]
     assert earned == sorted(earned) and earned[0] == 1 and earned[-1] == 3
     assert [sigils("victory", need) for need in SIGIL_LIVES] == [1, 2, 3]
+
+
+def test_the_campaign_uses_one_location_and_wave_growth_curve():
+    for stage, key in enumerate(ORDER):
+        location = LOCATIONS[key]
+        assert location.start_gold == BALANCE.starting_gold(stage)
+        assert location.life == pytest.approx(BALANCE.location_growth ** stage)
+        for wave_index, wave in enumerate(location.waves):
+            assert wave.hp == pytest.approx(BALANCE.wave_growth ** wave_index)
+
+
+def test_opening_field_gives_wanderers_three_bounded_approaches():
+    level = LOCATIONS["tristram"].level
+    assert len(level.routes) >= 3
+    assert len({route.entrance for route in level.routes}) == 1
+    assert all(route.length <= level.route("main").length * 1.6 for route in level.routes)

@@ -11,8 +11,9 @@ from hellward.__main__ import build
 from hellward.art import worldmap
 from hellward.story import STORIES
 from hellward.sim import planner
-from hellward.sim.campaign import ACTS, LOCATIONS
-from hellward.sim.content import SPELLS
+from hellward.sim.campaign import ACTS, LOCATIONS, ORDER
+from hellward.sim.content import CURSES, MONSTERS, SPELLS, Curse
+from hellward.sim.model import Monster
 from hellward.sim.players.ordinary import Ordinary
 from hellward.ui import menus
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene, Silent
@@ -139,13 +140,13 @@ def test_the_tree_learns_what_the_free_sigils_pay_for_and_unlearns_for_free(game
         g.backend.inject_click(x + w / 2, y + h / 2)
         tick(g)
 
-    click("fire_ball")        # needs Adept of Fire first
+    click("fire_ball")        # damaging area attacks arrive much later
     assert not flow.progress.learned
-    click("adept_fire")
-    click("fire_ball")
-    assert flow.progress.learned == {"adept_fire", "fire_ball"} and flow.progress.free == 0
-    click("warmth")           # no sigils left
-    assert "warmth" not in flow.progress.learned
+    click("adept_arrow")
+    click("warmth")
+    assert flow.progress.learned == {"adept_arrow", "warmth"} and flow.progress.free == 0
+    click("adept_fire")           # no sigils left
+    assert "adept_fire" not in flow.progress.learned
     assert_text_fits(g)
     press(g, "u")
     assert not flow.progress.learned and flow.progress.free == 3
@@ -162,6 +163,33 @@ def test_the_learned_skills_go_into_the_defence(game):
     assert g.scenes[-1].world.perks.top("pyre") == 1
 
 
+def test_a_late_learned_skill_is_marked_inactive_when_replaying_an_earlier_location(game):
+    """A learned Fire Ball cannot affect a Caves run, so its tree card must say so."""
+    g, flow = game
+    flow.progress.won = {key: 3 for key in ORDER[:9]}
+    flow.progress.learned = frozenset({"adept_fire", "master_fire", "fire_ball"})
+    flow.skills(LOCATIONS["caves"])
+    tick(g)
+    tree = g.scenes[-1]
+    assert isinstance(tree, SkillTreeScene)
+    fire_ball = next(spot for spot in tree.spots if spot.name == "fire_ball")
+    assert "Inactive in the Caves" in fire_ball.tip
+    flow.defend(LOCATIONS["caves"])
+    assert not g.scenes[-1].world.perks.fire_ball
+
+
+def test_an_earlier_briefing_counts_late_learned_skills_as_inactive(game):
+    """A revisit must disclose sigils spent on a skill filtered out of that defence."""
+    g, flow = game
+    flow.progress.won = {key: 3 for key in ORDER[:9]}
+    flow.progress.learned = frozenset({"adept_fire", "master_fire", "fire_ball"})
+    flow.progress.seen |= {"caves/before"}
+    flow.intro(LOCATIONS["caves"])
+    tick(g)
+    assert isinstance(g.scenes[-1], BriefingScene)
+    assert any("2 sigils sit in skills that do nothing here" in text["text"] for text in g.backend.texts)
+
+
 def test_q_smites_the_leader_closest_to_cursing_and_no_spell_is_cast_while_paused(game):
     g, flow = game
     flow.progress.won = {"tristram": 1}
@@ -169,16 +197,16 @@ def test_q_smites_the_leader_closest_to_cursing_and_no_spell_is_cast_while_pause
     tick(g)
     battle = g.scenes[-1]
     world = battle.world
-    world.gold = 2000
-    world.build("pyre", (7, 4))
-    world.call_wave()
-    while world.wave < 2:   # the Bone Acolyte walks in the third wave
-        world.break_left = 0.0 if world.break_left is not None else None
-        tick(g, 1)
-        assert world.time < 400
-    while not any(m.chant_curse is not None or m.asking is not None for m in world.leaders()):
-        tick(g)
-        assert world.time < 400
+    kind = MONSTERS["priest"]
+    first = Monster(world._id(), kind, 0, 0, 0, 100, 0)
+    second = Monster(world._id(), kind, 0, 0, 0, 100, 0)
+    for leader, left in ((first, 0.5), (second, 2.0)):
+        leader.s = 4.0
+        leader.chant_curse = Curse.BONE_PRISON
+        leader.chant_spot = (7, 4)
+        leader.chant_left = left
+    world.monsters.extend((first, second))
+    world.wave_alive[0] = 2
     world.mana = 100
     press(g, "p")
     press(g, "q")
@@ -186,6 +214,7 @@ def test_q_smites_the_leader_closest_to_cursing_and_no_spell_is_cast_while_pause
     press(g, "p")
     press(g, "q")
     assert world.chants_broken == 1 and world.mana == pytest.approx(100 - SPELLS["smite"].mana, abs=1)
+    assert first.chant_curse is None and second.chant_curse is not None
 
 
 def test_what_a_location_does_not_offer_is_refused_with_where_it_arrives(game):
@@ -193,12 +222,12 @@ def test_what_a_location_does_not_offer_is_refused_with_where_it_arrives(game):
     flow.defend(LOCATIONS["tristram"])
     tick(g)
     battle = g.scenes[-1]
-    press(g, "2")             # the Storm Obelisk arrives in the Graveyard
-    assert battle.placing is None
-    assert any("Graveyard" in text for _, text, _ in battle.hud.log)
-    press(g, "w")             # Meteor arrives in the Cathedral
+    press(g, "2")             # the Pyre arrives in the Cathedral
     assert battle.placing is None
     assert any("Cathedral" in text for _, text, _ in battle.hud.log)
+    press(g, "w")             # Meteor arrives in Travincal
+    assert battle.placing is None
+    assert any("Travincal" in text for _, text, _ in battle.hud.log)
     assert_text_fits(g)
 
 
@@ -307,5 +336,3 @@ def test_after_act1_ending_map_opens_on_act2_and_walks_to_docks(cache, tmp_path)
         assert isinstance(page, StoryScene) and page.pages[page.index].key == "docks-before"
     finally:
         g.close()
-
-

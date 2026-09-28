@@ -113,19 +113,23 @@ def fit(location: Location, kind: str) -> float:
 
 
 def ranked_tiles(location: Location, reach: float, door_bonus: float) -> list[tuple[int, int]]:
-    """Buildable tiles by how much path they watch, a gate's queue counting extra."""
+    """Buildable tiles by how much of every approach they watch, with gate queues counting extra."""
     level = location.level
-    queues = [s - DOOR_STOP - JOSTLE / 2 for s in level.door_s]
+    routes = tuple(route for route in level.routes if route.key != "breach")
+    queues = {route.key: [s - DOOR_STOP - JOSTLE / 2 for _, s in level.crossings(route.key)]
+              for route in routes}
     scored = []
     for y in range(level.height):
         for x in range(level.width):
             if not level.buildable(x, y):
                 continue
-            spans = level.coverage((x, y), reach)
-            watched = sum(b - a for a, b in spans)
+            watched = 0.0
+            for route in routes:
+                spans = route.coverage((x, y), reach)
+                watched += sum(b - a for a, b in spans)
+                watched += door_bonus * sum(1 for q in queues[route.key] if any(a <= q <= b for a, b in spans))
             if watched <= 0:
                 continue
-            watched += door_bonus * sum(1 for q in queues if any(a <= q <= b for a, b in spans))
             scored.append((watched, (x, y)))
     scored.sort(key=lambda item: (-item[0], item[1]))
     return [tile for _, tile in scored]
