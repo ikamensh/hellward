@@ -2,33 +2,41 @@
 
 A gothic tower defence on [Saga2D](../saga2d/) in which the demons have **leaders**, and a leader
 curses your towers. It picks the tower and the curse by playing the fight ahead in its head, again
-and again, before it casts. Descend from the burning village of Tristram through its graveyard,
-cathedral, catacombs and caves to the gate of hell. Hold each place with towers of fire, lightning,
-cold and poison, with warded gates that bar the arches, and with spells. Every victory earns sigils
-for a skill tree that carries down with you.
+and again, before it casts. Defend twelve locations in two acts, from burning Tristram through
+Hell's Gate and across Kurast to the Temple of Light. The first defence gives you a single-target
+Arrow Tower and Cleanse; gates, elemental towers, spells and larger attacks arrive gradually.
+Monsters enter from different sides and may wander along longer trails, while runners head straight
+for the sanctuary.
 
 ## Play the latest version
 
 ```bash
 cd ~/saga/hellward
-uv run hellward             # the title screen; Descend opens the world map
-uv run hellward --demo      # a scripted player defends the cathedral against the leaders
+uv run hellward                      # the title screen; Descend begins the campaign
+uv run hellward --profile playtest   # start a separate campaign from Tristram
+uv run hellward --demo               # a scripted player defends the cathedral against the leaders
 ```
 
-The first launch renders the stand-in art and the sounds into `~/.hellward/cache` (a few seconds).
-`--seed N` changes where the monsters walk; `--fullscreen` fills the screen.
+The first launch prepares art and sounds in `~/.hellward/cache` (a few seconds).
+The default `main` profile keeps your existing save. A new `--profile NAME` starts fresh in its own
+save slot; use the same name to resume it, or another name for another fresh run. Names use letters,
+numbers and underscores, starting with a letter or underscore. Saves live in `~/.hellward/saves`.
+`--seed N` changes seeded run variation; `--fullscreen` fills the screen.
 
 ## How to play
 
 | | |
 |---|---|
-| **1–4** or a build slot, then click the floor | a Pyre (fire), Storm Obelisk (lightning), Frost Shrine (cold) or Plague Totem (poison) |
-| **5**, then click an arch | a warded gate: walkers stop and batter it, flyers pass over |
+| **1** or the first build slot, then click buildable ground | an Arrow Tower: one arrow at one monster; your opening attack |
+| **2–5**, then click buildable ground | Pyre, Storm, Frost and Plague towers as later locations unlock them |
+| **6**, then click an arch | a warded gate, available from the Graveyard: walkers stop and batter it, flyers pass over |
+| **7–8**, then click buildable ground | Bone Altar and Druid Grove support towers in Act II |
 | click a tower | select it: **U** upgrade, **S** sell, **C** cleanse (mana) |
-| **Q** | Smite: with a leader pondering or chanting, it strikes the one closest to cursing and the curse never comes; otherwise click a monster |
-| **W**, then click the floor | Meteor: it lands a moment later and leaves the floor burning |
-| **E**, then click the floor | Frozen Orb: everything near it freezes, and a leader's curse breaks |
-| **Space** | call the next wave (gold for every second you spare) |
+| **Q** (from the Graveyard) | Smite: with a leader pondering or chanting, it strikes the one closest to cursing; otherwise click a monster |
+| **W** (from Travincal), then click the floor | Meteor: it lands a moment later and leaves the floor burning |
+| **E** (from the Jungle), then click the floor | Frozen Orb: nearby monsters freeze; an interruptible leader's chant breaks |
+| **V** during a wave break | sell one held salvage for battle gold instead of banking it for the forge |
+| **Space** | call the next wave; ending a break early can grant a small gold bonus |
 | **F** / **P** | double the pace / pause |
 | **Tab** | show or hide the leaders' minds: the life each curse would save its pack |
 | right click / **Esc** | let go of what you hold |
@@ -36,19 +44,29 @@ The first launch renders the stand-in art and the sounds into `~/.hellward/cache
 
 Hover a monster to read its resistances in the bar at the top. Leaders wear a violet ring. When
 one ponders, dots rise over its head; when it chants, a violet beam reaches for a tower and a rune
-circle closes round that tower's foot. Smite or freeze the leader before the circle closes and the
-curse never lands, or **Cleanse** a cursed tower after. Spells spend mana (the blue orb) and are not
-cast while paused. The red orb is the sanctuary's life.
+circle closes round that tower's foot. Later, Smite or Frozen Orb can break an interruptible chant
+before it lands. Marked and resolute curses cannot be interrupted; **Cleanse** removes curses from
+a tower afterward, even in the opening defence. Spells spend mana (the blue orb) and are not cast
+while paused. The red orb is the sanctuary's life.
 
 **The campaign.** Each location's intro names who comes, what they resist, the curses their
 leaders cast and how to answer them. A victory earns one to three **sigils** by the life you keep;
 spend them in the **skill tree** (K on the map or an intro), and unlearn them for free before the
-next place. A slot with a padlock is something this place does not offer yet. Holding Hell's Gate wins the
-descent. Progress is saved in `~/.hellward/saves`.
+next place. The **Forge** (F on an intro) spends banked monster salvage and rare trophies on
+permanent tower patterns; equip one pattern per tower family before a defence. A padlock marks a
+power this location does not offer yet. Holding Hell's Gate opens Act II; holding the Temple of
+Light completes the campaign.
+
+Some wave breaks offer a sealed **breach** entrance. The panel shows its harder side pack and named
+elite: keep it sealed, open it for battle gold, or seek a trophy for a future pattern. Clear the
+whole side pack to earn the chosen reward. A victorious cash clear forfeits that site's one-time
+trophy. Unsold salvage is banked only on victory, and replaying a location credits only an
+improvement over its previous best banked amount.
 
 ## More
 
 - [Design](docs/design.md): the rules of one defence, how a leader chooses, and how close to optimal it is.
 - [Campaign](docs/campaign.md): the locations, the skill tree, the spells, the world map, and tuning by simulation.
+- [Progression redesign](docs/redesign.md): routes, breaches, salvage, patterns and the slower unlock order.
 - [Audio](docs/audio.md): the cues, the music and how they are made.
 - [AGENTS.md](AGENTS.md): commands and layout for development.
