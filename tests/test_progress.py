@@ -1,5 +1,8 @@
 """The campaign's progress: fresh lanterns, sigils from defences, learned skills, the way down, and saving."""
 
+import subprocess
+import sys
+
 import pytest
 from saga2d import Game
 
@@ -64,6 +67,38 @@ def test_sigils_learning_and_the_lantern_last_to_the_next_session(tmp_path):
         assert again.at == progress.at
     finally:
         second.close()
+
+
+def test_a_named_profile_starts_fresh_and_keeps_the_existing_campaign(game):
+    """A playtest can begin at Tristram without replacing the player's main progress."""
+    main = Progress.load(game)
+    main.record_result("tristram", "victory", 18, salvage=2)
+    main.learn("adept_fire")
+
+    test = Progress.load(game, "playtest")
+    assert test.sigils == 0 and test.at == campaign.ORDER[0]
+    assert test.salvage == 0 and not test.learned and not test.seen
+    test.record_result("tristram", "victory", 10, salvage=1)
+
+    assert Progress.load(game).won == {"tristram": 3}
+    assert Progress.load(game).learned == frozenset({"adept_fire"})
+    assert Progress.load(game).salvage == 2
+    assert Progress.load(game, "playtest").won == {"tristram": 2}
+    assert Progress.load(game, "playtest").salvage == 1
+
+
+def test_command_line_offers_a_named_campaign_profile():
+    result = subprocess.run([sys.executable, "-m", "hellward", "--help"], capture_output=True, text=True, check=True)
+    assert "--profile" in result.stdout
+
+
+def test_profile_names_cannot_escape_the_campaign_save_slots(game):
+    with pytest.raises(ValueError, match="simple word"):
+        Progress.load(game, "../main")
+    result = subprocess.run([sys.executable, "-m", "hellward", "--profile", "../main"],
+                            capture_output=True, text=True)
+    assert result.returncode == 2
+    assert "simple word" in result.stderr
 
 
 def test_a_save_listing_a_removed_mastery_loads_with_it_forgotten(game):

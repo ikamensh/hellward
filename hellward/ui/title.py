@@ -61,6 +61,8 @@ class TitleScene(Scene):
                        font_size=19, color=style.BONE, anchor_x="center", anchor_y="center")
         self.draw_text("Each curse is picked by playing the fight ahead, again and again, before it is cast.", 640, 198,
                        font_size=15, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
+        self.draw_text(f"Campaign profile: {self.flow.progress.profile}", 640, 236,
+                       font_size=16, color=style.BONE, anchor_x="center", anchor_y="center")
 
 
 class ReckoningScene(Scene):

@@ -18,6 +18,13 @@ SLOT = "campaign"
 BREACH_SITES = frozenset(BREACHES)
 
 
+def slot_for_profile(profile: str) -> str:
+    """Keep the original campaign save intact; named playtests get separate slots."""
+    if not profile.isidentifier():
+        raise ValueError(f"Profile name must be a simple word: {profile!r}")
+    return SLOT if profile == "main" else f"{SLOT}_{profile}"
+
+
 @dataclass(frozen=True)
 class RewardGain:
     """New persistent rewards earned by one defence, beyond earlier results at that location."""
@@ -39,15 +46,16 @@ class Progress:
     trophies: frozenset[str] = frozenset()   # unspent trophy IDs, each the breach location's key
     patterns: frozenset[str] = frozenset()   # forged patterns, owned permanently
     loadout: Loadout = field(default_factory=Loadout)
+    profile: str = "main"
     game: Game | None = field(default=None, repr=False, compare=False)
 
     # -- Saving -----------------------------------------------------------------------------------
 
     @classmethod
-    def load(cls, game: Game) -> Progress:
-        data = game.save_manager.load(SLOT)
+    def load(cls, game: Game, profile: str = "main") -> Progress:
+        data = game.save_manager.load(slot_for_profile(profile))
         if data is None:
-            return cls(game=game)
+            return cls(profile=profile, game=game)
         state = data["state"]
         won = state["won"]["normal"] if "difficulty" in state else state["won"]   # a save from before the acts
         stage = min(len(ORDER) - 1, max((ORDER.index(key) + 1 for key in won), default=0))
@@ -62,7 +70,8 @@ class Progress:
         progress = cls(won=dict(won), learned=learned, at=state["at"], seen=frozenset(state.get("seen", ())),
                        salvage_best=dict(state.get("salvage_best", {})), salvage=state.get("salvage", 0),
                        breach_claims=dict(state.get("breach_claims", {})),
-                       trophies=frozenset(state.get("trophies", ())), patterns=owned, loadout=loadout, game=game)
+                       trophies=frozenset(state.get("trophies", ())), patterns=owned, loadout=loadout,
+                       profile=profile, game=game)
         check(progress.learned)
         return progress
 
@@ -72,7 +81,8 @@ class Progress:
                      "salvage_best": self.salvage_best, "salvage": self.salvage,
                      "breach_claims": self.breach_claims, "trophies": sorted(self.trophies),
                      "patterns": sorted(self.patterns), "loadout": list(self.loadout.equipped)}
-            self.game.save_manager.save(SLOT, state, "Progress", summary={"sigils": self.sigils, "at": self.at})
+            self.game.save_manager.save(slot_for_profile(self.profile), state, "Progress",
+                                        summary={"sigils": self.sigils, "at": self.at})
 
     def see(self, key: str) -> None:
         """Remember a story key as shown (opening counts, even when skipped) and save."""

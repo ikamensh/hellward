@@ -1,5 +1,5 @@
-"""Hellward: ``uv run hellward`` (``--demo`` lets a strong scripted player defend the Cathedral; ``--seed N`` changes
-the queues)."""
+"""Hellward: ``uv run hellward`` (``--profile NAME`` plays a separate campaign;
+``--demo`` lets a strong scripted player defend the Cathedral; ``--seed N`` changes the queues)."""
 
 from __future__ import annotations
 
@@ -19,6 +19,12 @@ from hellward.ui.loading import LoadingScene
 DATA = Path.home() / ".hellward"
 
 COMPILE_MESSAGE = "Compiling the leaders' minds (first launch only)..."
+
+
+def profile_name(value: str) -> str:
+    if not value.isidentifier():
+        raise argparse.ArgumentTypeError("profile name must be a simple word (letters, numbers, underscores)")
+    return value
 
 
 def build(game: Game, cache: Path):
@@ -87,6 +93,8 @@ def _activate(game: Game) -> None:
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Hellward — a gothic tower defence where demon leaders curse your towers")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--profile", type=profile_name, default="main",
+                        help="campaign profile; main keeps the existing save")
     parser.add_argument("--demo", action="store_true", help="skip the title and let the scripted defender play")
     parser.add_argument("--fullscreen", action="store_true")
     args = parser.parse_args(argv)
@@ -113,7 +121,8 @@ def main(argv: list[str] | None = None) -> None:
         game.set_fullscreen(True)   # --fullscreen is for this session; the saved choice is the settings
     sound = SoundBank(game)
     thinker = Thinker()
-    flow = Flow(game, art, sound=sound, planner=thinker, settings=values, progress=Progress.load(game),
+    flow = Flow(game, art, sound=sound, planner=thinker, settings=values,
+                progress=Progress.load(game, args.profile),
                 demo_player=Adaptive, seed=args.seed)
 
     try:
