@@ -27,7 +27,7 @@ from hellward.sim.players.hands import Hands, Player
 from hellward.sim.skills import NO_PERKS, SKILLS, Perks
 from hellward.ui import style
 from hellward.ui.effects import Effects
-from hellward.ui.hud import BUILD, NEW_TOWERS, Hud
+from hellward.ui.hud import BUILD, NEW_TOWERS, TOP, Hud
 from hellward.ui.lighting import Lighting
 from hellward.ui.menus import PauseScene
 from hellward.ui.view import MAP_X, MAP_Y, T, TOWER_SCALE, WorldView, px
@@ -89,8 +89,12 @@ class BattleScene(Scene):
         self.last_hold_note = -10.0
 
     def on_enter(self) -> None:
-        self.camera = Camera((WIDTH, HEIGHT))
         self.world = World(self.location, perks=self.perks, seed=self.seed, planner=self.planner, loadout=self.loadout)
+        level = self.world.level
+        zoom = min(1.0, (WIDTH - 2 * MAP_X) / (level.width * T), (TOP - MAP_Y) / (level.height * T))
+        self.camera = Camera((WIDTH, HEIGHT),
+                             world_bounds=(MAP_X, MAP_Y, MAP_X + level.width * T, MAP_Y + level.height * T),
+                             insets=(0, 0, 0, HEIGHT - TOP), zoom=zoom, min_zoom=min(0.25, zoom))
         self.view = WorldView(self, self.world, self.art)
         self.fx = Effects(self, self.view, self.world)
         self.hud = Hud(self, self.world, breach_claim=self.breach_claim)
@@ -564,7 +568,7 @@ class BattleScene(Scene):
             if control is not None:
                 self._control(control.name, control.enabled)
                 return True
-            if event.y >= 672:
+            if event.y >= TOP:
                 return True
             if self.placing is not None and self.placing.startswith("spell:"):
                 if self._cast_at(self.placing[6:], event.world_x, event.world_y) and not event.shift:
@@ -625,7 +629,7 @@ class BattleScene(Scene):
         world = self.world
         mouse = self.game.mouse_position
         hovered = None
-        if mouse is not None and mouse[1] < 672:
+        if mouse is not None and mouse[1] < TOP:
             wx, wy = self.camera.screen_to_world(*mouse)
             hovered = self.monster_at(wx, wy)
             tile = self.tile_at(wx, wy)
@@ -643,7 +647,7 @@ class BattleScene(Scene):
         self.fx.draw()
         self.hud.draw(placing=self.placing, selected=self.selected, hovered=hovered, speed=self.speed, paused=self.paused,
                       mouse=mouse, costs=self.cost)
-        if mouse is not None and mouse[1] < 672 and self.placing is None and hovered is None:
+        if mouse is not None and mouse[1] < TOP and self.placing is None and hovered is None:
             tile = self.tile_at(*self.camera.screen_to_world(*mouse))
             tower = world.tower_at(tile) if tile is not None else None
             if tower is not None:

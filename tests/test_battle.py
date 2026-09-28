@@ -9,13 +9,14 @@ from saga2d.testing import assert_text_fits
 
 from hellward.__main__ import build
 from hellward.sim import planner
-from hellward.sim.campaign import CATHEDRAL
+from hellward.sim.campaign import CATHEDRAL, TRISTRAM
+from hellward.sim.level import Level
 from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.content import DOOR, TOWERS
 from hellward.sim.model import SIM_DT
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
 from hellward.ui.hud import BUILD, SLOT, SLOT_X, TOP, slot_size
-from hellward.ui.view import MAP_X, MAP_Y, T
+from hellward.ui.view import MAP_X, MAP_Y, T, px
 
 
 @pytest.fixture(scope="module")
@@ -102,3 +103,24 @@ def test_a_refused_build_is_explained_not_raised(game):
     g.tick(SIM_DT)
     assert not scene.world.towers
     assert any("floor" in text for _, text, _ in scene.hud.log)
+
+
+def test_a_larger_field_fits_above_the_hud_and_its_far_corner_accepts_a_build(game):
+    """A player can see and click every approach when a location needs a larger field."""
+    g, art = game
+    level = Level("wide yard", 33, 18, ((0, 9), (32, 9)), ())
+    scene = BattleScene(art, replace(TRISTRAM, level=level))
+    g.push(scene)
+    g.tick(SIM_DT)
+    left, top = scene.camera.world_to_screen(*px(0, 0))
+    right, bottom = scene.camera.world_to_screen(*px(level.width, level.height))
+    assert 0 <= left < right <= WIDTH
+    assert 0 <= top < bottom <= TOP
+    tile = (level.width - 2, level.height - 2)
+    assert level.buildable(*tile)
+    g.backend.inject_key("1")
+    g.tick(SIM_DT)
+    sx, sy = scene.camera.world_to_screen(*px(tile[0] + 0.5, tile[1] + 0.5))
+    g.backend.inject_click(int(sx), int(sy))
+    g.tick(SIM_DT)
+    assert scene.world.tower_at(tile) is not None
