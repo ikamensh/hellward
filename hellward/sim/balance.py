@@ -14,7 +14,7 @@ from typing import Final
 
 @dataclass(frozen=True)
 class BalanceProfile:
-    base_hp: float = 7.0
+    base_hp: float = 6.0
     location_growth: float = 1.055
     wave_growth: float = 1.05
     arrow_hit: int = 2

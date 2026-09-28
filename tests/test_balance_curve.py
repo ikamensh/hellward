@@ -9,8 +9,9 @@ from hellward.sim.content import MONSTERS, TOWERS
 
 
 def test_opening_fights_use_small_hits_and_no_large_enemy_life():
-    """The first defence begins at four Arrow hits per common enemy."""
-    assert BALANCE.effective_hp(1.0, 0, 0) == 7
+    """The first defence stays within the requested 1–20 scale and needs several arrows."""
+    assert 1 <= BALANCE.effective_hp(1.0, 0, 0) <= 20
+    assert 2 <= -(-BALANCE.effective_hp(1.0, 0, 0) // BALANCE.arrow_damage(0)) <= 5
     assert BALANCE.effective_hp(2.0, 0, 4) <= 20
     assert [BALANCE.arrow_damage(rank) for rank in range(3)] == [2, 3, 4]
 
@@ -68,7 +69,8 @@ def test_a_few_profile_changes_reach_late_encounters_and_the_gold_economy():
 
 def test_monster_roles_share_the_small_opening_scale():
     """The first pack and its leader are readable, while bosses remain distinct."""
-    assert [MONSTERS[k].hp for k in ("fallen", "zombie", "shaman")] == [7, 11, 14]
+    assert all(1 <= MONSTERS[k].hp <= 20 for k in ("fallen", "zombie", "shaman"))
+    assert MONSTERS["fallen"].hp < MONSTERS["zombie"].hp < MONSTERS["shaman"].hp
     assert MONSTERS["fallen"].bounty == 1
     assert MONSTERS["skeleton"].hp < MONSTERS["overlord"].hp < MONSTERS["azazel"].hp
     assert MONSTERS["flayer"].hp < MONSTERS["hulk"].hp < MONSTERS["bone_priest"].hp

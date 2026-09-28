@@ -40,7 +40,7 @@ profile values, not twelve hand-tuned life factors:
 
 | Knob | Current value | What it controls |
 | --- | ---: | --- |
-| `base_hp` | 7 | HP of the opening common enemy |
+| `base_hp` | 6 | HP of the opening common enemy |
 | `location_growth` | 1.055 | HP and gold unit growth per location |
 | `wave_growth` | 1.05 | HP growth within a location |
 | `arrow_hit` | 2 | Rank-I Arrow damage; ranks add 1 each |
@@ -56,10 +56,10 @@ profile values, not twelve hand-tuned life factors:
 | `breach_cache_units` | 0.8 | Immediate cash reward for clearing a side pack |
 
 `HP = round(base_hp × role_hp × location_growth^location_index ×
-wave_growth^wave_index × encounter_factor)`. The first Fallen is 7 HP and the first
-Shaman, with `role_hp` near 2, is about 14–17 HP even in Tristram's late waves. The
-same common enemy is about 20 HP in the last location's final wave. A basic Arrow goes
-from four hits to ten; invested ranks and overlapping coverage close that gap. The
+wave_growth^wave_index × encounter_factor)`. The first Fallen is 6 HP and the first
+Shaman, with `role_hp` near 2, is about 12–15 HP even in Tristram's late waves. The
+same common enemy is about 15 HP in the last location's final wave. A basic Arrow goes
+from three hits to eight; invested ranks and overlapping coverage close that gap. The
 curve raises pressure without inflating every tower automatically. Bosses and named
 breach elites have authored role factors and abilities, but their HP still derives from
 the profile. Door HP, spell damage, rank prices and wave gold budgets derive from the
@@ -101,25 +101,25 @@ game's central threat, with Cleanse as opening counterplay.
 
 The word *slow* applies to power and options, not waiting through longer waves. Tune
 path exposure, spawn spacing, and counts to keep individual defences concise. Aim for
-roughly four hits on an opening common enemy and four to six hits from an appropriately
+roughly three hits on an opening common enemy and four to six hits from an appropriately
 invested late tower, with routes and leaders supplying the harder decisions.
 
 ## Open fields, routes, and enemies
 
-Keep the 25×14 viewport. Author open, traversable fields with sparse obstacles,
-several build areas, two ordinary entrances from the second location onward, and a
-visibly sealed breach entrance where offered. A level has a sanctuary, entrance
-positions and a bounded set of route variants through the field. Route intersections
-are allowed. Route geometry is immutable and validated when the level loads.
+Each location now uses a 33×18 field fitted above the fixed-size HUD. Monster halls
+are authored as walkable tiles, three tiles wide where routes branch and rejoin.
+The remaining interior is buildable tower ground, separated visibly by the hall edge.
+From Graveyard onward, maps have two ordinary entrances; six also show a sealed
+breach entrance. A level validates every route against its hall before play starts.
 
 Each spawned monster receives a committed route from its entrance. **Wanderers** get a
-seeded choice between a direct trail and an open-ground detour from their entrance. **Runners**
+seeded choice between a direct hall and a longer loop from their entrance. **Runners**
 take the shortest route and have the speed/HP tradeoff that makes the direct approach
 their identity. A choice belongs to the spawn, not a combat-dependent global random
 draw; the same seed and spawn ordinal choose the same route in a normal world and a
 planner clone. A detour should be no more than about 1.6 times the direct route so
 wandering never means an enemy stalls or walks away indefinitely. Route choices can
-cross the open field but never cross an obstacle or a build pad.
+branch and rejoin inside the monster halls but never cross a buildable tower plot.
 
 Route-local distance is still useful for fast movement and range intervals, but two
 monsters' `s` values on different routes are incomparable. Combat uses actual position
@@ -129,13 +129,12 @@ small interface. Gate semantics are explicit: a route that crosses a gate stops 
 batters it; a route that goes around it bypasses it. A side entrance creates a real
 new angle of attack, not a second spawn on the same line.
 
-Start with one Tristram or Graveyard pilot arena. Migrate movement, tower targeting,
-the planner estimate, scripted players, view interpolation, gate checks and replay
-serialization against it before migrating all twelve locations. The curse planner's
-exact rollout stays the game's own deterministic world. Its cheap candidate estimate
-must project route-specific future positions; the quality tool verifies that it still
-shortlists good curses. Painted grounds are invalidated by a geometry fingerprint, so
-the current procedural ground is drawn whenever an old corridor painting does not fit.
+The curse planner's exact rollout stays the game's own deterministic world. Its cheap
+candidate estimate projects route-specific future positions; the quality tool verifies
+that it still shortlists good curses. The floor fingerprint includes the walkable mask,
+so an old painting cannot silently put monster space under a tower plot. Image-generated
+terrain materials and code-drawn hall edges now form the floor while the old paintings
+have incompatible geometry.
 
 ## Breaches and loot
 
@@ -240,7 +239,7 @@ tristram --moments 8 --jobs 2`: smart share of best 0.962 across eight useful
 decisions (small sample). Today the first Fallen is `48 × 1.49 = 71.5` HP and the
 opening Frost Shrine already attacks an area.
 
-### Measured redesign
+### Measured first redesign before the corridor revision
 
 With the `1.055` location-growth profile, `tools/balance.py --location tristram
 --policies none,random,smart --defenders 4 --jobs 2` reports 4/4 wins under
@@ -262,3 +261,16 @@ That measures a gentler middle Act II and a tight final battle; a less capable
 veteran defender still lost every sampled Spider Forest, Hell's Gate and Temple
 defence. The former uniform margin targets are not met on every location.
 Future tuning can narrow the Act II middle without moving area attacks earlier.
+
+### Corridor revision and opening adjustment
+
+The 33×18 corridor maps initially made Tristram too hard at `base_hp=7`: the same
+four-defender check lost 8.5 lives without curses, 23.0 with random curses, and
+22.5 with smart curses. The eight-moment curse-quality
+check retained 0.924 of the best available choice across six useful decisions.
+
+Changing the one shared `base_hp` knob to 6 restored 4/4 wins under each policy.
+Mean lives lost are 0.2 without curses, 7.0 with random curses, and 8.0 with smart
+curses. Curse quality is 1.000 across six useful decisions (9 ms mean, 15 ms max).
+The new geometry still requires fresh planned-player builds and full-campaign
+calibration; those results will supersede the first redesign campaign table above.
