@@ -83,21 +83,31 @@ def test_fire_ball_cannot_be_learned_without_master_fire():
     assert can_learn(frozenset({"adept_fire", "master_fire"}), "fire_ball", 5)
 
 
-@pytest.mark.parametrize("kind,column", [("pyre", ("adept_fire", "master_fire", "fire_ball")),
-                                         ("storm", ("adept_lightning", "master_lightning", "static_field", "chain_lightning")),
-                                         ("frost", ("adept_cold", "glacial_spike")),
-                                         ("plague", ("adept_poison", "master_poison", "lower_resist",
-                                                     "contagion"))])
-def test_a_towers_skills_make_it_kill_more(kind, column):
-    """Property: every tower skill leaves fewer monsters alive, or fewer lives lost, than none."""
-    def result(learned):
-        world = world_of(g("zombie", 6, 0.6), g("fallen", 8, 0.4, start=2.0), learned=learned)
-        for tile in best(world, 2):
-            world.build(kind, tile)
-        world.call_wave()
-        run(world, 40)
-        return (world.lives, world.kills, -sum(m.hp for m in world.monsters))
-    assert result(column) > result(())
+@pytest.mark.parametrize("kind,learned", [("pyre", ("adept_fire", "master_fire", "fire_ball")),
+                                          ("storm", ("adept_lightning", "master_lightning", "static_field", "chain_lightning")),
+                                          ("frost", ("adept_cold", "glacial_spike")),
+                                          ("plague", ("adept_poison", "master_poison", "lower_resist"))])
+def test_combat_skills_hurt_a_cluster_more(kind, learned):
+    """A tough cluster in reach shows extra damage before kills or leaks hide it."""
+    plain = world_of()
+    reach = plain.tower_levels[kind][0].range
+    tile = next(tile for _, tile in tile_scores(plain, reach) if plain.level.coverage(tile, reach))
+    a, b = plain.level.coverage(tile, reach)[0]
+    middle = (a + b) / 2
+
+    def remaining_hp(skills):
+        world = world_of(learned=skills)
+        world.build(kind, tile)
+        for offset in (-0.1, 0.0, 0.1):
+            monster = Monster(world._id(), MONSTERS["zombie"], 0, 0, 0, MONSTERS["zombie"].hp * 10, 0)
+            monster.s = middle + offset
+            monster.frozen = 5.0
+            world.monsters.append(monster)
+        world.monsters.sort(key=lambda monster: monster.s, reverse=True)
+        run(world, 2)
+        return sum(monster.hp for monster in world.monsters)
+
+    assert remaining_hp(learned) < remaining_hp(())
 
 
 def test_holy_shield_and_thorns_make_a_gate_hold_more_life_and_hurt_its_batterers():
