@@ -78,10 +78,14 @@ class TestTowerRigs:
                    for rank in range(2))
 
     def test_arrow_tower_loads_as_a_game_asset(self, tmp_path):
-        """The art registry exposes the new tower even while the painted sheet has only older towers."""
+        """The painted sheet and game registry both cover every Arrow rank."""
         from saga2d import Game
+        from sagaforge import restyle
         from hellward.art import sprites
 
+        _, painted = restyle.load_frames(sprites.PAINTED / "towers")
+        assert all(f"{kind}/{rank}" in painted for kind in structures.TOWER_KINDS for rank in range(3))
+        assert len({painted[f"arrow/{rank}"].tobytes() for rank in range(3)}) == 3
         game = Game("Hellward art test", backend="mock", asset_path=tmp_path / "cache", save_dir=tmp_path / "saves")
         try:
             sprites.register(game, tmp_path / "cache")

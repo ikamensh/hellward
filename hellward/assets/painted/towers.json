@@ -3,7 +3,7 @@
   144,
   300
  ],
- "cols": 6,
+ "cols": 7,
  "rows": 3,
  "origin": [
   72,
@@ -22,8 +22,17 @@
  "grid": false,
  "cells": [
   {
-   "key": "pyre/0",
+   "key": "arrow/0",
    "col": 0,
+   "row": 0,
+   "tags": {
+    "kind": "arrow",
+    "rank": 0
+   }
+  },
+  {
+   "key": "pyre/0",
+   "col": 1,
    "row": 0,
    "tags": {
     "kind": "pyre",
@@ -32,7 +41,7 @@
   },
   {
    "key": "storm/0",
-   "col": 1,
+   "col": 2,
    "row": 0,
    "tags": {
     "kind": "storm",
@@ -41,7 +50,7 @@
   },
   {
    "key": "frost/0",
-   "col": 2,
+   "col": 3,
    "row": 0,
    "tags": {
     "kind": "frost",
@@ -50,7 +59,7 @@
   },
   {
    "key": "plague/0",
-   "col": 3,
+   "col": 4,
    "row": 0,
    "tags": {
     "kind": "plague",
@@ -59,7 +68,7 @@
   },
   {
    "key": "altar/0",
-   "col": 4,
+   "col": 5,
    "row": 0,
    "tags": {
     "kind": "altar",
@@ -68,7 +77,7 @@
   },
   {
    "key": "grove/0",
-   "col": 5,
+   "col": 6,
    "row": 0,
    "tags": {
     "kind": "grove",
@@ -76,8 +85,17 @@
    }
   },
   {
-   "key": "pyre/1",
+   "key": "arrow/1",
    "col": 0,
+   "row": 1,
+   "tags": {
+    "kind": "arrow",
+    "rank": 1
+   }
+  },
+  {
+   "key": "pyre/1",
+   "col": 1,
    "row": 1,
    "tags": {
     "kind": "pyre",
@@ -86,7 +104,7 @@
   },
   {
    "key": "storm/1",
-   "col": 1,
+   "col": 2,
    "row": 1,
    "tags": {
     "kind": "storm",
@@ -95,7 +113,7 @@
   },
   {
    "key": "frost/1",
-   "col": 2,
+   "col": 3,
    "row": 1,
    "tags": {
     "kind": "frost",
@@ -104,7 +122,7 @@
   },
   {
    "key": "plague/1",
-   "col": 3,
+   "col": 4,
    "row": 1,
    "tags": {
     "kind": "plague",
@@ -113,7 +131,7 @@
   },
   {
    "key": "altar/1",
-   "col": 4,
+   "col": 5,
    "row": 1,
    "tags": {
     "kind": "altar",
@@ -122,7 +140,7 @@
   },
   {
    "key": "grove/1",
-   "col": 5,
+   "col": 6,
    "row": 1,
    "tags": {
     "kind": "grove",
@@ -130,8 +148,17 @@
    }
   },
   {
-   "key": "pyre/2",
+   "key": "arrow/2",
    "col": 0,
+   "row": 2,
+   "tags": {
+    "kind": "arrow",
+    "rank": 2
+   }
+  },
+  {
+   "key": "pyre/2",
+   "col": 1,
    "row": 2,
    "tags": {
     "kind": "pyre",
@@ -140,7 +167,7 @@
   },
   {
    "key": "storm/2",
-   "col": 1,
+   "col": 2,
    "row": 2,
    "tags": {
     "kind": "storm",
@@ -149,7 +176,7 @@
   },
   {
    "key": "frost/2",
-   "col": 2,
+   "col": 3,
    "row": 2,
    "tags": {
     "kind": "frost",
@@ -158,7 +185,7 @@
   },
   {
    "key": "plague/2",
-   "col": 3,
+   "col": 4,
    "row": 2,
    "tags": {
     "kind": "plague",
@@ -167,7 +194,7 @@
   },
   {
    "key": "altar/2",
-   "col": 4,
+   "col": 5,
    "row": 2,
    "tags": {
     "kind": "altar",
@@ -176,7 +203,7 @@
   },
   {
    "key": "grove/2",
-   "col": 5,
+   "col": 6,
    "row": 2,
    "tags": {
     "kind": "grove",

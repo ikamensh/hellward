@@ -370,6 +370,20 @@ def first_build(pool: ProcessPoolExecutor, location_key: str, offset: int,
         hp *= 1.2
 
 
+def best_finalist(actual_scores: list[float], challenge_scores: list[float]) -> int:
+    """Prefer the build that plays best at real HP; use the search's harder trial to break a tie."""
+    return max(range(len(actual_scores)), key=lambda i: (actual_scores[i], challenge_scores[i]))
+
+
+def next_life(hp: float, score: float) -> float:
+    """Raise search difficulty when a build holds, but never train below the real game's HP."""
+    if score >= HOLD:
+        return hp * 1.06
+    if score < FALTER:
+        return max(1.0, hp / 1.06)
+    return hp
+
+
 def climb(pool: ProcessPoolExecutor, location_key: str, generations: int, children: int, per: int,
           confirm: int, resume: bool, log) -> Plan:
     """The climb for one location, from the first builds or, with ``resume``, from the plan the
@@ -401,22 +415,21 @@ def climb(pool: ProcessPoolExecutor, location_key: str, generations: int, childr
         elif scores[1 + k] == parent_score:   # as good on these seeds: drift, so the climb can cross a plateau
             parent, moved = kids[k], " ="
         log(f"  gen {g:3d} life x{hp:.2f} build {scores[0]:5.1f} best change {scores[1 + k]:5.1f}{moved}")
-        if parent_score >= HOLD:
-            hp *= 1.06
-        elif parent_score < FALTER and hp > 0.6:
-            hp /= 1.06
+        hp = next_life(hp, parent_score)
 
     trail.append(parent)
     finalists = list({json.dumps(p.to_json(), sort_keys=True): p for p in trail[:1] + trail[-4:]}.values())
     finals = [(offset + 60 + j) % TRAINING for j in range(confirm)]
     smart = evaluate(pool, finalists, location_key, finals, hp, "smart")
     defences += len(finalists) * len(finals)
-    chosen = finalists[max(range(len(finalists)), key=lambda i: smart[i])]
-    at_one = evaluate(pool, [chosen], location_key, finals, 1.0, "smart")[0]
-    defences += len(finals)
+    actual = smart if hp == 1.0 else evaluate(pool, finalists, location_key, finals, 1.0, "smart")
+    if actual is not smart:
+        defences += len(finalists) * len(finals)
+    chosen_index = best_finalist(actual, smart)
+    chosen, at_one = finalists[chosen_index], actual[chosen_index]
     log(f"  finalists against smart leaders at life x{hp:.2f}: {' '.join(f'{s:.1f}' for s in smart)}; "
         f"chosen at x1: {at_one:.1f}")
-    chosen.trained = {"confirmed_on": finals, "life": round(hp, 3), "smart_score": round(max(smart), 2),
+    chosen.trained = {"confirmed_on": finals, "life": round(hp, 3), "smart_score": round(smart[chosen_index], 2),
                       "smart_score_at_1": round(at_one, 2), "defences": before.get("defences", 0) + defences,
                       "minutes": round(before.get("minutes", 0) + (time.time() - start) / 60, 1),
                       "generations": done + generations}

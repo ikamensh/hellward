@@ -10,13 +10,13 @@ import pytest
 from hellward.sim import planner
 from hellward.sim.breaches import BREACHES
 from hellward.sim.campaign import LOCATIONS, ORDER, g
-from hellward.sim.content import Wave
+from hellward.sim.content import SPELLS, Wave
 from hellward.sim.level import Level, Route
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.adaptive import ORDERS, Adaptive
 from hellward.sim.players.hands import Hands, defend
-from hellward.sim.players.planned import PLANS, load
+from hellward.sim.players.planned import PLANS, THINK, Plan as PlannedPlan, Planned, load
 from hellward.sim.players.warden import fingerprint, load_plans
 from hellward.sim.skills import SKILLS, can_learn, check, cost
 
@@ -149,6 +149,100 @@ def test_the_planned_player_holds_tristram_with_its_searched_build():
         world, _ = defend(LOCATIONS["tristram"], PLAYERS["planned"](seed), seed=seed, sigils=0,
                           planner=planner.smart)
         assert world.outcome == "victory", seed
+
+
+def test_the_planned_player_holds_temple_with_its_searched_build():
+    """The finale's stored build wins most unseen smart-leader defences at the game's real HP."""
+    victories = 0
+    failed = []
+    for seed in range(1000, 1008):
+        world, _ = defend(LOCATIONS["temple"], PLAYERS["planned"](seed), seed=seed, sigils=33,
+                          planner=planner.smart)
+        victories += world.outcome == "victory"
+        if world.outcome != "victory":
+            failed.append(seed)
+    assert victories >= 6, failed
+
+
+def test_planned_player_spends_smite_on_a_high_stakes_boss_before_it_nears_the_exit():
+    """A boss that costs the sanctuary twenty lives deserves damage before a last-second rescue is possible."""
+    location = replace(LOCATIONS["temple"], waves=(Wave((g("bone_priest", 1),), 10),), wave_names=("Boss",))
+    world = World(location, planner=None)
+    hands = Hands(world, react=0.0)
+    player = Planned(plan=PlannedPlan([], [], [100.0]))
+    world.call_wave()
+    world.step(SIM_DT)
+    hands.observe(world.events)
+    world.events.clear()
+    boss = world.monsters[0]
+    assert world.remaining(boss) > world.level.route(boss.route).length / 2
+    world.mana = SPELLS["smite"].mana + 1
+
+    player.act(hands)
+
+    assert hands.record.spells["smite"] == 1
+
+
+def test_planned_player_rebuilds_past_a_boss_in_the_final_stretch():
+    """A committed build can sell spent positions and keep firing along a boss's remaining route."""
+    location = replace(LOCATIONS["temple"], waves=(Wave((g("bone_priest", 1),), 10),), wave_names=("Boss",))
+    world = World(location, planner=None)
+    route = world.level.route("main")
+    halfway = route.length / 2
+    behind = next((x, y) for y in range(world.level.height) for x in range(world.level.width)
+                  if world.level.buildable(x, y) and route.coverage((x, y), 3.0)
+                  and all(end < halfway for _, end in route.coverage((x, y), 3.0)))
+    world.gold = 1000
+    old = world.build("arrow", behind)
+    world.gold = world.cost("arrow") - 1
+    world.mana = 0
+    world.call_wave()
+    world.step(SIM_DT)
+    boss = world.monsters[0]
+    boss.s = halfway
+    hands = Hands(world, react=0.0)
+
+    player = Planned(plan=PlannedPlan([], [], [100.0]))
+    player.act(hands)
+
+    assert old.id not in world.towers
+    assert not world.towers   # one sale per decision; the next look buys the replacement
+    for _ in range(5):
+        world.step(SIM_DT)
+        hands.observe(world.events)
+        world.events.clear()
+    player.act(hands)
+    assert any(any(end > boss.s for _, end in route.coverage(t.tile, t.stats.range))
+               for t in world.towers.values())
+
+
+def test_planned_player_skips_the_rank_of_a_tower_sold_during_the_final_stretch():
+    """A planned rank no longer applies after that tower has funded an endgame replacement."""
+    location = replace(LOCATIONS["temple"], waves=(Wave((g("bone_priest", 1),), 10),), wave_names=("Boss",))
+    world = World(location, planner=None)
+    route = world.level.route("main")
+    halfway = route.length / 2
+    tile = next((x, y) for y in range(world.level.height) for x in range(world.level.width)
+                if world.level.buildable(x, y) and route.coverage((x, y), 3.0)
+                and all(end < halfway for _, end in route.coverage((x, y), 3.0)))
+    world.gold = 1000
+    tower = world.build("arrow", tile)
+    world.gold = world.cost("arrow") - 1
+    world.mana = 0
+    world.call_wave()
+    world.step(SIM_DT)
+    world.monsters[0].s = halfway
+    player = Planned(plan=PlannedPlan([], [("build", "arrow", tile), ("rank", tile)], [100.0]))
+    player.next = 1
+    hands = Hands(world, react=0.0)
+
+    player.act(hands)
+    assert tower.id not in world.towers
+    world.monsters.clear()
+    world.time += THINK
+    player.act(hands)
+
+    assert player.next == 2
 
 
 def test_the_adaptive_player_holds_tristram():

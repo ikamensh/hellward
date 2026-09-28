@@ -20,7 +20,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from hellward.sim.campaign import ORDER, Location
-from hellward.sim.content import CURSES, SPELLS, Curse, Element
+from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, Curse, Element
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.skills import can_learn
@@ -30,6 +30,7 @@ THINK = 0.25          # seconds between two looks at the build and the next wave
 LOOK = 0.2            # seconds between two looks for a spell worth casting
 ARCH_CLEAR = 0.6      # a gate cannot be warded while a walker stands this close to its arch
 LEAK_SOON = 2.0       # seconds from the sanctuary at which a walker is about to take lives
+HIGH_STAKES = 5       # a single leak this costly deserves damage throughout its approach
 
 # The share of a tower's work a curse takes away while it lasts, as a person would reckon it: Bone Prison
 # silences wholly but for half as long, and a Weakened frost shrine still chills.
@@ -99,6 +100,7 @@ class Planned:
     plan: Plan | None = None   # given, or loaded for the location when the defence begins
     next: int = 0              # the plan's next step
     gates: set[int] = field(default_factory=set)   # arches the plan has warded, to ward again when broken
+    relocated: set[tuple[int, int]] = field(default_factory=set)   # planned towers sold to follow the final boss
     clock: float = 0.0
     look: float = 0.0
     last_aim: float = -1e9
@@ -127,6 +129,8 @@ class Planned:
     def _build(self, world: World) -> None:
         assert self.plan is not None
         plan = self.plan
+        if self._follow_boss(world):
+            return
         if plan.rebuild == "now" or (plan.rebuild == "break" and world.break_left is not None):
             for index in sorted(self.gates):
                 door = world.doors[index]
@@ -142,7 +146,10 @@ class Planned:
                     world.build(step[1], step[2])
             elif step[0] == "rank":
                 tower = world.tower_at(step[1])
-                assert tower is not None
+                if tower is None:
+                    assert step[1] in self.relocated
+                    self.next += 1
+                    continue
                 price = world.upgrade_cost(tower)
                 if price is not None:
                     if world.rank_needs(tower) is not None:
@@ -160,6 +167,45 @@ class Planned:
                 self.gates.add(step[1])
             self.next += 1
         self._spare(world)
+
+    def _follow_boss(self, world: World) -> bool:
+        """In the last stretch, move spent towers ahead of a boss that would cost many lives to leak."""
+        if world.wave != len(world.waves) - 1 or world.schedule or not world.monsters:
+            return False
+        boss = max((m for m in world.monsters if m.kind.lives >= HIGH_STAKES),
+                   key=lambda m: (m.kind.lives, m.hp), default=None)
+        if boss is None:
+            return False
+        route = world.level.route(boss.route)
+        reach = world.tower_levels["arrow"][0].range
+        best: tuple[int, int] | None = None
+        most = 0.0
+        for y in range(world.level.height):
+            for x in range(world.level.width):
+                tile = x, y
+                if not world.level.buildable(x, y) or world.tower_at(tile) is not None:
+                    continue
+                covered = 0.0
+                for start, end in route.coverage(tile, reach):
+                    left = max(start, boss.s)
+                    if end > left:
+                        covered += (end - left) / (1.0 + max(0.0, start - boss.s) / 4.0)
+                if covered > most:
+                    best, most = tile, covered
+        if best is None:
+            return True
+        price = world.cost("arrow")
+        if world.gold >= price:
+            world.build("arrow", best)
+            return True
+        spent = [t for t in world.towers.values() if not t.curses and world.gold + int(t.spent * SELL_REFUND) >= price
+                 and all(all(end <= m.s for _, end in world.level.route(m.route).coverage(t.tile, t.stats.range))
+                         for m in world.monsters)]
+        if spent:
+            tower = max(spent, key=lambda t: (int(t.spent * SELL_REFUND), -t.id))
+            world.sell(tower.id)
+            self.relocated.add(tower.tile)
+        return True
 
     def _spare(self, world: World) -> None:
         """Gold the plan did not foresee (it is all done): ranks for the towers, the lowest first."""
@@ -245,6 +291,13 @@ class Planned:
             return
         if self._can(world, "smite") and self._stop_leak(hands):
             return
+        if self._can(world, "smite"):
+            boss = max((m for m in world.monsters if m.kind.lives >= HIGH_STAKES),
+                       key=lambda m: (m.kind.lives, m.hp), default=None)
+            if boss is not None:
+                hands.smite(boss.id)
+                self.last_aim = world.time
+                return
         if self._can(world, "meteor", spare):
             x, y, value = _best_meteor(world)
             if value >= (1.5 if full else plan.meteor_worth) * SPELLS["meteor"].damage * world.power():
