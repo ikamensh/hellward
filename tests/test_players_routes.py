@@ -50,7 +50,8 @@ def test_warden_draft_values_only_entrances_used_by_ordinary_waves():
 
 def test_corner_draft_ignores_bends_in_a_sealed_breach_corridor():
     location = sealed_yard()
-    assert path_corners(location.level) == []
+    reach = World(location).tower_levels["arrow"][0].range
+    assert path_corners(location.level, reach) == []
     assert tile_value_for_kind(location, "arrow", (12, 10), 3.0) == 0.0
 
 
