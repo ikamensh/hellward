@@ -1,5 +1,6 @@
 """Whole defences, played by the scripted players through a person's hands."""
 
+import math
 import random
 import sys
 from dataclasses import replace
@@ -393,10 +394,10 @@ def test_adaptive_forecasts_announced_breach_foes_and_prices_their_route(site):
     while not any(monster.route == "breach" for monster in world.monsters):
         world.step()
         assert world.wave_time < 6
-    bot.act(hands)
     side = next(monster for monster in world.monsters if monster.route == "breach")
     assert side.kind.key in bot.ahead
     assert bot.threat(side) > 0
+    bot.act(hands)
 
     while world.schedule:
         world.step()
@@ -448,13 +449,17 @@ def test_the_veteran_drafts_its_build_and_never_reads_the_wardens_stored_plans()
     assert veteran.skills(LOCATIONS["cathedral"], 6) == draft_skills(LOCATIONS["cathedral"], 6)
 
 
-def test_the_corner_player_puts_arrows_on_the_corners_of_tristrams_roads():
-    from hellward.sim.players.corner import path_corners
+def test_the_corner_player_builds_arrows_that_cover_tristrams_bends():
+    """The wide monster halls leave plots beside bends for the corner player's opening."""
     corner = PLAYERS["corner"](1)
-    world, _ = defend(LOCATIONS["tristram"], corner, seed=1, sigils=0, planner=planner.smart)
-    arrows = {t.tile for t in world.towers.values() if t.kind.key == "arrow"}
-    corners = set(path_corners(LOCATIONS["tristram"].level))
-    assert corners and arrows & corners
+    location = LOCATIONS["tristram"]
+    world, _ = defend(location, corner, seed=1, sigils=0, planner=planner.smart)
+    arrows = [t for t in world.towers.values() if t.kind.key == "arrow"]
+    bends = [tile for route in location.level.routes for tile in route.waypoints[1:-1]]
+    assert arrows
+    assert all(any(route.coverage(tower.tile, tower.reach) for route in location.level.routes)
+               for tower in arrows)
+    assert any(math.dist(tower.tile, bend) <= tower.reach for tower in arrows for bend in bends)
 
 
 def test_spacing_marks_down_a_tile_beside_a_tower_where_a_curse_would_catch_both():
@@ -469,11 +474,15 @@ def test_spacing_marks_down_a_tile_beside_a_tower_where_a_curse_would_catch_both
 def test_a_curse_scale_of_zero_curses_only_the_marked_tile():
     world = World(LOCATIONS["tristram"], seed=1, curse_scale=0.0)
     world.gold = 1000
-    for tile in ((5, 5), (6, 5), (7, 5)):
+    level = world.level
+    marked = next((x, y) for y in range(level.height) for x in range(level.width)
+                  if all(level.buildable(*tile) for tile in ((x, y), (x + 1, y), (x, y + 1))))
+    for tile in (marked, (marked[0] + 1, marked[1]), (marked[0], marked[1] + 1)):
         world.build("arrow", tile)
     from hellward.sim.model import curse_radius
     from hellward.sim.content import Curse, MONSTERS
-    assert [t.tile for t in world.caught((5, 5), curse_radius(Curse.WEAKEN, MONSTERS["shaman"], world.curse_scale))] == [(5, 5)]
+    assert len(world.caught(marked, curse_radius(Curse.WEAKEN, MONSTERS["shaman"], 1.0))) == 3
+    assert [t.tile for t in world.caught(marked, curse_radius(Curse.WEAKEN, MONSTERS["shaman"], world.curse_scale))] == [marked]
 
 
 def test_the_margin_tool_scales_the_locations_own_life_factor(monkeypatch):

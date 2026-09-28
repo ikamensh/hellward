@@ -22,9 +22,10 @@ from hellward.sim.skills import SKILLS, can_learn, column_of
 from hellward.sim.sums import float_sum
 
 
-def path_corners(level) -> list[tuple[int, int]]:
-    """Buildable tiles beside the bends of every entrance route."""
+def path_corners(level, reach: float) -> list[tuple[int, int]]:
+    """Buildable plots whose tower can cover a bend of an entrance route."""
     corners = []
+    plots = [(x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y)]
     for route in level.routes:
         if route.key.startswith("breach"):
             continue
@@ -32,9 +33,17 @@ def path_corners(level) -> list[tuple[int, int]]:
         for (x0, y0), (x1, y1), (x2, y2) in zip(waypoints, waypoints[1:], waypoints[2:]):
             in_x, in_y = (x1 > x0) - (x1 < x0), (y1 > y0) - (y1 < y0)
             out_x, out_y = (x2 > x1) - (x2 < x1), (y2 > y1) - (y2 < y1)
+            if (in_x, in_y) == (out_x, out_y):
+                continue
             cx, cy = x1 - in_x + out_x, y1 - in_y + out_y
-            if level.buildable(cx, cy) and (cx, cy) not in corners:
-                corners.append((cx, cy))
+            nearby = [tile for tile in plots if math.dist(tile, (x1, y1)) <= reach
+                      and route.coverage(tile, reach)]
+            if nearby:
+                corner = min(nearby, key=lambda tile: (math.dist(tile, (cx, cy)),
+                                                       -float_sum(b - a for a, b in route.coverage(tile, reach)),
+                                                       tile[1], tile[0]))
+                if corner not in corners:
+                    corners.append(corner)
     return corners
 
 
@@ -70,7 +79,7 @@ class Corner:
     reaction: tuple[float, float] = (0.5, 0.8)
     aim_gap: float = 0.5
     _planned: list[tuple[str, tuple[int, int]]] = field(default_factory=list)
-    _frost_tiles: list[tuple[int, int]] = field(default_factory=list)
+    _bend_tiles: list[tuple[int, int]] = field(default_factory=list)
     _clock: float = 0.0
     _last_aim: float = -1e9
     THINK: float = 0.5
@@ -105,8 +114,9 @@ class Corner:
 
     def _plan(self, world: World) -> None:
         """Bend by bend: the frost shrine on the inside, then one of each other damage tower packed round it."""
-        self._frost_tiles = path_corners(world.level)
-        for corner in self._frost_tiles:
+        anchor = "frost" if "frost" in world.location.arsenal.towers else world.location.arsenal.towers[0]
+        self._bend_tiles = path_corners(world.level, tower_reach(anchor, world))
+        for corner in self._bend_tiles:
             if "frost" in world.location.arsenal.towers:
                 self._planned.append(("frost", corner))
             self._pack(world, [corner])
@@ -192,7 +202,7 @@ class Corner:
             upgrades = [(t, c) for t in world.towers.values()
                         if (c := world.upgrade_cost(t)) is not None and world.rank_needs(t) is None]
             if not upgrades:
-                if self._pack(world, self._frost_tiles):
+                if self._pack(world, self._bend_tiles):
                     continue
                 return True
             tower, cost = min(upgrades, key=lambda u: (u[0].level, u[0].id))
