@@ -28,13 +28,21 @@ def test_an_arrow_hits_only_one_enemy_in_a_pack():
     """Two enemies together must still need two separate arrows."""
     place = replace(TRISTRAM, waves=(Wave((Group("fallen", 2, 0.0),), 0),), wave_names=("pair",))
     world = World(place, seed=2)
-    world.build("arrow", (1, 4))
+    world.build("arrow", (10, 6))
     world.call_wave()
+    world.step()
+    assert len(world.monsters) == 2
+    # Fallen choose routes independently; keep this pair together to test one arrow's impact.
+    for monster in world.monsters:
+        monster.route = "main"
+        monster.s = 10.0
+        monster.frozen = 10.0
     for _ in range(100):
         world.step()
         if any(event[0] == "hit" for event in world.events):
             break
-    assert len(world.monsters) == 2
+    else:
+        raise AssertionError("Arrow never hit the pack")
     full = world.monsters[0].max_hp
     assert sorted(monster.hp for monster in world.monsters) == [full - TOWERS["arrow"].levels[0].damage, full]
 
