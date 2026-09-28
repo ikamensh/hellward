@@ -1,7 +1,7 @@
 """The corner player: Ilya's winning opening from the old Normal, now tested against area curses.
 
-- Frost Shrine on the inside of every bend of the path (the tile beside both legs)
-- Other offered damage towers packed on free tiles closest to each shrine, bend by bend
+- A build plot within tower reach of each route bend; Frost Shrine there when offered
+- Other offered damage towers packed on free tiles closest to each bend plot
 - Spend every coin as it comes: build the plan, upgrade where the tree allows, then pack another round
 - Gates in every arch when offered
 - Smite on a chanting leader's sign when it has the mana
@@ -113,7 +113,7 @@ class Corner:
             world.call_wave()
 
     def _plan(self, world: World) -> None:
-        """Bend by bend: the frost shrine on the inside, then one of each other damage tower packed round it."""
+        """Choose reachable bend plots, then pack each offered damage tower around them."""
         anchor = "frost" if "frost" in world.location.arsenal.towers else world.location.arsenal.towers[0]
         self._bend_tiles = path_corners(world.level, tower_reach(anchor, world))
         for corner in self._bend_tiles:
