@@ -187,6 +187,39 @@ class TestWorldMapAct2:
         img = worldmap.picture(act=2)
         assert img.size == (worldmap.WIDTH * worldmap.DENSITY, worldmap.HEIGHT * worldmap.DENSITY)
 
+
+def test_authored_hall_floor_reads_differently_from_tower_ground():
+    """A hall's spare width is monster space even where no route centreline passes."""
+    import numpy as np
+
+    from hellward.art import mapart
+    from hellward.sim.level import Level
+
+    halls = frozenset((x, y) for x in range(9) for y in (2, 3) if 0 < x < 8 or y == 3)
+    level = Level("hall art", 9, 7, ((0, 3), (8, 3)), (), halls=halls)
+    image = mapart.stand_in(level, mapart.THEMES["village"])
+
+    def brightness(x: int, y: int) -> float:
+        px = mapart.PX
+        patch = np.asarray(image.crop(((x + 0.4) * px, (y + 0.4) * px,
+                                       (x + 0.6) * px, (y + 0.6) * px)), dtype=np.float32)
+        return float(patch.mean())
+
+    assert brightness(4, 2) > brightness(4, 1) + 8
+
+
+def test_painted_floor_stamp_changes_when_only_hall_width_changes():
+    """An old painting cannot silently put monster space under a tower plot."""
+    from dataclasses import replace
+
+    from hellward.art.mapart import layout_fingerprint
+    from hellward.sim.level import Level
+
+    halls = frozenset((x, 3) for x in range(9))
+    level = Level("hall stamp", 9, 7, ((0, 3), (8, 3)), (), halls=halls)
+    widened = replace(level, halls=halls | {(4, 2)})
+    assert layout_fingerprint(level) != layout_fingerprint(widened)
+
 if __name__ == "__main__":
     import pytest
     pytest.main([__file__, "-v"])

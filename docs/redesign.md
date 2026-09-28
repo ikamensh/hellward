@@ -133,8 +133,8 @@ The curse planner's exact rollout stays the game's own deterministic world. Its 
 candidate estimate projects route-specific future positions; the quality tool verifies
 that it still shortlists good curses. The floor fingerprint includes the walkable mask,
 so an old painting cannot silently put monster space under a tower plot. Image-generated
-terrain materials and code-drawn hall edges now form the floor while the old paintings
-have incompatible geometry.
+terrain materials and code-drawn hall edges now form the floor. The old corridor
+paintings were removed from the working assets because their geometry was obsolete.
 
 ## Breaches and loot
 

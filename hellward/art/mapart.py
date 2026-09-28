@@ -1,4 +1,4 @@
-"""A location's ground as one picture: its floor, the way the monsters walk, the walls, the pits, the
+"""A location's ground as one picture: its build ground, bounded monster halls, walls, pits, the
 hell portal they come out of and the sanctuary gate they are headed for.
 
 Each location has a :class:`Theme`: the cathedral's flagstones and torn crimson carpet, the village's mud
@@ -19,7 +19,7 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 from dataclasses import dataclass
 
@@ -27,6 +27,7 @@ from hellward.art.rig import DENSITY, TILE
 from hellward.sim.level import Level, Route, Tile
 
 PAINTED = Path(__file__).resolve().parent.parent / "assets" / "painted"
+TERRAIN = Path(__file__).resolve().parent.parent / "assets" / "terrain"
 PX = TILE * DENSITY          # pixels per tile in the picture
 
 FLOOR = np.array((70, 64, 62), dtype=np.float32)
@@ -97,9 +98,16 @@ THEMES: dict[str, Theme] = {
                     "tall pillars with bone niches, torch sconces guttering, the mother lamp hanging dim, scattered skulls"),
 }
 
+MATERIALS = {
+    "village": "village", "graveyard": "graveyard", "cathedral": "stone",
+    "catacombs": "stone", "caves": "cavern", "hell": "brimstone",
+    "docks": "docks", "spider_forest": "forest", "jungle": "forest",
+    "drowned_city": "stone", "travincal": "stone", "temple": "stone",
+}
+
 
 def _visible_routes(level: Level) -> tuple[Route, ...]:
-    """Wanderers can cross open ground; only entrances and committed roads are painted as trails."""
+    """Direct routes leave a worn trace within the broader monster halls."""
     return tuple(route for route in level.routes if route.key != "meander" and not route.key.endswith("_detour"))
 
 
@@ -111,22 +119,32 @@ def _noise(width: int, height: int, scale: int, seed: int) -> np.ndarray:
     return np.asarray(image, dtype=np.float32)[:height, :width] / 255.0
 
 
-def _stone(level: Level, seed: int, theme: Theme) -> Image.Image:
+def _material(level: Level, theme: Theme) -> Image.Image:
+    """Repeat image-generated ground with mirrored joins, then match a location's palette."""
+    key = next((name for name, value in THEMES.items() if value is theme), "cathedral")
+    with Image.open(TERRAIN / f"{MATERIALS[key]}.webp") as painting:
+        source = painting.convert("RGB")
+    size = (round(source.width * 0.65), round(source.height * 0.65))
+    source = source.resize(size, Image.Resampling.LANCZOS)
+    tile = Image.new("RGB", (size[0] * 2, size[1] * 2))
+    tile.paste(source, (0, 0))
+    tile.paste(ImageOps.mirror(source), (size[0], 0))
+    tile.paste(ImageOps.flip(source), (0, size[1]))
+    tile.paste(ImageOps.flip(ImageOps.mirror(source)), size)
     w, h = level.width * PX, level.height * PX
-    grain = 0.6 * _noise(w, h, 6, seed) + 0.4 * _noise(w, h, 40, seed + 1)
-    rng = random.Random(seed)
-    base = np.zeros((h, w, 3), dtype=np.float32)
-    floor, path = np.array(theme.floor, dtype=np.float32), np.array(theme.path, dtype=np.float32)
-    roads = {tile for route in _visible_routes(level) for tile in route.tiles}
-    for y in range(level.height):
-        for x in range(level.width):
-            tile = level.tile(x, y)
-            color = path if (x, y) in roads or tile is Tile.DOOR else floor
-            tint = rng.uniform(0.86, 1.1)
-            warm = rng.uniform(-4, 6)
-            base[y * PX:(y + 1) * PX, x * PX:(x + 1) * PX] = color * tint + np.array((warm, 0, -warm * 0.5))
-    base *= (0.78 + 0.4 * grain)[..., None]
-    image = Image.fromarray(np.clip(base, 0, 255).astype(np.uint8), "RGB")
+    canvas = Image.new("RGB", (w, h))
+    for y in range(0, h, tile.height):
+        for x in range(0, w, tile.width):
+            canvas.paste(tile, (x, y))
+    pixels = np.asarray(canvas, dtype=np.float32)
+    current = np.asarray(source, dtype=np.float32).mean(axis=(0, 1))
+    target = np.asarray(theme.floor, dtype=np.float32) * 1.2
+    pixels = np.clip(pixels * target / current, 0, 255)
+    return Image.fromarray(pixels.astype(np.uint8), "RGB")
+
+
+def _build_ground(level: Level, theme: Theme) -> Image.Image:
+    image = _material(level, theme)
     draw = ImageDraw.Draw(image)
     mortar = tuple(int(c * 0.55) for c in theme.floor)
     for y in range(level.height):
@@ -140,16 +158,34 @@ def _stone(level: Level, seed: int, theme: Theme) -> Image.Image:
                     draw.line((x0, y0 + PX // 2, x0 + PX, y0 + PX // 2), fill=(44, 40, 40), width=2)
             else:   # earth and rock: only a faint grid, so a tower's place still reads
                 draw.rectangle((x0, y0, x0 + PX - 1, y0 + PX - 1), outline=mortar, width=1)
-    for _ in range(90):   # cracks
-        x, y = rng.uniform(0, w), rng.uniform(0, h)
-        points = [(x, y)]
-        a = rng.uniform(0, 2 * math.pi)
-        for _ in range(rng.randint(3, 7)):
-            a += rng.uniform(-0.9, 0.9)
-            x, y = x + math.cos(a) * rng.uniform(8, 22), y + math.sin(a) * rng.uniform(8, 22)
-            points.append((x, y))
-        draw.line(points, fill=(30, 26, 28), width=2)
     return image
+
+
+def _halls(image: Image.Image, level: Level, theme: Theme) -> None:
+    """Give every monster tile one readable surface, including space between route centrelines."""
+    mask = Image.new("L", image.size, 0)
+    draw = ImageDraw.Draw(mask)
+    for x, y in level.walkable_tiles:
+        draw.rectangle((x * PX, y * PX, (x + 1) * PX - 1, (y + 1) * PX - 1), fill=255)
+    floor = np.asarray(image, dtype=np.float32)
+    ratio = np.maximum(1.25, np.asarray(theme.path, dtype=np.float32)
+                       / np.maximum(np.asarray(theme.floor, dtype=np.float32), 1))
+    hall = Image.fromarray(np.clip(floor * ratio, 0, 255).astype(np.uint8), "RGB")
+    image.paste(hall, (0, 0), mask)
+    rim = tuple(round(c * 0.38) for c in theme.path)
+    glint = tuple(min(255, round(c * 1.38)) for c in theme.path)
+    edge = ImageDraw.Draw(image)
+    for x, y in level.walkable_tiles:
+        x0, y0 = x * PX, y * PX
+        for dx, dy, segment in (
+            (-1, 0, (x0, y0, x0, y0 + PX - 1)),
+            (1, 0, (x0 + PX - 1, y0, x0 + PX - 1, y0 + PX - 1)),
+            (0, -1, (x0, y0, x0 + PX - 1, y0)),
+            (0, 1, (x0, y0 + PX - 1, x0 + PX - 1, y0 + PX - 1)),
+        ):
+            if (x + dx, y + dy) not in level.walkable_tiles:
+                edge.line(segment, fill=rim, width=5)
+                edge.line(segment, fill=glint, width=1)
 
 
 def _carpet(image: Image.Image, level: Level, seed: int) -> None:
@@ -261,7 +297,7 @@ def _gore(image: Image.Image, level: Level, seed: int) -> None:
 
 
 def _portal(image: Image.Image, level: Level) -> None:
-    """A portal at each open entrance and the common sanctuary gate."""
+    """Open entrances, visibly sealed optional breach entrances, and the sanctuary."""
     entrances = dict.fromkeys(route.entrance for route in _visible_routes(level) if not route.key.startswith("breach"))
     for x, y in entrances:
         cx, cy = (x + 0.5) * PX, (y + 0.5) * PX
@@ -276,6 +312,20 @@ def _portal(image: Image.Image, level: Level) -> None:
             draw.arc((cx - r * 0.6, cy - r, cx + r * 0.6, cy + r), 20 + i * 90, 280 + i * 90,
                      fill=(255, 120 - i * 30, 30, 255), width=5)
         image.paste(glow, (0, 0), glow)
+    for x, y in dict.fromkeys(route.entrance for route in level.routes if route.key.startswith("breach")):
+        cx, cy = (x + 0.5) * PX, (y + 0.5) * PX
+        seal = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(seal)
+        draw.ellipse((cx - PX * 0.38, cy - PX * 0.65, cx + PX * 0.38, cy + PX * 0.65),
+                     fill=(25, 13, 34, 255), outline=(158, 88, 188, 255), width=6)
+        draw.arc((cx - PX * 0.31, cy - PX * 0.56, cx + PX * 0.31, cy + PX * 0.56),
+                 35, 325, fill=(214, 160, 227, 255), width=3)
+        for offset in (-0.22, 0, 0.22):
+            xx = cx + offset * PX
+            draw.line((xx, cy - PX * 0.47, xx, cy + PX * 0.47), fill=(110, 95, 106, 255), width=6)
+        draw.ellipse((cx - 9, cy - 9, cx + 9, cy + 9), fill=(178, 133, 72, 255),
+                     outline=(238, 197, 121, 255), width=2)
+        image.paste(seal, (0, 0), seal)
     x, y = level.waypoints[-1]
     cx, cy = (x + 0.5) * PX, (y + 0.5) * PX
     holy = Image.new("RGBA", image.size, (0, 0, 0, 0))
@@ -292,19 +342,20 @@ def _portal(image: Image.Image, level: Level) -> None:
 
 
 def _road(image: Image.Image, level: Level, seed: int, theme: Theme) -> None:
-    """The way the monsters walk, where there is no carpet: worn ground or flags, darker at the edges."""
+    """A worn trace shows the shorter committed roads within the wider walkable halls."""
     rng = random.Random(seed)
-    draw = ImageDraw.Draw(image)
+    wear = Image.new("RGBA", image.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(wear)
     for route in _visible_routes(level):
         half = PX * (0.36 if route.key == "main" else 0.24 if not route.key.startswith("breach") else 0.17)
         path = theme.path if not route.key.startswith("breach") else tuple(int(c * 0.72) for c in theme.path)
         edge = tuple(int(c * 0.6) for c in path)
         points = [((x + 0.5) * PX, (y + 0.5) * PX) for x, y in route.waypoints]
-        for width, color in ((half + 5, edge), (half, path)):
+        for width, color, alpha in ((half + 5, edge, 110), (half, path, 145)):
             stroke = round(width * 2)
-            draw.line(points, fill=color, width=stroke, joint="curve")
+            draw.line(points, fill=color + (alpha,), width=stroke, joint="curve")
             for x, y in points:
-                draw.ellipse((x - width, y - width, x + width, y + width), fill=color)
+                draw.ellipse((x - width, y - width, x + width, y + width), fill=color + (alpha,))
         for _ in range(int(route.length * (5 if route.key == "main" else 3))):
             s = rng.uniform(0, route.length)
             px, py = route.point(s)
@@ -312,35 +363,8 @@ def _road(image: Image.Image, level: Level, seed: int, theme: Theme) -> None:
             r = rng.uniform(3, 8)
             shade = rng.uniform(0.7, 1.25)
             draw.ellipse((px * PX + ox - r, py * PX + oy - r * 0.7, px * PX + ox + r, py * PX + oy + r * 0.7),
-                         fill=tuple(int(min(255, c * shade)) for c in path))
-
-
-def _wander_lanes(image: Image.Image, level: Level, seed: int, theme: Theme) -> None:
-    """Scuffed patches identify unbuildable detours without turning them into paved roads."""
-    visible = {tile for route in _visible_routes(level) for tile in route.tiles}
-    wandering = {tile for route in level.routes
-                 if route.key == "meander" or route.key.endswith("_detour") for tile in route.tiles}
-    tiles = sorted(wandering - visible)
-    if not tiles:
-        return
-    rng = random.Random(seed)
-    wear = Image.new("L", image.size, 0)
-    mask = ImageDraw.Draw(wear)
-    for x, y in tiles:
-        cx = (x + 0.5 + rng.uniform(-0.09, 0.09)) * PX
-        cy = (y + 0.5 + rng.uniform(-0.09, 0.09)) * PX
-        rx = PX * rng.uniform(0.3, 0.4)
-        ry = PX * rng.uniform(0.2, 0.28)
-        mask.ellipse((cx - rx, cy - ry, cx + rx, cy + ry), fill=130)
-    image.paste(Image.new("RGB", image.size, theme.path), (0, 0), wear.filter(ImageFilter.GaussianBlur(PX * 0.06)))
-    draw = ImageDraw.Draw(image)
-    scuff = tuple(round(a * 0.45 + b * 0.55) for a, b in zip(theme.floor, theme.path))
-    for x, y in tiles:
-        for _ in range(4):
-            px = (x + rng.uniform(0.22, 0.78)) * PX
-            py = (y + rng.uniform(0.3, 0.7)) * PX
-            rx = rng.uniform(2, 5)
-            draw.ellipse((px - rx, py - rx * 0.45, px + rx, py + rx * 0.45), fill=scuff)
+                         fill=tuple(int(min(255, c * shade)) for c in path) + (75,))
+    image.paste(wear, (0, 0), wear)
 
 
 def _pits(image: Image.Image, level: Level, seed: int, theme: Theme) -> None:
@@ -410,9 +434,9 @@ def _props(image: Image.Image, level: Level, seed: int, theme: Theme) -> None:
 
 
 def stand_in(level: Level, theme: Theme = THEMES["cathedral"], seed: int = 11) -> Image.Image:
-    image = _stone(level, seed, theme)
+    image = _build_ground(level, theme)
     _gore(image, level, seed + 1)
-    _wander_lanes(image, level, seed + 6, theme)
+    _halls(image, level, theme)
     _road(image, level, seed + 2, theme)
     if theme is THEMES["cathedral"]:
         _carpet(image, level, seed + 2)
@@ -434,9 +458,10 @@ def painted(key: str) -> Path:
 def layout_fingerprint(level: Level) -> str:
     """Identity of everything that fixes a floor's paths, portals, and unbuildable tiles."""
     layout = {
-        "version": 1,
+        "version": 2,
         "size": (level.width, level.height),
         "routes": [(route.key, route.waypoints) for route in level.routes],
+        "walkable": sorted(level.walkable_tiles),
         "doors": sorted(level.doors),
         "obstacles": sorted(level.obstacles),
         "pools": sorted(level.pools),

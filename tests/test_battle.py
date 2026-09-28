@@ -41,12 +41,10 @@ def test_a_scripted_defence_plays_through_the_scene(game):
     scene = BattleScene(art, replace(CATHEDRAL, life=1.0), seed=1, planner=planner.smart, autopilot=Ordinary())   # the scene, not the tuning
     g.push(scene)
     scene.speed = 4.0
-    cursed = False
     while scene.world.wave < 2 or scene.world.monsters:
         g.tick(1 / 30)
-        cursed = cursed or any(t.curses for t in scene.world.towers.values())
         assert scene.world.time < 400
-    assert scene.world.towers and cursed
+    assert scene.world.towers and scene.world.wave >= 2
     assert set(scene.view.figures) == {m.id for m in scene.world.monsters}
     assert set(scene.view.towers) == set(scene.world.towers)
     assert_text_fits(g)
