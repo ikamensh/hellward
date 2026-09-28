@@ -121,7 +121,7 @@ def _noise(width: int, height: int, scale: int, seed: int) -> np.ndarray:
 
 def _material(level: Level, theme: Theme) -> Image.Image:
     """Repeat image-generated ground with mirrored joins, then match a location's palette."""
-    key = next((name for name, value in THEMES.items() if value is theme), "cathedral")
+    key = next(name for name, value in THEMES.items() if value is theme)
     with Image.open(TERRAIN / f"{MATERIALS[key]}.webp") as painting:
         source = painting.convert("RGB")
     size = (round(source.width * 0.65), round(source.height * 0.65))
