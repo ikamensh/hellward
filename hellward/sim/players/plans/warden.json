@@ -1,205 +1,392 @@
 {
  "catacombs/9": {
-  "early": 0.7,
-  "map": "9d0284395f9f",
+  "early": 1.01,
+  "map": "cfff08b4474f",
   "searched": {
    "leaders": "greedy",
-   "life": 1.34,
-   "lost": 1,
-   "plans": 300,
+   "life": 1.407,
+   "lost": 4,
+   "plans": 80,
+   "seeds": "0-3"
+  },
+  "skills": [
+   "adept_arrow",
+   "adept_fire",
+   "adept_lightning",
+   "adept_nature",
+   "holy_shield",
+   "master_fire",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "arrow",
+    25,
+    16
+   ],
+   [
+    "build",
+    "pyre",
+    7,
+    5
+   ],
+   [
+    "build",
+    "pyre",
+    29,
+    15
+   ],
+   [
+    "build",
+    "pyre",
+    24,
+    12
+   ],
+   [
+    "build",
+    "arrow",
+    17,
+    11
+   ],
+   [
+    "build",
+    "pyre",
+    25,
+    12
+   ],
+   [
+    "up",
+    25,
+    16
+   ],
+   [
+    "build",
+    "pyre",
+    24,
+    16
+   ],
+   [
+    "up",
+    17,
+    11
+   ],
+   [
+    "build",
+    "arrow",
+    7,
+    1
+   ],
+   [
+    "up",
+    29,
+    15
+   ],
+   [
+    "up",
+    24,
+    16
+   ],
+   [
+    "up",
+    7,
+    5
+   ],
+   [
+    "build",
+    "arrow",
+    3,
+    1
+   ],
+   [
+    "up",
+    24,
+    12
+   ],
+   [
+    "build",
+    "arrow",
+    29,
+    16
+   ],
+   [
+    "up",
+    3,
+    1
+   ],
+   [
+    "up",
+    7,
+    1
+   ],
+   [
+    "up",
+    29,
+    15
+   ],
+   [
+    "up",
+    17,
+    11
+   ],
+   [
+    "up",
+    29,
+    16
+   ],
+   [
+    "up",
+    3,
+    1
+   ],
+   [
+    "build",
+    "pyre",
+    25,
+    6
+   ],
+   [
+    "up",
+    29,
+    16
+   ]
+  ]
+ },
+ "cathedral/6": {
+  "early": 0.9,
+  "map": "70498a738374",
+  "searched": {
+   "leaders": "greedy",
+   "life": 1.0,
+   "lost": 31,
+   "plans": 80,
    "seeds": "0-3"
   },
   "skills": [
    "adept_bone",
    "adept_cold",
+   "adept_fire",
    "adept_lightning",
+   "holy_shield",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "build",
+    "pyre",
+    5,
+    8
+   ],
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "arrow",
+    11,
+    6
+   ],
+   [
+    "build",
+    "arrow",
+    17,
+    14
+   ],
+   [
+    "build",
+    "pyre",
+    15,
+    9
+   ],
+   [
+    "build",
+    "arrow",
+    30,
+    14
+   ],
+   [
+    "up",
+    15,
+    9
+   ],
+   [
+    "build",
+    "pyre",
+    27,
+    14
+   ],
+   [
+    "build",
+    "pyre",
+    15,
+    8
+   ],
+   [
+    "up",
+    11,
+    6
+   ],
+   [
+    "build",
+    "arrow",
+    22,
+    14
+   ],
+   [
+    "build",
+    "pyre",
+    24,
+    14
+   ],
+   [
+    "up",
+    15,
+    9
+   ],
+   [
+    "build",
+    "arrow",
+    4,
+    8
+   ],
+   [
+    "up",
+    22,
+    14
+   ],
+   [
+    "build",
+    "arrow",
+    25,
+    10
+   ],
+   [
+    "build",
+    "arrow",
+    15,
+    6
+   ],
+   [
+    "build",
+    "pyre",
+    27,
+    10
+   ],
+   [
+    "build",
+    "arrow",
+    26,
+    14
+   ],
+   [
+    "up",
+    24,
+    14
+   ],
+   [
+    "up",
+    15,
+    8
+   ],
+   [
+    "up",
+    17,
+    14
+   ],
+   [
+    "up",
+    22,
+    14
+   ],
+   [
+    "build",
+    "pyre",
+    11,
+    5
+   ],
+   [
+    "up",
+    26,
+    14
+   ],
+   [
+    "build",
+    "arrow",
+    15,
+    14
+   ],
+   [
+    "up",
+    15,
+    14
+   ],
+   [
+    "up",
+    15,
+    6
+   ],
+   [
+    "up",
+    27,
+    14
+   ]
+  ]
+ },
+ "caves/12": {
+  "early": 0.7,
+  "map": "720073aaca86",
+  "searched": {
+   "leaders": "greedy",
+   "life": 1.05,
+   "lost": 3,
+   "plans": 80,
+   "seeds": "0-3"
+  },
+  "skills": [
+   "adept_bone",
+   "adept_cold",
+   "adept_fire",
    "adept_poison",
-   "master_poison",
+   "glacial_spike",
+   "holy_shield",
+   "master_fire",
    "soul_harvest",
    "warmth"
   ],
   "steps": [
    [
     "build",
-    "pyre",
-    18,
-    10
+    "arrow",
+    23,
+    7
    ],
    [
     "build",
-    "arrow",
+    "pyre",
+    30,
+    8
+   ],
+   [
+    "build",
+    "frost",
     14,
-    9
+    3
    ],
    [
     "build",
-    "pyre",
-    22,
-    12
-   ],
-   [
-    "build",
-    "arrow",
-    21,
-    12
-   ],
-   [
-    "build",
-    "pyre",
-    19,
-    6
-   ],
-   [
-    "build",
-    "arrow",
+    "plague",
     20,
-    9
-   ],
-   [
-    "up",
-    21,
-    12
-   ],
-   [
-    "up",
-    22,
-    12
-   ],
-   [
-    "build",
-    "pyre",
-    16,
-    5
+    13
    ],
    [
     "build",
     "arrow",
-    18,
-    12
-   ],
-   [
-    "build",
-    "pyre",
-    19,
-    7
-   ],
-   [
-    "build",
-    "arrow",
-    11,
-    9
-   ],
-   [
-    "gate",
-    0
-   ],
-   [
-    "up",
-    18,
-    10
-   ]
-  ]
- },
- "cathedral/6": {
-  "early": 1.01,
-  "map": "8cea2931060c",
-  "searched": {
-   "leaders": "greedy",
-   "life": 1.196,
-   "lost": 13,
-   "plans": 300,
-   "seeds": "0-3"
-  },
-  "skills": [
-   "adept_bone",
-   "adept_fire",
-   "adept_nature",
-   "adept_poison",
-   "holy_shield",
-   "warmth"
-  ],
-  "steps": [
-   [
-    "build",
-    "arrow",
-    12,
-    8
-   ],
-   [
-    "build",
-    "arrow",
-    9,
-    9
-   ],
-   [
-    "build",
-    "pyre",
-    10,
-    5
-   ],
-   [
-    "build",
-    "arrow",
-    18,
-    8
-   ],
-   [
-    "up",
-    9,
-    9
-   ],
-   [
-    "build",
-    "arrow",
-    13,
-    6
-   ],
-   [
-    "build",
-    "arrow",
-    14,
-    9
-   ],
-   [
-    "build",
-    "arrow",
-    5,
-    9
-   ],
-   [
-    "build",
-    "arrow",
-    13,
-    5
-   ],
-   [
-    "build",
-    "arrow",
-    10,
-    9
-   ],
-   [
-    "build",
-    "arrow",
-    7,
-    6
-   ],
-   [
-    "build",
-    "arrow",
-    10,
-    7
-   ],
-   [
-    "build",
-    "arrow",
-    5,
-    10
-   ],
-   [
-    "build",
-    "arrow",
-    10,
+    30,
     3
    ],
    [
@@ -208,195 +395,110 @@
    ],
    [
     "up",
-    10,
-    5
-   ],
-   [
-    "build",
-    "pyre",
-    8,
-    9
-   ],
-   [
-    "up",
-    12,
+    30,
     8
    ],
    [
     "build",
     "arrow",
-    7,
-    4
+    14,
+    10
    ],
    [
     "up",
-    10,
-    9
+    14,
+    3
    ],
    [
-    "build",
-    "pyre",
-    21,
+    "up",
+    30,
     8
    ],
    [
     "up",
-    5,
-    9
-   ]
-  ]
- },
- "caves/12": {
-  "early": 0.5,
-  "map": "ec1f06e9eff4",
-  "searched": {
-   "leaders": "greedy",
-   "life": 1.297,
-   "lost": 0,
-   "plans": 300,
-   "seeds": "0-3"
-  },
-  "skills": [
-   "adept_arrow",
-   "adept_bone",
-   "adept_cold",
-   "adept_fire",
-   "adept_lightning",
-   "adept_nature",
-   "adept_poison",
-   "holy_shield",
-   "salvation",
-   "warmth"
-  ],
-  "steps": [
-   [
-    "build",
-    "plague",
-    12,
-    7
+    20,
+    13
    ],
    [
     "build",
     "plague",
-    17,
-    5
-   ],
-   [
-    "up",
-    12,
-    7
-   ],
-   [
-    "up",
-    17,
-    5
-   ],
-   [
-    "build",
-    "arrow",
-    22,
-    5
-   ],
-   [
-    "build",
-    "arrow",
-    19,
-    8
-   ],
-   [
-    "build",
-    "arrow",
     14,
     1
    ],
    [
-    "build",
-    "plague",
-    14,
-    9
-   ],
-   [
-    "build",
-    "pyre",
-    13,
-    5
-   ],
-   [
     "up",
-    22,
-    5
-   ],
-   [
-    "up",
-    22,
-    5
-   ],
-   [
-    "up",
-    19,
-    8
-   ],
-   [
-    "up",
-    13,
-    5
+    30,
+    3
    ],
    [
     "build",
     "arrow",
+    5,
+    11
+   ],
+   [
+    "build",
+    "pyre",
+    18,
+    4
+   ],
+   [
+    "build",
+    "frost",
     14,
     4
    ],
    [
     "up",
-    19,
-    8
+    20,
+    13
    ],
    [
-    "gate",
-    0
+    "up",
+    14,
+    1
    ],
    [
-    "build",
-    "arrow",
-    18,
-    9
+    "up",
+    5,
+    11
+   ],
+   [
+    "up",
+    23,
+    7
+   ],
+   [
+    "up",
+    30,
+    3
+   ],
+   [
+    "up",
+    14,
+    4
    ]
   ]
  },
  "graveyard/3": {
-  "early": 0.7,
-  "map": "c9e26aa8d2bd",
+  "early": 0.5,
+  "map": "9a5c2649f3c7",
   "searched": {
    "leaders": "greedy",
-   "life": 1.039,
-   "lost": 1,
-   "plans": 300,
+   "life": 1.0,
+   "lost": 34,
+   "plans": 80,
    "seeds": "0-3"
   },
   "skills": [
-   "adept_bone",
-   "adept_poison",
+   "adept_cold",
+   "holy_shield",
    "warmth"
   ],
   "steps": [
    [
-    "build",
-    "arrow",
-    16,
-    4
-   ],
-   [
-    "build",
-    "arrow",
-    12,
-    6
-   ],
-   [
-    "build",
-    "arrow",
-    13,
-    2
+    "gate",
+    0
    ],
    [
     "build",
@@ -407,31 +509,92 @@
    [
     "build",
     "arrow",
-    11,
-    1
+    10,
+    10
    ],
    [
     "build",
     "arrow",
-    20,
-    5
-   ],
-   [
-    "build",
-    "arrow",
-    23,
-    5
-   ],
-   [
-    "build",
-    "arrow",
-    9,
-    4
+    26,
+    7
    ],
    [
     "up",
-    12,
-    6
+    14,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    27,
+    3
+   ],
+   [
+    "up",
+    10,
+    10
+   ],
+   [
+    "build",
+    "arrow",
+    27,
+    7
+   ],
+   [
+    "up",
+    26,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    29,
+    3
+   ],
+   [
+    "build",
+    "arrow",
+    24,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    30,
+    3
+   ],
+   [
+    "up",
+    27,
+    3
+   ],
+   [
+    "build",
+    "arrow",
+    28,
+    3
+   ],
+   [
+    "build",
+    "arrow",
+    30,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    21,
+    7
+   ],
+   [
+    "up",
+    24,
+    7
+   ],
+   [
+    "up",
+    26,
+    7
    ],
    [
     "build",
@@ -440,43 +603,86 @@
     7
    ],
    [
-    "build",
-    "arrow",
-    3,
+    "up",
+    30,
     3
    ],
    [
     "build",
     "arrow",
-    16,
-    2
-   ],
-   [
-    "up",
-    16,
-    4
+    31,
+    7
    ],
    [
     "build",
     "arrow",
-    19,
-    5
+    10,
+    8
    ],
    [
     "up",
-    3,
+    27,
     3
+   ],
+   [
+    "build",
+    "arrow",
+    14,
+    8
+   ],
+   [
+    "up",
+    14,
+    8
+   ],
+   [
+    "up",
+    21,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    14,
+    10
+   ],
+   [
+    "build",
+    "arrow",
+    13,
+    13
+   ],
+   [
+    "up",
+    18,
+    7
+   ],
+   [
+    "up",
+    24,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    1,
+    9
+   ],
+   [
+    "up",
+    14,
+    8
    ]
   ]
  },
  "hells_gate/15": {
-  "early": 0.7,
-  "map": "55905a4883ec",
+  "early": 1.01,
+  "map": "259cb9bc9784",
   "searched": {
    "leaders": "greedy",
    "life": 1.0,
    "lost": 1,
-   "plans": 300,
+   "plans": 80,
    "seeds": "0-3"
   },
   "skills": [
@@ -494,169 +700,108 @@
   ],
   "steps": [
    [
-    "gate",
-    0
-   ],
-   [
     "build",
-    "pyre",
-    19,
+    "arrow",
+    11,
     8
    ],
    [
     "build",
     "storm",
-    8,
-    9
+    15,
+    6
    ],
    [
     "build",
     "plague",
-    23,
-    8
-   ],
-   [
-    "up",
-    19,
-    8
+    26,
+    15
    ],
    [
     "build",
-    "arrow",
-    9,
-    8
-   ],
-   [
-    "up",
-    9,
-    8
-   ],
-   [
-    "up",
-    9,
-    8
-   ],
-   [
-    "build",
-    "arrow",
-    21,
-    12
+    "plague",
+    15,
+    10
    ],
    [
     "build",
     "pyre",
-    12,
+    29,
+    15
+   ],
+   [
+    "up",
+    15,
     6
    ],
    [
     "up",
-    8,
-    9
+    26,
+    15
+   ],
+   [
+    "up",
+    29,
+    15
+   ],
+   [
+    "build",
+    "storm",
+    25,
+    15
+   ],
+   [
+    "up",
+    11,
+    8
    ],
    [
     "build",
     "pyre",
-    9,
-    4
-   ],
-   [
-    "build",
-    "plague",
     6,
-    8
+    7
    ],
    [
     "up",
-    23,
-    8
+    15,
+    6
    ],
    [
     "up",
-    12,
-    6
+    25,
+    15
    ],
    [
     "build",
     "arrow",
-    12,
-    5
-   ]
-  ]
- },
- "tristram/0": {
-  "early": 0.7,
-  "map": "36bf9dfe28c5",
-  "searched": {
-   "leaders": "greedy",
-   "life": 1.183,
-   "lost": 60,
-   "plans": 300,
-   "seeds": "0-3"
-  },
-  "skills": [],
-  "steps": [
-   [
-    "build",
-    "arrow",
-    21,
-    6
+    30,
+    15
    ],
    [
-    "build",
-    "arrow",
-    3,
+    "up",
+    6,
     7
    ],
    [
     "build",
-    "arrow",
-    18,
-    8
+    "storm",
+    1,
+    10
    ],
    [
     "build",
-    "arrow",
-    20,
-    8
-   ],
-   [
-    "up",
-    3,
+    "frost",
+    11,
     7
    ],
    [
-    "build",
-    "arrow",
-    13,
-    6
-   ],
-   [
-    "build",
-    "arrow",
-    11,
-    8
-   ],
-   [
-    "build",
-    "arrow",
-    13,
-    8
+    "gate",
+    0
    ],
    [
     "up",
-    18,
-    8
-   ],
-   [
-    "build",
-    "arrow",
-    22,
-    8
-   ],
-   [
-    "up",
-    11,
-    8
+    15,
+    10
    ],
    [
     "build",
@@ -666,20 +811,8 @@
    ],
    [
     "build",
-    "arrow",
-    17,
-    5
-   ],
-   [
-    "build",
-    "arrow",
-    21,
-    8
-   ],
-   [
-    "build",
-    "arrow",
-    4,
+    "storm",
+    11,
     5
    ],
    [
@@ -687,6 +820,156 @@
     "arrow",
     15,
     9
+   ],
+   [
+    "up",
+    11,
+    7
+   ],
+   [
+    "up",
+    30,
+    15
+   ],
+   [
+    "up",
+    1,
+    10
+   ],
+   [
+    "up",
+    6,
+    5
+   ]
+  ]
+ },
+ "tristram/0": {
+  "early": 0.9,
+  "map": "3dac59856de3",
+  "searched": {
+   "leaders": "greedy",
+   "life": 1.0,
+   "lost": 7,
+   "plans": 80,
+   "seeds": "0-3"
+  },
+  "skills": [],
+  "steps": [
+   [
+    "build",
+    "arrow",
+    16,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    18,
+    11
+   ],
+   [
+    "build",
+    "arrow",
+    31,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    8,
+    6
+   ],
+   [
+    "up",
+    16,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    30,
+    11
+   ],
+   [
+    "build",
+    "arrow",
+    14,
+    6
+   ],
+   [
+    "build",
+    "arrow",
+    28,
+    11
+   ],
+   [
+    "up",
+    14,
+    6
+   ],
+   [
+    "up",
+    16,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    16,
+    11
+   ],
+   [
+    "build",
+    "arrow",
+    12,
+    6
+   ],
+   [
+    "up",
+    28,
+    11
+   ],
+   [
+    "up",
+    31,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    13,
+    11
+   ],
+   [
+    "up",
+    8,
+    6
+   ],
+   [
+    "build",
+    "arrow",
+    31,
+    11
+   ],
+   [
+    "up",
+    16,
+    11
+   ],
+   [
+    "up",
+    14,
+    6
+   ],
+   [
+    "up",
+    13,
+    11
+   ],
+   [
+    "up",
+    31,
+    11
    ]
   ]
  }
