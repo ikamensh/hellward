@@ -20,7 +20,7 @@ from hellward.sim.players.hands import Hands, defend, react_for
 from hellward.sim.skills import perks
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
 from hellward.ui.hud import BUILD, SLOT, SLOT_X, TOP, slot_size
-from hellward.ui.view import MAP_X, MAP_Y, T
+from hellward.ui.view import px
 
 
 @pytest.fixture(scope="module")
@@ -41,8 +41,9 @@ def slot_centre(key: str) -> tuple[int, int]:
     return int(SLOT_X + i * step + size / 2), int(TOP + 16 + SLOT / 2)
 
 
-def tile_centre(x: int, y: int) -> tuple[int, int]:
-    return int(MAP_X + (x + 0.5) * T), int(MAP_Y + (y + 0.5) * T)
+def tile_centre(scene: BattleScene, x: int, y: int) -> tuple[int, int]:
+    sx, sy = scene.camera.world_to_screen(*px(x + 0.5, y + 0.5))
+    return int(sx), int(sy)
 
 
 def test_a_persons_defence_is_logged_to_a_replay_file(game):
@@ -54,17 +55,17 @@ def test_a_persons_defence_is_logged_to_a_replay_file(game):
              if scene.world.level.buildable(x, y)][:2]
     g.backend.inject_click(*slot_centre("arrow"))
     g.tick(SIM_DT)
-    g.backend.inject_click(*tile_centre(*tiles[0]))
+    g.backend.inject_click(*tile_centre(scene, *tiles[0]))
     g.tick(SIM_DT)
     g.backend.inject_click(*slot_centre("arrow"))
     g.tick(SIM_DT)
-    g.backend.inject_click(*tile_centre(*tiles[1]))
+    g.backend.inject_click(*tile_centre(scene, *tiles[1]))
     g.tick(SIM_DT)
     assert all(scene.world.tower_at(tile) is not None for tile in tiles)
     path_tile = scene.world.level.path_tiles[5]   # refused: towers stand on the bare floor
     g.backend.inject_click(*slot_centre("arrow"))
     g.tick(SIM_DT)
-    g.backend.inject_click(*tile_centre(*path_tile))
+    g.backend.inject_click(*tile_centre(scene, *path_tile))
     g.tick(SIM_DT)
     scene.speed = 10.0
     for _ in range(3000):

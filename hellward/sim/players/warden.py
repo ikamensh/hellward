@@ -95,7 +95,7 @@ def fingerprint(location: Location) -> str:
     """The map and arsenal a plan was searched on: a stored plan for a map that has changed since is not played."""
     level, arsenal = location.level, location.arsenal
     text = repr((level.width, level.height, level.waypoints, level.extra_routes, level.doors,
-                 sorted(level.obstacles), sorted(level.pools),
+                 sorted(level.walkable_tiles), sorted(level.obstacles), sorted(level.pools),
                  arsenal.towers, arsenal.gates, arsenal.spells))
     return hashlib.sha1(text.encode()).hexdigest()[:12]
 

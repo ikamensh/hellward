@@ -16,7 +16,7 @@ from hellward.sim.content import DOOR, TOWERS
 from hellward.sim.model import SIM_DT
 from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
 from hellward.ui.hud import BUILD, SLOT, SLOT_X, TOP, slot_size
-from hellward.ui.view import MAP_X, MAP_Y, T, px
+from hellward.ui.view import px
 
 
 @pytest.fixture(scope="module")
@@ -58,8 +58,9 @@ def slot_centre(key: str) -> tuple[int, int]:
     return int(SLOT_X + i * step + size / 2), int(TOP + 16 + SLOT / 2)
 
 
-def tile_centre(x: int, y: int) -> tuple[int, int]:
-    return int(MAP_X + (x + 0.5) * T), int(MAP_Y + (y + 0.5) * T)
+def tile_centre(scene: BattleScene, x: int, y: int) -> tuple[int, int]:
+    sx, sy = scene.camera.world_to_screen(*px(x + 0.5, y + 0.5))
+    return int(sx), int(sy)
 
 
 def test_a_player_builds_a_tower_and_a_gate_by_clicking(game):
@@ -71,17 +72,17 @@ def test_a_player_builds_a_tower_and_a_gate_by_clicking(game):
                 if scene.world.level.buildable(x, y))
     g.backend.inject_click(*slot_centre("pyre"))
     g.tick(SIM_DT)
-    g.backend.inject_click(*tile_centre(*tile))
+    g.backend.inject_click(*tile_centre(scene, *tile))
     g.tick(SIM_DT)
     tower = scene.world.tower_at(tile)
     assert tower is not None and tower.kind is TOWERS["pyre"]
     g.backend.inject_key(str(BUILD.index("gate") + 1))
     g.tick(SIM_DT)
     door = scene.world.level.doors[0]
-    g.backend.inject_click(*tile_centre(*door))
+    g.backend.inject_click(*tile_centre(scene, *door))
     g.tick(SIM_DT)
     assert scene.world.doors[0].built and scene.world.doors[0].hp == scene.world.gate_life
-    g.backend.inject_click(*tile_centre(*tile))
+    g.backend.inject_click(*tile_centre(scene, *tile))
     g.tick(SIM_DT)
     assert scene.selected is tower
     gold = scene.world.gold
@@ -99,7 +100,7 @@ def test_a_refused_build_is_explained_not_raised(game):
     g.backend.inject_key("1")
     g.tick(SIM_DT)
     path = scene.world.level.path_tiles[5]
-    g.backend.inject_click(*tile_centre(*path))
+    g.backend.inject_click(*tile_centre(scene, *path))
     g.tick(SIM_DT)
     assert not scene.world.towers
     assert any("floor" in text for _, text, _ in scene.hud.log)

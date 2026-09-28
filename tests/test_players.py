@@ -56,6 +56,16 @@ def test_every_stored_warden_plan_is_for_todays_map_and_its_sigils():
         assert all(s.kind in location.arsenal.towers for s in plan.steps if s.what == "build"), key
 
 
+def test_warden_plan_is_invalidated_when_the_walkable_hall_changes():
+    """A build searched for one corridor layout must not be reused on another."""
+    location = LOCATIONS["tristram"]
+    level = location.level
+    extra = next((x, y) for y in range(1, level.height - 1) for x in range(1, level.width - 1)
+                 if level.buildable(x, y))
+    revised = replace(level, halls=level.walkable_tiles | {extra})
+    assert fingerprint(replace(location, level=revised)) != fingerprint(location)
+
+
 def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():
     pack = Wave((g("skeleton", 4), g("priest", 2, 4.0, start=1.0)), 10)
     world = World(replace(LOCATIONS["graveyard"], waves=(pack,), wave_names=("pack",)), seed=3, planner=planner.smart)
