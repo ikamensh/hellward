@@ -183,6 +183,8 @@ def tile_value(location: Location, kind: str, tile: tuple[int, int], reach: floa
     length = 0.0
     queues = 0.0
     for route in location.level.routes:
+        if route.key.startswith("breach"):
+            continue
         spans = route.coverage(tile, reach)
         length += sum(b - a for a, b in spans)
         queues += sum(QUEUE_FALLOFF ** i for i, (_, s) in enumerate(location.level.crossings(route.key))

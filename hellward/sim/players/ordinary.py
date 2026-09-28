@@ -22,15 +22,16 @@ THINK = 0.5          # seconds between the defender's decisions
 
 def tile_scores(world: World, reach: float = 3.0) -> list[tuple[float, tuple[int, int]]]:
     level = world.level
+    routes = tuple(route for route in level.routes if world.breach_opened or not route.key.startswith("breach"))
     queues = [(route.key, s - DOOR_STOP - JOSTLE / 2)
-              for route in level.routes for _, s in level.crossings(route.key)]
+              for route in routes for _, s in level.crossings(route.key)]
     scored = []
     for y in range(level.height):
         for x in range(level.width):
             if not level.buildable(x, y):
                 continue
             score = 0.0
-            for route in level.routes:
+            for route in routes:
                 spans = route.coverage((x, y), reach)
                 score += float_sum(b - a for a, b in spans)
                 score += DOOR_BONUS * int_sum(1 for key, q in queues

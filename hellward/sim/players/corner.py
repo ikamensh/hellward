@@ -26,6 +26,8 @@ def path_corners(level) -> list[tuple[int, int]]:
     """Buildable tiles beside the bends of every entrance route."""
     corners = []
     for route in level.routes:
+        if route.key.startswith("breach"):
+            continue
         waypoints = route.waypoints
         for (x0, y0), (x1, y1), (x2, y2) in zip(waypoints, waypoints[1:], waypoints[2:]):
             in_x, in_y = (x1 > x0) - (x1 < x0), (y1 > y0) - (y1 < y0)
@@ -43,9 +45,10 @@ def tower_reach(kind: str, world: World) -> float:
 
 def tile_value_for_kind(location: Location, kind: str, tile: tuple[int, int], reach: float) -> float:
     level = location.level
-    length = float_sum(b - a for route in level.routes for a, b in route.coverage(tile, reach))
+    routes = tuple(route for route in level.routes if not route.key.startswith("breach"))
+    length = float_sum(b - a for route in routes for a, b in route.coverage(tile, reach))
     queues = 0.0
-    for route in level.routes:
+    for route in routes:
         spans = route.coverage(tile, reach)
         for _, ds in level.crossings(route.key):
             if any(a <= ds <= b for a, b in spans):

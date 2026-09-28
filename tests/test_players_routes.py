@@ -10,10 +10,11 @@ from hellward.sim.level import Level, Route
 from hellward.sim.model import Monster, World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.adaptive import Study
+from hellward.sim.players.corner import path_corners, tile_value_for_kind
 from hellward.sim.players.hands import defend
-from hellward.sim.players.ordinary import Ordinary
+from hellward.sim.players.ordinary import Ordinary, tile_scores
 from hellward.sim.players.planned import _busy
-from hellward.sim.players.warden import _near
+from hellward.sim.players.warden import _near, tile_value
 from hellward.sim.content import MONSTERS
 from tools.campaign_balance import leaders_spawned
 
@@ -25,6 +26,32 @@ def yard():
     return replace(TRISTRAM, level=level,
                    waves=(Wave((Group("fallen", 5, 0.5, route="north"),), 0),),
                    wave_names=("The yard",))
+
+
+def sealed_yard():
+    """An optional corridor far enough from the ordinary route to tempt an uninformed build."""
+    level = Level("sealed yard", 25, 14, ((0, 6), (24, 6)), (),
+                  extra_routes=(Route("breach", ((0, 12), (10, 12), (10, 9), (20, 9), (20, 6), (24, 6))),))
+    return replace(TRISTRAM, level=level,
+                   waves=(Wave((Group("fallen", 5, 0.5),), 0),), wave_names=("The yard",))
+
+
+def test_ordinary_build_score_ignores_a_sealed_breach_corridor():
+    world = World(sealed_yard())
+    tile = (12, 10)
+    assert world.level.buildable(*tile)
+    assert dict((tile, score) for score, tile in tile_scores(world))[tile] == 0.0
+
+
+def test_warden_draft_values_only_entrances_used_by_ordinary_waves():
+    location = sealed_yard()
+    assert tile_value(location, "arrow", (12, 10), 3.0) == 0.0
+
+
+def test_corner_draft_ignores_bends_in_a_sealed_breach_corridor():
+    location = sealed_yard()
+    assert path_corners(location.level) == []
+    assert tile_value_for_kind(location, "arrow", (12, 10), 3.0) == 0.0
 
 
 def test_players_do_not_confuse_equal_distances_on_different_routes():
