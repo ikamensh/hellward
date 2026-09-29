@@ -99,7 +99,7 @@ dev = [
 requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=2.3.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
-    { name = "saga2d", specifier = "==0.3.15" },
+    { name = "saga2d", specifier = "==0.3.16" },
     { name = "sagaforge", editable = "../sagaforge" },
     { name = "setuptools", marker = "extra == 'dev'", specifier = ">=84" },
 ]
@@ -485,16 +485,16 @@ wheels = [
 
 [[package]]
 name = "saga2d"
-version = "0.3.15"
+version = "0.3.16"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pillow" },
     { name = "pyglet" },
     { name = "websockets" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e7/5d/5121b8b102bc64d7b401786180fce984318aeab78559d9fcaf5b57135022/saga2d-0.3.15.tar.gz", hash = "sha256:8882c20b45724a92bc0b45f7ea7dd14db4f5d36be7821ae7d5497abf9c8db4c1", size = 682003 }
+sdist = { url = "https://files.pythonhosted.org/packages/9c/0f/42c51c35f49850d26cd21a1eeaf691c4d667a0cc651df73b0b7ae7e4c1b1/saga2d-0.3.16.tar.gz", hash = "sha256:ccd323d762ba527c31b3bf7634cc7d6022791b8e0dd9b96c777081ddc207e174", size = 705247 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c9/80/b1c09eb000357977c22a0b29696d9890ab27632326f53232f35c8bf3a8f5/saga2d-0.3.15-py3-none-any.whl", hash = "sha256:9a3d8973eeb57adacd6caaddfc15d8a766e8e171c4ee2326170126e77ac2173d", size = 525581 },
+    { url = "https://files.pythonhosted.org/packages/ff/61/32abffe467c153cf4daeb0d64fb766513e9b61ab0aecc65b5d1c7ed9c01e/saga2d-0.3.16-py3-none-any.whl", hash = "sha256:84607f59a9373a3705f699efdeae092cfe193ff64088965f54049a2d2f505121", size = 529055 },
 ]
 
 [[package]]

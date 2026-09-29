@@ -10,7 +10,7 @@ A world is one :class:`~hellward.sim.campaign.Location`, with the player's learn
 
 Events for the view are appended to :attr:`World.events` when ``record`` is on; clones switch it off.
 
-Compiled by mypyc (:mod:`hellward.sim.fastsim`), a class's ``__new__`` runs its ``__init__``, so there is no blank
+Compiled by mypyc (:mod:`hellward.fastsim`), a class's ``__new__`` runs its ``__init__``, so there is no blank
 object to fill: copies are made by the constructors, and the classes whose constructor needs arguments say in
 ``__reduce__`` how they are pickled.
 """

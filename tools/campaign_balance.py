@@ -45,7 +45,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from hellward.sim import fastsim  # noqa: E402
+from hellward import fastsim  # noqa: E402
 
 # The compiled simulation, before anything imports the rules: in the main process and in every worker (a spawned worker
 # imports this module again as __mp_main__), unless HELLWARD_INTERPRETED is set. Every run records what it ran on.

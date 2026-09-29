@@ -13,13 +13,13 @@ import os
 import random
 import subprocess
 import sys
-import time
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
-from hellward.sim import fastsim, planner
+from hellward import fastsim
+from hellward.sim import planner
 from hellward.sim.campaign import LOCATIONS
 from hellward.sim.content import Curse, Element, MONSTERS
 from hellward.sim.items import Loadout
@@ -37,7 +37,7 @@ import sim_bench  # noqa: E402
 COMPILED = """
 import json, pickle, sys
 sys.path[:0] = [{root!r}, {tools!r}, {tests!r}]
-from hellward.sim import fastsim
+from hellward import fastsim
 fastsim.attach({build!r})
 import sim_bench
 from test_fastsim import full_fight
@@ -237,35 +237,17 @@ def test_float_sum_adds_as_the_builtin_sum_does() -> None:
 
 @pytest.mark.parametrize("module", fastsim.MODULES)
 def test_a_compiled_module_calls_no_builtin_sum(module: str) -> None:
-    path = fastsim.PACKAGE / fastsim.source(module)
+    source = fastsim.RUNTIME.source(module)
+    path = fastsim.PACKAGE / source
     calls = [node.lineno for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
              if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "sum"]
-    assert not calls, f"hellward/{fastsim.source(module)}, lines {calls}: use sums.float_sum or sums.int_sum"
+    assert not calls, f"hellward/{source}, lines {calls}: use sums.float_sum or sums.int_sum"
 
 
 def test_a_build_of_other_sources_is_refused(tmp_path: Path) -> None:
     (tmp_path / "0123456789abcdef0123").mkdir()
     with pytest.raises(ImportError, match="other sources"):
         fastsim.attach(tmp_path / "0123456789abcdef0123")
-
-
-def test_a_new_build_prunes_what_no_process_has_started_on_for_days(tmp_path: Path, monkeypatch) -> None:
-    """Old builds, the staging of an interrupted one and what an earlier prune left half removed go; a recent build,
-    the one just made and the one this process runs stay."""
-    monkeypatch.setattr(fastsim, "BUILDS", tmp_path)
-    day = 24 * 3600
-
-    def made(name: str, days: float) -> Path:
-        (tmp_path / name / "hellward" / "sim").mkdir(parents=True)
-        os.utime(tmp_path / name, (time.time() - days * day,) * 2)
-        return tmp_path / name
-
-    old, interrupted, half_pruned = made("a" * 20, 4), made("b" * 20 + "-x1y2z3", 5), made("c" * 20 + ".pruned", 9)
-    recent, running, new = made("d" * 20, 2.5), made("e" * 20, 30), made("f" * 20, 30)
-    monkeypatch.setenv(fastsim.ENV, str(running))
-    fastsim.prune(keep=new)
-    assert sorted(p.name for p in tmp_path.iterdir()) == sorted(p.name for p in (recent, running, new))
-    assert not any(p.exists() for p in (old, interrupted, half_pruned))
 
 
 SPAWN_ROUND_TRIP = """
@@ -275,17 +257,18 @@ from concurrent.futures import ProcessPoolExecutor
 
 
 def _init() -> None:
-    from hellward.sim import fastsim
+    from hellward import fastsim
     fastsim.activate()   # the parent's build, through HELLWARD_FASTSIM
 
 
 def _decide(world, leader_id):
-    from hellward.sim import fastsim, planner
+    from hellward import fastsim
+    from hellward.sim import planner
     return planner.decide(world, leader_id), fastsim.compiled()
 
 
 def main() -> None:
-    from hellward.sim import fastsim
+    from hellward import fastsim
     fastsim.attach({build!r})   # the compiled parent, before the simulation is imported
     from hellward.sim import planner
     from hellward.sim.campaign import CATHEDRAL

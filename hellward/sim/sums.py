@@ -1,4 +1,4 @@
-"""Totals, added the same way by the source and by the compiled simulation (:mod:`hellward.sim.fastsim`).
+"""Totals, added the same way by the source and by the compiled simulation (:mod:`hellward.fastsim`).
 
 The built-in ``sum`` adds floats with Neumaier's compensation (CPython since 3.12), and mypyc compiles
 ``sum(generator)`` into plain additions, so one ``sum()`` gives the source and the compiled simulation two answers

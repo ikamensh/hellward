@@ -43,7 +43,7 @@ uv run python tools/story.py paint           # paint the story's missing panels 
 - `hellward/story.py` — every story page (its panel's picture, words and what the painter paints), the panel
   bible (`REFERENCES`, `STYLES`, `RULES`, `FRAMING`); panels in `assets/story/`, the prologue in
   `assets/story/prologue/`.
-- `hellward/sim/fastsim.py` — the simulation compiled with mypyc for the game (built on its first launch) and the
+- `hellward/fastsim.py` — the simulation compiled with mypyc for the game (built on its first launch) and the
   tools that play many defences (`build/fastsim/`); `sums.py` adds floats as source and compiled both do. `tests/test_fastsim.py` holds the
   compiled simulation to the source, event for event.
 - `hellward/audio/` — `cues.py` (every cue by name, from the pieces in `assets/pieces/` and synth),
@@ -56,8 +56,9 @@ uv run python tools/story.py paint           # paint the story's missing panels 
   `assets/painted/` when its cells match, else the stand-in; `HELLWARD_ART=procedural` forces them).
 - `hellward/ui/` — `flow.py` (the ways between the screens), `progress.py` (the saved campaign and the pages seen),
   `story.py` (story pages, the prologue, the Chronicle), `loading.py`,
-  `mapscreen.py`, `briefing.py` (a location's intro), `skilltree.py`, `battle.py` (the defence:
-  fixed-step clock, input, spells, event routing, the replay log), `view.py` (sprites kept in step with the rules),
+  `mapscreen.py`, `briefing.py` (a location's intro), `skilltree.py`, `battle.py` (the defence's
+  fixed-step clock and scene transitions), `battle_orders.py` (input, spells, commands and replays),
+  `battle_presentation.py` (event routing and drawing), `view.py` (sprites kept in step with the rules),
   `effects.py` (bolts, lightning, novas, curses, spells, the leaders' thoughts), `lighting.py` (the
   darkness overlay), `hud.py` (panel, orbs, spell bar, chronicle, banners), `thinking.py` (the
   planner's worker process), `title.py` (title and reckoning), `menus.py`, `widgets.py`, `style.py`.

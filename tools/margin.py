@@ -29,7 +29,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from hellward.sim import fastsim  # noqa: E402
+from hellward import fastsim  # noqa: E402
 
 if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of its worker processes
     fastsim.activate()

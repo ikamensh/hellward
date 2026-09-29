@@ -5,7 +5,7 @@
     uv run python tools/sim_bench.py --decisions               # how long the leaders take to choose, per location
 
 Every location is defended once by the ordinary player (``hands.defend``) against smart leaders, on seed 1.
-Each run is a fresh process: source (``HELLWARD_INTERPRETED=1``) and compiled (:mod:`hellward.sim.fastsim`)
+Each run is a fresh process: source (``HELLWARD_INTERPRETED=1``) and compiled (:mod:`hellward.fastsim`)
 alternate, so that both meet the same load on a shared machine, and each is timed by the processor time of the
 defence alone (its events are kept, and written out after the clock stops). The fastest of ``--repeat`` runs
 counts.
@@ -36,7 +36,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from hellward.sim import fastsim  # noqa: E402
+from hellward import fastsim  # noqa: E402
 
 if __name__ in ("__main__", "__mp_main__"):   # run as a program, not as a library (tests/test_fastsim.py)
     fastsim.activate()   # the compiled simulation, unless HELLWARD_INTERPRETED is set

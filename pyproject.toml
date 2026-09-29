@@ -10,10 +10,10 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
 authors = [{ name = "Ilya Kamenshchikov", email = "ilya.kamenshchikov@gmail.com" }]
-dependencies = ["saga2d==0.3.15", "sagaforge"]
+dependencies = ["saga2d==0.3.16", "sagaforge"]
 
 [project.optional-dependencies]
-dev = ["pytest>=9.0.2", "mypy>=2.3.1", "setuptools>=84"]  # mypy brings mypyc, which compiles the simulation (hellward/sim/fastsim.py)
+dev = ["pytest>=9.0.2", "mypy>=2.3.1", "setuptools>=84"]  # mypy brings mypyc, which compiles the simulation (hellward/fastsim.py)
 
 [project.scripts]
 hellward = "hellward.__main__:main"
@@ -28,7 +28,7 @@ packages = ["hellward"]
 testpaths = ["tests"]
 
 [tool.mypy]
-files = ["hellward/sim"]   # the simulation that hellward/sim/fastsim.py compiles must type-check
+files = ["hellward/sim"]   # the simulation that hellward/fastsim.py compiles must type-check
 exclude = [
     "hellward/sim/players/adaptive.py",
     "hellward/sim/players/planned.py",
