@@ -130,7 +130,8 @@ class BattleScene(Scene):
         if self.selected is not None and self.selected.id not in world.towers:
             self.selected = None
         self.fx.selected = self.selected.id if self.selected is not None else -1
-        self.view.sync(self.acc / SIM_DT if not self.paused else 1.0, dt)
+        self.view.sync(self.acc / SIM_DT if not self.paused else 1.0, dt,
+                       animation_dt=0.0 if self.paused else min(dt, 0.1) * self.speed)
         self.fx.update(dt)
         self.hud.update(dt)
         self._door_blows(dt)

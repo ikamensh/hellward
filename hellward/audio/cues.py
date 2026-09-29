@@ -427,9 +427,11 @@ class Fall:
 
 
 FALLS: dict[str, Fall] = {
-    "fallen": Fall("fallen_cry", "body_light"),
+    # The painted deaths land well before these long cries end.  Let the body
+    # sound meet the fallen sprite, with the last of the voice over its heap.
+    "fallen": Fall("fallen_cry", "body_light", gap=-1.0),
     "skeleton": Fall(None, "bones", longest=1.8),
-    "zombie": Fall("zombie_cry", "body_wet", gap=-0.2),
+    "zombie": Fall("zombie_cry", "body_wet", gap=-1.0),
     "goatman": Fall("goatman_cry", "body_medium"),
     "gargoyle": Fall("gargoyle_cry", "stone_crumble", gap=-0.15, body_gain=0.8, longest=1.6),
     "overlord": Fall("overlord_cry", "body_heavy", gap=-0.2, body_gain=0.9, boom=0.35),

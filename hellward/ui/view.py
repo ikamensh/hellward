@@ -2,8 +2,8 @@
 
 The scene steps the world in whole :data:`~hellward.sim.model.SIM_DT` s; :meth:`WorldView.before_step`
 remembers where each monster was, so :meth:`WorldView.sync` can draw it part of the way to where it is
-now. Frames follow the rules' own clocks: the walk advances with the distance walked, a blow follows
-the battering at a door, and a leader raises its staff when its chant begins.
+now. Walk frames advance with distance travelled. The enhanced figures have their own directional
+hit and death clips; these and door blows advance on the battle clock, including pause and speed.
 """
 
 from __future__ import annotations
@@ -37,6 +37,9 @@ CURSE_TINT = {Curse.WEAKEN: (0.9, 0.55, 0.55), Curse.DECREPIFY: (0.8, 0.72, 0.55
               Curse.BONE_PRISON: (0.6, 0.6, 0.6)}
 TORCH = (255, 150, 60)
 CURSE_COLOR = {Curse.WEAKEN: "blood", Curse.DECREPIFY: "ember", Curse.DIM_VISION: "curse", Curse.BONE_PRISON: "holy"}
+HIT_FRAME_DT = 0.07
+DEATH_TIMING = {"fallen": (0.07, 0.65), "skeleton": (0.09, 0.8), "zombie": (0.12, 1.03)}
+LEGACY_DEATH_LIFE = 0.8
 
 
 def px(x: float, y: float) -> tuple[float, float]:
@@ -64,8 +67,11 @@ class Figure:
     shadow: Sprite
     prev: float
     aura: Sprite | None = None
+    facing: str = "front"
     flash: float = 0.0
     flash_tint: tuple[float, float, float] = (1.0, 1.0, 1.0)
+    hit_time: float = -1.0  # seconds into an enhanced hit, or -1 while there is no hit
+    attack_time: float = 0.0
     x: float = 0.0          # where it was last drawn, in world pixels
     y: float = 0.0
     dying: float = -1.0     # seconds into its fall, or -1 while alive
@@ -173,10 +179,33 @@ class WorldView:
         for figure in self.figures.values():
             figure.prev = figure.monster.s
 
+    def _monster_facing(self, monster: Monster, s: float, previous: str | None = None) -> str:
+        route = self.level.route(monster.route)
+        kind = monster.kind.key
+        if kind not in figures.ENHANCED:
+            return facing_of(*route.heading(s))
+        # A short travel tangent turns through diagonal bearings before the route's sharp corner.
+        ahead = route.point(min(route.length, s + 0.25))
+        behind = route.point(max(0.0, s - 0.25))
+        angle = math.atan2(ahead[0] - behind[0], ahead[1] - behind[1])
+        facings = figures.facings(kind)
+        if previous in facings:
+            old_angle = facings.index(previous) * math.pi / 4
+            delta = (angle - old_angle + math.pi) % (2 * math.pi) - math.pi
+            if abs(delta) < math.radians(30):
+                return previous
+        return facings[round(angle / (math.pi / 4)) % len(facings)]
+
+    @staticmethod
+    def _show_frame(figure: Figure, frame: str) -> None:
+        name = f"mon/{figure.monster.kind.key}/{figure.facing}/{frame}"
+        if figure.sprite.image != name:
+            figure.sprite.image = name
+
     def spawn(self, monster: Monster) -> None:
         cell = self.art.monster[monster.kind.key]
         x, y = self.monster_point(monster)
-        facing = facing_of(*self.level.route(monster.route).heading(monster.s))
+        facing = self._monster_facing(monster, monster.s)
         sprite = self.scene.add_sprite(placed(f"mon/{monster.kind.key}/{facing}/walk1", cell, x, y))
         size = monster.kind.size
         shadow = self.scene.add_sprite(Sprite("fx/shadow", position=(x, y + 2),
@@ -185,15 +214,25 @@ class WorldView:
         if monster.kind.leader is not None:
             aura = self.scene.add_sprite(Sprite("fx/ring/curse", position=(x, y + 1),
                                                 size=(T * 0.9, T * 0.5), layer=RenderLayer.OBJECTS, opacity=150))
-        self.figures[monster.id] = Figure(monster, sprite, shadow, monster.s, aura, x=x, y=y)
+        self.figures[monster.id] = Figure(monster, sprite, shadow, monster.s, aura=aura, facing=facing, x=x, y=y)
 
     def kill(self, monster_id: int) -> Figure | None:
         figure = self.figures.pop(monster_id, None)
         if figure is None:
             return None
+        enhanced = figure.monster.kind.key in figures.ENHANCED
         figure.dying = 0.0
+        figure.hit_time = -1.0
+        figure.facing = self._monster_facing(figure.monster, figure.monster.s, figure.facing)
         figure.fall = 1 if monster_id % 2 else -1
-        figure.shadow.remove()
+        if enhanced:
+            # Death starts at the rules' final position, even when it happened between rendered frames.
+            figure.x, figure.y = self.monster_point(figure.monster)
+            cell = self.art.monster[figure.monster.kind.key]
+            figure.sprite.position = (figure.x - cell.origin[0], figure.y - cell.origin[1])
+            figure.shadow.position = (figure.x, figure.y + 2)
+        else:
+            figure.shadow.remove()
         if figure.aura is not None:
             figure.aura.remove()
         self.dying.append(figure)
@@ -209,6 +248,8 @@ class WorldView:
     def hit(self, monster_id: int, element: str) -> None:
         figure = self.figures.get(monster_id)
         if figure is not None:
+            if figure.monster.kind.key in figures.ENHANCED and figure.hit_time < 0:
+                figure.hit_time = 0.0
             figure.flash = 0.09
             figure.flash_tint = {"physical": (1.0, 0.93, 0.76), "fire": (1.0, 0.7, 0.45), "lightning": (0.75, 0.85, 1.0), "cold": (0.7, 0.9, 1.0),
                                  "poison": (0.7, 1.0, 0.55), "holy": (1.0, 0.95, 0.7)}[element]
@@ -267,8 +308,9 @@ class WorldView:
 
     # -- Every frame ----------------------------------------------------------------------------
 
-    def sync(self, alpha: float, dt: float) -> None:
-        self.clock += dt
+    def sync(self, alpha: float, dt: float, *, animation_dt: float | None = None) -> None:
+        motion_dt = dt if animation_dt is None else animation_dt
+        self.clock += motion_dt
         if self.world.breach_opened and not self.breach_lit:
             self.breach_lit = True
             for seal in self.seals:
@@ -284,19 +326,36 @@ class WorldView:
             else:
                 y_draw = y
             figure.x, figure.y = x, y
-            hx, hy = self.level.route(m.route).heading(s)
-            facing = facing_of(hx, hy)
-            if m.door >= 0:
+            if figure.hit_time < 0:
+                figure.facing = self._monster_facing(m, s, figure.facing)
+            if m.kind.key in figures.ENHANCED:
+                hit_frames = figures.hit_frames(m.kind.key)
+                if figure.hit_time >= 0:
+                    frame = hit_frames[min(int(figure.hit_time / HIT_FRAME_DT), len(hit_frames) - 1)]
+                    figure.hit_time += motion_dt
+                    if figure.hit_time >= len(hit_frames) * HIT_FRAME_DT:
+                        figure.hit_time = -1.0
+                elif m.door >= 0:
+                    phase = (figure.attack_time * 1.2 + m.id * 0.37) % 1.0
+                    frame = "wind" if phase < 0.45 else "strike" if phase < 0.62 else "recover"
+                elif m.chant_curse is not None:
+                    frame = "raise" if m.chant_left > m.kind.leader.channel - 0.3 else "chant"
+                    figure.facing = "front"
+                else:
+                    walk = figures.walk(m.kind.key)
+                    frame = walk[int(s / figures.stride(m.kind.key)) % len(walk)]
+                figure.attack_time = figure.attack_time + motion_dt if m.door >= 0 else 0.0
+            elif m.door >= 0:
                 phase = (self.clock * 1.2 + m.id * 0.37) % 1.0
                 frame = "wind" if phase < 0.45 else "strike" if phase < 0.62 else "recover"
             elif m.chant_curse is not None:
                 frame = "raise" if m.chant_left > m.kind.leader.channel - 0.3 else "chant"
-                facing = "front"
+                figure.facing = "front"
             else:
                 frame = figures.WALK[int(s / figures.STRIDE) % 4]
             cell = self.art.monster[m.kind.key]
             sprite = figure.sprite
-            sprite.image = f"mon/{m.kind.key}/{facing}/{frame}"
+            self._show_frame(figure, frame)
             sprite.position = (x - cell.origin[0], y_draw - cell.origin[1])
             tint = (1.0, 1.0, 1.0)
             if m.frozen > 0:
@@ -306,7 +365,7 @@ class WorldView:
             elif m.poison:
                 tint = (0.74, 1.0, 0.62)
             if figure.flash > 0:
-                figure.flash -= dt
+                figure.flash -= motion_dt
                 tint = figure.flash_tint
             sprite.tint = tint
             figure.shadow.position = (x, y + 2)
@@ -318,12 +377,26 @@ class WorldView:
                 w = T * (0.8 + 0.15 * pulse) * (1.3 if m.chant_curse is not None else 1.0)
                 figure.aura.size = (w, w * 0.5)
         for figure in list(self.dying):
-            figure.dying += dt
-            t = min(1.0, figure.dying / 0.45)
-            figure.sprite.rotation = figure.fall * 80 * (t * t)
-            figure.sprite.opacity = int(255 * (1 - max(0.0, (figure.dying - 0.3) / 0.5)))
-            if figure.dying > 0.8:
+            kind = figure.monster.kind.key
+            if kind in figures.ENHANCED:
+                frame_dt, lifetime = DEATH_TIMING[kind]
+                death_frames = figures.death_frames(kind)
+                frame = death_frames[min(int(figure.dying / frame_dt), len(death_frames) - 1)]
+                self._show_frame(figure, frame)
+                fade = max(0.0, (figure.dying - len(death_frames) * frame_dt) /
+                           (lifetime - len(death_frames) * frame_dt))
+                figure.sprite.opacity = int(255 * (1 - min(1.0, fade)))
+                figure.shadow.opacity = int(150 * (1 - min(1.0, fade)))
+            else:
+                lifetime = LEGACY_DEATH_LIFE
+                t = min(1.0, figure.dying / 0.45)
+                figure.sprite.rotation = figure.fall * 80 * (t * t)
+                figure.sprite.opacity = int(255 * (1 - max(0.0, (figure.dying - 0.3) / 0.5)))
+            figure.dying += motion_dt
+            if figure.dying > lifetime:
                 figure.sprite.remove()
+                if figure.monster.kind.key in figures.ENHANCED:
+                    figure.shadow.remove()
                 self.dying.remove(figure)
         for standing in self.towers.values():
             tower = standing.tower

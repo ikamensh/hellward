@@ -1,8 +1,8 @@
 """Every picture the game shows, registered with the game's asset manager under a stable name.
 
-A monster's frames come from its painted sheet in ``hellward/assets/painted/`` when there is one whose
-cells match :func:`hellward.art.figures.frames`, otherwise from the low-poly stand-in, rendered once
-into a cache (in parallel: forty seconds of rendering on one core) and read from there afterwards.
+The three enhanced monsters combine their original painted frames, optional small supplemental
+paintings, and rendered guides for unpainted bearings and actions. Other monsters load a matching
+painted sheet or their cached low-poly stand-ins.
 ``HELLWARD_ART=procedural`` ignores the paintings. Towers, gates and the ground work the same way.
 
 Names: ``mon/<kind>/<facing>/<frame>`` with the facings ``front``, ``back``, ``right``, ``left``;
@@ -48,14 +48,18 @@ class Cell:
     origin: tuple[float, float]     # logical: where the ground point sits in the image
 
 
-def monster_sheet(kind: str) -> tuple[restyle.Sheet, dict[str, Image.Image]]:
-    """The stand-in frames of one monster as a restyle sheet: a row per facing, its frames across."""
+def _monster_layout(kind: str) -> restyle.Sheet:
     (w, h), origin = figures.cell(kind)
     frames = figures.frames(kind)
-    keys = [(f"{facing}/{frame}", {"facing": facing, "frame": frame}) for facing in figures.FACINGS for frame in frames]
-    sheet = restyle.Sheet.layout(keys, cols=len(frames), cell=(w * DENSITY, h * DENSITY),
-                                 origin=(origin[0] * DENSITY, origin[1] * DENSITY), scale=DENSITY)
-    images = {key: figures.render(kind, tags["facing"], tags["frame"]) for key, tags in keys}
+    keys = [(f"{facing}/{frame}", {"facing": facing, "frame": frame}) for facing in figures.facings(kind) for frame in frames]
+    return restyle.Sheet.layout(keys, cols=len(frames), cell=(w * DENSITY, h * DENSITY),
+                                origin=(origin[0] * DENSITY, origin[1] * DENSITY), scale=DENSITY)
+
+
+def monster_sheet(kind: str) -> tuple[restyle.Sheet, dict[str, Image.Image]]:
+    """The stand-in frames of one monster as a restyle sheet: a row per facing, its frames across."""
+    sheet = _monster_layout(kind)
+    images = {c.key: figures.render(kind, c.tags["facing"], c.tags["frame"]) for c in sheet.cells}
     return sheet, images
 
 
@@ -71,29 +75,143 @@ class _Uncut:
         self.frames = frames
 
 
-def _load_monster(kind: str, cache: Path) -> tuple[restyle.Sheet, dict[str, Image.Image], bool]:
+def _load_monster(kind: str, cache: Path) -> tuple[restyle.Sheet, dict[str, Image.Image], frozenset[str]]:
+    if kind in figures.ENHANCED:
+        return _load_enhanced(kind, cache)
     if _painted_matches(kind):
         sheet, frames = restyle.load_frames(PAINTED / f"mon-{kind}")
-        return sheet, frames, True
+        return sheet, frames, _registered_keys(frames)
     if not procedural() and restyle.file(PAINTED / f"mon-{kind}", "json").exists():
         warnings.warn(f"painted sheet for {kind} no longer matches its frames; drawing the stand-in")
     sheet, frames = restyle.load_frames(cache / f"mon-{kind}")
-    return sheet, frames, False
+    return sheet, frames, frozenset()
+
+
+def _registered_keys(frames: dict[str, Image.Image]) -> frozenset[str]:
+    """Legacy ``side`` paint is registered as both true game-facing names."""
+    keys: set[str] = set()
+    for key in frames:
+        facing, frame = key.split("/")
+        if facing == "side":
+            keys.update((f"right/{frame}", f"left/{frame}"))
+        else:
+            keys.add(key)
+    return frozenset(keys)
+
+
+def _load_checked(path: Path) -> tuple[restyle.Sheet, dict[str, Image.Image]]:
+    """Reject a sheet whose image size disagrees with its manifest before cells are cropped."""
+    sheet, frames = restyle.load_frames(path)
+    with Image.open(restyle.file(path, "png")) as image:
+        if image.size != sheet.size:
+            raise ValueError(f"{path}: painted image is {image.size}, manifest expects {sheet.size}")
+    return sheet, frames
+
+
+def _in_canvas(image: Image.Image, source: restyle.Sheet, target: restyle.Sheet) -> Image.Image:
+    """Place an old painted cell on the new common canvas by its physical ground pivot."""
+    if source.scale != target.scale:
+        raise ValueError(f"painted monster scale {source.scale} != {target.scale}")
+    x = round(target.origin[0] - source.origin[0])
+    y = round(target.origin[1] - source.origin[1])
+    if x < 0 or y < 0 or x + image.width > target.cell[0] or y + image.height > target.cell[1]:
+        raise ValueError("painted monster cell does not fit its enhanced canvas")
+    canvas = Image.new("RGBA", target.cell)
+    canvas.alpha_composite(image, (x, y))
+    return canvas
+
+
+def _painted_enhanced(kind: str) -> tuple[restyle.Sheet, dict[str, Image.Image]]:
+    """Resolve approved base and supplemental paintings without rendering guides."""
+    sheet = _monster_layout(kind)
+    expected = {c.key for c in sheet.cells}
+    frames: dict[str, Image.Image] = {}
+    base = PAINTED / f"mon-{kind}"
+    if restyle.file(base, "json").exists():
+        old_sheet, old = _load_checked(base)
+        expected_old = {f"{f}/{frame}" for f in figures.FACINGS for frame in figures.WALK + figures.STRIKE}
+        if len(old_sheet.cells) != len(old) or set(old) != expected_old:
+            raise ValueError(f"{base}: expected the original 21 front/back/side walk and attack keys")
+        # The old painted four-step cycle becomes an eight-step hold cycle. It remains painterly
+        # throughout, while an as-yet-unpainted octant uses one coherent procedural walk clip.
+        for facing in ("front", "back", "right"):
+            source_facing = "side" if facing == "right" else facing
+            for i, frame in enumerate(figures.walk(kind)):
+                source = f"{source_facing}/walk{i // 2 + 1}"
+                key = f"{facing}/{frame}"
+                frames[key] = _in_canvas(old[source], old_sheet, sheet)
+            for frame in figures.STRIKE:
+                key = f"{facing}/{frame}"
+                frames[key] = _in_canvas(old[f"{source_facing}/{frame}"], old_sheet, sheet)
+    supplied: set[str] = set()
+    for suffix in ("enhanced", "bearings", "doors"):
+        supplemental = PAINTED / f"mon-{kind}-{suffix}"
+        if not restyle.file(supplemental, "json").exists():
+            continue
+        extra_sheet, extra = _load_checked(supplemental)
+        if len(extra_sheet.cells) != len(extra):
+            raise ValueError(f"{supplemental}: duplicate frame keys")
+        if extra_sheet.cell != sheet.cell or extra_sheet.origin != sheet.origin or extra_sheet.scale != sheet.scale:
+            raise ValueError(f"{supplemental}: cell, origin and scale must match the enhanced monster sheet")
+        unknown = extra.keys() - expected
+        if unknown:
+            raise ValueError(f"{supplemental}: unknown frame keys {sorted(unknown)}")
+        repeated = extra.keys() & supplied
+        if repeated:
+            raise ValueError(f"{supplemental}: duplicate supplemental frame keys {sorted(repeated)}")
+        frames.update(extra)
+        supplied.update(extra)
+        # Hold the four painted contacts and passing poses between their keys instead of
+        # interleaving them with flat procedural frames. That keeps every walk clip one style.
+        for facing in figures.facings(kind):
+            walk_keys = [f"{facing}/{frame}" for frame in figures.walk(kind)]
+            given = [i for i, key in enumerate(walk_keys) if key in extra]
+            if not given:
+                continue
+            for i, key in enumerate(walk_keys):
+                if key in frames:
+                    continue
+                nearest = min(given, key=lambda j: min((i - j) % len(walk_keys), (j - i) % len(walk_keys)))
+                frames[key] = extra[walk_keys[nearest]]
+    return sheet, frames
+
+
+def _load_enhanced(kind: str, cache: Path) -> tuple[restyle.Sheet, dict[str, Image.Image], frozenset[str]]:
+    if procedural():
+        sheet, frames = restyle.load_frames(cache / f"mon-{kind}")
+        return sheet, frames, frozenset()
+    sheet, painted = _painted_enhanced(kind)
+    if len(painted) == len(sheet.cells):
+        return sheet, painted, frozenset(painted)
+    _, frames = restyle.load_frames(cache / f"mon-{kind}")
+    frames.update(painted)
+    return sheet, frames, frozenset(painted)
 
 
 def _painted_matches(kind: str) -> bool:
+    if kind in figures.ENHANCED:
+        return False
     stem = PAINTED / f"mon-{kind}"
     if procedural() or not restyle.file(stem, "json").exists():
         return False
-    wanted = {f"{facing}/{frame}" for frame in figures.frames(kind) for facing in figures.FACINGS}
+    wanted = {f"{facing}/{frame}" for frame in figures.frames(kind) for facing in figures.facings(kind)}
     return {c.key for c in restyle.Sheet.load(stem).cells} == wanted
+
+
+def _needs_render(kind: str, cache: Path) -> bool:
+    if restyle.file(cache / f"mon-{kind}", "json").exists():
+        return False
+    if kind in figures.ENHANCED and not procedural():
+        sheet, painted = _painted_enhanced(kind)
+        return len(painted) != len(sheet.cells)
+    return not _painted_matches(kind)
 
 
 def warm(cache_dir: Path) -> Path:
     """Render every missing stand-in the paintings do not replace into the cache, in parallel; returns the folder."""
     cache = cache_dir / f"art-{art_version()}"
     cache.mkdir(parents=True, exist_ok=True)
-    missing = [k for k in MONSTERS if not _painted_matches(k) and not restyle.file(cache / f"mon-{k}", "json").exists()]
+    missing = [kind for kind in MONSTERS if _needs_render(kind, cache)]
     if missing:
         with ProcessPoolExecutor(min(len(missing), os.cpu_count() or 4)) as pool:
             list(pool.map(_render_kind, missing, [cache] * len(missing)))
@@ -108,6 +226,7 @@ class Art:
     arch: Cell
     pillar: Cell
     painted: set[str]
+    monster_painted: dict[str, frozenset[str]]  # registered facing/frame names resolved from paintings
 
 
 def _cell(canvas: tuple[float, float], origin: tuple[float, float]) -> Cell:
@@ -129,16 +248,20 @@ def register(game: Game, cache_dir: Path) -> Art:
     cache = warm(cache_dir)
     assets = game.assets
     painted: set[str] = set()
+    monster_painted: dict[str, frozenset[str]] = {}
     cells: dict[str, Cell] = {}
     for kind in MONSTERS:
-        sheet, frames, is_painted = _load_monster(kind, cache)
-        if is_painted:
+        sheet, frames, provenance = _load_monster(kind, cache)
+        monster_painted[kind] = provenance
+        if provenance:
             painted.add(kind)
         cw, ch = sheet.cell
         cells[kind] = Cell((cw / DENSITY, ch / DENSITY), (sheet.origin[0] / DENSITY, sheet.origin[1] / DENSITY))
         for key, image in frames.items():
             facing, frame = key.split("/")
-            if facing == "side":
+            if kind in figures.ENHANCED:
+                assets.image_from_pil(f"mon/{kind}/{facing}/{frame}", image)
+            elif facing == "side":
                 assets.image_from_pil(f"mon/{kind}/right/{frame}", image)
                 assets.image_from_pil(f"mon/{kind}/left/{frame}", ImageOps.mirror(image))
             else:
@@ -172,7 +295,7 @@ def register(game: Game, cache_dir: Path) -> Art:
     assets.image_from_pil("worldmap", worldmap.picture(act=1))
     assets.image_from_pil("worldmap-2", worldmap.picture(act=2))
     return Art(cells, _cell(*structures.TOWER_CELL), _cell(*structures.GATE_CELL), _cell(*structures.ARCH_CELL),
-               _cell(*structures.PILLAR_CELL), painted)
+               _cell(*structures.PILLAR_CELL), painted, monster_painted)
 
 
 def ground(game: Game, location: Location) -> str:

@@ -1,7 +1,7 @@
 """Repaint Hellward's stand-ins with an image model (see ``sagaforge.restyle`` and its guide).
 
     uv run python tools/restyle.py refresh DIR                    # every subject: dump, render (Codex), cut, preview
-    uv run python tools/restyle.py --subjects mon-skeleton,towers refresh DIR
+    uv run python tools/restyle.py --subjects mon-goatman,towers refresh DIR
     uv run python tools/restyle.py dump DIR | render DIR | cut DIR [--force] | preview DIR
     uv run python tools/restyle.py ground DIR                     # every location's floor, painted over its stand-in
     uv run python tools/restyle.py --locations caves ground DIR   # refresh one location's painted floor
@@ -10,6 +10,8 @@
 
 Subjects: ``mon-<kind>`` (a row per facing, the frames across; Azazel is painted one facing per sheet so the
 boss keeps its detail), ``towers`` (a row per rank, a column per kind) and ``gates`` (intact, damaged, broken).
+The eight-bearing Fallen, Skeleton and Zombie use ``tools/monster_animation.py`` for small
+supplemental strips; this legacy full-sheet command leaves their approved paintings alone.
 Cut sheets are installed into ``hellward/assets/painted``; the game prefers them to the stand-ins.
 Each sheet is padded with the key colour to 3:2, the shape Codex's image tool returns.
 """
@@ -201,8 +203,23 @@ def _prompt(sheet: restyle.Sheet, layout: str, subject: str, fixes: str) -> str:
             f"margin, must stay pure flat #FF00FF. Do not paint a dark backdrop, a vignette or any lighting on the background.")
 
 
+_ENHANCED_NOTICE_SHOWN = False
+
+
 def subjects(selected: set[str] | None) -> list[Subject]:
-    found = [s for kind in MONSTERS for s in monster_subjects(kind)] + [tower_subject(), gate_subject(), structure_subject()]
+    global _ENHANCED_NOTICE_SHOWN
+    if selected:
+        requested = sorted(name for name in selected if any(
+            name == f"mon-{kind}" or name.startswith(f"mon-{kind}@") or name.startswith(f"mon-{kind}-")
+            for kind in figures.ENHANCED))
+        if requested:
+            raise ValueError(f"{', '.join(requested)}: enhanced monsters use short bearing/action strips; "
+                             "run tools/monster_animation.py guide/cut/merge (see docs/animation.md)")
+    elif not _ENHANCED_NOTICE_SHOWN:
+        print("Fallen, Skeleton and Zombie use supplemental animation strips; skipping them in full-sheet refresh.")
+        _ENHANCED_NOTICE_SHOWN = True
+    found = [s for kind in MONSTERS if kind not in figures.ENHANCED for s in monster_subjects(kind)]
+    found += [tower_subject(), gate_subject(), structure_subject()]
     if selected:
         found = [s for s in found if s.name in selected or s.install in selected]
     return found

@@ -1,0 +1,67 @@
+# Monster animation
+
+## Visual goal
+
+The monster must read as the same creature while moving through a turn, taking a hit, and dying. At the game's normal zoom, the planted foot should stay near the route, the weapon should remain in the same hand, and a death should be recognizable from its silhouette before the blood or dust effect plays. Fallen, Skeleton, and Zombie are the first quality pass; the other monsters retain their existing assets until their clips are authored.
+
+## Motion model
+
+- **Eight travel bearings.** Sample the route on either side of the monster to get the direction it is actually travelling, including diagonals and the short interval around a bend. Select the nearest 45-degree facing. Draw left views independently: mirroring swaps the Fallen's blade and the Skeleton's sword and shield. Keep the last facing during a hit or death.
+- **Distance drives footsteps.** Interpolate the monster's route position for every drawn frame, then advance its walk cycle by distance travelled. A slow or frozen monster does not run in place; a faster one does not slide through the same number of poses. Each kind has its own stride and pose rhythm. Frame selection and transient visual states live in the view, outside the deterministic simulation.
+- **One-shot actions.** Death overrides hit, which overrides a door blow or chant, which overrides walking. A hit has a short, readable recoil and returns to the current walk phase. Repeated hits do not hold a monster in permanent recoil. A death starts at the creature's last foot point and facing, completes its own sequence, then removes the sprite. Pausing freezes the action clock; changing battle speed scales it with the fight.
+- **Ground contact.** Every pose within a clip shares a ground pivot. The shadow remains under the feet while the body falls. Oversized poses need a deliberately sized cell or a separate death cell; remeasuring every frame independently would make the creature jump.
+
+## Character direction
+
+| Monster | Travel | Hit | Death |
+| --- | --- | --- | --- |
+| Fallen | Quick, low scamper: ears and blade lag the torso, feet alternate clearly. | Sharp recoil with the weapon pulled across the body. | Loses its footing, drops toward one side, and curls into a small heap. |
+| Skeleton | Measured march led by the shield, with weight settling onto each straight leg. | Shield and skull jerk on different beats, exposing a loose rib cage. | Knees and spine fail, then skull, shield, and bones separate into a dry pile. |
+| Zombie | Uneven drag and recovery, one leg trailing while the head and arms lag behind. | Heavy torso absorbs the blow before the head snaps back. | Buckles at the knees and pitches forward into a slow, weighty collapse. |
+
+The existing impact particles and three distinct death sounds reinforce these motions. The body animation must still communicate the event when sound is off or several monsters die together.
+
+The three-hit recoil lasts 0.21 s for each creature. Their five death poses have different weight: Fallen changes pose every 0.07 s and fades out by 0.65 s, Skeleton every 0.09 s and by 0.80 s, Zombie every 0.12 s and by 1.03 s. Fallen's light-body sound lands about 0.32 s into its death and Zombie's wet-body sound about 0.47 s in, close to the visible fall. The simulation continues to own damage and death; these timings only change the presentation.
+
+## Asset production
+
+1. Keep the posed Sagaforge meshes as deterministic motion guides and as a complete fallback. Render every desired bearing from the same rig and camera. Author the extra travel, hit, and death poses there first, so the sheet manifest can be checked before painting.
+2. Repaint in short strips grouped by creature, bearing, and action. Use the existing painted creature as the identity and material reference. One enormous sheet would shrink each cell in the image model's output and invite hand swaps, changing proportions, and magenta background leakage.
+3. Cut each strip against its guide, keeping one registration for the strip and the same explicit foot pivot across strips. Validate the complete frame manifest, alpha edges, feet, and silhouette. Reject a sheet if the cutter cannot recover its intended grid; do not silently ship a low-poly replacement for one of the three showcase monsters.
+4. Inspect at normal battle zoom and at 1:1 sprite resolution. Review a loop of each facing, both turns, a hit followed by walking, and the entire death. Compare consecutive frames for character drift and the last death frame for floor contact. Keep only the final contact sheet or clip in `~/saga/evidence/hellward/monster-animation/` with its source commit and reproduction command.
+
+The painted source sheets are an art dependency, not an animation state machine. The view asks for stable names such as `mon/fallen/front_right/walk3` and `mon/zombie/back/death4`; the asset registry resolves those names to the approved painting or the authored guide. Changing the manifest for these three must leave every other painted monster valid.
+
+### Installed sheets and reproducible painting
+
+Each enhanced creature registers **152 named images**: eight bearings times eight walk positions, three door poses, three hits, and five death poses. The original `mon-<kind>` painting supplies the front/back/right contact poses and door attacks. The supplemental `mon-<kind>-bearings` sheet adds true diagonal and left-facing paintings. Skeleton and Zombie have eight individually painted steps in all eight bearings: the sheet contains the other five complete cycles plus intermediate poses for the three original directions. Fallen has eight individually painted steps in six bearings; its original front and back contacts are held for one intermediate slot each. This keeps those two cycles painterly while their ground movement still interpolates every drawn frame. `mon-<kind>-enhanced` supplies all 64 hit/death poses; `mon-<kind>-doors` supplies the 15 remaining door attacks, plus Fallen's corrected right-facing attack. Every registered image for the first three resolves to a painting; `HELLWARD_ART=procedural` remains a complete deterministic fallback for development. The common canvas and ground origin are fixed in `figures.ENHANCED_CELLS`.
+
+Use the small-strip tool to revise art without repainting a giant atlas:
+
+```bash
+uv run python tools/monster_animation.py guide fallen impact /tmp/fallen-impact --facings front_right
+# Edit /tmp/fallen-impact/mon-fallen-impact-input.png with the image model; inspect its result.
+uv run python tools/monster_animation.py cut fallen impact /tmp/fallen-impact /path/to/rendered.png
+# Inspect the transparent cut and its drift/edge report before installing it.
+uv run python tools/monster_animation.py merge fallen impact /tmp/fallen-impact
+```
+
+The same commands accept `walk` (four contact poses), `walk-even` (four inbetweens), `walk-full` (all eight poses), and `door` (wind/strike/recover). For a new bearing, use `--facings`; `impact` and `walk-full` require it. Without it the other walk and door strips use the five supplemental bearings. Paint one eight-cell impact or complete walk strip per bearing, a twenty-cell contact sheet for five bearings, or a fifteen-cell door sheet. `merge` replaces only the supplied keys and retains the rest. For a complete eight-step revision, use `cut --register-to APPROVED_GUIDE_STEM` with an eight-cell guide assembled from the approved contact paintings; the command validates that its frame grid and ground pivot match the rendered guide. This keeps the revised figures at the same game-scale footprint. The global `tools/restyle.py refresh` intentionally leaves these three approved multipart sheets alone.
+
+Use this prompt as the edit template, adding the facing and the creature-specific motion from the table above: “Edit the attached magenta guide sprite sheet into finished dark gothic action-RPG sprites. Use the existing painted `mon-<kind>` sheet as the exact character, materials, lighting, weapon-hand and scale reference. Preserve the guide's grid, cell positions, ground point, poses and facing in every cell. For an impact strip, row one is hit1, hit2, hit3, death1; row two is death2 through death5. Keep the progression from recoil through a fully prone corpse, with no extra limbs or swapped weapon. Leave every pixel outside the figure pure flat #FF00FF; no floor, shadow, text, effects or added objects. Keep each figure entirely inside its cell.” The Fallen is a red imp with two horns and a curved blade in its right hand; Skeleton has a right-hand sword and left-arm round shield; Zombie has an uneven dragging leg and both arms reaching forward. The painting, guide manifest, and cutter registration are the reproducible source for each sheet.
+
+## Verification and rollout
+
+Use a BattleScene integration test to cover all eight bearings, progression tied to travel, hit priority and recovery, death completion, and exact asset registration. Use the real Pyglet renderer for the visual pass: the mock backend verifies state but does not produce a useful screenshot. Capture a deterministic clip or contact sheet for each of the three at normal battle scale, then a normal Tristram/Graveyard battle frame to check the composition among towers, effects, and terrain. This pass changes presentation only, so balance and curse quality should be unchanged.
+
+Expand to the remaining monsters by motion family, not by copying these three timelines: fliers need wing-driven lift and a falling crash, spiders need staggered leg groups, casters need distinct chant transitions, and large bosses need longer anticipation and more screen-space weight.
+
+## Other approaches
+
+| Approach | Benefit | Cost or visual risk |
+| --- | --- | --- |
+| Textured 3D rigs rendered offline to sprite sheets | Most consistent identity across every bearing; real depth, lighting, and limb overlap. | Requires model, texture, and animation authoring beyond the current low-poly kit. Strong long-term option. |
+| Layered 2D cutout rigs drawn by Saga2D | Continuous joint motion with fewer images and cheap variation. | Perspective turns, cloth, and overlapping limbs can look flat; needs a new per-part pivot and draw-order system. |
+| Optical-flow inbetweens from the present paintings | Quickly raises apparent frame rate without repainting whole walks. | Warped blades, ghosted limbs, and no new hidden-side information; suitable only as a temporary bridge. |
+| Procedural 3D guides with richer geometry and lighting, without repainting | Deterministic, fast to extend across the cast, good for iteration. | Less painterly than the surrounding finished art until the renderer/materials are upgraded. |
+| Sprite transforms, flash, and extra particles alone | Minimal asset work and immediate hit feedback. | Cannot supply true directional silhouettes or the character-specific deaths this pass calls for. |

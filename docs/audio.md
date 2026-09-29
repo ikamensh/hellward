@@ -67,10 +67,11 @@ in a row and varies the pitch of repeated cues by up to ±4 % (deaths ±3 %).
 | `death_priest` | 2 | a dry bony rattle-hiss, bones collapsing |
 | `death_witch` | 2 | a piercing scream, a body falling |
 
-A death is Warband's pattern: the cry, faded over its last 0.15 s as the body lands 0.12–0.3 s
-before the cry ends; the body take is rotated one step against the cry take so no two cues share
-a whole fall. Long rumbles (bones, rubble) are cut to 1.4–1.8 s so a wave of gargoyles does not
-drown the next one.
+A death starts with a cry and a body impact, with the body take rotated one step against the cry
+take so no two cues share a whole fall. Fallen and Zombie land early, while their painted collapse
+is visible; their cries finish over the heap. Other voiced deaths land 0.12–0.3 s before the cry
+ends. Long rumbles (bones, rubble) are cut to 1.4–1.8 s so a wave of gargoyles does not drown the
+next one.
 
 ### Levels and the budget
 

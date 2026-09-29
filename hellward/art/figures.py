@@ -1,10 +1,8 @@
-"""The monsters as posed low-poly figures: the stand-ins the painted sprites are made from.
+"""The monsters as posed low-poly figures: guides and fallbacks for the painted sprites.
 
-Every monster has the same frames: a four-step walk (contact, passing, contact, passing), a three-phase
-blow for battering doors (wind-up, strike, recover) and, for leaders, a two-phase incantation (raise,
-chant). Each is drawn in three facings: ``front`` (walking towards the camera), ``back`` and ``side``
-(walking to the right); walking left is the side facing mirrored. Poses are pushed past realistic so
-they read at 30–80 px.
+Fallen, skeletons and zombies have eight bearings and their own walk, hit and death poses. The other
+monsters retain the original three-bearing, four-step walk. Poses are pushed past realistic so they
+read at 30–80 px.
 
 :func:`mesh` builds one frame; :func:`render` rasterises it into a cell whose feet sit on
 :func:`cell` 's origin. Flyers are drawn hovering: their cell's origin is still the ground point.
@@ -25,14 +23,46 @@ from hellward.sim.content import MONSTERS
 
 FACINGS = ("front", "back", "side")
 WALK = ("walk1", "walk2", "walk3", "walk4")
+ENHANCED = frozenset(("fallen", "skeleton", "zombie"))
+ENHANCED_FACINGS = ("front", "front_right", "right", "back_right", "back", "back_left", "left", "front_left")
+ENHANCED_WALK = tuple(f"walk{i}" for i in range(1, 9))
+HIT = ("hit1", "hit2", "hit3")
+DEATH = ("death1", "death2", "death3", "death4", "death5")
 STRIKE = ("wind", "strike", "recover")
 CAST = ("raise", "chant")
 STRIDE = 0.2          # tiles walked per walk frame
 SCALE = 2.0           # figures stand about twice life size on the tile grid: the camera shows height at 57%, and they must read at 1x
+# The painted sheets use these shared canvases. Keep the feet fixed even when a pose changes.
+ENHANCED_CELLS = {
+    "fallen": ((104, 117), (52.0, 70.4387296736308)),
+    "skeleton": ((124, 142), (62.0, 91.19392639587906)),
+    "zombie": ((127, 132), (63.5, 86.82620078560831)),
+}
+
+
+def facings(kind: str) -> tuple[str, ...]:
+    return ENHANCED_FACINGS if kind in ENHANCED else FACINGS
+
+
+def walk(kind: str) -> tuple[str, ...]:
+    return ENHANCED_WALK if kind in ENHANCED else WALK
+
+
+def hit_frames(kind: str) -> tuple[str, ...]:
+    return HIT if kind in ENHANCED else ()
+
+
+def death_frames(kind: str) -> tuple[str, ...]:
+    return DEATH if kind in ENHANCED else ()
+
+
+def stride(kind: str) -> float:
+    """Tiles per walk frame. A shorter zombie step keeps its limp alive at low speed."""
+    return {"fallen": 0.085, "skeleton": 0.10, "zombie": 0.055}.get(kind, STRIDE)
 
 
 def frames(kind: str) -> tuple[str, ...]:
-    return WALK + STRIKE + (CAST if MONSTERS[kind].leader else ())
+    return walk(kind) + STRIKE + (CAST if MONSTERS[kind].leader else ()) + hit_frames(kind) + death_frames(kind)
 
 
 @dataclass(frozen=True)
@@ -46,6 +76,9 @@ class Pose:
     right: float | None = None   # the weapon arm's own swing, overriding ``arm``
     left: float | None = None
     flap: float = 0.0     # wings: 0 spread level, positive raised
+    left_leg: float | None = None  # a limp does not mirror the leading leg
+    head_roll: float = 0.0
+    death: int = 0        # character-specific collapse, 1..5
 
 
 POSES = {
@@ -58,6 +91,66 @@ POSES = {
     "recover": Pose(leg=8, lean=12, twist=-8, lunge=0.03, right=25, left=-5, flap=10),
     "raise": Pose(lean=-6, right=-110, left=-100, bob=0.02),
     "chant": Pose(lean=-12, right=-170, left=-150, bob=0.06),
+}
+
+# Per-creature rhythm matters more than simply adding frames to the old shared cycle. The pairs at
+# 1/5 are planted contacts; 3/7 are the passing feet. A zombie's left leg drags instead of mirroring
+# the right, while a skeleton guards with its shield and the Fallen dives forward into each step.
+ENHANCED_POSES: dict[str, dict[str, Pose]] = {
+    "fallen": {
+        "walk1": Pose(leg=42, arm=-30, lean=24, twist=-10, bob=-0.025, right=-28, left=35, head_roll=-6),
+        "walk2": Pose(leg=24, arm=-18, lean=20, twist=-4, bob=0.015, right=-10, left=25),
+        "walk3": Pose(leg=2, arm=0, lean=15, bob=0.045, right=18, left=8),
+        "walk4": Pose(leg=-23, arm=18, lean=20, twist=6, bob=0.01, right=35, left=-12),
+        "walk5": Pose(leg=-42, arm=30, lean=24, twist=10, bob=-0.025, right=38, left=-30, head_roll=6),
+        "walk6": Pose(leg=-24, arm=18, lean=20, twist=4, bob=0.015, right=25, left=-24),
+        "walk7": Pose(leg=-2, arm=0, lean=15, bob=0.045, right=0, left=-8),
+        "walk8": Pose(leg=23, arm=-18, lean=20, twist=-6, bob=0.01, right=-20, left=12),
+        "hit1": Pose(leg=12, lean=-12, twist=-15, right=-65, left=-25, head_roll=-12),
+        "hit2": Pose(leg=-8, lean=-24, twist=-25, right=-85, left=-48, head_roll=-22, bob=-0.02),
+        "hit3": Pose(leg=-18, lean=2, twist=-8, right=-25, left=-12, head_roll=-5),
+        "death1": Pose(leg=30, lean=-20, twist=-20, right=-65, left=-60, head_roll=-24, death=1),
+        "death2": Pose(leg=18, lean=12, twist=-34, right=-90, left=-85, death=2),
+        "death3": Pose(leg=10, lean=20, twist=-40, right=-95, left=-100, death=3),
+        "death4": Pose(leg=4, lean=12, right=-100, left=-100, death=4),
+        "death5": Pose(right=-100, left=-100, death=5),
+    },
+    "skeleton": {
+        "walk1": Pose(leg=36, lean=-2, twist=-5, bob=-0.01, right=-20, left=27),
+        "walk2": Pose(leg=20, lean=0, twist=-2, bob=0.015, right=-8, left=33),
+        "walk3": Pose(leg=2, lean=2, bob=0.025, right=5, left=38),
+        "walk4": Pose(leg=-18, lean=0, twist=3, bob=0.01, right=20, left=34),
+        "walk5": Pose(leg=-36, lean=-2, twist=5, bob=-0.01, right=30, left=27),
+        "walk6": Pose(leg=-20, lean=0, twist=2, bob=0.015, right=18, left=32),
+        "walk7": Pose(leg=-2, lean=2, bob=0.025, right=4, left=38),
+        "walk8": Pose(leg=18, lean=0, twist=-3, bob=0.01, right=-12, left=34),
+        "hit1": Pose(leg=15, lean=-8, twist=12, right=-55, left=70, head_roll=12),
+        "hit2": Pose(leg=-12, lean=-22, twist=25, right=-80, left=95, head_roll=24),
+        "hit3": Pose(leg=-8, lean=-3, twist=8, right=-18, left=42, head_roll=8),
+        "death1": Pose(leg=16, lean=-24, twist=22, right=-80, left=110, head_roll=30, death=1),
+        "death2": Pose(leg=-16, lean=20, twist=42, right=-110, left=125, death=2),
+        "death3": Pose(leg=-25, lean=25, right=-110, left=125, death=3),
+        "death4": Pose(death=4),
+        "death5": Pose(death=5),
+    },
+    "zombie": {
+        "walk1": Pose(leg=33, left_leg=-8, lean=18, twist=-7, bob=-0.02, right=54, left=80, head_roll=7),
+        "walk2": Pose(leg=20, left_leg=-3, lean=20, twist=-3, bob=-0.005, right=62, left=75, head_roll=10),
+        "walk3": Pose(leg=5, left_leg=4, lean=23, bob=0.015, right=70, left=68, head_roll=13),
+        "walk4": Pose(leg=-10, left_leg=9, lean=22, twist=3, bob=0.005, right=75, left=59, head_roll=15),
+        "walk5": Pose(leg=-26, left_leg=12, lean=18, twist=8, bob=-0.015, right=80, left=54, head_roll=10),
+        "walk6": Pose(leg=-14, left_leg=7, lean=20, twist=5, bob=0.0, right=75, left=62, head_roll=5),
+        "walk7": Pose(leg=0, left_leg=0, lean=24, bob=0.012, right=68, left=70, head_roll=0),
+        "walk8": Pose(leg=18, left_leg=-5, lean=21, twist=-3, bob=0.0, right=59, left=75, head_roll=3),
+        "hit1": Pose(leg=8, left_leg=-4, lean=2, twist=-12, right=80, left=88, head_roll=-16),
+        "hit2": Pose(leg=-4, left_leg=2, lean=-14, twist=-20, right=96, left=105, head_roll=-28, bob=-0.015),
+        "hit3": Pose(leg=5, left_leg=-2, lean=11, twist=-8, right=65, left=81, head_roll=-4),
+        "death1": Pose(leg=10, left_leg=-10, lean=-8, twist=-14, right=100, left=110, head_roll=-23, death=1),
+        "death2": Pose(leg=-12, left_leg=10, lean=25, twist=-19, right=112, left=116, head_roll=24, death=2),
+        "death3": Pose(leg=-20, left_leg=22, lean=33, right=120, left=125, death=3),
+        "death4": Pose(leg=-18, left_leg=18, death=4),
+        "death5": Pose(death=5),
+    },
 }
 
 INK = (26, 20, 24)
@@ -98,7 +191,7 @@ def humanoid(b: Build, pose: Pose, *, head: Mesh, right_hand: Mesh = (), left_ha
     hip = b.hip
     lx = b.torso[0] * 0.28
     if b.robe is None:
-        for side, swing in ((-1, pose.leg), (1, -pose.leg)):
+        for side, swing in ((-1, pose.leg), (1, pose.left_leg if pose.left_leg is not None else -pose.leg)):
             leg = rod((0, 0, 0), (0, 0.02, -hip + b.leg_w * 0.4), b.leg_w, b.legs_color)
             leg += r3.box((0, 0.05, -hip + b.leg_w * 0.35), (b.leg_w * 1.1, b.leg_w * 1.8, b.leg_w * 0.7), darker(b.legs_color, 0.6))
             mesh += move(pitch(leg, swing, (0, 0, 0)), side * lx, 0, hip)
@@ -107,14 +200,14 @@ def humanoid(b: Build, pose: Pose, *, head: Mesh, right_hand: Mesh = (), left_ha
         skirt = r3.cone((0, 0, 0.0), b.torso[0] * 0.55 + hem, hip * 1.3, b.robe, sides=9)
         skirt = pitch(skirt, -pose.leg * 0.15, (0, 0, hip))
         mesh += skirt
-        for side, swing in ((-1, pose.leg), (1, -pose.leg)):
+        for side, swing in ((-1, pose.leg), (1, pose.left_leg if pose.left_leg is not None else -pose.leg)):
             foot = r3.box((side * lx, 0.05 + swing * 0.003, 0.03), (b.leg_w, b.leg_w * 1.6, 0.06), darker(b.robe, 0.5))
             mesh += foot
     upper: Mesh = []
     tw, td, th = b.torso
     upper += r3.box((0, 0, hip + th / 2), (tw, td, th), b.body_color)
     upper += r3.box((0, 0, hip + th * 0.08), (tw * 1.05, td * 1.1, th * 0.16), darker(b.body_color, 0.6))  # belt
-    upper += move(head, 0, 0.01, hip + th + b.head * 0.85)
+    upper += move(roll(head, pose.head_roll, (0, 0, 0)), 0, 0.01, hip + th + b.head * 0.85)
     upper += list(extra)
     shoulder_z = hip + th * 0.88
     for side, hand, own in ((-1, right_hand, pose.right), (1, left_hand, pose.left)):
@@ -146,6 +239,12 @@ def eyes(r: float, color=EYE, spread: float = 0.36, height: float = 0.1) -> Mesh
     return [f for side in (-1, 1) for f in r3.box((side * r * spread, r * 0.86, r * height), (s, s * 0.6, s * 0.7), color)]
 
 
+def on_ground(mesh: Mesh) -> Mesh:
+    """Settle a posed collapse on the floor without changing the frame's ground anchor."""
+    lowest = min(p[2] for face in mesh for p in face.points)
+    return move(mesh, dz=0.02 - lowest)
+
+
 # -- The monsters ------------------------------------------------------------------------------
 
 
@@ -171,7 +270,7 @@ def fallen(pose: Pose, *, shaman: bool = False) -> Mesh:
         right = blade((0, 0.0, -0.01), (0, 0.2, 0.0), 0.07, (196, 196, 206))
         right += rod((0, -0.02, 0.0), (0, 0.03, -0.03), 0.03, (70, 50, 40))
         right = held(right, 62)
-    return humanoid(b, pose, head=head, right_hand=right, left_hand=[])
+    return humanoid(b, pose, head=head, right_hand=right if pose.death < 4 else [], left_hand=[])
 
 
 def skeleton(pose: Pose) -> Mesh:
@@ -192,7 +291,27 @@ def skeleton(pose: Pose) -> Mesh:
     shield = pitch(shield, 90, (0, 0, 0))
     shield += r3.sphere((0, 0.04, 0), 0.03, (160, 150, 140), rings=3, sides=5)
     shield = move(shield, 0.03, 0.04, 0.02)
-    return humanoid(b, pose, head=head, right_hand=sword, left_hand=shield, extra=ribs)
+    if pose.death >= 4:
+        # A skeletal warrior does not topple as one solid body: the bones scatter and settle.
+        spread = 1.0 if pose.death == 4 else 0.82
+        remains: Mesh = []
+        remains += r3.sphere((0.17 * spread, -0.03, 0.085), 0.085, bone, rings=4, sides=7)
+        remains += r3.box((0.17 * spread, 0.045, 0.045), (0.09, 0.025, 0.025), darker(bone, 0.8))
+        for index, (x, y, a) in enumerate(((-0.18, 0.05, -35), (-0.08, -0.09, 50), (0.02, 0.14, -55), (0.24, 0.16, 30))):
+            length = 0.20 if index < 2 else 0.14
+            limb = rod((-length / 2, 0, 0), (length / 2, 0, 0), 0.035, bone)
+            remains += move(yaw(limb, a), x * spread, y * spread, 0.055)
+        for i in range(3):
+            remains += r3.box((-0.06 + i * 0.055, 0.0, 0.045), (0.018, 0.16, 0.025), (150, 140, 118))
+        remains += move(pitch(shield, 80, (0, 0, 0)), -0.28 * spread, -0.13, 0.08)
+        remains += move(pitch(sword, 80, (0, 0, 0)), 0.33 * spread, 0.12, 0.06)
+        return on_ground(remains)
+    body = humanoid(b, pose, head=head if pose.death < 3 else [], right_hand=sword, left_hand=shield, extra=ribs)
+    if pose.death >= 2:
+        body = pitch(body, (0, 28, 58)[pose.death - 1], (0, 0, 0.05))
+    if pose.death == 3:
+        body += r3.sphere((0.22, -0.08, 0.11), 0.085, bone, rings=4, sides=7)
+    return on_ground(body) if pose.death else body
 
 
 def zombie(pose: Pose) -> Mesh:
@@ -591,17 +710,36 @@ GAITS = {"zombie": 0.6, "overlord": 0.75, "azazel": 0.7, "gargoyle": 0.5, "hulk"
 
 
 def pose_of(kind: str, frame: str) -> Pose:
-    pose = POSES[frame]
+    pose = ENHANCED_POSES[kind][frame] if kind in ENHANCED and frame in ENHANCED_POSES[kind] else POSES[frame]
     gait = GAITS.get(kind, 1.0)
-    if frame in WALK and gait != 1.0:
+    if kind not in ENHANCED and frame in WALK and gait != 1.0:
         pose = replace(pose, leg=pose.leg * gait, arm=pose.arm * gait)
     return pose
 
 
 def mesh(kind: str, facing: str, frame: str) -> Mesh:
-    built = BUILDERS[kind](pose_of(kind, frame))
-    turn = {"front": 0.0, "back": 180.0, "side": -90.0}[facing]
-    return r3.scale(yaw(built, turn), SCALE)
+    pose = pose_of(kind, frame)
+    built = BUILDERS[kind](pose)
+    turn = {"front": 0.0, "front_right": -45.0, "right": -90.0, "back_right": -135.0,
+            "back": 180.0, "back_left": 135.0, "left": 90.0, "front_left": 45.0,
+            "side": -90.0}[facing]
+    if kind == "zombie" and pose.death and facing not in ("back", "back_right", "back_left"):
+        # A forward collapse is seen from the front and sides in true profile.
+        built = on_ground(pitch(built, (0, -20, -43, -66, -82)[pose.death - 1], (0, 0, 0.06)))
+    turned = yaw(built, turn)
+    if kind == "zombie" and pose.death and facing in ("back", "back_right", "back_left"):
+        # From behind, falling directly away would foreshorten to a standing-looking column.
+        # Let the corpse topple sideways across the screen while the facing remains back.
+        direction = -1 if facing == "back_left" else 1
+        turned = on_ground(roll(turned, direction * (0, 18, 42, 68, 82)[pose.death - 1], (0, 0, 0.06)))
+        if facing != "back" and pose.death >= 2:
+            turned = move(turned, dx=0.07 if facing == "back_right" else -0.07)
+    if kind == "fallen" and pose.death:
+        # Screen-plane tumble after turning: the side views read as fallen bodies too.
+        turned = on_ground(roll(turned, (0, 22, 50, 72, 86)[pose.death - 1], (0, 0, 0.07)))
+        if pose.death >= 4:
+            turned += blade((0.22, 0.08, 0.025), (0.42, 0.18, 0.025), 0.06, (196, 196, 206))
+    return r3.scale(turned, SCALE)
 
 
 # -- Cells ------------------------------------------------------------------------------------
@@ -610,9 +748,11 @@ def mesh(kind: str, facing: str, frame: str) -> Mesh:
 @lru_cache(maxsize=None)
 def cell(kind: str) -> tuple[tuple[int, int], tuple[float, float]]:
     """``((width, height), (origin_x, origin_y))`` of a frame image in logical pixels; the origin is the ground point."""
+    if kind in ENHANCED_CELLS:
+        return ENHANCED_CELLS[kind]
     left = top = right = 0.0
     bottom = 4.0
-    for facing in FACINGS:
+    for facing in facings(kind):
         for frame in frames(kind):
             x0, y0, x1, y1 = r3.bounds(mesh(kind, facing, frame), PROJECTION)
             left, right = min(left, x0), max(right, x1)
