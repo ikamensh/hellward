@@ -2,11 +2,11 @@
 
     caffeinate -u uv run python tools/animation_preview.py /tmp/hellward-animation-preview
 
-Writes a native-scale contact sheet, a 30 fps MP4, and reproduction details.
-The film walks each monster through eight bearings, then shows diagonal and
-right door attacks followed by hit and death clips. It uses the same
-BattleScene, Sprite, camera and pyglet backend as the game; the battle clock
-is stopped so each pose is reproducible.
+Writes a 60 fps MP4, ordered eight-frame walk cycles, an action contact sheet,
+and reproduction details. Walking and walk-to-hit transitions use BattleScene's
+normal 20 Hz rules steps and interpolated 60 Hz draws at each monster's own
+speed. Door blows and deaths hold the rules clock for a reproducible review.
+Every picture uses the game's real Sprite, camera and pyglet backend.
 """
 
 from __future__ import annotations
@@ -46,14 +46,15 @@ def _crop(frame: Image.Image, scene, figure) -> Image.Image:
 
 
 def _sheet(cells: dict[tuple[str, str, str], Image.Image], out: Path, reactions: tuple[str, ...],
-           doors: tuple[str, ...], door_frames: tuple[str, ...]) -> None:
+           doors: tuple[str, ...], door_frames: tuple[str, ...], fps: int) -> None:
     pad, heading, label = 10, 28, 24
     width = pad + len(BEARINGS) * (CROP[0] + pad)
     height = heading + len(KINDS) * (1 + len(reactions) + len(doors)) * (CROP[1] + label + pad)
     sheet = Image.new("RGB", (width, height), (24, 20, 23))
     draw = ImageDraw.Draw(sheet)
     font = ImageFont.load_default()
-    draw.text((pad, 8), "Hellward: game-scale walk, hit, death • real 30 fps renderer", fill=(235, 224, 205), font=font)
+    draw.text((pad, 8), f"Hellward: game-scale walk, hit, death • real {fps} fps renderer",
+              fill=(235, 224, 205), font=font)
     for kind_index, kind in enumerate(KINDS):
         for group_index, group in enumerate(("walk", *reactions, *doors)):
             row = kind_index * (1 + len(reactions) + len(doors)) + group_index
@@ -67,6 +68,29 @@ def _sheet(cells: dict[tuple[str, str, str], Image.Image], out: Path, reactions:
     sheet.save(out)
 
 
+def _walk_sheet(cells: dict[tuple[str, str, str], Image.Image], out: Path, fps: int) -> None:
+    """Show every bearing in playback order, including the transition from step 8 to 1."""
+    from hellward.art import figures
+
+    pad, heading, label = 10, 28, 24
+    width = pad + 8 * (CROP[0] + pad)
+    height = heading + len(KINDS) * len(BEARINGS) * (CROP[1] + label + pad)
+    sheet = Image.new("RGB", (width, height), (24, 20, 23))
+    draw = ImageDraw.Draw(sheet)
+    draw.text((pad, 8), f"Hellward: ordered 1x walk cycles • {fps} fps real renderer",
+              fill=(235, 224, 205))
+    for kind_index, kind in enumerate(KINDS):
+        for facing_index, bearing in enumerate(BEARINGS):
+            row = kind_index * len(BEARINGS) + facing_index
+            y = heading + row * (CROP[1] + label + pad)
+            for col, frame in enumerate(figures.walk(kind)):
+                x = pad + col * (CROP[0] + pad)
+                sheet.paste(cells[(kind, bearing, frame)], (x, y))
+                draw.text((x + 2, y + CROP[1] + 4), f"{kind}  {bearing}  {frame}",
+                          fill=(235, 224, 205))
+    sheet.save(out)
+
+
 def record(out: Path, fps: int) -> None:
     from saga2d import Game
 
@@ -75,14 +99,19 @@ def record(out: Path, fps: int) -> None:
     from hellward.sim.campaign import TRISTRAM
     from hellward.sim.content import MONSTERS
     from hellward.sim.level import Level, Route
-    from hellward.sim.model import Monster
-    from hellward.sim.players.ordinary import Ordinary
+    from hellward.sim.model import SIM_DT, Monster
     from hellward.ui.battle import HEIGHT, WIDTH, BattleScene
+    from hellward.ui.view import HIT_FRAME_DT, T
 
     class AnimationScene(BattleScene):
-        """Hold the rules clock while keeping BattleScene's usual draw and Pace 1x HUD."""
+        """Run ordinary travel, but allow staged actions without changing the HUD pace."""
+
+        staged = False
 
         def update(self, dt: float) -> None:
+            if not self.staged:
+                super().update(dt)
+                return
             self.speed = 0.0
             try:
                 super().update(dt)
@@ -105,7 +134,7 @@ def record(out: Path, fps: int) -> None:
                 raise RuntimeError(f"{kind}: preview requires all {len(expected)} frames painted")
         level = Level("animation bearings", 33, 18, ((0, 8), (32, 8)), (),
                       extra_routes=(Route("tour", TOUR),))
-        scene = AnimationScene(art, replace(TRISTRAM, level=level), seed=1, autopilot=Ordinary())
+        scene = AnimationScene(art, replace(TRISTRAM, level=level), seed=1, autopilot=None)
         game.push(scene)
         scene.hud.banners.clear()
         route = level.route("tour")
@@ -120,6 +149,7 @@ def record(out: Path, fps: int) -> None:
         assert encoder.stdin is not None
         assert encoder.stderr is not None
         cells: dict[tuple[str, str, str], Image.Image] = {}
+        walk_cells: dict[tuple[str, str, str], Image.Image] = {}
         font = ImageFont.load_default()
 
         def capture(label: str) -> Image.Image:
@@ -133,6 +163,8 @@ def record(out: Path, fps: int) -> None:
             return frame
 
         for index, kind in enumerate(KINDS):
+            scene.staged = False
+            scene.acc = 0.0
             spec = MONSTERS[kind]
             monster = Monster(100 + index, spec, 0, 0.0, 0.0, spec.hp, 0.0, route="tour")
             monster.s = midpoint(route, 0)
@@ -142,17 +174,40 @@ def record(out: Path, fps: int) -> None:
 
             for leg, bearing in enumerate(BEARINGS):
                 center = midpoint(route, leg)
-                for step in range(8):
-                    monster.s = center + (step - 3.5) * figures.stride(kind)
-                    figure.prev = monster.s
-                    scene.view.sync(1.0, dt, animation_dt=dt)
-                    frame = capture(f"{kind} — {bearing} walk")
-                    if step == 4:
-                        cells[(kind, "walk", bearing)] = _crop(frame, scene, figure)
+                stride = figures.stride(kind)
+                cycle = len(figures.walk(kind)) * stride
+                # Start at phase one, safely inside the straight leg. The normal
+                # world step and BattleScene interpolation do the rest.
+                monster.s = round((center - cycle / 2) / cycle) * cycle + 0.1 * stride
+                figure.prev = monster.s
+                scene.acc = 0.0
+                scene.view.sync(1.0, 0.0, animation_dt=0.0)
+                seen: list[str] = []
+                previous_position = (figure.x, figure.y)
+                for _ in range(math.ceil((cycle / spec.speed + SIM_DT + 0.3) * fps)):
+                    frame = capture(f"{kind} — {bearing} walk at 1x")
+                    position = (figure.x, figure.y)
+                    if math.dist(previous_position, position) > spec.speed * T / fps + 0.1:
+                        raise RuntimeError(f"{kind} {bearing}: preview jumped between drawn frames")
+                    previous_position = position
+                    frame_name = figure.sprite.image.rsplit("/", 1)[-1]
+                    if not seen or frame_name != seen[-1]:
+                        seen.append(frame_name)
+                    key = (kind, bearing, frame_name)
+                    if frame_name in figures.walk(kind) and key not in walk_cells:
+                        walk_cells[key] = _crop(frame, scene, figure)
+                    if seen == [*figures.walk(kind), "walk1"]:
+                        break
+                if seen != [*figures.walk(kind), "walk1"]:
+                    raise RuntimeError(f"{kind} {bearing}: incomplete ordered walk cycle {seen}")
+                cells[(kind, "walk", bearing)] = walk_cells[(kind, bearing, "walk1")]
 
+            scene.staged = True
+            scene.acc = 0.0
             for bearing, leg in DOORS:
                 monster.s = midpoint(route, leg)
                 figure.prev = monster.s
+                scene.view.sync(1.0, 0.0, animation_dt=0.0)
                 monster.door = 0
                 for _ in range(fps):
                     scene.view.sync(1.0, dt, animation_dt=dt)
@@ -165,21 +220,31 @@ def record(out: Path, fps: int) -> None:
                 scene.view.sync(1.0, 0.0, animation_dt=0.0)
 
             for action_index, (bearing, leg) in enumerate(REACTIONS):
-                monster.s = midpoint(route, leg)
                 if action_index:
                     scene.view.spawn(monster)
                     figure = scene.view.figures[monster.id]
+                scene.staged = False
+                scene.acc = 0.0
+                monster.s = midpoint(route, leg) - 0.3
                 figure.prev = monster.s
                 scene.view.sync(1.0, 0.0, animation_dt=0.0)
+                for _ in range(round(0.18 * fps)):
+                    capture(f"{kind} — {bearing} walk before hit")
                 scene.view.hit(monster.id, "physical")
-                for _ in range(max(1, fps // 2)):
-                    scene.view.sync(1.0, dt, animation_dt=dt)
+                recovered = False
+                for _ in range(math.ceil((len(figures.hit_frames(kind)) * HIT_FRAME_DT + 0.25) * fps)):
                     frame = capture(f"{kind} — {bearing} hit")
                     frame_name = figure.sprite.image.rsplit("/", 1)[-1]
                     key = (kind, bearing, frame_name)
                     if frame_name in figures.hit_frames(kind) and key not in cells:
                         cells[key] = _crop(frame, scene, figure)
+                    if frame_name in figures.walk(kind):
+                        recovered = True
+                if not recovered:
+                    raise RuntimeError(f"{kind} {bearing}: hit never returned to the walk")
 
+                scene.staged = True
+                scene.acc = 0.0
                 scene.view.kill(monster.id)
                 for _ in range(2 * fps):
                     scene.view.sync(1.0, dt, animation_dt=dt)
@@ -196,6 +261,8 @@ def record(out: Path, fps: int) -> None:
 
         missing = [(kind, "walk", bearing) for kind in KINDS for bearing in BEARINGS
                    if (kind, "walk", bearing) not in cells]
+        missing += [(kind, bearing, frame) for kind in KINDS for bearing in BEARINGS
+                    for frame in figures.walk(kind) if (kind, bearing, frame) not in walk_cells]
         missing += [(kind, bearing, frame) for kind in KINDS for bearing, _ in REACTIONS
                     for frame in (*figures.hit_frames(kind), *figures.death_frames(kind))
                     if (kind, bearing, frame) not in cells]
@@ -204,7 +271,8 @@ def record(out: Path, fps: int) -> None:
         if missing:
             raise RuntimeError(f"preview missed animation frames: {missing}")
         _sheet(cells, out / "contact-sheet.png", tuple(bearing for bearing, _ in REACTIONS),
-               tuple(f"door_{bearing}" for bearing, _ in DOORS), figures.STRIKE)
+               tuple(f"door_{bearing}" for bearing, _ in DOORS), figures.STRIKE, fps)
+        _walk_sheet(walk_cells, out / "walk-cycles.png", fps)
         encoder.stdin.close()
         stderr = encoder.stderr.read().decode()
         if encoder.wait() != 0:
@@ -215,7 +283,7 @@ def record(out: Path, fps: int) -> None:
         command = shlex.join(["caffeinate", "-u", "uv", "run", "python", "tools/animation_preview.py", str(out),
                                "--fps", str(fps)])
         (out / "README.txt").write_text(f"Source commit: {commit}\nReproduce: {command}\n", encoding="utf-8")
-        print(f"wrote {out / 'contact-sheet.png'} and {out / 'clip.mp4'}")
+        print(f"wrote {out / 'walk-cycles.png'}, {out / 'contact-sheet.png'} and {out / 'clip.mp4'}")
     finally:
         if encoder is not None:
             encoder.kill()
@@ -227,7 +295,7 @@ def record(out: Path, fps: int) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("out", type=Path)
-    parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--fps", type=int, default=60)
     args = parser.parse_args()
     if args.fps < 24:
         parser.error("fps must be at least 24 to capture every hit and death pose")
