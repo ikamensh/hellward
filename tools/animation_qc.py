@@ -110,6 +110,11 @@ def audit(kind: str, painted: Mapping[str, Image.Image], guides: Mapping[str, Im
     facings = sorted(key.split("/")[0] for key in painted if key.endswith("/walk1"))
     for facing in facings:
         names = [f"{facing}/walk{i}" for i in range(1, 9)]
+        walk_bytes = [painted[name].tobytes() for name in names]
+        for i, cell_bytes in enumerate(walk_bytes):
+            if cell_bytes == walk_bytes[(i + 1) % len(walk_bytes)]:
+                issues.append(Issue("review", f"{kind}/{facing} walk{i + 1}→walk{(i + 1) % 8 + 1} "
+                                    "identical walk frames: inspect held pose"))
         paint_center = np.array([_upper_center(painted[name], cell, origin) for name in names])
         guide_center = np.array([_upper_center(guides[name], cell, origin) for name in names])
         paint_parity = float(np.median(paint_center[1::2, 0]) - np.median(paint_center[::2, 0]))
@@ -174,6 +179,7 @@ def main() -> int:
 
     print("Error limits: walk parity >5px, step deviation >12px, hit ratio outside 0.50–1.25×; "
           "review: step >8px or hit ratio outside 0.80–1.20×")
+    print("Held pose review only: byte-identical adjacent walk frames, including walk8→walk1")
     print("Raw hit review only: painted central height >1.25× AND opaque area >1.35× "
           "vs median painted walk")
     print("Death entry review only: hit3→death1 guide-normalized width >1.35× with area >1.25×, "

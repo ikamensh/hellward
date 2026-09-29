@@ -35,7 +35,8 @@ def _figure(*, offset: int = 0, height: int = 0, raised_weapon: bool = False,
 
 
 def _frames() -> dict[str, Image.Image]:
-    return {f"front/walk{i}": _figure() for i in range(1, 9)} | {
+    walk_offsets = (0, 1, 2, 3, 4, 3, 2, 1)
+    return {f"front/walk{i}": _figure(offset=walk_offsets[i - 1]) for i in range(1, 9)} | {
         f"front/hit{i}": _figure(raised_weapon=True) for i in range(1, 4)
     } | {
         "front/death1": _figure()
@@ -90,6 +91,18 @@ def test_single_displaced_walk_frame_reports_transition_jolt() -> None:
     issues = audit("skeleton", painted, guide, CELL, ORIGIN)
     assert any("skeleton/front walk4→walk5" in str(issue) and "jolt" in str(issue) for issue in issues), issues
     assert all(issue.severity == "review" for issue in issues)
+
+
+def test_identical_adjacent_walk_frames_and_loop_seam_are_reviewed() -> None:
+    """Held poses remain legal, but a painter should see every accidental duplicate."""
+    guide = _frames()
+    painted = guide | {"front/walk4": guide["front/walk3"], "front/walk8": guide["front/walk1"]}
+    issues = audit("fallen", painted, guide, CELL, ORIGIN)
+    holds = [issue for issue in issues if "identical walk frames" in issue.message]
+    assert len(holds) == 2, issues
+    assert all(issue.severity == "review" for issue in holds)
+    assert any("walk3→walk4" in issue.message for issue in holds)
+    assert any("walk8→walk1" in issue.message for issue in holds)
 
 
 def test_death_entry_reports_broad_body_mass_growth_for_review_only() -> None:
