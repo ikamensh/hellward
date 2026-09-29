@@ -40,6 +40,7 @@ from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.ghost import Ghost  # noqa: E402
 from hellward.sim.players.hands import Player, defend  # noqa: E402
 from hellward.sim.skills import cost  # noqa: E402
+from tools.tuning import life_margin  # noqa: E402
 
 LOW, HIGH, STEP = 0.2, 12.0, 1.02
 
@@ -58,18 +59,8 @@ def wins(who: str, key: str, seed: int, sigils: int, leaders: str, life_mult: fl
 
 def margin(who: str, key: str, seed: int, sigils: int, leaders: str, curse_scale: float = 1.0) -> float:
     """The largest life factor won, bisected in ratio to STEP; 0 when even LOW is lost."""
-    if not wins(who, key, seed, sigils, leaders, LOW, curse_scale):
-        return 0.0
-    low, high = LOW, HIGH
-    if wins(who, key, seed, sigils, leaders, high, curse_scale):
-        return high
-    while high / low > STEP:
-        mid = (low * high) ** 0.5
-        if wins(who, key, seed, sigils, leaders, mid, curse_scale):
-            low = mid
-        else:
-            high = mid
-    return low
+    return life_margin(lambda life: wins(who, key, seed, sigils, leaders, life, curse_scale), LOW, HIGH,
+                       step=STEP, check_low=True, check_high=True)
 
 
 def seed_list(text: str) -> list[int]:

@@ -59,6 +59,7 @@ from hellward.sim.content import MONSTERS, START_LIVES  # noqa: E402
 from hellward.sim.model import Planner, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.hands import defend, react_for  # noqa: E402
+from tools.tuning import life_margin  # noqa: E402
 
 SEEDS = "1000-1019"                    # the evaluation seeds; offline planning may use 0-99
 UNCAPPED = 10_000                      # the sanctuary's life in the leader A/B, so every life lost counts
@@ -133,17 +134,14 @@ def play(player: str, location: str, seed: int, sigils: int, *, leaders: str = "
 def margin(player: str, location: str, seed: int, sigils: int, curse_scale: float = 1.0,
            leaders: str = "smart") -> tuple[float, list[dict]]:
     """The largest factor on the location's life at which the player still wins this seed, to 2%, and its runs."""
-    low, high = MARGIN_RANGE
-    runs = []
-    while high / low > MARGIN_STEP:
-        mid = math.sqrt(low * high)
-        run = play(player, location, seed, sigils, leaders=leaders, life=mid, curse_scale=curse_scale)
+    runs: list[dict] = []
+
+    def wins(life: float) -> bool:
+        run = play(player, location, seed, sigils, leaders=leaders, life=life, curse_scale=curse_scale)
         runs.append(run)
-        if run["outcome"] == "victory":
-            low = mid
-        else:
-            high = mid
-    return low, runs
+        return run["outcome"] == "victory"
+
+    return life_margin(wins, *MARGIN_RANGE, step=MARGIN_STEP), runs
 
 
 # -- The campaign, in order -----------------------------------------------------------------------------------------

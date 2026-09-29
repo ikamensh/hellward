@@ -32,12 +32,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
-from hellward.sim.model import SIM_DT, World  # noqa: E402
-from hellward.sim.players.hands import Hands, defend, react_for  # noqa: E402
+from hellward.sim.players.hands import defend  # noqa: E402
 from hellward.sim.players.warden import (  # noqa: E402
     PLANS, Plan, Step, Warden, draft_build, draft_skills, fingerprint, plan_key, tile_value,
 )
 from hellward.sim.skills import SKILLS, above, can_learn, kept, perks, tower_levels  # noqa: E402
+from tools.tuning import life_margin  # noqa: E402
 
 LEADERS = {"smart": planner.smart, "greedy": planner.greedy}
 UNCAPPED = 100_000
@@ -55,17 +55,8 @@ def lost(row: dict, key: str, sigils: int, seed: int, hp: float, leaders: str) -
     """Lives a plan loses in one defence with every monster's life times ``hp``, counted past a fall."""
     if seed not in TRAINING:
         raise ValueError(f"seed {seed} is not a training seed")
-    location = LOCATIONS[key]
-    player = Warden(plan=Plan.of(row))
-    learned = player.skills(location, sigils)
-    world = World(location, hardness=hp, perks=perks(learned, ORDER.index(location.key)), seed=seed, planner=LEADERS[leaders])
-    world.lives = UNCAPPED
-    hands = Hands(world, react_for(seed))
-    while world.outcome is None and world.time < LIMIT:
-        player.act(hands)
-        world.step(SIM_DT)
-        hands.observe(world.events)
-        world.events.clear()
+    world, _ = defend(LOCATIONS[key], Warden(plan=Plan.of(row)), seed=seed, sigils=sigils,
+                      planner=LEADERS[leaders], hp=hp, lives=UNCAPPED, limit=LIMIT)
     return UNCAPPED - world.lives
 
 
@@ -79,16 +70,7 @@ def won(row: dict, key: str, sigils: int, seed: int, hp: float, leaders: str) ->
 
 def margin(row: dict, key: str, sigils: int, seed: int, leaders: str, hi: float = 16.0) -> float:
     """The largest factor on every monster's life at which the plan still wins, bisected to 2% (0 when it loses at 1)."""
-    if not won(row, key, sigils, seed, 1.0, leaders):
-        return 0.0
-    lo = 1.0
-    while hi / lo > 1.02:
-        mid = (lo * hi) ** 0.5
-        if won(row, key, sigils, seed, mid, leaders):
-            lo = mid
-        else:
-            hi = mid
-    return lo
+    return life_margin(lambda life: won(row, key, sigils, seed, life, leaders), 1.0, hi, check_low=True)
 
 
 # -- Mutations ------------------------------------------------------------------------------------
