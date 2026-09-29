@@ -20,7 +20,7 @@ from hellward.ui.battle import BattleScene
 from hellward.ui.briefing import BriefingScene
 from hellward.ui.forge import ForgeScene
 from hellward.ui.mapscreen import MapScene
-from hellward.ui.progress import Progress, RewardGain
+from hellward.ui.progress import Progress, RewardGain, slot_for_profile
 from hellward.ui.skilltree import SkillTreeScene
 from hellward.ui.story import ChronicleScene, PrologueScene, StoryScene
 from hellward.ui.title import ReckoningScene, TitleScene
@@ -43,6 +43,18 @@ class Flow:
     def title(self) -> None:
         self.game.clear_and_push(TitleScene(self))
         self.sound.music("title")
+
+    def switch_profile(self, name: str) -> None:
+        """Make the chosen campaign the source of progress for the next descent."""
+        self.progress = Progress.load(self.game, name)
+
+    def create_profile(self, name: str) -> None:
+        """Persist a fresh campaign before making it active."""
+        if self.game.save_manager.load(slot_for_profile(name)) is not None:
+            raise ValueError(f"Campaign profile already exists: {name}")
+        fresh = Progress(profile=name, game=self.game)
+        fresh.save()
+        self.progress = fresh
 
     def world_map(self) -> None:
         """Before the map shows, play one due and unseen story (:meth:`due`), then the map."""

@@ -5,13 +5,15 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
-from saga2d import Anchor, Button, Column, Row, Scene
+from saga2d import Anchor, Button, Column, Label, Layout, Panel, Row, Scene
+from saga2d.input import InputEvent
 
 from hellward.sim.campaign import ORDER, LOCATIONS, sigils
 from hellward.sim.content import START_LIVES
 from hellward.sim.model import World
 from hellward.ui import style, widgets
-from hellward.ui.menus import SettingsScene, settings
+from hellward.ui.menus import PANEL, QUIET_BUTTON, SettingsScene, settings
+from hellward.ui.progress import campaign_profiles
 
 if TYPE_CHECKING:
     from hellward.ui.flow import Flow
@@ -29,10 +31,14 @@ class TitleScene(Scene):
     def open_settings(self) -> None:
         self.game.push(SettingsScene(settings(self.game)))
 
+    def open_profiles(self) -> None:
+        self.game.push(ProfileScene(self.flow))
+
     def on_enter(self) -> None:
         self.art = self.game.assets.has_image("title")
         menu = Column(
             Button("Descend", shortcut="Enter", on_click=self.flow.descend, width=320),
+            Button("Campaign profiles", shortcut="P", on_click=self.open_profiles, width=320),
             Button("Chronicle", shortcut="C", on_click=self.flow.chronicle, width=320),
             Button("Watch the leaders at work", shortcut="D", on_click=self.flow.demo, width=320),
             Button("Settings", hotkey="S", on_click=self.open_settings, width=320),
@@ -63,6 +69,116 @@ class TitleScene(Scene):
                        font_size=15, color=style.PALE_GOLD, anchor_x="center", anchor_y="center")
         self.draw_text(f"Campaign profile: {self.flow.progress.profile}", 640, 236,
                        font_size=16, color=style.BONE, anchor_x="center", anchor_y="center")
+
+
+class ProfileScene(Scene):
+    """Choose an existing campaign or name a new one before descending."""
+
+    transparent = True
+    pause_below = True
+    pop_on_cancel = True
+    PAGE_SIZE = 5
+
+    def __init__(self, flow: Flow) -> None:
+        self.flow = flow
+        self.names: tuple[str, ...] = ()
+        self.page = 0
+        self.creating = False
+        self.name = ""
+        self.error = ""
+
+    def on_enter(self) -> None:
+        self.names = campaign_profiles(self.game)
+        current = self.flow.progress.profile
+        if current not in self.names:  # a command-line profile may not have been saved yet
+            self.names = (*self.names, current)
+        self.page = self.names.index(current) // self.PAGE_SIZE
+        self.panel = Panel(layout=Layout.VERTICAL, spacing=10, anchor=Anchor.CENTER, style=PANEL)
+        self.ui.add(self.panel)
+        self.show_list()
+
+    def show_list(self) -> None:
+        self.creating = False
+        self.panel.clear()
+        self.panel.add(Label("Campaign profiles", text_style="banner", width=420, align="center"))
+        self.panel.add(Label("Each profile saves its own progress.",
+                             text_style="small", width=420, align="center", wrap=True))
+        first = self.page * self.PAGE_SIZE
+        for index, name in enumerate(self.names[first:first + self.PAGE_SIZE], 1):
+            current = name == self.flow.progress.profile
+            self.panel.add(Button(f"{name}{'  •  current' if current else ''}", shortcut=str(index),
+                                  on_click=lambda chosen=name: self.select(chosen), width=420,
+                                  style=None if current else QUIET_BUTTON))
+        pages = (len(self.names) - 1) // self.PAGE_SIZE + 1
+        if pages > 1:
+            self.panel.add(Row(
+                Button("Previous", on_click=lambda: self.turn_page(-1), width=150,
+                       enabled=self.page > 0, style=QUIET_BUTTON),
+                Label(f"{self.page + 1} / {pages}", text_style="small", width=100, align="center"),
+                Button("Next", on_click=lambda: self.turn_page(1), width=150,
+                       enabled=self.page + 1 < pages, style=QUIET_BUTTON), spacing=10))
+        self.panel.add(Button("New campaign profile", shortcut="N", on_click=self.show_new, width=420))
+        self.panel.add(Button("Back", shortcut="Esc", on_click=self.game.pop, width=420, style=QUIET_BUTTON))
+
+    def turn_page(self, direction: int) -> None:
+        self.page += direction
+        self.show_list()
+
+    def select(self, name: str) -> None:
+        self.flow.switch_profile(name)
+        self.game.pop()
+
+    def show_new(self) -> None:
+        self.creating = True
+        self.name = ""
+        self.error = ""
+        self.panel.clear()
+        self.panel.add(Label("New campaign", text_style="banner", width=420, align="center"))
+        self.panel.add(Label("Use letters, digits or _. Start with a letter or _.",
+                             text_style="small", width=420, align="center", wrap=True))
+        field = Panel(layout=Layout.VERTICAL, style=QUIET_BUTTON)
+        field.add(Label(lambda: f"{self.name}|" if self.name else "Name your campaign", text_style="heading",
+                        width=410, align="center"))
+        self.panel.add(field)
+        self.panel.add(Label(lambda: self.error or "Backspace edits the name.", text_style="small", width=420,
+                             align="center", text_color=style.PALE_GOLD))
+        self.panel.add(Row(Button("Create", shortcut="Enter", on_click=self.create, width=205),
+                           Button("Back", shortcut="Esc", on_click=self.show_list, width=205, style=QUIET_BUTTON),
+                           spacing=10))
+
+    def create(self) -> None:
+        if not self.name.isidentifier() or not self.name.isascii():
+            self.error = "Start with a letter or _; use only letters, digits and underscores."
+        elif self.name.casefold() in {name.casefold() for name in self.names}:
+            self.error = "That profile exists. Choose it from the list."
+        else:
+            self.flow.create_profile(self.name)
+            self.game.pop()
+
+    def handle_input(self, event: InputEvent) -> bool:
+        if not self.creating or event.type != "key_press" or event.key is None:
+            return False
+        if event.key == "backspace":
+            self.name = self.name[:-1]
+            self.error = ""
+            return True
+        if event.ctrl or event.alt or event.meta:
+            return False
+        key = event.key
+        char = "_" if key == "underscore" or (key == "minus" and event.shift) else key
+        if len(char) != 1 or not char.isascii() or not (char.isalnum() or char == "_"):
+            return False
+        if len(self.name) >= 24:
+            self.error = "Names can be at most 24 characters."
+        elif not self.name and char.isdigit():
+            self.error = "Start with a letter or underscore."
+        else:
+            self.name += char.lower()
+            self.error = ""
+        return True
+
+    def draw(self) -> None:
+        self.draw_rect(0, 0, 1280, 800, (0, 0, 0, 175))
 
 
 class ReckoningScene(Scene):

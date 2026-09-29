@@ -23,7 +23,7 @@ from hellward.ui.mapscreen import MapScene
 from hellward.ui.progress import Progress
 from hellward.ui.skilltree import SkillTreeScene
 from hellward.ui.story import PrologueScene, StoryScene
-from hellward.ui.title import ReckoningScene, TitleScene
+from hellward.ui.title import ProfileScene, ReckoningScene, TitleScene
 
 
 @pytest.fixture(scope="module")
@@ -76,6 +76,71 @@ def test_a_first_descent_walks_the_lantern_to_tristram_and_its_intro_names_its_h
     press(g, "return")
     battle = g.scenes[-1]
     assert isinstance(battle, BattleScene) and battle.world.location.key == "tristram"
+
+
+def test_the_title_can_create_and_switch_campaign_profiles_without_mixing_their_saves(game):
+    g, flow = game
+    flow.progress.record("tristram", "victory", 18)
+    g.push(TitleScene(flow))
+    tick(g)
+
+    press(g, "p")
+    assert isinstance(g.scenes[-1], ProfileScene)
+    assert_text_fits(g)
+    press(g, "n")
+    for key in "fresh":
+        press(g, key)
+    assert_text_fits(g)
+    press(g, "return")
+    assert isinstance(g.scenes[-1], TitleScene)
+    assert flow.progress.profile == "fresh" and flow.progress.sigils == 0
+    press(g, "return")
+    assert isinstance(g.scenes[-1], PrologueScene)
+    flow.progress.record("tristram", "victory", 10)
+
+    flow.title()
+    press(g, "p")
+    press(g, "1")
+    assert flow.progress.profile == "main" and flow.progress.sigils == 3
+    press(g, "p")
+    press(g, "2")
+    assert flow.progress.profile == "fresh" and flow.progress.sigils == 2
+    assert Progress.load(g, "main").sigils == 3
+    assert Progress.load(g, "fresh").sigils == 2
+
+
+def test_the_title_lists_a_named_campaign_saved_by_an_earlier_session(cache, tmp_path):
+    saves = tmp_path / "saves"
+    first, _flow = open_game(cache, saves)
+    Progress.load(first, "playtest").record("tristram", "victory", 10)
+    first.close()
+
+    second, flow = open_game(cache, saves)
+    try:
+        second.push(TitleScene(flow))
+        tick(second)
+        press(second, "p")
+        press(second, "2")
+        assert isinstance(second.scenes[-1], TitleScene)
+        assert flow.progress.profile == "playtest" and flow.progress.sigils == 2
+    finally:
+        second.close()
+
+
+def test_new_profile_refuses_an_existing_name_even_when_only_the_case_differs(game):
+    g, flow = game
+    Progress.load(g, "Playtest").record("tristram", "victory", 18)
+    g.push(TitleScene(flow))
+    tick(g)
+    press(g, "p")
+    press(g, "n")
+    for key in "playtest":
+        press(g, key)
+    press(g, "return")
+    assert isinstance(g.scenes[-1], ProfileScene)
+    assert flow.progress.profile == "main"
+    assert Progress.load(g, "Playtest").sigils == 3
+    assert_text_fits(g)
 
 
 def test_a_won_defence_earns_sigils_that_open_the_way_and_last_to_the_next_session(cache, tmp_path):

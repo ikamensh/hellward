@@ -18,9 +18,10 @@ uv run hellward --demo               # a scripted player defends the cathedral a
 ```
 
 The first launch prepares art and sounds in `~/.hellward/cache` (a few seconds).
-The default `main` profile keeps your existing save. A new `--profile NAME` starts fresh in its own
-save slot; use the same name to resume it, or another name for another fresh run. Names use letters,
-numbers and underscores, starting with a letter or underscore. Saves live in `~/.hellward/saves`.
+The title's **Campaign profiles** button (or **P**) lets you switch between saves or name a new one.
+The default `main` profile keeps your existing save. You can also launch a profile directly with
+`--profile NAME`. Names use letters, numbers and underscores, starting with a letter or underscore.
+Saves live in `~/.hellward/saves`.
 `--seed N` changes seeded run variation; `--fullscreen` fills the screen.
 
 ## How to play

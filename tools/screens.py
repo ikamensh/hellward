@@ -2,7 +2,7 @@
 
     uv run python tools/screens.py OUT [--only NAME,NAME] [--seconds 60] [--seed 1]
 
-Writes ``OUT/<name>.png``: ``title``, ``map``, ``intro-<location>`` for every location,
+Writes ``OUT/<name>.png``: ``title``, ``profiles``, ``profile-new``, ``map``, ``intro-<location>`` for every location,
 ``skills``, ``battle-<location>`` for every location, ``magic``, ``chant``, ``mark``, ``resolute``, ``reckoning``, ``story-tristram-before``,
 ``prologue-12``, ``prologue-27`` and ``chronicle-first``.
 The display must be awake (``caffeinate -u``). The frames are for looking at,
@@ -41,6 +41,7 @@ def main() -> None:
     from hellward.ui.mapscreen import MapScene
     from hellward.ui.progress import Progress
     from hellward.ui.story import ChronicleScene, PrologueScene, StoryScene
+    from hellward.ui.title import ProfileScene
 
     cache = Path.home() / ".hellward" / "cache"
     game = Game("Hellward", resolution=(1280, 800), backend="pyglet", visible=False,
@@ -64,6 +65,22 @@ def main() -> None:
         flow.title()
         ticks(4)
         shot("title")
+
+    def profiles() -> None:
+        Progress.load(game, "playtest").save()
+        flow.title()
+        game.push(ProfileScene(flow))
+        ticks(4)
+        shot("profiles")
+
+    def profile_new() -> None:
+        flow.title()
+        scene = ProfileScene(flow)
+        game.push(scene)
+        scene.show_new()
+        scene.name = "fresh"
+        ticks(4)
+        shot("profile-new")
 
     def world_map() -> None:
         flow.world_map()
@@ -209,7 +226,8 @@ def main() -> None:
         ticks(60)
         shot("chronicle-first")
 
-    frames = {"title": title, "map": world_map, "map-2": act_two_map, "skills": skills, "magic": magic,
+    frames = {"title": title, "profiles": profiles, "profile-new": profile_new,
+              "map": world_map, "map-2": act_two_map, "skills": skills, "magic": magic,
               "chant": make_telegraph("chant", "cathedral", False), "mark": make_telegraph("mark", "travincal", True),
               "resolute": resolute,
               "reckoning": reckoning,

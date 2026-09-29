@@ -25,6 +25,17 @@ def slot_for_profile(profile: str) -> str:
     return SLOT if profile == "main" else f"{SLOT}_{profile}"
 
 
+def campaign_profiles(game: Game) -> tuple[str, ...]:
+    """The main campaign and named campaign saves visible in the title's picker."""
+    prefix = f"save_{SLOT}_"
+    names = {"main"}
+    for path in (game.data_dir / "saves").glob(f"{prefix}*.json"):
+        name = path.name[len(prefix):-len(".json")]
+        if name.isidentifier():
+            names.add(name)
+    return ("main", *sorted(names - {"main"}, key=lambda name: (name.casefold(), name)))
+
+
 @dataclass(frozen=True)
 class RewardGain:
     """New persistent rewards earned by one defence, beyond earlier results at that location."""
