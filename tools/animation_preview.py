@@ -1,6 +1,7 @@
 """Review the first three monsters' animations through Hellward's real renderer.
 
     caffeinate -u uv run python tools/animation_preview.py /tmp/hellward-animation-preview
+    caffeinate -u uv run python tools/animation_preview.py /tmp/hellward-animation-3d --art procedural
 
 Writes a 60 fps MP4, ordered eight-frame walk cycles, an action contact sheet,
 and reproduction details. Walking and walk-to-hit transitions use BattleScene's
@@ -46,14 +47,14 @@ def _crop(frame: Image.Image, scene, figure) -> Image.Image:
 
 
 def _sheet(cells: dict[tuple[str, str, str], Image.Image], out: Path, reactions: tuple[str, ...],
-           doors: tuple[str, ...], door_frames: tuple[str, ...], fps: int) -> None:
+           doors: tuple[str, ...], door_frames: tuple[str, ...], fps: int, art_mode: str) -> None:
     pad, heading, label = 10, 28, 24
     width = pad + len(BEARINGS) * (CROP[0] + pad)
     height = heading + len(KINDS) * (1 + len(reactions) + len(doors)) * (CROP[1] + label + pad)
     sheet = Image.new("RGB", (width, height), (24, 20, 23))
     draw = ImageDraw.Draw(sheet)
     font = ImageFont.load_default()
-    draw.text((pad, 8), f"Hellward: game-scale walk, hit, death • real {fps} fps renderer",
+    draw.text((pad, 8), f"Hellward: {art_mode} walk, hit, death • real {fps} fps renderer",
               fill=(235, 224, 205), font=font)
     for kind_index, kind in enumerate(KINDS):
         for group_index, group in enumerate(("walk", *reactions, *doors)):
@@ -68,7 +69,7 @@ def _sheet(cells: dict[tuple[str, str, str], Image.Image], out: Path, reactions:
     sheet.save(out)
 
 
-def _walk_sheet(cells: dict[tuple[str, str, str], Image.Image], out: Path, fps: int) -> None:
+def _walk_sheet(cells: dict[tuple[str, str, str], Image.Image], out: Path, fps: int, art_mode: str) -> None:
     """Show every bearing in playback order, including the transition from step 8 to 1."""
     from hellward.art import figures
 
@@ -77,7 +78,7 @@ def _walk_sheet(cells: dict[tuple[str, str, str], Image.Image], out: Path, fps: 
     height = heading + len(KINDS) * len(BEARINGS) * (CROP[1] + label + pad)
     sheet = Image.new("RGB", (width, height), (24, 20, 23))
     draw = ImageDraw.Draw(sheet)
-    draw.text((pad, 8), f"Hellward: ordered 1x walk cycles • {fps} fps real renderer",
+    draw.text((pad, 8), f"Hellward: {art_mode} ordered 1x walk cycles • {fps} fps real renderer",
               fill=(235, 224, 205))
     for kind_index, kind in enumerate(KINDS):
         for facing_index, bearing in enumerate(BEARINGS):
@@ -91,7 +92,8 @@ def _walk_sheet(cells: dict[tuple[str, str, str], Image.Image], out: Path, fps: 
     sheet.save(out)
 
 
-def record(out: Path, fps: int) -> None:
+def record(out: Path, fps: int, art_mode: str = "painted") -> None:
+    os.environ["HELLWARD_ART"] = art_mode
     from saga2d import Game
 
     from hellward.__main__ import build
@@ -128,10 +130,11 @@ def record(out: Path, fps: int) -> None:
     encoder = None
     try:
         art = build(game, cache)
-        for kind in KINDS:
-            expected = {f"{facing}/{frame}" for facing in figures.facings(kind) for frame in figures.frames(kind)}
-            if set(art.monster_painted[kind]) != expected:
-                raise RuntimeError(f"{kind}: preview requires all {len(expected)} frames painted")
+        if art_mode == "painted":
+            for kind in KINDS:
+                expected = {f"{facing}/{frame}" for facing in figures.facings(kind) for frame in figures.frames(kind)}
+                if set(art.monster_painted[kind]) != expected:
+                    raise RuntimeError(f"{kind}: preview requires all {len(expected)} frames painted")
         level = Level("animation bearings", 33, 18, ((0, 8), (32, 8)), (),
                       extra_routes=(Route("tour", TOUR),))
         scene = AnimationScene(art, replace(TRISTRAM, level=level), seed=1, autopilot=None)
@@ -271,8 +274,8 @@ def record(out: Path, fps: int) -> None:
         if missing:
             raise RuntimeError(f"preview missed animation frames: {missing}")
         _sheet(cells, out / "contact-sheet.png", tuple(bearing for bearing, _ in REACTIONS),
-               tuple(f"door_{bearing}" for bearing, _ in DOORS), figures.STRIKE, fps)
-        _walk_sheet(walk_cells, out / "walk-cycles.png", fps)
+               tuple(f"door_{bearing}" for bearing, _ in DOORS), figures.STRIKE, fps, art_mode)
+        _walk_sheet(walk_cells, out / "walk-cycles.png", fps, art_mode)
         encoder.stdin.close()
         stderr = encoder.stderr.read().decode()
         if encoder.wait() != 0:
@@ -281,7 +284,7 @@ def record(out: Path, fps: int) -> None:
 
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
         command = shlex.join(["caffeinate", "-u", "uv", "run", "python", "tools/animation_preview.py", str(out),
-                               "--fps", str(fps)])
+                               "--fps", str(fps), "--art", art_mode])
         (out / "README.txt").write_text(f"Source commit: {commit}\nReproduce: {command}\n", encoding="utf-8")
         print(f"wrote {out / 'walk-cycles.png'}, {out / 'contact-sheet.png'} and {out / 'clip.mp4'}")
     finally:
@@ -296,10 +299,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("out", type=Path)
     parser.add_argument("--fps", type=int, default=60)
+    parser.add_argument("--art", choices=("painted", "procedural"), default="painted")
     args = parser.parse_args()
     if args.fps < 24:
         parser.error("fps must be at least 24 to capture every hit and death pose")
-    record(args.out, args.fps)
+    record(args.out, args.fps, args.art)
 
 
 if __name__ == "__main__":
