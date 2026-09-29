@@ -23,7 +23,7 @@ from hellward.ui.lighting import Lighting
 from hellward.ui.view import MAP_X, MAP_Y, T, TOWER_SCALE, WorldView, px
 
 
-@dataclass(frozen=True)
+@dataclass
 class BattleState:
     placing: str | None
     selected: Tower | None

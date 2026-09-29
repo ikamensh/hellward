@@ -12,7 +12,7 @@ from pathlib import Path
 
 from saga2d import Game
 
-from hellward.sim import fastsim
+from hellward import fastsim
 from hellward.ui import style
 from hellward.ui.loading import LoadingScene
 

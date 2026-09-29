@@ -16,7 +16,7 @@ leader could cast on every tower in its reach is played out *exactly*: the game'
 so every moment compares a choice of target; the timing check below the table then asks whether the
 moments smart would have waited through were worth waiting for.
 
-It runs the compiled simulation (:mod:`hellward.sim.fastsim`, built on first use), which plays as the source does;
+It runs the compiled simulation (:mod:`hellward.fastsim`, built on first use), which plays as the source does;
 ``HELLWARD_INTERPRETED=1`` runs the source.
 """
 
@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from hellward.sim import fastsim  # noqa: E402
+from hellward import fastsim  # noqa: E402
 
 if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of its worker processes, not as a library
     fastsim.activate()   # the compiled simulation, unless HELLWARD_INTERPRETED is set

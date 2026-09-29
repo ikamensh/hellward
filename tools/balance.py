@@ -7,7 +7,7 @@ Each defender is the ordinary player with a different element rotation and tower
 policy it prints the victories, the lives the defenders lost (mean and range) and the curses cast. The
 leaders are worth something when ``smart`` costs the defenders clearly more lives than ``random``.
 
-It runs the compiled simulation (:mod:`hellward.sim.fastsim`, built on first use), which plays as the source does;
+It runs the compiled simulation (:mod:`hellward.fastsim`, built on first use), which plays as the source does;
 ``HELLWARD_INTERPRETED=1`` runs the source.
 """
 
@@ -22,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from hellward.sim import fastsim  # noqa: E402
+from hellward import fastsim  # noqa: E402
 
 if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of its worker processes, not as a library
     fastsim.activate()   # the compiled simulation, unless HELLWARD_INTERPRETED is set

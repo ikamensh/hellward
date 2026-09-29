@@ -104,6 +104,28 @@ def test_a_refused_build_is_explained_not_raised(game):
     assert any("floor" in text for _, text, _ in scene.hud.log)
 
 
+def test_keyboard_placement_can_be_cancelled_and_the_next_build_is_recorded(game):
+    """The battle's keys and clicks act on one selection, and only a completed build reaches the replay."""
+    g, art = game
+    scene = BattleScene(art, TRISTRAM)
+    g.push(scene)
+    g.tick(SIM_DT)
+    g.backend.inject_key("1")
+    g.tick(SIM_DT)
+    assert scene.placing == "arrow"
+    g.backend.inject_key("escape")
+    g.tick(SIM_DT)
+    assert scene.placing is None and scene.replay == []
+    g.backend.inject_key("1")
+    g.tick(SIM_DT)
+    tile = next((x, y) for y in range(scene.world.level.height) for x in range(scene.world.level.width)
+                if scene.world.level.buildable(x, y))
+    g.backend.inject_click(*tile_centre(scene, *tile))
+    g.tick(SIM_DT)
+    assert scene.world.tower_at(tile) is not None
+    assert scene.replay[-1][1:] == ["build", "arrow", list(tile)]
+
+
 def test_a_larger_field_fits_above_the_hud_and_its_far_corner_accepts_a_build(game):
     """A player can see and click every approach when a location needs a larger field."""
     g, art = game

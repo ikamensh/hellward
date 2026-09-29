@@ -5,7 +5,7 @@ The world asks for a decision at a step boundary and reads it half a second of g
 :func:`hellward.sim.planner.decide` returns inline, so the game stays deterministic for a seed.
 
 The workers run the same compiled simulation as the game: the pool initializer activates the build the
-parent activated (through :data:`hellward.sim.fastsim.ENV`) before anything unpickles a world, so the
+parent activated (through :data:`hellward.fastsim.ENV`) before anything unpickles a world, so the
 worlds the game sends over round-trip between the compiled parent and the compiled workers. This module
 imports nothing from the simulation at load time for exactly that reason: a spawned worker imports it
 before the initializer runs.
@@ -34,7 +34,7 @@ def _decide(world: World, leader_id: int) -> planner.Decision:
 
 def _start_worker() -> None:
     """Activate the parent's build, then serve the game: ignore Ctrl-C and end with it however it ends."""
-    from hellward.sim import fastsim
+    from hellward import fastsim
 
     try:
         fastsim.activate()
