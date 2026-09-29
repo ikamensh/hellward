@@ -1,0 +1,1969 @@
+{
+ "cell": [
+  254,
+  264
+ ],
+ "cols": 16,
+ "rows": 14,
+ "origin": [
+  127.0,
+  173.65240157121661
+ ],
+ "scale": 2,
+ "pad": [
+  0,
+  0
+ ],
+ "chroma": [
+  255,
+  0,
+  255
+ ],
+ "grid": false,
+ "cells": [
+  {
+   "key": "front/walk1",
+   "col": 0,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "front/walk2",
+   "col": 1,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "front/walk3",
+   "col": 2,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "front/walk4",
+   "col": 3,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "front/walk5",
+   "col": 4,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk5"
+   }
+  },
+  {
+   "key": "front/walk6",
+   "col": 5,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk6"
+   }
+  },
+  {
+   "key": "front/walk7",
+   "col": 6,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk7"
+   }
+  },
+  {
+   "key": "front/walk8",
+   "col": 7,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk8"
+   }
+  },
+  {
+   "key": "front/walk9",
+   "col": 8,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk9"
+   }
+  },
+  {
+   "key": "front/walk10",
+   "col": 9,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk10"
+   }
+  },
+  {
+   "key": "front/walk11",
+   "col": 10,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk11"
+   }
+  },
+  {
+   "key": "front/walk12",
+   "col": 11,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk12"
+   }
+  },
+  {
+   "key": "front/walk13",
+   "col": 12,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk13"
+   }
+  },
+  {
+   "key": "front/walk14",
+   "col": 13,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk14"
+   }
+  },
+  {
+   "key": "front/walk15",
+   "col": 14,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk15"
+   }
+  },
+  {
+   "key": "front/walk16",
+   "col": 15,
+   "row": 0,
+   "tags": {
+    "facing": "front",
+    "frame": "walk16"
+   }
+  },
+  {
+   "key": "front/wind",
+   "col": 0,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "front/strike",
+   "col": 1,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "front/recover",
+   "col": 2,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "recover"
+   }
+  },
+  {
+   "key": "front/hit1",
+   "col": 3,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "hit1"
+   }
+  },
+  {
+   "key": "front/hit2",
+   "col": 4,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "hit2"
+   }
+  },
+  {
+   "key": "front/hit3",
+   "col": 5,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "hit3"
+   }
+  },
+  {
+   "key": "front/death1",
+   "col": 6,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "death1"
+   }
+  },
+  {
+   "key": "front/death2",
+   "col": 7,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "death2"
+   }
+  },
+  {
+   "key": "front/death3",
+   "col": 8,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "death3"
+   }
+  },
+  {
+   "key": "front/death4",
+   "col": 9,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "death4"
+   }
+  },
+  {
+   "key": "front/death5",
+   "col": 10,
+   "row": 1,
+   "tags": {
+    "facing": "front",
+    "frame": "death5"
+   }
+  },
+  {
+   "key": "front_right/walk1",
+   "col": 11,
+   "row": 1,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "front_right/walk2",
+   "col": 12,
+   "row": 1,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "front_right/walk3",
+   "col": 13,
+   "row": 1,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "front_right/walk4",
+   "col": 14,
+   "row": 1,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "front_right/walk5",
+   "col": 15,
+   "row": 1,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk5"
+   }
+  },
+  {
+   "key": "front_right/walk6",
+   "col": 0,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk6"
+   }
+  },
+  {
+   "key": "front_right/walk7",
+   "col": 1,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk7"
+   }
+  },
+  {
+   "key": "front_right/walk8",
+   "col": 2,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk8"
+   }
+  },
+  {
+   "key": "front_right/walk9",
+   "col": 3,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk9"
+   }
+  },
+  {
+   "key": "front_right/walk10",
+   "col": 4,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk10"
+   }
+  },
+  {
+   "key": "front_right/walk11",
+   "col": 5,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk11"
+   }
+  },
+  {
+   "key": "front_right/walk12",
+   "col": 6,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk12"
+   }
+  },
+  {
+   "key": "front_right/walk13",
+   "col": 7,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk13"
+   }
+  },
+  {
+   "key": "front_right/walk14",
+   "col": 8,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk14"
+   }
+  },
+  {
+   "key": "front_right/walk15",
+   "col": 9,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk15"
+   }
+  },
+  {
+   "key": "front_right/walk16",
+   "col": 10,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "walk16"
+   }
+  },
+  {
+   "key": "front_right/wind",
+   "col": 11,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "front_right/strike",
+   "col": 12,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "front_right/recover",
+   "col": 13,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "recover"
+   }
+  },
+  {
+   "key": "front_right/hit1",
+   "col": 14,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "hit1"
+   }
+  },
+  {
+   "key": "front_right/hit2",
+   "col": 15,
+   "row": 2,
+   "tags": {
+    "facing": "front_right",
+    "frame": "hit2"
+   }
+  },
+  {
+   "key": "front_right/hit3",
+   "col": 0,
+   "row": 3,
+   "tags": {
+    "facing": "front_right",
+    "frame": "hit3"
+   }
+  },
+  {
+   "key": "front_right/death1",
+   "col": 1,
+   "row": 3,
+   "tags": {
+    "facing": "front_right",
+    "frame": "death1"
+   }
+  },
+  {
+   "key": "front_right/death2",
+   "col": 2,
+   "row": 3,
+   "tags": {
+    "facing": "front_right",
+    "frame": "death2"
+   }
+  },
+  {
+   "key": "front_right/death3",
+   "col": 3,
+   "row": 3,
+   "tags": {
+    "facing": "front_right",
+    "frame": "death3"
+   }
+  },
+  {
+   "key": "front_right/death4",
+   "col": 4,
+   "row": 3,
+   "tags": {
+    "facing": "front_right",
+    "frame": "death4"
+   }
+  },
+  {
+   "key": "front_right/death5",
+   "col": 5,
+   "row": 3,
+   "tags": {
+    "facing": "front_right",
+    "frame": "death5"
+   }
+  },
+  {
+   "key": "right/walk1",
+   "col": 6,
+   "row": 3,
+   "tags": {
+    "facing": "right",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "right/walk2",
+   "col": 7,
+   "row": 3,
+   "tags": {
+    "facing": "right",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "right/walk3",
+   "col": 8,
+   "row": 3,
+   "tags": {
+    "facing": "right",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "right/walk4",
+   "col": 9,
+   "row": 3,
+   "tags": {
+    "facing": "right",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "right/walk5",
+   "col": 10,
+   "row": 3,
+   "tags": {
+    "facing": "right",
+    "frame": "walk5"
+   }
+  },
+  {
+   "key": "right/walk6",
+   "col": 11,
+   "row": 3,
+   "tags": {
+    "facing": "right",
+    "frame": "walk6"
+   }
+  },
+  {
+   "key": "right/walk7",
+   "col": 12,
+   "row": 3,
+   "tags": {
+    "facing": "right",
+    "frame": "walk7"
+   }
+  },
+  {
+   "key": "right/walk8",
+   "col": 13,
+   "row": 3,
+   "tags": {
+    "facing": "right",
+    "frame": "walk8"
+   }
+  },
+  {
+   "key": "right/walk9",
+   "col": 14,
+   "row": 3,
+   "tags": {
+    "facing": "right",
+    "frame": "walk9"
+   }
+  },
+  {
+   "key": "right/walk10",
+   "col": 15,
+   "row": 3,
+   "tags": {
+    "facing": "right",
+    "frame": "walk10"
+   }
+  },
+  {
+   "key": "right/walk11",
+   "col": 0,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "walk11"
+   }
+  },
+  {
+   "key": "right/walk12",
+   "col": 1,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "walk12"
+   }
+  },
+  {
+   "key": "right/walk13",
+   "col": 2,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "walk13"
+   }
+  },
+  {
+   "key": "right/walk14",
+   "col": 3,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "walk14"
+   }
+  },
+  {
+   "key": "right/walk15",
+   "col": 4,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "walk15"
+   }
+  },
+  {
+   "key": "right/walk16",
+   "col": 5,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "walk16"
+   }
+  },
+  {
+   "key": "right/wind",
+   "col": 6,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "right/strike",
+   "col": 7,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "right/recover",
+   "col": 8,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "recover"
+   }
+  },
+  {
+   "key": "right/hit1",
+   "col": 9,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "hit1"
+   }
+  },
+  {
+   "key": "right/hit2",
+   "col": 10,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "hit2"
+   }
+  },
+  {
+   "key": "right/hit3",
+   "col": 11,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "hit3"
+   }
+  },
+  {
+   "key": "right/death1",
+   "col": 12,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "death1"
+   }
+  },
+  {
+   "key": "right/death2",
+   "col": 13,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "death2"
+   }
+  },
+  {
+   "key": "right/death3",
+   "col": 14,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "death3"
+   }
+  },
+  {
+   "key": "right/death4",
+   "col": 15,
+   "row": 4,
+   "tags": {
+    "facing": "right",
+    "frame": "death4"
+   }
+  },
+  {
+   "key": "right/death5",
+   "col": 0,
+   "row": 5,
+   "tags": {
+    "facing": "right",
+    "frame": "death5"
+   }
+  },
+  {
+   "key": "back_right/walk1",
+   "col": 1,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "back_right/walk2",
+   "col": 2,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "back_right/walk3",
+   "col": 3,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "back_right/walk4",
+   "col": 4,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "back_right/walk5",
+   "col": 5,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk5"
+   }
+  },
+  {
+   "key": "back_right/walk6",
+   "col": 6,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk6"
+   }
+  },
+  {
+   "key": "back_right/walk7",
+   "col": 7,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk7"
+   }
+  },
+  {
+   "key": "back_right/walk8",
+   "col": 8,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk8"
+   }
+  },
+  {
+   "key": "back_right/walk9",
+   "col": 9,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk9"
+   }
+  },
+  {
+   "key": "back_right/walk10",
+   "col": 10,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk10"
+   }
+  },
+  {
+   "key": "back_right/walk11",
+   "col": 11,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk11"
+   }
+  },
+  {
+   "key": "back_right/walk12",
+   "col": 12,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk12"
+   }
+  },
+  {
+   "key": "back_right/walk13",
+   "col": 13,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk13"
+   }
+  },
+  {
+   "key": "back_right/walk14",
+   "col": 14,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk14"
+   }
+  },
+  {
+   "key": "back_right/walk15",
+   "col": 15,
+   "row": 5,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk15"
+   }
+  },
+  {
+   "key": "back_right/walk16",
+   "col": 0,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "walk16"
+   }
+  },
+  {
+   "key": "back_right/wind",
+   "col": 1,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "back_right/strike",
+   "col": 2,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "back_right/recover",
+   "col": 3,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "recover"
+   }
+  },
+  {
+   "key": "back_right/hit1",
+   "col": 4,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "hit1"
+   }
+  },
+  {
+   "key": "back_right/hit2",
+   "col": 5,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "hit2"
+   }
+  },
+  {
+   "key": "back_right/hit3",
+   "col": 6,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "hit3"
+   }
+  },
+  {
+   "key": "back_right/death1",
+   "col": 7,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "death1"
+   }
+  },
+  {
+   "key": "back_right/death2",
+   "col": 8,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "death2"
+   }
+  },
+  {
+   "key": "back_right/death3",
+   "col": 9,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "death3"
+   }
+  },
+  {
+   "key": "back_right/death4",
+   "col": 10,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "death4"
+   }
+  },
+  {
+   "key": "back_right/death5",
+   "col": 11,
+   "row": 6,
+   "tags": {
+    "facing": "back_right",
+    "frame": "death5"
+   }
+  },
+  {
+   "key": "back/walk1",
+   "col": 12,
+   "row": 6,
+   "tags": {
+    "facing": "back",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "back/walk2",
+   "col": 13,
+   "row": 6,
+   "tags": {
+    "facing": "back",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "back/walk3",
+   "col": 14,
+   "row": 6,
+   "tags": {
+    "facing": "back",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "back/walk4",
+   "col": 15,
+   "row": 6,
+   "tags": {
+    "facing": "back",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "back/walk5",
+   "col": 0,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk5"
+   }
+  },
+  {
+   "key": "back/walk6",
+   "col": 1,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk6"
+   }
+  },
+  {
+   "key": "back/walk7",
+   "col": 2,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk7"
+   }
+  },
+  {
+   "key": "back/walk8",
+   "col": 3,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk8"
+   }
+  },
+  {
+   "key": "back/walk9",
+   "col": 4,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk9"
+   }
+  },
+  {
+   "key": "back/walk10",
+   "col": 5,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk10"
+   }
+  },
+  {
+   "key": "back/walk11",
+   "col": 6,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk11"
+   }
+  },
+  {
+   "key": "back/walk12",
+   "col": 7,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk12"
+   }
+  },
+  {
+   "key": "back/walk13",
+   "col": 8,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk13"
+   }
+  },
+  {
+   "key": "back/walk14",
+   "col": 9,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk14"
+   }
+  },
+  {
+   "key": "back/walk15",
+   "col": 10,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk15"
+   }
+  },
+  {
+   "key": "back/walk16",
+   "col": 11,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "walk16"
+   }
+  },
+  {
+   "key": "back/wind",
+   "col": 12,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "back/strike",
+   "col": 13,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "back/recover",
+   "col": 14,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "recover"
+   }
+  },
+  {
+   "key": "back/hit1",
+   "col": 15,
+   "row": 7,
+   "tags": {
+    "facing": "back",
+    "frame": "hit1"
+   }
+  },
+  {
+   "key": "back/hit2",
+   "col": 0,
+   "row": 8,
+   "tags": {
+    "facing": "back",
+    "frame": "hit2"
+   }
+  },
+  {
+   "key": "back/hit3",
+   "col": 1,
+   "row": 8,
+   "tags": {
+    "facing": "back",
+    "frame": "hit3"
+   }
+  },
+  {
+   "key": "back/death1",
+   "col": 2,
+   "row": 8,
+   "tags": {
+    "facing": "back",
+    "frame": "death1"
+   }
+  },
+  {
+   "key": "back/death2",
+   "col": 3,
+   "row": 8,
+   "tags": {
+    "facing": "back",
+    "frame": "death2"
+   }
+  },
+  {
+   "key": "back/death3",
+   "col": 4,
+   "row": 8,
+   "tags": {
+    "facing": "back",
+    "frame": "death3"
+   }
+  },
+  {
+   "key": "back/death4",
+   "col": 5,
+   "row": 8,
+   "tags": {
+    "facing": "back",
+    "frame": "death4"
+   }
+  },
+  {
+   "key": "back/death5",
+   "col": 6,
+   "row": 8,
+   "tags": {
+    "facing": "back",
+    "frame": "death5"
+   }
+  },
+  {
+   "key": "back_left/walk1",
+   "col": 7,
+   "row": 8,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "back_left/walk2",
+   "col": 8,
+   "row": 8,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "back_left/walk3",
+   "col": 9,
+   "row": 8,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "back_left/walk4",
+   "col": 10,
+   "row": 8,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "back_left/walk5",
+   "col": 11,
+   "row": 8,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk5"
+   }
+  },
+  {
+   "key": "back_left/walk6",
+   "col": 12,
+   "row": 8,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk6"
+   }
+  },
+  {
+   "key": "back_left/walk7",
+   "col": 13,
+   "row": 8,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk7"
+   }
+  },
+  {
+   "key": "back_left/walk8",
+   "col": 14,
+   "row": 8,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk8"
+   }
+  },
+  {
+   "key": "back_left/walk9",
+   "col": 15,
+   "row": 8,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk9"
+   }
+  },
+  {
+   "key": "back_left/walk10",
+   "col": 0,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk10"
+   }
+  },
+  {
+   "key": "back_left/walk11",
+   "col": 1,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk11"
+   }
+  },
+  {
+   "key": "back_left/walk12",
+   "col": 2,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk12"
+   }
+  },
+  {
+   "key": "back_left/walk13",
+   "col": 3,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk13"
+   }
+  },
+  {
+   "key": "back_left/walk14",
+   "col": 4,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk14"
+   }
+  },
+  {
+   "key": "back_left/walk15",
+   "col": 5,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk15"
+   }
+  },
+  {
+   "key": "back_left/walk16",
+   "col": 6,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "walk16"
+   }
+  },
+  {
+   "key": "back_left/wind",
+   "col": 7,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "back_left/strike",
+   "col": 8,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "back_left/recover",
+   "col": 9,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "recover"
+   }
+  },
+  {
+   "key": "back_left/hit1",
+   "col": 10,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "hit1"
+   }
+  },
+  {
+   "key": "back_left/hit2",
+   "col": 11,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "hit2"
+   }
+  },
+  {
+   "key": "back_left/hit3",
+   "col": 12,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "hit3"
+   }
+  },
+  {
+   "key": "back_left/death1",
+   "col": 13,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "death1"
+   }
+  },
+  {
+   "key": "back_left/death2",
+   "col": 14,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "death2"
+   }
+  },
+  {
+   "key": "back_left/death3",
+   "col": 15,
+   "row": 9,
+   "tags": {
+    "facing": "back_left",
+    "frame": "death3"
+   }
+  },
+  {
+   "key": "back_left/death4",
+   "col": 0,
+   "row": 10,
+   "tags": {
+    "facing": "back_left",
+    "frame": "death4"
+   }
+  },
+  {
+   "key": "back_left/death5",
+   "col": 1,
+   "row": 10,
+   "tags": {
+    "facing": "back_left",
+    "frame": "death5"
+   }
+  },
+  {
+   "key": "left/walk1",
+   "col": 2,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "left/walk2",
+   "col": 3,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "left/walk3",
+   "col": 4,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "left/walk4",
+   "col": 5,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "left/walk5",
+   "col": 6,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk5"
+   }
+  },
+  {
+   "key": "left/walk6",
+   "col": 7,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk6"
+   }
+  },
+  {
+   "key": "left/walk7",
+   "col": 8,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk7"
+   }
+  },
+  {
+   "key": "left/walk8",
+   "col": 9,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk8"
+   }
+  },
+  {
+   "key": "left/walk9",
+   "col": 10,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk9"
+   }
+  },
+  {
+   "key": "left/walk10",
+   "col": 11,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk10"
+   }
+  },
+  {
+   "key": "left/walk11",
+   "col": 12,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk11"
+   }
+  },
+  {
+   "key": "left/walk12",
+   "col": 13,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk12"
+   }
+  },
+  {
+   "key": "left/walk13",
+   "col": 14,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk13"
+   }
+  },
+  {
+   "key": "left/walk14",
+   "col": 15,
+   "row": 10,
+   "tags": {
+    "facing": "left",
+    "frame": "walk14"
+   }
+  },
+  {
+   "key": "left/walk15",
+   "col": 0,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "walk15"
+   }
+  },
+  {
+   "key": "left/walk16",
+   "col": 1,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "walk16"
+   }
+  },
+  {
+   "key": "left/wind",
+   "col": 2,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "left/strike",
+   "col": 3,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "left/recover",
+   "col": 4,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "recover"
+   }
+  },
+  {
+   "key": "left/hit1",
+   "col": 5,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "hit1"
+   }
+  },
+  {
+   "key": "left/hit2",
+   "col": 6,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "hit2"
+   }
+  },
+  {
+   "key": "left/hit3",
+   "col": 7,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "hit3"
+   }
+  },
+  {
+   "key": "left/death1",
+   "col": 8,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "death1"
+   }
+  },
+  {
+   "key": "left/death2",
+   "col": 9,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "death2"
+   }
+  },
+  {
+   "key": "left/death3",
+   "col": 10,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "death3"
+   }
+  },
+  {
+   "key": "left/death4",
+   "col": 11,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "death4"
+   }
+  },
+  {
+   "key": "left/death5",
+   "col": 12,
+   "row": 11,
+   "tags": {
+    "facing": "left",
+    "frame": "death5"
+   }
+  },
+  {
+   "key": "front_left/walk1",
+   "col": 13,
+   "row": 11,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk1"
+   }
+  },
+  {
+   "key": "front_left/walk2",
+   "col": 14,
+   "row": 11,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk2"
+   }
+  },
+  {
+   "key": "front_left/walk3",
+   "col": 15,
+   "row": 11,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk3"
+   }
+  },
+  {
+   "key": "front_left/walk4",
+   "col": 0,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk4"
+   }
+  },
+  {
+   "key": "front_left/walk5",
+   "col": 1,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk5"
+   }
+  },
+  {
+   "key": "front_left/walk6",
+   "col": 2,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk6"
+   }
+  },
+  {
+   "key": "front_left/walk7",
+   "col": 3,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk7"
+   }
+  },
+  {
+   "key": "front_left/walk8",
+   "col": 4,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk8"
+   }
+  },
+  {
+   "key": "front_left/walk9",
+   "col": 5,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk9"
+   }
+  },
+  {
+   "key": "front_left/walk10",
+   "col": 6,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk10"
+   }
+  },
+  {
+   "key": "front_left/walk11",
+   "col": 7,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk11"
+   }
+  },
+  {
+   "key": "front_left/walk12",
+   "col": 8,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk12"
+   }
+  },
+  {
+   "key": "front_left/walk13",
+   "col": 9,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk13"
+   }
+  },
+  {
+   "key": "front_left/walk14",
+   "col": 10,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk14"
+   }
+  },
+  {
+   "key": "front_left/walk15",
+   "col": 11,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk15"
+   }
+  },
+  {
+   "key": "front_left/walk16",
+   "col": 12,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "walk16"
+   }
+  },
+  {
+   "key": "front_left/wind",
+   "col": 13,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "wind"
+   }
+  },
+  {
+   "key": "front_left/strike",
+   "col": 14,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "strike"
+   }
+  },
+  {
+   "key": "front_left/recover",
+   "col": 15,
+   "row": 12,
+   "tags": {
+    "facing": "front_left",
+    "frame": "recover"
+   }
+  },
+  {
+   "key": "front_left/hit1",
+   "col": 0,
+   "row": 13,
+   "tags": {
+    "facing": "front_left",
+    "frame": "hit1"
+   }
+  },
+  {
+   "key": "front_left/hit2",
+   "col": 1,
+   "row": 13,
+   "tags": {
+    "facing": "front_left",
+    "frame": "hit2"
+   }
+  },
+  {
+   "key": "front_left/hit3",
+   "col": 2,
+   "row": 13,
+   "tags": {
+    "facing": "front_left",
+    "frame": "hit3"
+   }
+  },
+  {
+   "key": "front_left/death1",
+   "col": 3,
+   "row": 13,
+   "tags": {
+    "facing": "front_left",
+    "frame": "death1"
+   }
+  },
+  {
+   "key": "front_left/death2",
+   "col": 4,
+   "row": 13,
+   "tags": {
+    "facing": "front_left",
+    "frame": "death2"
+   }
+  },
+  {
+   "key": "front_left/death3",
+   "col": 5,
+   "row": 13,
+   "tags": {
+    "facing": "front_left",
+    "frame": "death3"
+   }
+  },
+  {
+   "key": "front_left/death4",
+   "col": 6,
+   "row": 13,
+   "tags": {
+    "facing": "front_left",
+    "frame": "death4"
+   }
+  },
+  {
+   "key": "front_left/death5",
+   "col": 7,
+   "row": 13,
+   "tags": {
+    "facing": "front_left",
+    "frame": "death5"
+   }
+  }
+ ]
+}

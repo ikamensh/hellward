@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from saga2d import RenderLayer, Scene, Sprite, SpriteAnchor
 
-from hellward.art import figures, sprites
+from hellward.art import figures, rigged, sprites
 from hellward.art.fx import ELEMENT_COLORS
 from hellward.art.mapart import THEMES
 from hellward.art.rig import PROJECTION, TILE
@@ -76,6 +76,7 @@ class Figure:
     y: float = 0.0
     dying: float = -1.0     # seconds into its fall, or -1 while alive
     fall: int = 1
+    rigged: bool = False
 
 
 @dataclass
@@ -198,7 +199,8 @@ class WorldView:
 
     @staticmethod
     def _show_frame(figure: Figure, frame: str) -> None:
-        name = f"mon/{figure.monster.kind.key}/{figure.facing}/{frame}"
+        family = "mon3d" if figure.rigged else "mon"
+        name = f"{family}/{figure.monster.kind.key}/{figure.facing}/{frame}"
         if figure.sprite.image != name:
             figure.sprite.image = name
 
@@ -206,7 +208,12 @@ class WorldView:
         cell = self.art.monster[monster.kind.key]
         x, y = self.monster_point(monster)
         facing = self._monster_facing(monster, monster.s)
-        sprite = self.scene.add_sprite(placed(f"mon/{monster.kind.key}/{facing}/walk1", cell, x, y))
+        use_rigged = (monster.kind.key in self.art.rigged and
+                      (self.art.monster_style == "rigged" or
+                       (self.art.monster_style == "mixed" and
+                        bool(random.Random(f"{monster.kind.key}:{monster.id}").getrandbits(1)))))
+        family = "mon3d" if use_rigged else "mon"
+        sprite = self.scene.add_sprite(placed(f"{family}/{monster.kind.key}/{facing}/walk1", cell, x, y))
         size = monster.kind.size
         shadow = self.scene.add_sprite(Sprite("fx/shadow", position=(x, y + 2),
                                               size=(T * size * 1.1, T * size * 0.4), layer=RenderLayer.OBJECTS))
@@ -214,7 +221,8 @@ class WorldView:
         if monster.kind.leader is not None:
             aura = self.scene.add_sprite(Sprite("fx/ring/curse", position=(x, y + 1),
                                                 size=(T * 0.9, T * 0.5), layer=RenderLayer.OBJECTS, opacity=150))
-        self.figures[monster.id] = Figure(monster, sprite, shadow, monster.s, aura=aura, facing=facing, x=x, y=y)
+        self.figures[monster.id] = Figure(monster, sprite, shadow, monster.s, aura=aura, facing=facing,
+                                          x=x, y=y, rigged=use_rigged)
 
     def kill(self, monster_id: int) -> Figure | None:
         figure = self.figures.pop(monster_id, None)
@@ -342,8 +350,9 @@ class WorldView:
                     frame = "raise" if m.chant_left > m.kind.leader.channel - 0.3 else "chant"
                     figure.facing = "front"
                 else:
-                    walk = figures.walk(m.kind.key)
-                    frame = walk[int(s / figures.stride(m.kind.key)) % len(walk)]
+                    walk = rigged.WALK if figure.rigged else figures.walk(m.kind.key)
+                    stride = figures.stride(m.kind.key) / (2 if figure.rigged else 1)
+                    frame = walk[int(s / stride) % len(walk)]
                 figure.attack_time = figure.attack_time + motion_dt if m.door >= 0 else 0.0
             elif m.door >= 0:
                 phase = (self.clock * 1.2 + m.id * 0.37) % 1.0

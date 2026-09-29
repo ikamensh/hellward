@@ -52,6 +52,7 @@ def game_art(tmp_path_factory):
     try:
         with pytest.MonkeyPatch.context() as patch:
             patch.delenv("HELLWARD_ART", raising=False)
+            patch.setenv("HELLWARD_MONSTER_STYLE", "painted")
             art = build(game, root / "cache")
         yield game, art, backend
     finally:

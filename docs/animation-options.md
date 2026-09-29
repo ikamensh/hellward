@@ -46,6 +46,12 @@ pipeline a more bounded first step.
 
 ## Recommended 3D pilot
 
+The first comparison is now playable: Skeleton and Zombie have baked 3D sprite
+sets alongside their paintings, with a stable mixed assignment per spawn. See
+[the comparison and reproduction commands](rigged-monsters.md). Their current
+meshes are structural motion studies; the textured, painterly treatment in the
+pilot below remains the visual target.
+
 1. **One finished Skeleton.** Make one textured mesh and an articulated rig with a fixed ground root.
    Keep shield and sword attached to their correct hands. Match the current painted Skeleton's
    silhouette, size and lighting at game zoom before animating. The present mesh is a motion blockout,

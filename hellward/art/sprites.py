@@ -22,7 +22,7 @@ from PIL import Image, ImageFilter, ImageOps
 from saga2d import Game
 from sagaforge import restyle
 
-from hellward.art import figures, mapart, rig, structures, worldmap
+from hellward.art import figures, mapart, rig, rigged, structures, worldmap
 from hellward.art.rig import DENSITY
 from hellward.sim.content import MONSTERS
 from hellward.sim.campaign import Location
@@ -227,6 +227,8 @@ class Art:
     pillar: Cell
     painted: set[str]
     monster_painted: dict[str, frozenset[str]]  # registered facing/frame names resolved from paintings
+    rigged: frozenset[str]             # kinds with a baked 3D alternative registered
+    monster_style: str                 # painted, mixed, or rigged; fixed when the game loads art
 
 
 def _cell(canvas: tuple[float, float], origin: tuple[float, float]) -> Cell:
@@ -247,6 +249,11 @@ def _tower_outline(image: Image.Image) -> Image.Image:
 def register(game: Game, cache_dir: Path) -> Art:
     cache = warm(cache_dir)
     assets = game.assets
+    style = os.environ.get("HELLWARD_MONSTER_STYLE", "mixed")
+    if style not in {"painted", "mixed", "rigged"}:
+        raise ValueError(f"HELLWARD_MONSTER_STYLE must be painted, mixed, or rigged; got {style!r}")
+    if procedural():
+        style = "painted"
     painted: set[str] = set()
     monster_painted: dict[str, frozenset[str]] = {}
     cells: dict[str, Cell] = {}
@@ -266,6 +273,18 @@ def register(game: Game, cache_dir: Path) -> Art:
                 assets.image_from_pil(f"mon/{kind}/left/{frame}", ImageOps.mirror(image))
             else:
                 assets.image_from_pil(f"mon/{kind}/{facing}/{frame}", image)
+    rigged_kinds: set[str] = set()
+    if style != "painted":
+        for kind in rigged.KINDS:
+            layout, images = rigged.load(kind)
+            if (layout.cell, layout.origin) != (
+                (round(cells[kind].size[0] * DENSITY), round(cells[kind].size[1] * DENSITY)),
+                (cells[kind].origin[0] * DENSITY, cells[kind].origin[1] * DENSITY),
+            ):
+                raise ValueError(f"{kind}: rigged and painted cells have different ground pivots")
+            for key, image in images.items():
+                assets.image_from_pil(f"mon3d/{kind}/{key}", image)
+            rigged_kinds.add(kind)
     towers = _painted_cells("towers")
     for kind in structures.TOWER_KINDS:
         for rank in range(3):
@@ -295,7 +314,7 @@ def register(game: Game, cache_dir: Path) -> Art:
     assets.image_from_pil("worldmap", worldmap.picture(act=1))
     assets.image_from_pil("worldmap-2", worldmap.picture(act=2))
     return Art(cells, _cell(*structures.TOWER_CELL), _cell(*structures.GATE_CELL), _cell(*structures.ARCH_CELL),
-               _cell(*structures.PILLAR_CELL), painted, monster_painted)
+               _cell(*structures.PILLAR_CELL), painted, monster_painted, frozenset(rigged_kinds), style)
 
 
 def ground(game: Game, location: Location) -> str:
