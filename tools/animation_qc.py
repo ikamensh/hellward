@@ -19,16 +19,21 @@ from pathlib import Path
 from typing import Literal
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 
 MAX_PARITY_DRIFT = 5.0  # source pixels: 2.5 logical pixels at the painted sheet's 2x density
 REVIEW_TRANSITION_RESIDUAL = 8.0
 ERROR_TRANSITION_RESIDUAL = 12.0
 REVIEW_BODY_RATIO = (0.80, 1.20)
 ERROR_BODY_RATIO = (0.50, 1.25)  # recoil may crouch; visible growth is the stronger hard signal
+REVIEW_RAW_HIT_HEIGHT_RATIO = 1.25
+REVIEW_RAW_HIT_AREA_RATIO = 1.35
 REVIEW_DEATH_WIDTH_RATIO = 1.35
 REVIEW_DEATH_AREA_RATIO = 1.25
 REVIEW_DEATH_AREA_ALONE_RATIO = 1.55
+ATLAS_GAP = 8
+ATLAS_HEADER_HEIGHT = 32
+ATLAS_LABEL_WIDTH = 100
 
 
 @dataclass(frozen=True)
@@ -72,6 +77,32 @@ def _silhouette_mass(image: Image.Image) -> tuple[float, int]:
     return float(np.quantile(xx, .95) - np.quantile(xx, .05)), len(xx)
 
 
+def _write_contact_sheet(kind: str, painted: Mapping[str, Image.Image],
+                         cell: tuple[int, int], origin: tuple[float, float], scale: int,
+                         facings: tuple[str, ...], actions: tuple[str, ...], destination: Path) -> None:
+    """Show every resolved bearing/action at the size the renderer draws it."""
+    width, height = round(cell[0] / scale), round(cell[1] / scale)
+    canvas = Image.new("RGB", (ATLAS_LABEL_WIDTH + len(actions) * (width + ATLAS_GAP) + ATLAS_GAP,
+                               ATLAS_HEADER_HEIGHT + len(facings) * (height + ATLAS_GAP) + ATLAS_GAP),
+                       (24, 20, 23))
+    draw = ImageDraw.Draw(canvas)
+    draw.text((8, 8), kind, fill=(235, 224, 205))
+    for col, action in enumerate(actions):
+        draw.text((ATLAS_LABEL_WIDTH + col * (width + ATLAS_GAP) + 2, 8), action,
+                  fill=(235, 224, 205))
+    for row, facing in enumerate(facings):
+        y = ATLAS_HEADER_HEIGHT + row * (height + ATLAS_GAP)
+        draw.text((8, y + 4), facing, fill=(235, 224, 205))
+        for col, action in enumerate(actions):
+            x = ATLAS_LABEL_WIDTH + col * (width + ATLAS_GAP)
+            tile = Image.new("RGBA", (width, height), (24, 20, 23, 255))
+            ImageDraw.Draw(tile).line((0, round(origin[1] / scale), width, round(origin[1] / scale)),
+                                      fill=(100, 34, 34, 255))
+            tile.alpha_composite(painted[f"{facing}/{action}"].resize((width, height), Image.Resampling.LANCZOS))
+            canvas.paste(tile.convert("RGB"), (x, y))
+    canvas.save(destination)
+
+
 def audit(kind: str, painted: Mapping[str, Image.Image], guides: Mapping[str, Image.Image],
           cell: tuple[int, int], origin: tuple[float, float]) -> list[Issue]:
     """Return hard registration/growth failures and pose-dependent review findings."""
@@ -95,16 +126,25 @@ def audit(kind: str, painted: Mapping[str, Image.Image], guides: Mapping[str, Im
                 severity = "error" if residual > ERROR_TRANSITION_RESIDUAL else "review"
                 issues.append(Issue(severity, f"{kind}/{facing} walk{i}→walk{next_i} jolt: upper-body step "
                                     f"deviates {residual:.1f}px from guide"))
-        walk_ratio = float(np.median([_body_height(painted[name], cell, origin) /
-                                      _body_height(guides[name], cell, origin) for name in names]))
+        painted_walk_heights = [_body_height(painted[name], cell, origin) for name in names]
+        guide_walk_heights = [_body_height(guides[name], cell, origin) for name in names]
+        walk_ratio = float(np.median(np.array(painted_walk_heights) / guide_walk_heights))
+        raw_walk_height = float(np.median(painted_walk_heights))
+        raw_walk_area = float(np.median([_silhouette_mass(painted[name])[1] for name in names]))
         for index in range(1, 4):
             name = f"{facing}/hit{index}"
-            ratio = (_body_height(painted[name], cell, origin) /
-                     _body_height(guides[name], cell, origin) / walk_ratio)
+            raw_height = _body_height(painted[name], cell, origin)
+            ratio = raw_height / _body_height(guides[name], cell, origin) / walk_ratio
             if not REVIEW_BODY_RATIO[0] <= ratio <= REVIEW_BODY_RATIO[1]:
                 severity = "error" if not ERROR_BODY_RATIO[0] <= ratio <= ERROR_BODY_RATIO[1] else "review"
                 issues.append(Issue(severity, f"{kind}/{name} body scale: {ratio:.2f}× the "
                                     "guide-normalized walk"))
+            raw_height_ratio = raw_height / raw_walk_height
+            raw_area_ratio = _silhouette_mass(painted[name])[1] / raw_walk_area
+            if raw_height_ratio > REVIEW_RAW_HIT_HEIGHT_RATIO and raw_area_ratio > REVIEW_RAW_HIT_AREA_RATIO:
+                issues.append(Issue("review", f"{kind}/{name} raw body growth: height "
+                                    f"{raw_height_ratio:.2f}× and opaque area {raw_area_ratio:.2f}× "
+                                    "painted walk; inspect identity scale"))
         hit_name, death_name = f"{facing}/hit3", f"{facing}/death1"
         hit_paint_width, hit_paint_area = _silhouette_mass(painted[hit_name])
         hit_guide_width, hit_guide_area = _silhouette_mass(guides[hit_name])
@@ -125,6 +165,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Check painted monster animation against its posed guides")
     parser.add_argument("--kind", choices=("fallen", "skeleton", "zombie"),
                         help="audit one enhanced monster (default: all three)")
+    parser.add_argument("--contact-sheet", type=Path, metavar="DIR",
+                        help="also write one logical-1× all-bearing walk/hit/death atlas per audited monster")
     args = parser.parse_args()
 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -132,12 +174,18 @@ def main() -> int:
 
     print("Error limits: walk parity >5px, step deviation >12px, hit ratio outside 0.50–1.25×; "
           "review: step >8px or hit ratio outside 0.80–1.20×")
+    print("Raw hit review only: painted central height >1.25× AND opaque area >1.35× "
+          "vs median painted walk")
     print("Death entry review only: hit3→death1 guide-normalized width >1.35× with area >1.25×, "
           "or area >1.55× alone; inspect pose and body continuity")
     total_errors = 0
+    if args.contact_sheet is not None:
+        args.contact_sheet.mkdir(parents=True, exist_ok=True)
     for kind in (args.kind,) if args.kind else ("fallen", "skeleton", "zombie"):
         sheet, painted = sprites._painted_enhanced(kind)
-        names = [f"{facing}/{frame}" for facing in figures.facings(kind)
+        facings = figures.facings(kind)
+        actions = figures.walk(kind) + figures.HIT + figures.DEATH
+        names = [f"{facing}/{frame}" for facing in facings
                  for frame in figures.walk(kind) + figures.HIT + (figures.DEATH[0],)]
         guides = {name: figures.render(kind, *name.split("/")) for name in names}
         issues = audit(kind, painted, guides, sheet.cell, sheet.origin)
@@ -146,6 +194,10 @@ def main() -> int:
         print(f"{kind}: {errors} error(s), {reviews} review finding(s)")
         for issue in issues:
             print(f"  {issue}")
+        if args.contact_sheet is not None:
+            output = args.contact_sheet / f"{kind}-all-bearings.png"
+            _write_contact_sheet(kind, painted, sheet.cell, sheet.origin, sheet.scale, facings, actions, output)
+            print(f"  1× contact sheet: {output}")
         total_errors += errors
     return int(total_errors > 0)
 

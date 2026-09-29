@@ -6,9 +6,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+import numpy as np
 from PIL import Image, ImageDraw
 
-from tools.animation_qc import audit
+from tools.animation_qc import ATLAS_GAP, ATLAS_HEADER_HEIGHT, ATLAS_LABEL_WIDTH, audit
 
 
 CELL = (128, 128)
@@ -71,6 +72,17 @@ def test_hit_with_enlarged_body_reports_scale_mismatch() -> None:
     assert all(issue.severity == "review" for issue in issues)
 
 
+def test_raw_hit_growth_is_reviewed_even_when_guide_also_grows() -> None:
+    """A guide can share an unintended zoom, so compare painted anatomy to painted walking too."""
+    frames = _frames() | {f"front/walk{i}": _figure(height=-10) for i in range(1, 9)} | {
+        "front/hit1": _figure(height=20)
+    }
+    issues = audit("skeleton", frames, frames, CELL, ORIGIN)
+    growth = [issue for issue in issues if "front/hit1" in issue.message and "raw body growth" in issue.message]
+    assert len(growth) == 1, issues
+    assert growth[0].severity == "review"
+
+
 def test_single_displaced_walk_frame_reports_transition_jolt() -> None:
     """One bad frame must fail even when the four-frame parity median hides it."""
     guide = _frames()
@@ -123,6 +135,32 @@ def test_art_gate_command_is_executable() -> None:
     result = subprocess.run([sys.executable, str(TOOL), "--help"], capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stderr
     assert "painted monster animation" in result.stdout
+
+
+def test_optional_contact_sheet_contains_installed_actions_at_logical_size(tmp_path: Path) -> None:
+    """The manual 1× atlas displays resolved painted walk, hit, and death cells."""
+    from hellward.art import figures, sprites
+
+    result = subprocess.run([sys.executable, str(TOOL), "--contact-sheet", str(tmp_path)],
+                            capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stdout + result.stderr
+    for kind in ("fallen", "skeleton", "zombie"):
+        output = tmp_path / f"{kind}-all-bearings.png"
+        assert output.exists()
+        sheet, cells = sprites._painted_enhanced(kind)
+        facings = figures.facings(kind)
+        actions = figures.walk(kind) + figures.HIT + figures.DEATH
+        width, height = (round(v / sheet.scale) for v in sheet.cell)
+        with Image.open(output) as atlas:
+            for key in ("back/walk8", "left/hit2", "front_right/death5"):
+                facing, action = key.split("/")
+                cell = cells[key].resize((width, height), Image.Resampling.LANCZOS)
+                yy, xx = np.nonzero(np.asarray(cell.getchannel("A")) == 255)
+                assert len(xx) > 0
+                sample = len(xx) // 2
+                x = ATLAS_LABEL_WIDTH + actions.index(action) * (width + ATLAS_GAP) + int(xx[sample])
+                y = ATLAS_HEADER_HEIGHT + facings.index(facing) * (height + ATLAS_GAP) + int(yy[sample])
+                assert atlas.getpixel((x, y)) == cell.convert("RGB").getpixel((int(xx[sample]), int(yy[sample])))
 
 
 def test_installed_first_three_monsters_clear_the_animation_gate() -> None:
