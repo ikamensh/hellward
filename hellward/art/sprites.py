@@ -18,7 +18,7 @@ from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 from saga2d import Game
 from sagaforge import restyle
 
@@ -114,6 +114,17 @@ def _cell(canvas: tuple[float, float], origin: tuple[float, float]) -> Cell:
     return Cell((float(canvas[0]), float(canvas[1])), (float(origin[0]), float(origin[1])))
 
 
+def _tower_outline(image: Image.Image) -> Image.Image:
+    """Separate a tower's silhouette from detailed ground at gameplay scale."""
+    image = image.convert("RGBA")
+    solid = image.getchannel("A").point(lambda alpha: 255 if alpha >= 96 else 0)
+    dark = Image.new("RGBA", image.size, (20, 16, 18, 0))
+    dark.putalpha(solid.filter(ImageFilter.MaxFilter(7)).point(lambda alpha: alpha * 190 // 255))
+    light = Image.new("RGBA", image.size, (230, 204, 156, 0))
+    light.putalpha(solid.filter(ImageFilter.MaxFilter(3)).point(lambda alpha: alpha * 165 // 255))
+    return Image.alpha_composite(Image.alpha_composite(dark, light), image)
+
+
 def register(game: Game, cache_dir: Path) -> Art:
     cache = warm(cache_dir)
     assets = game.assets
@@ -137,7 +148,8 @@ def register(game: Game, cache_dir: Path) -> Art:
         for rank in range(3):
             key = f"{kind}/{rank}"
             image = towers.get(key) if towers else None
-            assets.image_from_pil(f"tower/{key}", image if image is not None else structures.tower_image(kind, rank))
+            source = image if image is not None else structures.tower_image(kind, rank)
+            assets.image_from_pil(f"tower/{key}", _tower_outline(source))
     if towers:
         painted.add("towers")
     gates = _painted_cells("gates")
