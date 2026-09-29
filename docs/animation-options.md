@@ -16,8 +16,15 @@ rasterized to the same eight-frame sprite interface. It proves that one body can
 but the current low-poly material and eight held samples do not match the painterly game art. The
 `tools/rig3d_preview.py` experiment interpolates the Skeleton's existing pose controls at 60 fps
 and turns its mesh continuously between bearings: the camera, ground origin, travel speed and
-proportions are identical on both sides. This
-demonstrates structural continuity, not a finished character or an in-game 3D renderer.
+proportions are identical on both sides. This demonstrates structural continuity, not a finished
+character or an in-game 3D renderer.
+
+An eight-frame ImageGen revision of Fallen's front and back walks removed their duplicated frames
+and passed cell registration and center-track checks. The 60 fps game render exposed alternating
+head and torso texture and brightness on the new intermediate frames. Their upper-body pixel changes
+were sometimes as large as the approved contact-to-contact change, even though only a limb should
+have moved partway. We discarded that candidate. More frames only help when identity and surface
+detail stay stable through the motion.
 
 ## Choices
 
@@ -31,7 +38,7 @@ demonstrates structural continuity, not a finished character or an in-game 3D re
 Optical-flow interpolation is a small stopgap only. It invents pixels between incompatible shapes and
 can smear the Skeleton's sword or the Fallen's blade. It cannot reveal a creature's hidden side.
 
-The engine currently pins `saga2d==0.3.15` and uses Pyglet 2.1 for the game view. Pyglet's own 2.1
+The engine currently pins `saga2d==0.3.16` and uses Pyglet 2.1 for the game view. Pyglet's own 2.1
 documentation calls its 3D model module an undocumented work in progress, so a runtime skinned-rig
 plan should include a renderer spike before promising glTF animation playback. Blender's official
 documentation supports armature animation and transparent render film, which makes an offline export
@@ -73,16 +80,21 @@ fine turning require flexibility that baked views cannot supply.
 Run `uv run python tools/animation_qc.py` before accepting a painted strip. The audit compares the
 head/torso track and body height against each matching procedural pose, then flags alternating walk
 centers, jarring adjacent steps (including the 8-to-1 seam), and hits whose body scale differs from
-the walk. The procedural guide is a motion reference, not an anatomical truth: review findings need a
-human pass, especially a deliberate lean or head recoil. A hard failure must be fixed or documented
-with a specific visual reason before the atlas is merged. Also review a normal-speed rendered loop;
-an isolated contact sheet cannot show vibration or a bad transition into and out of hit.
+the walk. A second raw painted-walk comparison catches guides that share a size mistake, and exact
+duplicate neighboring walk frames receive a review finding. Generate the all-bearing 1× contact
+sheets with `uv run python tools/animation_qc.py --contact-sheet /tmp/hellward-monster-qc`. The
+procedural guide is a motion reference, not an anatomical truth: review findings need a human pass,
+especially a deliberate lean or head recoil. A hard failure must be fixed or documented with a
+specific visual reason before the atlas is merged. Also review a normal-speed rendered loop; an
+isolated contact sheet cannot show vibration or a bad transition into and out of hit.
 
 The fix workflow is to use one approved body and ground point as reference for a whole bearing/action
 strip, preserve the original paint and hand props, correct the inconsistent cells, rerun the audit,
 then capture the real renderer. Scaling an entire hit sprite to satisfy one numeric threshold can
 shrink the head, hands, and weapon incorrectly. The final visual approval is a short loop at game
-zoom, followed by one inspected 1:1 strip.
+zoom, followed by one inspected 1:1 strip. For future intermediates, use a common rig or constrained
+part deformation to preserve the approved head and torso texture while moving limbs around a planted
+foot. Use ImageGen for newly exposed surfaces, then run the same 1× and moving-loop review.
 
 ## Sources
 
