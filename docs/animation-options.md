@@ -49,6 +49,9 @@ pipeline a more bounded first step.
    timeline at enough samples that a normal-speed loop reads smoothly (start with 24 walk samples,
    then judge 16/24/32 in game). Export a manifest with action, bearing, frame time, cell, and pivot.
    Keep all actions on one model; do not resize each render to its own silhouette.
+   Budget the atlases before committing to the count: the Skeleton's 248×284 source-pixel cell
+   consumes about 0.27 MiB of uncompressed RGBA; its current 152 cells are about 41 MiB before
+   padding and mipmaps. More samples improve timing but quickly multiply texture memory.
 4. **Adapt the image registry.** Let the existing `mon/<kind>/<bearing>/<action><frame>` lookup select
    the new atlas. The battle view still owns route direction, distance phase, and action priority.
    This avoids rewriting combat rules while testing the art direction. Profile atlas upload and memory
