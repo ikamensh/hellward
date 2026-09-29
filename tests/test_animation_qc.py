@@ -21,7 +21,7 @@ def _figure(*, offset: int = 0, height: int = 0, raised_weapon: bool = False,
     image = Image.new("RGBA", CELL)
     draw = ImageDraw.Draw(image)
     draw.ellipse((56 + offset, 30 - height, 72 + offset, 46 - height), fill="white")
-    torso_left, torso_right = (43, 85) if broad_body else (55, 73)
+    torso_left, torso_right = (49, 79) if broad_body else (55, 73)
     draw.rectangle((torso_left + offset, 46 - height, torso_right + offset, 76), fill="white")
     draw.line((60 + offset, 76, 60, 90), fill="white", width=5)
     draw.line((68 + offset, 76, 68, 90), fill="white", width=5)
@@ -89,6 +89,7 @@ def test_death_entry_reports_broad_body_mass_growth_for_review_only() -> None:
     assert len(death) == 1, issues
     assert death[0].severity == "review"
     assert "width" in death[0].message and "area" in death[0].message
+    assert "area 1.39×" in death[0].message  # the width+area branch, below the area-only limit
 
 
 def test_death_entry_reports_opaque_mass_growth_without_width_growth() -> None:
@@ -99,7 +100,7 @@ def test_death_entry_reports_opaque_mass_growth_without_width_growth() -> None:
     death = [issue for issue in issues if "death entry" in issue.message]
     assert len(death) == 1, issues
     assert death[0].severity == "review"
-    assert "area" in death[0].message
+    assert "width 1.00×" in death[0].message  # the area-only branch
 
 
 def test_death_entry_ignores_thin_raised_weapon() -> None:
