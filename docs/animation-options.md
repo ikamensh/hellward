@@ -7,7 +7,9 @@ vibration comes from image-space inconsistency: independently painted walk strip
 torso between adjacent poses, and some hit paintings change the apparent body scale. A shared cell
 and foot pivot prevent the *sprite origin* from jumping, but cannot hold the anatomy inside the cell
 steady. The eight-key cycle also makes every mismatch recur several times per second. A faster
-playback clock would make the same mismatch more frequent.
+playback clock would make the same mismatch more frequent. Fallen's front and back cycles still
+hold four distinct paintings across eight walk slots, so this QA pass cannot make those views as
+fluid as a genuinely sampled motion curve.
 
 The existing procedural fallback is made from posed 3D meshes in `hellward/art/figures.py`, then
 rasterized to the same eight-frame sprite interface. It proves that one body can serve every bearing,
