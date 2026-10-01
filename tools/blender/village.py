@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 import bmesh  # noqa: E402
 import bpy  # noqa: E402
 from mathutils import Matrix, Vector, noise  # noqa: E402
+from mathutils.bvhtree import BVHTree  # noqa: E402
 
 import lib  # noqa: E402
 
@@ -802,6 +803,7 @@ class Opening:
 
 
 TIMBER_D = 0.07   # how far the frame stands proud of the plaster
+FLAME_Z = 2.6     # windows centred above this (the upper floors) get an fx_flame mark
 
 
 class House:
@@ -813,18 +815,28 @@ class House:
         self.rng = self.m.rng
         self.panes: list[Mesh] = []
         self.fx: list[tuple[str, Vector]] = []
+        self.flames: list[tuple[Vector, Vector]] = []  # (mark, outward normal) before the visibility check
         self.verge_drop = 0.32  # how far below a gable's wall line its rafters hang (half the thatch, and some)
 
     def add_fx(self, kind: str, loc) -> None:
         n = sum(1 for k, _ in self.fx if k.startswith(kind)) + 1
-        self.fx.append((f"{kind}_{n}" if kind == "fx_fire" else kind, vec(loc)))
+        self.fx.append((f"{kind}_{n}" if kind in ("fx_fire", "fx_flame") else kind, vec(loc)))
 
-    def pane(self, pts) -> None:
+    def pane(self, pts, out) -> None:
+        """A glowing pane through `pts`, facing `out`: the outward normal of the wall it is set in."""
         pm = Mesh(f"window_{len(self.panes) + 1}")
-        pm.poly(pts, "glow_window", [(0, 0), (1, 0), (1, 1), (0, 1)])
+        pm.poly(pts, "glow_window", [(0, 0), (1, 0), (1, 1), (0, 1)], out=out)
         self.panes.append(pm)
 
     def finish(self, warp=None) -> None:
+        # an upper-floor window gets an fx_flame mark where a flame licks out of it, unless the mark is buried
+        # in the house's own solid geometry (a chimney stack built over a gable window)
+        self.m.bm.normal_update()
+        tree = BVHTree.FromBMesh(self.m.bm)
+        for at, out in self.flames:
+            hit, normal, *_ = tree.ray_cast(at, out, 2.0)
+            if hit is None or normal.dot(out) < 0:  # a ray out of a buried mark leaves through a back face
+                self.add_fx("fx_flame", at)
         names = [n for n, _ in self.fx]
         assert len(names) == len(set(names)), names
         finish(self.name, [self.m, *self.panes], self.fx, warp)
@@ -977,7 +989,8 @@ class House:
         # -- posts: corners, jambs, then fill the gaps
         pw = 0.22
         posts = [(-ext0, pw + ext0), (length - pw, pw + ext1)]
-        for o, u0, u1 in ops:
+        storey = [(o, u0, u1) for o, u0, u1 in ops if o.z < z1]  # openings in the gable above are _gable's
+        for o, u0, u1 in storey:
             posts += [(u0 - 0.17, 0.17), (u1, 0.17)]
         posts.sort()
         filled = []
@@ -1001,7 +1014,7 @@ class House:
             ua, ub = pa + wa, pb
             if ub - ua < 0.15:
                 continue
-            here = [(o, u0, u1) for o, u0, u1 in ops if ua - 0.01 <= u0 and u1 <= ub + 0.01]
+            here = [(o, u0, u1) for o, u0, u1 in storey if ua - 0.01 <= u0 and u1 <= ub + 0.01]
             if here:
                 for o, u0, u1 in here:
                     if o.kind == "window" and o.z - 0.1 > zp0 + 0.05:
@@ -1153,8 +1166,11 @@ class House:
         self.m.poly([P(u0, za), P(u0, za, -rev), P(u1, za, -rev), P(u1, za)], lining, out=Z)
         if o.kind == "window":
             self.pane([P(u0, za, -rev + 0.01), P(u1, za, -rev + 0.01), P(u1, zb, -rev + 0.01),
-                       P(u0, zb, -rev + 0.01)])
+                       P(u0, zb, -rev + 0.01)], n)
             um = (u0 + u1) / 2
+            centre = P(um, (za + zb) / 2, -rev + 0.01)
+            if centre.z > FLAME_Z:
+                self.flames.append((centre + n * 0.15 + Z * 0.3, n))
             self.m.beam(P(um, za, -rev * 0.45), P(um, zb, -rev * 0.45), 0.055, 0.05, n=n)
             if o.h > 0.7:
                 zt = za + o.h * 0.62
@@ -1200,7 +1216,7 @@ class House:
         w = u1 - u0
         if o.ajar:
             back = [P(u0, za, -rev - 0.3), P(u1, za, -rev - 0.3), P(u1, zb, -rev - 0.3), P(u0, zb, -rev - 0.3)]
-            self.pane(back)
+            self.pane(back, n)
             self.m.poly([P(u0, zb, -rev), P(u1, zb, -rev), P(u1, zb, -rev - 0.3), P(u0, zb, -rev - 0.3)],
                         "timber", out=-Z)
             self.m.poly([P(u0, za, -rev), P(u0, za, -rev - 0.3), P(u1, za, -rev - 0.3), P(u1, za, -rev)],

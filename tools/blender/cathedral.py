@@ -1,8 +1,8 @@
 """The cathedral: the sanctuary the player defends, which the monsters walk into.
 
-A west tower and spire (28 m) over a deep, splayed portal on the +Y front that stands open and glows from
-within; behind it a nave with a clerestory, lower aisles held by flying buttresses and pinnacled piers, and
-a polygonal apse at the east (-Y) end. Stone walls, slate roofs. Window reveals carry a glowing backing
+A west tower and spire (28 m) over a deep, splayed portal on the +Y front that stands open onto a short
+passage, pillars and an altar dark against the light at its end; behind it a nave with a clerestory, lower
+aisles held by flying buttresses and pinnacled piers, and a polygonal apse at the east (-Y) end. Stone walls, slate roofs. Window reveals carry a glowing backing
 (glow_window) and a pane of `stained_glass` whose UVs span 0..1 over the window. The portal stands at the
 head of three broad steps; `fx_door` marks its threshold, on the top step.
 """
@@ -398,10 +398,22 @@ for target in (porch, gable_wall):
         xform(c, Matrix.Translation((0, (y0 + y1) / 2, 0)))
         cut(target, c, "stone")
 parts.append(gable_wall)
-tower_cut = prism(arch_outline(PW, PSPRING, 1.0, 12, bottom=-0.5), 1.3 + 0.5, name="cutter")
-xform(tower_cut, Matrix.Translation((0, T1 - 1.3 + 0.9, 0)))
+# the passage beyond the doorway: a closed stone tunnel set in a cavity cut into the tower, floored at the
+# threshold, with the light at its far end and pillars and an altar standing against it
+PASS_IN = T1 - 1.3       # where the doorway's cut ends and the passage begins
+PASS_END = PASS_IN - 3.2  # its far end
+PASS_T = 0.3             # its walls' and vault's thickness
+# the doorway's cut runs on into the cavity, so no film of tower is left across the passage's mouth
+tower_cut = prism(arch_outline(PW, PSPRING, 1.0, 12, bottom=-0.5), T1 + 0.5 - (PASS_IN - 0.2), name="cutter")
+xform(tower_cut, Matrix.Translation((0, (T1 + 0.5 + PASS_IN - 0.2) / 2, 0)))
 tc.append(tower_cut)
 cut_all(tower, tc)
+# the cavity's faces lie inside the tunnel's walls (half their thickness out), so none shows or fights
+mid = PASS_T / 2
+cavity = prism(arch_outline(PW + 2 * mid, PSPRING, (PW + mid) / (PW + 2 * mid), 12, bottom=-0.5),
+               PASS_IN - (PASS_END - mid), name="cutter")
+xform(cavity, Matrix.Translation((0, (PASS_IN + PASS_END - mid) / 2, 0)))
+cut(tower, cavity, "stone")
 parts += [tower, porch]
 # roll mouldings on each order's edge, slim shafts in the jambs
 for w, y0, y1 in orders:
@@ -455,11 +467,33 @@ for sx in (-1, 1):
     parts.append(r)
     course(sx * (PX - 0.05), sx * (PX + 0.2), P0 + 0.4, FRONT, WALL - 0.2, 0.2)
     pier(sx * (PX + 0.1), FRONT - 0.3, 0, [(0.75, 0.75, 3.2, 0, 0.05), (0.6, 0.6, 2.9, 0, 0)], (0.42, 2.5))
-# the light within, the open doors folded back against the passage, the floor raised to the threshold
-light = flat_poly(arch_outline(PW + 0.1, PSPRING, 1.0, 12, bottom=0.0), T1 - 1.25, "glow_holy", "glow")
-glow.append(light)
-# the light lies across the passage floor too, so it shows from above
-glow.append(box((PW - 0.1, 1.3, 0.02), loc=(0, T1 - 0.62, LIFT + 0.02), mat="glow_holy", name="glow"))
+# the passage: walls and a pointed vault in one ring, a floor level with the threshold, a wall closing it
+pass_len = PASS_IN - (PASS_END - PASS_T)
+tunnel = arch_ring(PW, PSPRING, PASS_T, pass_len, k=1.0, n=12, mat="stone", name="passage", bottom=-0.1)
+xform(tunnel, Matrix.Translation((0, PASS_IN - pass_len / 2, 0)))
+parts.append(tunnel)
+parts.append(box((PW + 2 * PASS_T, pass_len, LIFT + 0.1), loc=(0, PASS_IN - pass_len / 2, -0.1), base=True,
+                 mat="stone", name="passage"))
+vault_top = PSPRING + arch_height(PW + 2 * PASS_T, (PW + PASS_T) / (PW + 2 * PASS_T))
+parts.append(box((PW + 2 * PASS_T, PASS_T, vault_top + 0.2), loc=(0, PASS_END - PASS_T / 2, -0.1), base=True,
+                 mat="stone", name="passage"))
+# the light fills its far end and lies along its floor, so it shows from above
+glow.append(flat_poly(arch_outline(PW + 0.1, PSPRING, 1.0, 12, bottom=LIFT - 0.05), PASS_END + 0.012, "glow_holy",
+                      "glow"))
+glow.append(box((PW - 0.1, 2.6, 0.02), loc=(0, PASS_IN - 1.6, LIFT + 0.02), mat="glow_holy", name="glow"))
+# two pillars part-way in and an altar with three candles before the light, all in silhouette
+for sx in (-1, 1):
+    x, y = sx * 0.8, PASS_IN - 2.0
+    parts.append(box((0.5, 0.5, 0.24), loc=(x, y, LIFT), base=True, mat="stone", bevel=0.03, name="pillar"))
+    # the shaft dies into the vault above a capital
+    parts.append(box((0.35, 0.35, 5.45 - LIFT), loc=(x, y, LIFT), base=True, mat="stone", bevel=0.03, name="pillar"))
+    parts.append(box((0.47, 0.47, 0.2), loc=(x, y, 4.55), base=True, mat="stone", bevel=0.03, name="pillar"))
+altar_y = PASS_END + 0.5
+parts.append(box((1.3, 0.5, 0.92), loc=(0, altar_y, LIFT), base=True, mat="stone", bevel=0.03, name="altar"))
+parts.append(box((1.4, 0.6, 0.08), loc=(0, altar_y, LIFT + 0.92), base=True, mat="stone", bevel=0.02, name="altar"))
+for x, h in ((-0.45, 0.22), (0.0, 0.3), (0.45, 0.22)):
+    glow.append(lathe([(0, 0), (0.035, 0), (0.035, h), (0, h)], 8, "glow_fire", "glow", loc=(x, altar_y, LIFT + 1.0)))
+# the open doors folded back against the doorway, the floor raised to the threshold
 for sx in (-1, 1):
     door = box((0.1, 1.25, PSPRING + 0.6), loc=(sx * (PW / 2 - 0.07), T1 - 0.6, 0), base=True, mat="planks",
                bevel=0.015, name="door")
@@ -592,7 +626,7 @@ ys = [v.co.y for v in church.data.vertices]
 shift = -(min(ys) + FRONT + 0.8) / 2
 church.data.transform(Matrix.Translation((0, shift, 0)))
 empty("fx_door", (0, FRONT + shift, LIFT))
-empty("fx_light", (0, T1 - 2.0 + shift, 2.5))
+empty("fx_light", (0, PASS_IN - 2.6 + shift, 2.2))
 tris = sum(len(f.vertices) - 2 for f in church.data.polygons)
 xs = [v.co.x for v in church.data.vertices]
 zs = [v.co.z for v in church.data.vertices]
