@@ -12,4 +12,5 @@ if [ ! -f "$cache" ] || [ -n "$(find "$game/scripts" "$game/assets" "$game/shade
   DYLD_INSERT_LIBRARIES="$shim" /Applications/Godot.app/Contents/MacOS/Godot --headless --path "$game" --import >/dev/null 2>&1
   touch "$cache"
 fi
-DYLD_INSERT_LIBRARIES="$shim" exec /Applications/Godot.app/Contents/MacOS/Godot "$@"
+# captures are silent: a recording's soundtrack is mixed from the game's sound log (tools/mixdown.py)
+DYLD_INSERT_LIBRARIES="$shim" exec /Applications/Godot.app/Contents/MacOS/Godot --audio-driver Dummy "$@"
