@@ -13,13 +13,18 @@ func build(lvl: Level, keep_clear: Array) -> void:
 	var stones: Array = []
 	var c := level.centre()
 	var area := Rect2(-30.0, -24.0, 130.0, 90.0)
-	for i in 26000:
+	var clump := FastNoiseLite.new()
+	clump.seed = 13
+	clump.frequency = 0.08
+	for i in 50000:
 		var p := Vector3(_rng.randf_range(area.position.x, area.end.x), 0.0, _rng.randf_range(area.position.y, area.end.y))
 		var lane := _lane_weight(p)
 		if lane > 0.35 or _cleared(p, keep_clear):
 			continue
 		if _rng.randf() < lane * 2.0:
 			continue
+		if _rng.randf() > smoothstep(0.3, 0.7, clump.get_noise_2d(p.x, p.z) * 0.5 + 0.5) + 0.12:
+			continue   # grass grows in clumps, with bare earth between
 		p.y = level.ground_height(p.x, p.z)
 		tufts.append(p)
 	for i in 2600:
@@ -30,6 +35,7 @@ func build(lvl: Level, keep_clear: Array) -> void:
 	add_child(_tufts(tufts))
 	add_child(_stones(stones))
 	add_child(_forest())
+	_dead_wood(keep_clear)
 
 
 func _lane_weight(p: Vector3) -> float:
@@ -181,3 +187,50 @@ func _cone(st: SurfaceTool, y0: float, y1: float, r0: float, r1: float, sides: i
 		var q1 := Vector3(cos(a1) * r1, y1, sin(a1) * r1)
 		st.add_vertex(p0); st.add_vertex(q0); st.add_vertex(p1)
 		st.add_vertex(p1); st.add_vertex(q0); st.add_vertex(q1)
+
+
+## Dead trees in a loose band round the village, between the houses and the pines.
+func _dead_wood(keep_clear: Array) -> void:
+	var c := level.centre()
+	var transforms: Array = []
+	for i in 600:
+		if transforms.size() >= 70:
+			break
+		var p := Vector3(_rng.randf_range(-40.0, 106.0), 0.0, _rng.randf_range(-40.0, 76.0))
+		var outside_x: float = max(-p.x, p.x - 66.0)
+		var outside_z: float = max(-p.z, p.z - 36.0)
+		var out: float = max(outside_x, outside_z)
+		if out < 12.0 or out > 40.0 or _cleared(p, keep_clear) or (p.z > c.z and out < 25.0):
+			continue
+		p.y = level.ground_height(p.x, p.z) - 0.2
+		var s := _rng.randf_range(1.2, 2.4)
+		var b := Basis(Vector3.UP, _rng.randf() * TAU) * Basis(Vector3.RIGHT, deg_to_rad(_rng.randf_range(-6, 6)))
+		transforms.append(Transform3D(b.scaled(Vector3.ONE * s), p))
+	var tree := Models.make("dead_tree")
+	for node in tree.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		var mesh: Mesh = mi.mesh.duplicate()
+		for k in mesh.get_surface_count():
+			var m := mi.get_surface_override_material(k)
+			if m:
+				mesh.surface_set_material(k, m)
+		var mm := MultiMesh.new()
+		mm.transform_format = MultiMesh.TRANSFORM_3D
+		mm.mesh = mesh
+		mm.instance_count = transforms.size()
+		var local := _relative(mi, tree)
+		for k in transforms.size():
+			mm.set_instance_transform(k, transforms[k] * local)
+		var mmi := MultiMeshInstance3D.new()
+		mmi.multimesh = mm
+		add_child(mmi)
+	tree.free()
+
+
+func _relative(node: Node3D, root: Node3D) -> Transform3D:
+	var t := node.transform
+	var parent := node.get_parent()
+	while parent != root and parent is Node3D:
+		t = (parent as Node3D).transform * t
+		parent = parent.get_parent()
+	return t

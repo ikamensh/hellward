@@ -81,6 +81,7 @@ func build(lvl: Level, scorch: Array) -> void:
 		light.position = pos + Vector3(0, 4.0, 0)
 		add_child(light)
 	_churchyard()
+	_verges(scorch)
 	_portal()
 	_cathedral()
 	scorch.append([level.portal_pos, 9.0])
@@ -97,6 +98,31 @@ func _burn_prop(pos: Vector3, size: float) -> void:
 	var light := Fx.fire_light(5.0 * size, 8.0 + 2.0 * size)
 	light.position = pos + Vector3(0, 1.5, 0)
 	add_child(light)
+
+
+## The sacked village's leavings on the mud between the streets, where the monsters never walk:
+## tipped barrels, crates, rubble, a broken cart, half of them scorched.
+func _verges(scorch: Array) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 21
+	var kinds := ["barrel", "barrel", "crate", "rubble", "crate", "barrel"]
+	var placed := 0
+	for i in 400:
+		if placed >= 26:
+			break
+		var p := Vector3(rng.randf_range(2.0, 64.0), 0.0, rng.randf_range(2.0, 34.0))
+		var t := level.tile_at(p)
+		if level.cell(t) != "P" or level.road_distance(p) < 3.4:
+			continue
+		var kind: String = kinds[placed % kinds.size()]
+		var node := _place(kind, p, rng.randf() * 360.0)
+		node.scale = Vector3.ONE * rng.randf_range(0.6, 1.0)
+		if kind == "barrel" and rng.randf() < 0.7:
+			node.rotation_degrees.x = 88.0
+			node.position.y = 0.3 * node.scale.y
+		if rng.randf() < 0.5:
+			scorch.append([p, rng.randf_range(1.5, 3.0)])
+		placed += 1
 
 
 ## Gravestones in loose rows on either flank of the cathedral.
@@ -171,7 +197,7 @@ func _burn(node: Node3D, pos: Vector3) -> void:
 	var marks := node.find_children("fx_fire*", "", true, false)
 	for i in marks.size():
 		var m := marks[i] as Node3D
-		m.add_child(Fx.fire(1.6 if i % 2 == 0 else 1.1))
+		m.add_child(Fx.fire(2.6 if i % 2 == 0 else 1.8))
 		if i == 0:
 			var smoke := Fx.smoke(3.0, 18.0)
 			smoke.position = Vector3(0, 1.5, 0)

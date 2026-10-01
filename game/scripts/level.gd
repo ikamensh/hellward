@@ -16,6 +16,7 @@ var portal_pos: Vector3
 var door_pos: Vector3
 var occupied: Dictionary = {}  # Vector2i -> true where a tower stands
 var pads: Array = []           # [Vector2 centre, radius, height]: levelled plots for buildings on the slopes
+var _road: PackedFloat32Array   # metres to the nearest route centre line, a sample per metre over the floor mask
 var _hills := FastNoiseLite.new()
 
 
@@ -33,6 +34,27 @@ func load_location(key: String) -> void:
 	door_pos = tile_pos(Vector2i(last[0], last[1])) + Vector3(9.0, 0, 0)
 	for r in data["routes"]:
 		routes.append(_route_path(r["points"]))
+	_road = _road_field()
+
+
+## Distance to the nearest route centre line at every metre of the floor mask.
+func _road_field() -> PackedFloat32Array:
+	var w := int(MASK_SIZE.x)
+	var h := int(MASK_SIZE.y)
+	var road := PackedFloat32Array()
+	road.resize(w * h)
+	road.fill(99.0)
+	for route in routes:
+		for i in route.size() - 1:
+			var n := int(ceil(route[i].distance_to(route[i + 1]) / 0.5))
+			for k in n:
+				var q: Vector3 = route[i].lerp(route[i + 1], float(k) / n)
+				var c := Vector2(q.x - MASK_ORIGIN.x, q.z - MASK_ORIGIN.y)
+				for y in range(int(c.y) - 6, int(c.y) + 7):
+					for x in range(int(c.x) - 6, int(c.x) + 7):
+						if x >= 0 and y >= 0 and x < w and y < h:
+							road[y * w + x] = min(road[y * w + x], Vector2(x + 0.5, y + 0.5).distance_to(c))
+	return road
 
 
 func tile_pos(t: Vector2i) -> Vector3:
@@ -86,25 +108,12 @@ func _route_path(points: Array) -> PackedVector3Array:
 func floor_mask(scorch_points: Array) -> ImageTexture:
 	var w := int(MASK_SIZE.x)
 	var h := int(MASK_SIZE.y)
-	var road := PackedFloat32Array()
-	road.resize(w * h)
-	road.fill(99.0)
-	for route in routes:
-		for i in route.size() - 1:
-			var n := int(ceil(route[i].distance_to(route[i + 1]) / 0.5))
-			for k in n:
-				var q: Vector3 = route[i].lerp(route[i + 1], float(k) / n)
-				var c := Vector2(q.x - MASK_ORIGIN.x, q.z - MASK_ORIGIN.y)
-				for y in range(int(c.y) - 6, int(c.y) + 7):
-					for x in range(int(c.x) - 6, int(c.x) + 7):
-						if x >= 0 and y >= 0 and x < w and y < h:
-							road[y * w + x] = min(road[y * w + x], Vector2(x + 0.5, y + 0.5).distance_to(c))
 	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
 	var court := Rect2(door_pos.x - 9.0, door_pos.z - 7.0, 13.0, 14.0)
 	for y in h:
 		for x in w:
 			var world_xz := Vector2(x + 0.5, y + 0.5) + MASK_ORIGIN
-			var d := road[y * w + x]
+			var d := _road[y * w + x]
 			var t := tile_at(Vector3(world_xz.x, 0, world_xz.y))
 			var lane := 1.0 - smoothstep(2.2, 3.0, d)
 			var mud: float = max(0.55 if cell(t) == "P" else 0.0, 1.0 - smoothstep(3.0, 5.5, d))
@@ -127,6 +136,15 @@ func floor_mask(scorch_points: Array) -> ImageTexture:
 				img.set_pixel(x, y, px)
 	img.resize(w * 4, h * 4, Image.INTERPOLATE_CUBIC)
 	return ImageTexture.create_from_image(img)
+
+
+## How far `p` is from the nearest route's centre line (metres; the streets are about 2.6 m to each side).
+func road_distance(p: Vector3) -> float:
+	var x := int(p.x - MASK_ORIGIN.x)
+	var y := int(p.z - MASK_ORIGIN.y)
+	if x < 0 or y < 0 or x >= int(MASK_SIZE.x) or y >= int(MASK_SIZE.y):
+		return 99.0
+	return _road[y * int(MASK_SIZE.x) + x]
 
 
 ## Ground height: flat on the field and its approaches, rolling into low hills beyond and climbing into a
