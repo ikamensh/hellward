@@ -4,6 +4,9 @@ A 3D take on [Hellward](../hellward/) (the 2D gothic tower defence) in **Godot 4
 its first monsters and towers, built to see how far 3D can carry the game. Part of the Saga stack
 (`../AGENTS.md`). Local only; no GitHub remote. Why Godot, and the open questions: [docs/engine.md](docs/engine.md).
 
+Next: this demo becomes Hellward's client, driven by the Python simulation as a server, and moves into
+`../hellward` (`godot/`). Requirements and order of work: [../hellward/docs/godot-client.md](../hellward/docs/godot-client.md).
+
 ## Commands
 
 ```bash
