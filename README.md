@@ -10,7 +10,7 @@ the lanes to the cathedral. One level, four monsters (Fallen, Fallen Shaman, Zom
 ```bash
 brew install --cask godot        # once (Godot 4.7)
 cd ~/saga/hellward3d
-godot --path game                 # play
+godot --path game                 # play (any key skips the opening flight)
 godot --path game -- demo         # watch a scripted defender play
 godot --path game -- demo film    # the same, with a directed camera
 ```
@@ -18,9 +18,10 @@ godot --path game -- demo film    # the same, with a directed camera
 | | |
 |---|---|
 | **1–4**, then click buildable ground | Arrow Tower, Pyre, Frost Shrine, Storm Obelisk (Shift keeps building) |
-| click a tower | choose it: **U** upgrade, **S** sell, **C** cleanse a curse (35 mana) |
+| click a tower | choose it: **U** upgrade, **S** sell, **C** cleanse a curse (35 mana); hover shows its reach |
 | **Space** | summon the next wave (early: a little gold) |
 | **F** | double the pace |
+| **H** | hide the HUD |
 | arrow keys / screen edges, wheel, middle drag | pan, zoom, turn the camera |
 | right click / **Esc** | let go |
 

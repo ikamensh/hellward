@@ -13,6 +13,7 @@ tools/test.sh                              # headless integration tests (game/te
 tools/shot.sh VIEW OUT.png [FRAMES] [args] # one 1080p frame of a named view (game/scripts/shots.gd)
 tools/gallery.sh OUT.png V1,V2,.. FRAMES demo   # several views from one run, as a contact sheet
 tools/record.sh OUT.mp4 FRAMES 1 demo film      # a video with its mixed soundtrack; OUT a dir: every Nth JPEG
+tools/showcase.sh [OUT]                    # tests, beauty stills and the filmed demo into the evidence folder
 tools/preview.sh MODEL OUT.png [anim=walk]      # contact sheet of one model under game lighting
 tools/model.sh NAME...                     # build models: tools/blender/NAME.py in Blender -> game/assets/models/NAME.glb
 uv run python tools/paint.py [NAME...]     # paint images with Codex (art/painted/)
@@ -34,15 +35,18 @@ render on macOS (the dummy renderer only), but runs the tests.
 
 ## Layout
 
-- `game/scripts/` — `main.gd` (environment, lighting, wiring; user args), `level.gd` (the 2D grid in metres,
+- `game/scripts/` — `main.gd` (wiring, mist, vignette; user args), `atmosphere.gd` (the night: sky, moon,
+  fog, glow, grade; shared with the model previews), `level.gd` (the 2D grid in metres,
   routes, the floor mask and terrain), `dressing.gd` (the village, portal, cathedral, fires), `scatter.gd`
   (grass, stones, forest, dead wood), `world.gd` (the rules: waves, gold, lives, mana), `monster.gd`,
   `tower.gd`, `bolt.gd` (missiles), `vfx.gd` (battle effects), `fx.gd` (particles, firelight), `hud.gd`,
   `builder.gd` (input), `camera_rig.gd`, `intro.gd`, `demo.gd` (scripted defender and film director),
   `sfx.gd` (cues, music, the recording's sound log), `mats.gd` (the material library), `models.gd`.
-- `game/shaders/` — ground, grass, overlay (hit/chill/curse), bar, orb, ring, vortex.
+- `game/shaders/` — ground, grass, overlay (hit/chill/curse/kind rim/x-ray), bar, orb, ring, vortex, beam
+  (Cleanse), curse_beam, vignette, hud_panel/hud_bar/hud_banner.
 - `tools/blender/` — one script per model; `lib.py` holds the contract, `monsters.py`, `towers.py`,
-  `village.py` the shared kits.
+  `village.py`, `drystone.py` the shared kits.
+- `game/assets/` — `models/` (built), `textures/` (PBR sets), `fx/` and `ui/` (keyed sprites), `audio/`.
 
 ## Conventions
 
