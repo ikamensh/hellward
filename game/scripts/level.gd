@@ -15,9 +15,13 @@ var routes: Array = []        # Array of PackedVector3Array, portal to sanctuary
 var portal_pos: Vector3
 var door_pos: Vector3
 var occupied: Dictionary = {}  # Vector2i -> true where a tower stands
+var pads: Array = []           # [Vector2 centre, radius, height]: levelled plots for buildings on the slopes
+var _hills := FastNoiseLite.new()
 
 
 func load_location(key: String) -> void:
+	_hills.seed = 7
+	_hills.frequency = 0.012
 	var text := FileAccess.get_file_as_string("res://data/%s.json" % key)
 	data = JSON.parse_string(text)
 	width = int(data["width"])
@@ -125,23 +129,35 @@ func floor_mask(scorch_points: Array) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
-## Ground height: flat on the field and its approaches, rolling into low hills beyond.
-func ground_height(x: float, z: float, noise: FastNoiseLite) -> float:
+## Ground height: flat on the field and its approaches, rolling into low hills beyond and climbing into a
+## ring of hills that closes the horizon; levelled where a pad holds a building.
+func ground_height(x: float, z: float) -> float:
+	var h := _terrain(x, z)
+	for pad in pads:
+		var k := 1.0 - smoothstep(float(pad[1]), float(pad[1]) + 4.0, Vector2(x, z).distance_to(pad[0]))
+		h = lerp(h, float(pad[2]), k)
+	return h
+
+
+## Level a plot of `radius` metres at (x, z) and return its height.
+func pad(x: float, z: float, radius: float) -> float:
+	var y := _terrain(x, z)
+	pads.append([Vector2(x, z), radius, y])
+	return y
+
+
+func _terrain(x: float, z: float) -> float:
 	var c := centre()
 	var dx: float = max(abs(x - c.x) - width * TILE * 0.5 - 6.0, 0.0)
 	var dz: float = max(abs(z - c.z) - height * TILE * 0.5 - 4.0, 0.0)
 	var d := sqrt(dx * dx + dz * dz)
 	var rise: float = clamp(d / 30.0, 0.0, 1.0)
-	var near := rise * rise * (6.0 + 9.0 * noise.get_noise_2d(x, z)) + rise * 3.0 * noise.get_noise_2d(x * 3.0, z * 3.0)
-	# far off, the land climbs into a ring of hills that closes the horizon
+	var near := rise * rise * (6.0 + 9.0 * _hills.get_noise_2d(x, z)) + rise * 3.0 * _hills.get_noise_2d(x * 3.0, z * 3.0)
 	var ring: float = clamp((d - 60.0) / 140.0, 0.0, 1.0)
-	return near + ring * ring * (26.0 + 18.0 * noise.get_noise_2d(x * 0.5, z * 0.5))
+	return near + ring * ring * (26.0 + 18.0 * _hills.get_noise_2d(x * 0.5, z * 0.5))
 
 
 func build_floor(scorch_points: Array) -> MeshInstance3D:
-	var noise := FastNoiseLite.new()
-	noise.seed = 7
-	noise.frequency = 0.012
 	var c := centre()
 	var size := Vector2(640.0, 520.0)
 	var steps := Vector2i(256, 208)
@@ -153,7 +169,7 @@ func build_floor(scorch_points: Array) -> MeshInstance3D:
 			var x := origin.x + size.x * i / steps.x
 			var z := origin.y + size.y * j / steps.y
 			st.set_uv(Vector2(x, z))
-			st.add_vertex(Vector3(x, ground_height(x, z, noise), z))
+			st.add_vertex(Vector3(x, ground_height(x, z), z))
 	for j in steps.y:
 		for i in steps.x:
 			var a := j * (steps.x + 1) + i

@@ -20,10 +20,12 @@ func build(lvl: Level, keep_clear: Array) -> void:
 			continue
 		if _rng.randf() < lane * 2.0:
 			continue
+		p.y = level.ground_height(p.x, p.z)
 		tufts.append(p)
 	for i in 2600:
 		var p := Vector3(_rng.randf_range(area.position.x, area.end.x), 0.0, _rng.randf_range(area.position.y, area.end.y))
 		if not _cleared(p, keep_clear):
+			p.y = level.ground_height(p.x, p.z)
 			stones.append(p)
 	add_child(_tufts(tufts))
 	add_child(_stones(stones))
@@ -125,9 +127,6 @@ func _stones(points: Array) -> MultiMeshInstance3D:
 
 ## A dark pine forest on the hills around the village: a silhouette against the burning sky.
 func _forest() -> MultiMeshInstance3D:
-	var noise := FastNoiseLite.new()
-	noise.seed = 7
-	noise.frequency = 0.012
 	var c := level.centre()
 	var points: Array = []
 	for i in 2400:
@@ -138,7 +137,7 @@ func _forest() -> MultiMeshInstance3D:
 			continue   # keep the portal's field and the cathedral's approach open
 		if p.z > c.z and r < 125.0:
 			continue   # the cameras look from the south: no trunks in front of the lens
-		p.y = level.ground_height(p.x, p.z, noise) - 0.3
+		p.y = level.ground_height(p.x, p.z) - 0.3
 		points.append(p)
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D

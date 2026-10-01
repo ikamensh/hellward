@@ -6,7 +6,7 @@ set -e
 cd "$(dirname "$0")/.."
 out=$(cd "$(dirname "$1")" && pwd)/$(basename "$1"); views=$2; frames=${3:-40}; shift 2; [ $# -gt 0 ] && shift
 tmp=$(mktemp -d /tmp/hw3d-gallery.XXXXXX)
-tools/godot-capture.sh --path game --fixed-fps 30 res://scenes/capture.tscn -- scene=res://scenes/main.tscn "gallery=$views" "out=$tmp" "frames=$frames" "$@" 2>&1 \
+tools/godot-capture.sh --path game --fixed-fps 30 res://scenes/capture.tscn -- scene=res://scenes/main.tscn "gallery=$views" "out=$tmp" "frames=$frames" "timeout=$((120 + frames / 10))" "$@" 2>&1 \
   | grep -E "ERROR|SCRIPT ERROR|at: " | head -20 || true
 files=""
 for v in $(echo "$views" | tr , ' '); do files="$files $tmp/$v.png"; done

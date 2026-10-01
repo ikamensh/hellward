@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")/.."
 name=$1; out=$(cd "$(dirname "$2")" && pwd)/$(basename "$2"); frames=${3:-40}; shift 2; [ $# -gt 0 ] && shift
-tools/godot-capture.sh --path game --fixed-fps 30 res://scenes/capture.tscn -- scene=res://scenes/main.tscn "shot=$name" "snap=$out" "frames=$frames" "$@" 2>&1 \
+tools/godot-capture.sh --path game --fixed-fps 30 res://scenes/capture.tscn -- scene=res://scenes/main.tscn "shot=$name" "snap=$out" "frames=$frames" "timeout=$((120 + frames / 10))" "$@" 2>&1 \
   | grep -E "ERROR|SCRIPT ERROR|at: " | head -20 || true
 test -f "$out"
 echo "$out"
