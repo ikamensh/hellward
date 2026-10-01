@@ -26,6 +26,7 @@ var lives := START_LIVES
 var mana := 60.0
 var wave := -1                       # the latest wave called; -1 before the first
 var paid := -1                       # the latest wave whose clear bonus was paid
+var slain := {}                      # wave index -> monsters of that wave killed (leaks are not slain)
 var spawners: Array = []             # {kind, left, interval, next, life}
 var monsters: Array = []
 var towers: Array = []
@@ -45,8 +46,26 @@ func waves() -> Array:
 	return data["waves"]
 
 
+## Monsters still to come or still on their feet; corpses fading away do not hold a wave open.
 func wave_active() -> bool:
-	return not spawners.is_empty() or not monsters.filter(func(m): return not m.gone).is_empty()
+	return not spawners.is_empty() or not living().is_empty()
+
+
+## Every group a wave sends: the 2D game's, and the demo's extra skeletons.
+func roster(i: int) -> Array:
+	return waves()[i]["groups"] + EXTRA.get(i, [])
+
+
+func tower_at(tile: Vector2i) -> Tower:
+	for t in towers:
+		if t.tile == tile and not t.removed:
+			return t
+	return null
+
+
+## What selling `t` gives back.
+func refund(t: Tower) -> int:
+	return int(t.spent * 0.7)
 
 
 func can_call() -> bool:
@@ -60,11 +79,9 @@ func call_wave() -> void:
 		gold += EARLY_BONUS
 	wave += 1
 	var w: Dictionary = waves()[wave]
-	var groups: Array = w["groups"].duplicate()
-	groups.append_array(EXTRA.get(wave, []))
-	for g in groups:
+	for g in roster(wave):
 		spawners.append({"kind": g["kind"], "left": int(g["count"]), "interval": float(g["interval"]),
-			"next": time + float(g["start"]), "life": float(w["life"])})
+			"next": time + float(g["start"]), "life": float(w["life"]), "wave": wave})
 	announce.emit("Wave %d of %d" % [wave + 1, waves().size()], w["name"])
 	Sfx.play("wave")
 	changed.emit()
@@ -102,15 +119,18 @@ func upgrade(t: Tower) -> bool:
 	return true
 
 
-func sell(t: Tower) -> void:
+## Sell `t` for its refund; a cursed tower can't be sold.
+func sell(t: Tower) -> bool:
 	if t.cursed > 0.0:
-		return
-	gold += int(t.spent * 0.7)
+		Sfx.play("refuse")
+		return false
+	gold += refund(t)
 	Sfx.play("sell", t.global_position)
 	level.occupied.erase(t.tile)
 	towers.erase(t)
 	t.dismantle()
 	changed.emit()
+	return true
 
 
 func cleanse(t: Tower) -> bool:
@@ -118,6 +138,7 @@ func cleanse(t: Tower) -> bool:
 		return false
 	mana -= CLEANSE_COST
 	t.lift_curse()
+	Vfx.holy(self, t.global_position)
 	Sfx.play("cleanse", t.global_position)
 	changed.emit()
 	return true
@@ -130,7 +151,7 @@ func _process(delta: float) -> void:
 	mana = min(MANA_MAX, mana + MANA_REGEN * delta)
 	for sp in spawners.duplicate():
 		while sp["left"] > 0 and time >= sp["next"]:
-			_spawn(sp["kind"], sp["life"])
+			_spawn(sp["kind"], sp["life"], sp["wave"])
 			sp["left"] -= 1
 			sp["next"] += sp["interval"]
 		if sp["left"] <= 0:
@@ -140,25 +161,28 @@ func _process(delta: float) -> void:
 			monsters.erase(m)
 			m.queue_free()
 	if wave > paid and not wave_active():
-		paid = wave
-		var w: Dictionary = waves()[wave]
-		gold += int(w["clear_bonus"])
+		var bonus := 0
+		while paid < wave:   # a wave called early is paid when the field clears too
+			paid += 1
+			bonus += int(waves()[paid]["clear_bonus"])
+		gold += bonus
 		if wave == waves().size() - 1:
 			outcome = "won"
 			announce.emit("Tristram holds", "The last wave is broken. The lamp still burns.")
 			Sfx.play("victory")
 			finished.emit(true)
 		else:
-			announce.emit("Wave cleared", "+%d gold. Build, then summon the next wave." % int(w["clear_bonus"]))
+			announce.emit("Wave cleared", "+%d gold. Build, then summon the next wave." % bonus)
 			Sfx.play("cleared")
 		changed.emit()
 
 
-func _spawn(kind: String, life: float) -> void:
+func _spawn(kind: String, life: float, of_wave: int) -> void:
 	var m := Monster.new()
 	var stats: Dictionary = data["monsters"][kind]
 	var route: PackedVector3Array = level.routes[rng.randi() % level.routes.size()]
 	m.setup(self, kind, stats, route, life, rng.randi())
+	m.wave = of_wave
 	add_child(m)
 	monsters.append(m)
 
@@ -175,10 +199,15 @@ func breached(m: Monster) -> void:
 		outcome = "lost"
 		announce.emit("The lamp goes out", "Tristram falls to the Fallen.")
 		Sfx.play("defeat")
+		for n in monsters + towers:   # the battle stops where it stands
+			n.process_mode = Node.PROCESS_MODE_DISABLED
 		finished.emit(false)
 
 
 func killed(m: Monster) -> void:
+	if outcome != "":
+		return
+	slain[m.wave] = slain.get(m.wave, 0) + 1
 	gold += int(m.stats["bounty"])
 	Vfx.coin(self, m.global_position + Vector3(0, m.height + 0.3, 0), int(m.stats["bounty"]))
 	Sfx.play("gold", m.global_position)
@@ -188,6 +217,8 @@ func killed(m: Monster) -> void:
 ## Monsters within `reach` metres of `p`, on the ground plane.
 func near(p: Vector3, reach: float) -> Array:
 	var out: Array = []
+	if outcome != "":
+		return out
 	for m in monsters:
 		if m.alive():
 			var d := Vector2(m.global_position.x - p.x, m.global_position.z - p.z).length()

@@ -131,7 +131,7 @@ func _glow(color: Color, size: float) -> MeshInstance3D:
 	var q := QuadMesh.new()
 	q.size = Vector2(size, size)
 	g.mesh = q
-	var m := Fx._billboard(Fx.dot_texture(), true)
+	var m := Fx.billboard(Fx.dot_texture(), true)
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.vertex_color_use_as_albedo = false
 	m.albedo_color = color

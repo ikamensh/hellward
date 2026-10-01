@@ -2,8 +2,9 @@
 
     uv run python tools/mixdown.py DIR FRAMES OUT.wav     # DIR/sound.log: "frame stem gain_db pan" lines
 
-Every cue is placed at frame / 30 s with its gain and a constant-power pan; music lines loop their track
-from that frame to the end. The mix is brought to -18 dBFS RMS with soft-limited peaks.
+Every cue is placed at frame / 30 s with its gain and a constant-power pan. Music lines ("frame music_NAME gain
+fade", or music_stop) follow the game's rule: a new track starts at once and loops, and the one before it fades
+out over `fade` seconds. The mix is brought to -18 dBFS RMS with soft-limited peaks.
 tools/record.sh runs this and muxes the result into the video.
 """
 from __future__ import annotations
@@ -43,22 +44,32 @@ def main() -> int:
     length = int(frames / FPS * RATE) + RATE
     mix = np.zeros((length, 2), dtype=np.float32)
     cache: dict[str, np.ndarray] = {}
+    tracks: list[list] = []   # [start, stop or None, fade samples, music, amp]
     for line in (folder / "sound.log").read_text().splitlines():
-        frame, stem, gain, pan = line.split()
+        frame, stem, gain, last = line.split()
         start = int(int(frame) / FPS * RATE)
         amp = 10 ** (float(gain) / 20)
         if stem.startswith("music_"):
-            track = read_mp3(AUDIO / f"{stem}.mp3") * amp
-            reps = (length - start) // len(track) + 1
-            looped = np.tile(track, (reps, 1))[: length - start]
-            mix[start:] += looped
+            if tracks and tracks[-1][1] is None:
+                tracks[-1][1], tracks[-1][2] = start, max(1, int(float(last) * RATE))
+            if stem != "music_stop":
+                tracks.append([start, None, 0, read_mp3(AUDIO / f"{stem}.mp3"), amp])
             continue
         if stem not in cache:
             cache[stem] = read_wav(AUDIO / f"{stem}.wav")
         clip = cache[stem][: length - start] * amp
-        angle = (float(pan) + 1) * np.pi / 4
+        angle = (float(last) + 1) * np.pi / 4
         mix[start:start + len(clip), 0] += clip * np.cos(angle)
         mix[start:start + len(clip), 1] += clip * np.sin(angle)
+    for start, stop, fade, track, amp in tracks:
+        end = length if stop is None else min(length, stop + fade)
+        reps = (end - start) // len(track) + 1
+        part = np.tile(track, (reps, 1))[: end - start] * amp
+        if stop is not None:
+            ramp = np.ones(end - start, dtype=np.float32)
+            ramp[stop - start:] = np.linspace(1.0, 0.0, end - stop, dtype=np.float32)
+            part *= ramp[:, None]
+        mix[start:end] += part
     # to a listening level: -18 dBFS RMS, the peaks soft-limited
     rms = float(np.sqrt(np.mean(mix ** 2)))
     if rms > 0:

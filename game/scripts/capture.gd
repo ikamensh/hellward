@@ -4,16 +4,13 @@ extends Node
 ## (or any window, once the screen is locked) its drawables, which slowed windowed renders to a frame a second;
 ## a SubViewport never asks for one. `res=WxH` sets the size (1920x1080).
 
-static var view: SubViewport
-
-
 func _ready() -> void:
 	var args := {}
 	for a in OS.get_cmdline_user_args():
 		var kv := a.split("=", true, 1)
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	var res: PackedStringArray = args.get("res", "1920x1080").split("x")
-	view = SubViewport.new()
+	var view := SubViewport.new()
 	view.size = Vector2i(int(res[0]), int(res[1]))
 	view.msaa_3d = Viewport.MSAA_2X
 	view.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA
@@ -34,7 +31,3 @@ func _ready() -> void:
 		push_error("capture: timed out")
 		get_tree().quit(2))
 
-
-## The frame last drawn, as an image.
-static func image() -> Image:
-	return view.get_texture().get_image()

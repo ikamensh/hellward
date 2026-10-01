@@ -699,12 +699,9 @@ func refresh() -> void:
 		_wave_kicker.text = "Wave %s · %s" % [NUMERALS[world.wave], NUMERALS[total - 1]]
 		_wave_name.text = w["name"]
 		var count := 0
-		for g in w["groups"] + World.EXTRA.get(world.wave, []):
+		for g in world.roster(world.wave):
 			count += int(g["count"])
-		var left: int = world.living().size()
-		for sp in world.spawners:
-			left += int(sp["left"])
-		var done := clampi(count - left, 0, count)
+		var done: int = world.slain.get(world.wave, 0)
 		_progress.set_shader_parameter("fill", float(done) / count)
 		_progress_text.text = "%d / %d slain" % [done, count]
 	_call.disabled = not world.can_call()

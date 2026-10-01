@@ -29,7 +29,7 @@ var _shot := -1
 var _focus: Node3D
 var _over := false
 
-const OPENING := 13.0   # seconds of the opening flight before a filmed defence begins
+var _rolling := false   # filmed, the defence waits for the opening flight to land
 
 
 func setup(m: Node, filming: bool) -> void:
@@ -39,15 +39,16 @@ func setup(m: Node, filming: bool) -> void:
 	film = filming
 	world.gold += DEMO_GOLD
 	if film:
-		rig.user_control = false
-		main.hud.cinematic(true, 0.01)
 		world.finished.connect(_ending)
-		_opening()
+		var intro := Intro.new()
+		add_child(intro)
+		intro.play(main, true)
+		intro.landed.connect(func(): _rolling = true)
 
 
 func _process(delta: float) -> void:
 	_t += delta
-	if film and _t < OPENING:
+	if film and not _rolling:
 		return
 	_build()
 	_cleanse()
@@ -61,7 +62,7 @@ func _build() -> void:
 		var p: Array = PLAN[_step]
 		var tile: Vector2i = p[1]
 		if p[0] == "upgrade":
-			var t := _tower_at(tile)
+			var t := world.tower_at(tile)
 			if t == null or t.rank >= 2:
 				_step += 1
 				continue
@@ -74,13 +75,6 @@ func _build() -> void:
 			world.build(p[0], tile)
 		_step += 1
 		return
-
-
-func _tower_at(tile: Vector2i) -> Tower:
-	for t in world.towers:
-		if t.tile == tile and not t.removed:
-			return t
-	return null
 
 
 func _cleanse() -> void:
@@ -100,18 +94,6 @@ func _call_waves(delta: float) -> void:
 	if _quiet > wait and world.can_call():
 		world.call_wave()
 		_quiet = 0.0
-
-
-func _opening() -> void:
-	var lv := world.level
-	rig.snap(lv.centre() + Vector3(-12, 0, 14), 35.0, 24.0, 78.0)
-	rig.glide(lv.portal_pos + Vector3(7, 0, 1), 70.0, 16.0, 17.0, 8.0)
-	var tw := create_tween()
-	tw.tween_callback(func(): main.hud.title_card("Hellward", "Tristram burns", 3.0)).set_delay(0.8)
-	tw.tween_callback(func(): main.hud.title_card("Tristram", "Hold the cathedral until the last wave breaks.", 2.5)).set_delay(6.0)
-	tw.tween_callback(func():
-		rig.glide(lv.centre() + Vector3(2, 0, 3), 0.0, 55.0, 52.0, 4.0)
-		main.hud.cinematic(false, 2.0)).set_delay(1.5)
 
 
 func _ending(_won: bool) -> void:

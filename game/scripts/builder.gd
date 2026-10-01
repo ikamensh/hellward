@@ -118,11 +118,10 @@ func _process(_delta: float) -> void:
 func _hover(tile: Vector2i) -> void:
 	if chosen and is_instance_valid(chosen) and not chosen.removed:
 		return
-	for t in world.towers:
-		if t.tile == tile and not t.removed:
-			_show_reach(t.global_position, t.reach(), Color(1.0, 0.8, 0.45, 0.5))
-			return
-	_reach_mark.visible = false
+	var t := world.tower_at(tile)
+	_reach_mark.visible = t != null
+	if t:
+		_show_reach(t.global_position, t.reach(), Color(1.0, 0.8, 0.45, 0.5))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -153,14 +152,12 @@ func _click(screen: Vector2) -> void:
 	var tile := _tile_at(screen)
 	if held != "":
 		var t := world.build(held, tile)
-		if t and not Input.is_key_pressed(KEY_SHIFT):
+		if t == null:
+			Sfx.play("refuse")
+		elif not Input.is_key_pressed(KEY_SHIFT):
 			let_go()
 		return
-	for t in world.towers:
-		if t.tile == tile and not t.removed:
-			choose(t)
-			return
-	choose(null)
+	choose(world.tower_at(tile))
 
 
 func _order(name: String) -> void:
@@ -171,13 +168,14 @@ func _order(name: String) -> void:
 			hud.set_pace(Engine.time_scale > 1.0)
 		"upgrade":
 			if chosen:
-				world.upgrade(chosen)
+				if not world.upgrade(chosen):
+					Sfx.play("refuse")
 				choose(chosen)
 		"sell":
-			if chosen:
-				world.sell(chosen)
+			if chosen and world.sell(chosen):
 				choose(null)
 		"cleanse":
 			if chosen:
-				world.cleanse(chosen)
+				if not world.cleanse(chosen):
+					Sfx.play("refuse")
 				hud.select(chosen)

@@ -1,7 +1,7 @@
 class_name CameraRig
 extends Node3D
 ## The battle camera: it orbits a target on the ground. Drag with the middle mouse to turn, the arrow keys
-## or screen edges to pan, the wheel to zoom. A script may drive it (`fly_to`).
+## or screen edges to pan, the wheel to zoom. A script may drive it (`snap`, `glide`, `follow`).
 
 var target := Vector3.ZERO
 var yaw := 0.0          # degrees; 0 looks north (-Z)
@@ -12,7 +12,6 @@ var user_control := true
 
 var cam: Camera3D
 var follow: Node3D          # when set, the target keeps to this node (a monster being filmed)
-var _goal := {}
 var _turning := false
 var _glide: Tween
 
@@ -27,13 +26,8 @@ func _ready() -> void:
 	_apply()
 
 
-func fly_to(t: Vector3, y: float, p: float, d: float) -> void:
-	_goal = {"target": t, "yaw": y, "pitch": p, "distance": d}
-
-
 ## A filmed move: ease from here to there over `seconds`, both ends at rest.
 func glide(t: Vector3, y: float, p: float, d: float, seconds: float) -> void:
-	_goal = {}
 	if _glide:
 		_glide.kill()
 	_glide = create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
@@ -45,7 +39,6 @@ func glide(t: Vector3, y: float, p: float, d: float, seconds: float) -> void:
 
 func snap(t: Vector3, y: float, p: float, d: float) -> void:
 	target = t; yaw = y; pitch = p; distance = d
-	_goal = {}
 	_apply()
 
 
@@ -65,19 +58,14 @@ func _process(delta: float) -> void:
 			if mouse.y < 4: move.z -= 1
 			if mouse.y > size.y - 5: move.z += 1
 		if move != Vector3.ZERO:
-			_goal = {}
+			if _glide:
+				_glide.kill()   # the player's hand wins over a scripted move
 			var basis_y := Basis(Vector3.UP, deg_to_rad(yaw))
 			target += basis_y * move.normalized() * distance * 0.9 * delta
 			target = target.clamp(bounds.position, bounds.end)
 	if is_instance_valid(follow):
 		var k_follow: float = 1.0 - exp(-delta * 2.5)
 		target = target.lerp(follow.global_position, k_follow)
-	if not _goal.is_empty():
-		var k: float = 1.0 - exp(-delta * 1.6)
-		target = target.lerp(_goal["target"], k)
-		yaw = lerp(yaw, float(_goal["yaw"]), k)
-		pitch = lerp(pitch, float(_goal["pitch"]), k)
-		distance = lerp(distance, float(_goal["distance"]), k)
 	_apply()
 
 
@@ -88,17 +76,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
 			distance = max(distance * 0.9, 14.0)
-			_goal = {}
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
 			distance = min(distance * 1.1, 90.0)
-			_goal = {}
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_turning = mb.pressed
 	elif event is InputEventMouseMotion and _turning:
 		var mm := event as InputEventMouseMotion
 		yaw -= mm.relative.x * 0.25
 		pitch = clamp(pitch + mm.relative.y * 0.2, 20.0, 80.0)
-		_goal = {}
 
 
 func _apply() -> void:

@@ -7,7 +7,7 @@ extends RefCounted
 
 const DIR := "res://assets/audio/"
 const VOICES := 4
-const GAIN := {"arrow_cast": -9.0, "arrow_hit": -10.0, "fire_cast": -6.0, "fireball": -4.0, "fire_hit": -6.0,
+const GAIN := {"arrow_cast": -9.0, "arrow_hit": -10.0, "fire_cast": -6.0, "fireball": -4.0,
 	"frost": -6.0, "lightning": -4.0, "gold": -14.0, "build": -3.0, "death_fallen": -6.0, "death_zombie": -4.0,
 	"death_skeleton": -5.0, "death_shaman": -2.0}
 
@@ -16,6 +16,7 @@ static var _sounding: Dictionary = {}    # cue -> players still playing
 static var _log: FileAccess
 static var _frame := 0
 static var _root: Node
+static var _music: AudioStreamPlayer
 
 
 static func setup(root: Node, log_path: String) -> void:
@@ -80,16 +81,36 @@ static func play(cue: String, at = null) -> void:
 		_log.flush()
 
 
-## The looping battle music (or the title's), quietly under the battle.
-static func music(name: String, volume_db := -8.0) -> AudioStreamPlayer:
+## Play a looping track (title, battle_tristram) in place of the current one, which fades out over `fade` s.
+static func music(name: String, volume_db := -8.0, fade := 2.0) -> void:
+	_fade_out(fade)
 	var stream: AudioStreamMP3 = load(DIR + "music_" + name + ".mp3")
 	stream.loop = true
-	var p := AudioStreamPlayer.new()
-	p.stream = stream
-	p.volume_db = volume_db
-	_root.add_child(p)
-	p.play()
+	_music = AudioStreamPlayer.new()
+	_music.stream = stream
+	_music.volume_db = volume_db
+	_root.add_child(_music)
+	_music.play()
+	_note("music_" + name, volume_db, fade)
+
+
+## Let the current track fade to silence.
+static func stop_music(fade := 2.0) -> void:
+	_fade_out(fade)
+	_note("music_stop", 0.0, fade)
+
+
+static func _fade_out(fade: float) -> void:
+	if is_instance_valid(_music):
+		var old := _music
+		var tw := old.create_tween()
+		tw.tween_property(old, "volume_db", -60.0, fade)
+		tw.tween_callback(old.queue_free)
+	_music = null
+
+
+## Music changes go in the recording's log as "frame stem gain fade" (tools/mixdown.py).
+static func _note(stem: String, gain: float, fade: float) -> void:
 	if _log:
-		_log.store_line("%d music_%s %.1f 0" % [_frame, name, volume_db])
+		_log.store_line("%d %s %.1f %.1f" % [_frame, stem, gain, fade])
 		_log.flush()
-	return p

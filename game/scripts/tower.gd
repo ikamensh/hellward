@@ -23,7 +23,6 @@ var _turret: Node3D
 var _muzzle: Node3D
 var _crystal: Node3D
 var _overlay: ShaderMaterial
-var _light: OmniLight3D
 var _curse_fx: Node3D
 var _telegraph: Node3D
 var _t := 0.0
@@ -86,13 +85,13 @@ func _dress() -> void:
 		lantern.omni_range = 5.0
 		lantern.position = Vector3(0, 4.2, 0)
 		_model.add_child(lantern)
-	_light = dress_fx(_model, kind, rank)
+	dress_fx(_model, kind, rank)
 	_overlay.set_shader_parameter("curse", 1.0 if cursed > 0.0 else 0.0)
 
 
 ## A tower model's own fire and glow: the Pyre's flame, the shrine's and the obelisk's light. The HUD's
 ## portraits of the towers wear them too.
-static func dress_fx(model: Node3D, kind: String, rank: int) -> OmniLight3D:
+static func dress_fx(model: Node3D, kind: String, rank: int) -> void:
 	var light: OmniLight3D = null
 	match kind:
 		"pyre":
@@ -113,7 +112,6 @@ static func dress_fx(model: Node3D, kind: String, rank: int) -> OmniLight3D:
 			light.omni_range = 8.0
 			var crystal := Models.node(model, "crystal")
 			(crystal if crystal else Models.node(model, "fx_muzzle")).add_child(light)
-	return light
 
 
 func promote() -> void:
@@ -150,7 +148,6 @@ func lift_curse() -> void:
 	_overlay.set_shader_parameter("curse", 0.0)
 	if is_instance_valid(_curse_fx):
 		_curse_fx.queue_free()
-	Vfx.holy(world, global_position)
 
 
 func _process(delta: float) -> void:

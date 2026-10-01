@@ -25,6 +25,7 @@ var hp := 1.0
 var max_hp := 1.0
 var height := 1.5
 var leader := false
+var wave := -1                      # the wave that sent it
 var gone := false                   # dead and faded, or inside the cathedral: the world frees it
 var progress := 0.0                 # 0..1 along the route, for targeting
 
@@ -172,13 +173,12 @@ func _process(delta: float) -> void:
 				_curse_clock -= delta
 				if _curse_clock <= 0.0:
 					_ponder()
-		"ponder":
-			if _state_t > 1.1:
-				_chant()
-		"chant":
+		"ponder", "chant":
 			if not is_instance_valid(_curse_target) or _curse_target.removed:
-				_resume()
-			elif _state_t > 1.9:
+				_resume()   # its tower was sold
+			elif _state == "ponder" and _state_t > 1.1:
+				_chant()
+			elif _state == "chant" and _state_t > 1.9:
 				_curse_lands()
 		"door":
 			if _state_t > 1.4:

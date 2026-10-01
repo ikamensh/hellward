@@ -20,7 +20,7 @@ static func dot_texture() -> Texture2D:
 	return _dot
 
 
-static func _billboard(tex: Texture2D, additive: bool, shaded := false, frames := 1) -> StandardMaterial3D:
+static func billboard(tex: Texture2D, additive: bool, shaded := false, frames := 1) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.particles_anim_h_frames = frames
 	m.particles_anim_v_frames = frames
@@ -40,7 +40,7 @@ static func _billboard(tex: Texture2D, additive: bool, shaded := false, frames :
 
 
 ## A colour ramp over a particle's life; `hdr` keeps values above 1, so glow picks them up.
-static func _ramp(stops: Array, hdr := false) -> GradientTexture1D:
+static func ramp(stops: Array, hdr := false) -> GradientTexture1D:
 	var g := Gradient.new()
 	g.offsets = PackedFloat32Array(stops.map(func(s): return s[0]))
 	g.colors = PackedColorArray(stops.map(func(s): return s[1]))
@@ -50,7 +50,7 @@ static func _ramp(stops: Array, hdr := false) -> GradientTexture1D:
 	return t
 
 
-static func _curve(points: Array) -> CurveTexture:
+static func curve(points: Array) -> CurveTexture:
 	var c := Curve.new()
 	for p in points:
 		c.add_point(Vector2(p[0], p[1]))
@@ -78,7 +78,7 @@ static func fire(size: float, intensity := 1.0) -> GPUParticles3D:
 	pm.damping_max = 0.5
 	pm.scale_min = 0.8
 	pm.scale_max = 1.25
-	pm.scale_curve = _curve([[0.0, 0.75], [0.25, 1.0], [1.0, 0.25]])
+	pm.scale_curve = curve([[0.0, 0.75], [0.25, 1.0], [1.0, 0.25]])
 	pm.angle_min = -8.0
 	pm.angle_max = 8.0
 	pm.anim_offset_min = 0.0
@@ -90,14 +90,14 @@ static func fire(size: float, intensity := 1.0) -> GPUParticles3D:
 	pm.turbulence_influence_max = 0.07
 	# overlapping additive flames sum: each stays faint, so the heart of a big fire is orange, not white
 	var k := intensity
-	pm.color_ramp = _ramp([[0.0, Color(k, k * 0.8, k * 0.55, 0.0)], [0.1, Color(k, k * 0.75, k * 0.45, 0.5)],
+	pm.color_ramp = ramp([[0.0, Color(k, k * 0.8, k * 0.55, 0.0)], [0.1, Color(k, k * 0.75, k * 0.45, 0.5)],
 		[0.45, Color(k * 0.95, k * 0.5, k * 0.25, 0.4)], [0.8, Color(0.7, 0.22, 0.07, 0.2)],
 		[1.0, Color(0.35, 0.1, 0.04, 0.0)]])
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(size * 0.85, size * 1.2)
 	q.center_offset = Vector3(0, size * 0.4, 0)
-	q.material = _billboard(load("res://assets/fx/fire_sheet.png"), true, false, 4)
+	q.material = billboard(load("res://assets/fx/fire_sheet.png"), true, false, 4)
 	p.draw_pass_1 = q
 	p.visibility_aabb = AABB(Vector3(-size * 2, -1, -size * 2), Vector3(size * 4, size * 5, size * 4))
 	return p
@@ -121,7 +121,7 @@ static func smoke(size: float, height := 14.0) -> GPUParticles3D:
 	pm.gravity = Vector3(0.25, 0.1, 0.05)
 	pm.scale_min = 1.0
 	pm.scale_max = 1.6
-	pm.scale_curve = _curve([[0.0, 0.3], [1.0, 1.0]])
+	pm.scale_curve = curve([[0.0, 0.3], [1.0, 1.0]])
 	pm.angle_min = 0.0
 	pm.angle_max = 360.0
 	pm.angular_velocity_min = -12.0
@@ -131,13 +131,13 @@ static func smoke(size: float, height := 14.0) -> GPUParticles3D:
 	pm.turbulence_noise_scale = 6.0
 	pm.anim_offset_min = 0.0
 	pm.anim_offset_max = 1.0
-	pm.color_ramp = _ramp([[0.0, Color(0.55, 0.26, 0.1, 0.0)], [0.08, Color(0.5, 0.24, 0.1, 0.6)],
+	pm.color_ramp = ramp([[0.0, Color(0.55, 0.26, 0.1, 0.0)], [0.08, Color(0.5, 0.24, 0.1, 0.6)],
 		[0.25, Color(0.24, 0.17, 0.14, 0.6)], [0.6, Color(0.15, 0.14, 0.14, 0.42)],
 		[1.0, Color(0.11, 0.11, 0.12, 0.0)]])
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(size * 2.4, size * 2.4)
-	q.material = _billboard(load("res://assets/fx/smoke_sheet.png"), false, false, 4)
+	q.material = billboard(load("res://assets/fx/smoke_sheet.png"), false, false, 4)
 	p.draw_pass_1 = q
 	p.visibility_aabb = AABB(Vector3(-height, -2, -height), Vector3(height * 2, height * 1.6, height * 2))
 	return p
@@ -163,17 +163,17 @@ static func fireball(size: float) -> GPUParticles3D:
 	pm.gravity = Vector3(0, 1.5, 0)
 	pm.scale_min = 0.8
 	pm.scale_max = 1.3
-	pm.scale_curve = _curve([[0.0, 0.45], [0.25, 1.0], [1.0, 1.25]])
+	pm.scale_curve = curve([[0.0, 0.45], [0.25, 1.0], [1.0, 1.25]])
 	pm.angle_min = 0.0
 	pm.angle_max = 360.0
 	pm.anim_offset_min = 0.0
 	pm.anim_offset_max = 1.0
-	pm.color_ramp = _ramp([[0.0, Color(2.6, 2.3, 1.8, 1.0)], [0.15, Color(2.4, 1.4, 0.6, 0.95)],
+	pm.color_ramp = ramp([[0.0, Color(2.6, 2.3, 1.8, 1.0)], [0.15, Color(2.4, 1.4, 0.6, 0.95)],
 		[0.5, Color(1.1, 0.4, 0.1, 0.6)], [1.0, Color(0.15, 0.05, 0.02, 0.0)]], true)
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(size * 1.1, size * 1.1)
-	q.material = _billboard(load("res://assets/fx/fire_sheet.png"), true, false, 4)
+	q.material = billboard(load("res://assets/fx/fire_sheet.png"), true, false, 4)
 	p.draw_pass_1 = q
 	p.emitting = true
 	p.finished.connect(p.queue_free)
@@ -198,19 +198,19 @@ static func puff(size: float) -> GPUParticles3D:
 	pm.damping_min = 1.5
 	pm.damping_max = 2.5
 	pm.gravity = Vector3(0, 0.6, 0)
-	pm.scale_curve = _curve([[0.0, 0.4], [1.0, 1.3]])
+	pm.scale_curve = curve([[0.0, 0.4], [1.0, 1.3]])
 	pm.angle_min = 0.0
 	pm.angle_max = 360.0
 	pm.angular_velocity_min = -30.0
 	pm.angular_velocity_max = 30.0
 	pm.anim_offset_min = 0.0
 	pm.anim_offset_max = 1.0
-	pm.color_ramp = _ramp([[0.0, Color(0.45, 0.2, 0.08, 0.0)], [0.12, Color(0.3, 0.17, 0.1, 0.6)],
+	pm.color_ramp = ramp([[0.0, Color(0.45, 0.2, 0.08, 0.0)], [0.12, Color(0.3, 0.17, 0.1, 0.6)],
 		[0.5, Color(0.13, 0.12, 0.12, 0.45)], [1.0, Color(0.1, 0.1, 0.1, 0.0)]])
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(size * 1.8, size * 1.8)
-	q.material = _billboard(load("res://assets/fx/smoke_sheet.png"), false, false, 4)
+	q.material = billboard(load("res://assets/fx/smoke_sheet.png"), false, false, 4)
 	p.draw_pass_1 = q
 	p.emitting = true
 	p.finished.connect(p.queue_free)
@@ -239,12 +239,12 @@ static func embers(extent: Vector3, amount := 120) -> GPUParticles3D:
 	pm.turbulence_noise_scale = 3.0
 	pm.turbulence_influence_min = 0.1
 	pm.turbulence_influence_max = 0.3
-	pm.color_ramp = _ramp([[0.0, Color(1.0, 0.6, 0.2, 0.0)], [0.1, Color(1.0, 0.55, 0.15) * 4.0],
+	pm.color_ramp = ramp([[0.0, Color(1.0, 0.6, 0.2, 0.0)], [0.1, Color(1.0, 0.55, 0.15) * 4.0],
 		[0.7, Color(1.0, 0.3, 0.05) * 2.0], [1.0, Color(0.6, 0.1, 0.0, 0.0)]])
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(0.09, 0.09)
-	q.material = _billboard(dot_texture(), true)
+	q.material = billboard(dot_texture(), true)
 	p.draw_pass_1 = q
 	p.visibility_aabb = AABB(-extent - Vector3(5, 0, 5), extent * 2 + Vector3(10, 15, 10))
 	return p
@@ -269,12 +269,12 @@ static func sparks(color: Color, amount := 24, speed := 4.0) -> GPUParticles3D:
 	pm.damping_max = 3.0
 	pm.scale_min = 0.6
 	pm.scale_max = 1.2
-	pm.scale_curve = _curve([[0.0, 1.0], [1.0, 0.3]])
-	pm.color_ramp = _ramp([[0.0, color * 3.0], [0.5, color * 1.6], [1.0, Color(color.r, color.g, color.b, 0.0)]], true)
+	pm.scale_curve = curve([[0.0, 1.0], [1.0, 0.3]])
+	pm.color_ramp = ramp([[0.0, color * 3.0], [0.5, color * 1.6], [1.0, Color(color.r, color.g, color.b, 0.0)]], true)
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(0.035, 0.32)
-	var m := _billboard(dot_texture(), true)
+	var m := billboard(dot_texture(), true)
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_DISABLED
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	q.material = m
@@ -302,12 +302,12 @@ static func shed(color: Color, amount: int, size: float, seconds: float, fall :=
 	pm.damping_max = 1.0
 	pm.scale_min = 0.5
 	pm.scale_max = 1.2
-	pm.scale_curve = _curve([[0.0, 1.0], [1.0, 0.0]])
-	pm.color_ramp = _ramp([[0.0, color * 2.5], [0.5, color * 1.5], [1.0, Color(color.r, color.g, color.b, 0.0)]], true)
+	pm.scale_curve = curve([[0.0, 1.0], [1.0, 0.0]])
+	pm.color_ramp = ramp([[0.0, color * 2.5], [0.5, color * 1.5], [1.0, Color(color.r, color.g, color.b, 0.0)]], true)
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(size, size)
-	q.material = _billboard(dot_texture(), true)
+	q.material = billboard(dot_texture(), true)
 	p.draw_pass_1 = q
 	return p
 

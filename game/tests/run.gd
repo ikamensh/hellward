@@ -9,7 +9,8 @@ var _main: Node
 
 
 func _ready() -> void:
-	for t in [test_scene_runs, test_intro_hands_over_the_camera, test_building_obeys_map_and_purse, test_wave_kills_pay_gold,
+	for t in [test_scene_runs, test_intro_hands_over_the_camera, test_building_obeys_map_and_purse,
+			test_early_wave_keeps_its_bonus, test_defeat_stops_the_battle, test_wave_kills_pay_gold,
 			test_shaman_curses_and_cleanse_lifts, test_mouse_builds_a_tower, test_scripted_defence_holds_tristram]:
 		_main = null
 		print("-- ", t.get_method())
@@ -113,6 +114,46 @@ func test_wave_kills_pay_gold() -> void:
 	check(w.lives > 0, "five arrow towers hold the first wave")
 
 
+## Calling the next wave before the field is clear still pays the earlier wave's clear bonus (regression).
+func test_early_wave_keeps_its_bonus() -> void:
+	var m := await start()
+	var w: World = m.world
+	w.gold = 400
+	for tile in [Vector2i(16, 7), Vector2i(11, 10), Vector2i(22, 5), Vector2i(13, 6), Vector2i(18, 11), Vector2i(28, 6)]:
+		w.build("arrow", tile)
+	w.call_wave()
+	await seconds(2)
+	w.call_wave()   # early: the first wave is still on the field
+	var expected: int = int(w.waves()[0]["clear_bonus"]) + int(w.waves()[1]["clear_bonus"])
+	var before := w.gold
+	for i in 200:
+		await seconds(1)
+		if not w.wave_active():
+			break
+	check(not w.wave_active(), "both waves end")
+	check(w.paid == 1, "both waves are paid")
+	check(w.gold >= before + expected, "the gold includes both clear bonuses")
+
+
+## When the last life goes, the battle stops where it stands: no more shots, kills or gold (regression).
+func test_defeat_stops_the_battle() -> void:
+	var m := await start()
+	var w: World = m.world
+	w.gold = 100
+	w.build("arrow", Vector2i(16, 7))
+	w.lives = 1
+	w.call_wave()
+	for i in 120:
+		await seconds(1)
+		if w.outcome != "":
+			break
+	check(w.outcome == "lost", "a lone tower loses Tristram with one life")
+	var gold := w.gold
+	await seconds(5)
+	check(w.gold == gold, "no gold changes after the defeat")
+	check(w.near(w.level.centre(), 999.0).is_empty(), "towers find nothing to shoot")
+
+
 ## A Fallen Shaman curses a tower near its path; Cleanse lifts the curse for mana.
 func test_shaman_curses_and_cleanse_lifts() -> void:
 	var m := await start()
@@ -122,7 +163,7 @@ func test_shaman_curses_and_cleanse_lifts() -> void:
 	for tile in [Vector2i(9, 6), Vector2i(12, 6), Vector2i(14, 6), Vector2i(8, 10), Vector2i(11, 10)]:
 		towers.append(w.build("arrow", tile))
 	check(not towers.has(null), "five towers stand by the lanes")
-	w.spawners.append({"kind": "shaman", "left": 1, "interval": 1.0, "next": w.time, "life": 50.0})
+	w.spawners.append({"kind": "shaman", "left": 1, "interval": 1.0, "next": w.time, "life": 50.0, "wave": 0})
 	var cursed: Tower = null
 	for i in 40 * 30:
 		await frames(1)

@@ -64,7 +64,13 @@ func _ready() -> void:
 		intro.play(self)
 	elif not args.has("film"):
 		world.announce.emit("Tristram", "The village under the cathedral burns. Hold the sanctuary.")
-	Sfx.music("battle_tristram")
+		Sfx.music("battle_tristram", -8.0, 0.01)
+	# as in the 2D game: the title's music after a victory, silence under the defeat
+	world.finished.connect(func(won: bool):
+		if won:
+			Sfx.music("title", -6.0, 4.0)
+		else:
+			Sfx.stop_music(4.0))
 	if args.has("shot"):
 		Shots.frame(self, args["shot"])
 	if args.has("snap"):

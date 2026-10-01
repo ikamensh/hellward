@@ -43,7 +43,7 @@ static func explosion(parent: Node, at: Vector3, color: Color, ground := true) -
 	var q := QuadMesh.new()
 	q.size = Vector2.ONE
 	flash.mesh = q
-	var m := Fx._billboard(Fx.dot_texture(), true)
+	var m := Fx.billboard(Fx.dot_texture(), true)
 	m.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	m.billboard_keep_scale = true
 	m.vertex_color_use_as_albedo = false
@@ -94,14 +94,14 @@ static func dust(parent: Node, at: Vector3, size: float) -> void:
 	pm.gravity = Vector3(0, -0.5, 0)
 	pm.damping_min = 1.0
 	pm.damping_max = 2.0
-	pm.scale_curve = Fx._curve([[0.0, 0.4], [1.0, 1.0]])
+	pm.scale_curve = Fx.curve([[0.0, 0.4], [1.0, 1.0]])
 	pm.anim_offset_max = 1.0
-	pm.color_ramp = Fx._ramp([[0.0, Color(0.35, 0.3, 0.25, 0.0)], [0.15, Color(0.35, 0.3, 0.25, 0.6)],
+	pm.color_ramp = Fx.ramp([[0.0, Color(0.35, 0.3, 0.25, 0.0)], [0.15, Color(0.35, 0.3, 0.25, 0.6)],
 		[1.0, Color(0.3, 0.27, 0.24, 0.0)]])
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(1.6, 1.6)
-	q.material = Fx._billboard(load("res://assets/fx/smoke_sheet.png"), false, true, 4)
+	q.material = Fx.billboard(load("res://assets/fx/smoke_sheet.png"), false, true, 4)
 	p.draw_pass_1 = q
 	p.emitting = true
 	_one_shot(parent, p, at + Vector3(0, 0.3, 0), 2.0)
@@ -211,7 +211,7 @@ static func _bolt_leg(im: ImmediateMesh, path: PackedVector3Array, eye: Vector3,
 static func _jagged(a: Vector3, b: Vector3, rng: RandomNumberGenerator) -> PackedVector3Array:
 	var pts := PackedVector3Array([a, b])
 	var sway := a.distance_to(b) * 0.2
-	while pts[0].distance_to(pts[1]) > 0.25 and pts.size() < 64:
+	while (pts.size() < 3 or pts[0].distance_to(pts[1]) > 0.25) and pts.size() < 64:   # forks need an inner point
 		var next := PackedVector3Array()
 		for i in pts.size() - 1:
 			next.append(pts[i])
