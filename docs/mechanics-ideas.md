@@ -24,8 +24,9 @@ make the mode a build choice rather than a plain upgrade.
 
 **Curses taken.** Slay the Spire's Evolve and Fire Breathing turn the enemy's junk into fuel. Here: a Martyr's Candle
 that answers a curse landing on it with a bolt at the caster, or an Effigy as a lightning rod. The rollouts price
-them with no new planner code, and the leaders' minds overlay shows leaders curse around them. Placing one shapes
-where leaders curse.
+them with no new planner code, so leaders may curse around them; that is a side effect, not a goal (Ilya dropped
+"prefer verbs that change what leaders decide" on 2026-10-01). With Cleanse gone, a curse taken is a cost the player
+plans for rather than clicks away, which makes it a better verb.
 
 **Overkill.** Readable only because the numbers stay small: a hit of 4 into 1 life left shows 3 wasted. Absolute
 armor pushes toward heavy hitters, heavy hitters overkill small monsters, and an overkill relic makes that build hold
@@ -49,6 +50,16 @@ Counter relics, shown as pips on the towers they affect:
 
 - Arrow towers deal double damage once every 10 attacks.
 - Every third spell costs no mana.
+
+## Global spells
+
+Spells kill one or two strays, or lend a tower a strong, short boost that the leaders' curses will likely go for.
+
+- **Smite:** holy damage to one monster, no resistance; enough to finish a stray at half life.
+- **Frozen Orb, Meteor:** stop or burn a small knot that slipped through.
+- **Battle Hymn:** one tower strikes twice as fast for 6 s. The planner's rollouts see a tower dealing more damage,
+  so the next curse is likely to land on it: a boost is worth most where leaders cannot reach.
+- **Consecrate:** a tower ignores armor for 8 s.
 
 ## A first set
 
