@@ -5,7 +5,7 @@
 | Measure | Implementation | Verification |
 | --- | --- | --- |
 | Painted character identity | Eight authored bind views for Fallen, Skeleton and Zombie; no changing paint inside an action | Review all bearings and the real battle comparison |
-| Stable surfaces and proportions | Eleven overlapping parts per view, reused for walk, hit, strike and death | Fixed texture and hit-size integration properties |
+| Stable surfaces and proportions | Eleven overlapping parts per view, reused for walk, hit, strike and death | Fixed texture, shared depth interval and hit-size integration properties |
 | Individual movement | Fallen's quick bouncing stride, Skeleton's restrained shield gait, Zombie's asymmetric shuffle | Continuous 60 fps renderer preview |
 | Directional movement | Eight true views; same motion phase through turns, existing tangent smoothing and direction hysteresis | Route integration test and all-bearing preview |
 | Impact and death | Recoil overlays the current gait; quick imp fall, scattered bones, slow heavy corpse collapse | Transition, pause, speed and cleanup integration tests |
@@ -33,12 +33,16 @@ in a still. Quantitative properties catch drift and broken playback; they cannot
 back-to-front layer order, and hidden-part donors. The source scale is fixed per view and independent
 of action. Texture extraction assigns remaining pixels to the nearest bone and overlaps joint edges.
 Transparent noise below alpha 12 is discarded. Hidden limbs are copied only from explicit donors;
-missing painted parts raise an error. This is asset preparation, not runtime image generation.
+missing painted parts raise an error. This is preparation at load time, not runtime image generation.
 
-`hellward/art/puppet.py` prepares bone-aligned trimmed textures and supplies continuous poses.
+`hellward/art/puppet.py` prepares bone-aligned trimmed textures and 64 periodic joint samples per view. Runtime interpolates
+those samples and overlays impact/strike/death poses.
 `hellward/ui/puppet.py` submits their transforms through the engine's public sprite API. Surface
-textures never change during a walk or impact. A death snapshots the last rendered pose; attacking
-arms keep their layer order when death begins. The battle owns all clocks, including pause and speed.
+textures never change during a walk or impact. Hidden Skeleton arms and legs are taken from explicit
+painted front-view donors; Zombie arm masks and pivots are registered separately in each view. A death snapshots the last rendered pose; attacking
+arms keep their layer order when death begins. The battle owns all clocks, including pause and speed. Every piece shares the middle of the root's
+8px sorting interval: this prevents floating point cancellation from splitting a body between draw
+groups at an exact boundary. A regression check reproduces that failure on an uncorrected body.
 
 The design has limits: turns still select eight views, limbs are flat painted surfaces, and the gait
 uses projected foot motion rather than a full 3D foot constraint. Large rotations can expose joint
@@ -81,3 +85,6 @@ Skeleton's accepted material edit used this final prompt:
 The edit moved the painted figures despite its placement constraint. Each view's source joints,
 regions, height and ground were registered to its edited bounding box before texture extraction;
 this alignment is encoded in `skeleton-rig.json`, not inferred while playing.
+
+API second-opinion review was attempted with Gemini 3.1 Pro and Claude Opus 4.8; both failed
+because the local CLI could not authenticate. No external review conclusion is claimed.

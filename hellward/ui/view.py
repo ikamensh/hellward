@@ -64,7 +64,7 @@ def facing_of(dx: float, dy: float) -> str:
 @dataclass
 class Figure:
     monster: Monster
-    sprite: Sprite
+    sprite: Sprite | None
     shadow: Sprite
     prev: float
     aura: Sprite | None = None
@@ -203,6 +203,7 @@ class WorldView:
     def _show_frame(figure: Figure, frame: str) -> None:
         family = "mon3d" if figure.rigged else "mon"
         name = f"{family}/{figure.monster.kind.key}/{figure.facing}/{frame}"
+        assert figure.sprite is not None
         if figure.sprite.image != name:
             figure.sprite.image = name
 
@@ -215,12 +216,13 @@ class WorldView:
                        (self.art.monster_style == "mixed" and
                         bool(random.Random(f"{monster.kind.key}:{monster.id}").getrandbits(1)))))
         family = "mon3d" if use_rigged else "mon"
-        sprite = self.scene.add_sprite(placed(f"{family}/{monster.kind.key}/{facing}/walk1", cell, x, y))
+        sprite = None
         body = None
         if monster.kind.key in self.art.puppets:
-            sprite.visible = False
             body = PuppetBody(self.scene, monster.kind.key, facing)
             body.walk(facing, monster.s, x, y)
+        else:
+            sprite = self.scene.add_sprite(placed(f"{family}/{monster.kind.key}/{facing}/walk1", cell, x, y))
         size = monster.kind.size
         shadow = self.scene.add_sprite(Sprite("fx/shadow", position=(x, y + 2),
                                               size=(T * size * 1.1, T * size * 0.4), layer=RenderLayer.OBJECTS))
@@ -245,7 +247,8 @@ class WorldView:
             # Death starts at the rules' final position, even when it happened between rendered frames.
             figure.x, figure.y = self.monster_point(figure.monster)
             cell = self.art.monster[figure.monster.kind.key]
-            figure.sprite.position = (figure.x - cell.origin[0], figure.y - cell.origin[1])
+            if figure.sprite is not None:
+                figure.sprite.position = (figure.x - cell.origin[0], figure.y - cell.origin[1])
             figure.shadow.position = (figure.x, figure.y + 2)
         else:
             figure.shadow.remove()
@@ -383,9 +386,9 @@ class WorldView:
                 frame = figures.WALK[int(s / figures.STRIDE) % 4]
             cell = self.art.monster[m.kind.key]
             sprite = figure.sprite
-            if figure.puppet is None:
+            if sprite is not None:
                 self._show_frame(figure, frame)
-            sprite.position = (x - cell.origin[0], y_draw - cell.origin[1])
+                sprite.position = (x - cell.origin[0], y_draw - cell.origin[1])
             tint = (1.0, 1.0, 1.0)
             if m.frozen > 0:
                 tint = (0.55, 0.78, 1.0)
@@ -396,7 +399,8 @@ class WorldView:
             if figure.flash > 0:
                 figure.flash -= motion_dt
                 tint = figure.flash_tint
-            sprite.tint = tint
+            if sprite is not None:
+                sprite.tint = tint
             if figure.puppet is not None:
                 figure.puppet.update(figure.facing, s, x, y_draw, hit=hit, attack=attack, tint=tint)
             figure.shadow.position = (x, y + 2)
@@ -415,6 +419,7 @@ class WorldView:
                                      death=figure.dying, fall=figure.fall)
                 figure.shadow.opacity = round(150 * min(1.0, max(0.0, (lifetime - figure.dying) / 0.35)))
             elif kind in figures.ENHANCED:
+                assert figure.sprite is not None
                 frame_dt, lifetime = DEATH_TIMING[kind]
                 death_frames = figures.death_frames(kind)
                 frame = death_frames[min(int(figure.dying / frame_dt), len(death_frames) - 1)]
@@ -424,13 +429,15 @@ class WorldView:
                 figure.sprite.opacity = int(255 * (1 - min(1.0, fade)))
                 figure.shadow.opacity = int(150 * (1 - min(1.0, fade)))
             else:
+                assert figure.sprite is not None
                 lifetime = LEGACY_DEATH_LIFE
                 t = min(1.0, figure.dying / 0.45)
                 figure.sprite.rotation = figure.fall * 80 * (t * t)
                 figure.sprite.opacity = int(255 * (1 - max(0.0, (figure.dying - 0.3) / 0.5)))
             figure.dying += motion_dt
             if figure.dying > lifetime:
-                figure.sprite.remove()
+                if figure.sprite is not None:
+                    figure.sprite.remove()
                 if figure.puppet is not None:
                     figure.puppet.remove()
                 if figure.monster.kind.key in figures.ENHANCED:

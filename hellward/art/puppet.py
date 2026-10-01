@@ -217,6 +217,7 @@ def _width(kind: str, name: str) -> float:
 def register(game, kinds: tuple[str, ...]) -> None:
     for kind in kinds:
         for facing in figures.facings(kind):
+            _walk_samples(kind, facing)
             for name in BONES:
                 game.assets.image_from_pil(f"puppet/{kind}/{facing}/{name}", part(kind, facing, name).image)
     # Full-resolution masks are only needed during texture preparation.
@@ -267,6 +268,24 @@ def walk_joints(kind: str, facing: str, phase: float, source: Rig) -> dict[str, 
     return points
 
 
+
+@lru_cache(maxsize=24)
+def _walk_samples(kind: str, facing: str) -> tuple[tuple[str, ...], np.ndarray]:
+    """Prepare one periodic motion curve; runtime interpolates the joint positions."""
+    source = rig(kind, facing)
+    names = tuple(source.joints)
+    samples = [walk_joints(kind, facing, phase / 64, source) for phase in range(64)]
+    return names, np.array([[sample[name] for name in names] for sample in samples])
+
+
+def _walking(kind: str, facing: str, phase: float) -> dict[str, np.ndarray]:
+    names, samples = _walk_samples(kind, facing)
+    frame = (phase % 1.0) * len(samples)
+    index = int(frame)
+    blend = frame - index
+    points = samples[index] * (1 - blend) + samples[(index + 1) % len(samples)] * blend
+    return dict(zip(names, points))
+
 def _rotate(point: np.ndarray, pivot: np.ndarray, degrees: float) -> np.ndarray:
     angle = math.radians(degrees)
     c, s = math.cos(angle), math.sin(angle)
@@ -288,7 +307,11 @@ def live_pose(kind: str, facing: str, distance: float, *, hit: float = -1.0,
               attack: float = -1.0) -> Endpoints:
     """Add reactions to the current gait rather than switching to a new body."""
     source = rig(kind, facing)
-    points = walk_joints(kind, facing, distance / CYCLE[kind] if attack < 0 else 0.23, source)
+    points = _walking(kind, facing, distance / CYCLE[kind])
+    if attack >= 0:
+        stance = _walking(kind, facing, 0.23)
+        settle = _curve(attack, ((0, 0), (0.15, 1)))
+        points = {name: point + (stance[name] - point) * settle for name, point in points.items()}
     forward = BEARINGS[facing]
     side = forward[0] if abs(forward[0]) > 0.1 else 1.0
     upper = ("neck", "crown", "r_shoulder", "l_shoulder", "r_elbow", "l_elbow", "r_wrist", "l_wrist", "hem")

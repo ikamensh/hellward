@@ -207,11 +207,11 @@ def _needs_render(kind: str, cache: Path) -> bool:
     return not _painted_matches(kind)
 
 
-def warm(cache_dir: Path) -> Path:
+def warm(cache_dir: Path, *, skip: frozenset[str] = frozenset()) -> Path:
     """Render every missing stand-in the paintings do not replace into the cache, in parallel; returns the folder."""
     cache = cache_dir / f"art-{art_version()}"
     cache.mkdir(parents=True, exist_ok=True)
-    missing = [kind for kind in MONSTERS if _needs_render(kind, cache)]
+    missing = [kind for kind in MONSTERS if kind not in skip and _needs_render(kind, cache)]
     if missing:
         with ProcessPoolExecutor(min(len(missing), os.cpu_count() or 4)) as pool:
             list(pool.map(_render_kind, missing, [cache] * len(missing)))
@@ -228,7 +228,7 @@ class Art:
     painted: set[str]
     monster_painted: dict[str, frozenset[str]]  # registered facing/frame names resolved from paintings
     rigged: frozenset[str]             # kinds with a baked 3D alternative registered
-    monster_style: str                 # painted, mixed, or rigged; fixed when the game loads art
+    monster_style: str                 # painted, puppet, mixed, or rigged; fixed when the game loads art
     puppets: frozenset[str] = frozenset()
 
 
@@ -248,17 +248,25 @@ def _tower_outline(image: Image.Image) -> Image.Image:
 
 
 def register(game: Game, cache_dir: Path) -> Art:
-    cache = warm(cache_dir)
     assets = game.assets
     style = os.environ.get("HELLWARD_MONSTER_STYLE", "painted")
     if style not in {"painted", "mixed", "rigged", "puppet"}:
         raise ValueError(f"HELLWARD_MONSTER_STYLE must be painted, mixed, rigged, or puppet; got {style!r}")
     if procedural():
         style = "painted"
+    puppet_kinds = frozenset(puppet.KINDS) if style == "puppet" else frozenset()
+    cache = warm(cache_dir, skip=puppet_kinds)
+    if puppet_kinds:
+        puppet.register(game, puppet.KINDS)
     painted: set[str] = set()
     monster_painted: dict[str, frozenset[str]] = {}
     cells: dict[str, Cell] = {}
     for kind in MONSTERS:
+        if kind in puppet_kinds:
+            cells[kind] = _cell(*figures.cell(kind))
+            monster_painted[kind] = frozenset()
+            painted.add(kind)
+            continue
         sheet, frames, provenance = _load_monster(kind, cache)
         monster_painted[kind] = provenance
         if provenance:
@@ -286,9 +294,6 @@ def register(game: Game, cache_dir: Path) -> Art:
             for key, image in images.items():
                 assets.image_from_pil(f"mon3d/{kind}/{key}", image)
             rigged_kinds.add(kind)
-    puppet_kinds = frozenset(puppet.KINDS) if style == "puppet" else frozenset()
-    if puppet_kinds:
-        puppet.register(game, puppet.KINDS)
     towers = _painted_cells("towers")
     for kind in structures.TOWER_KINDS:
         for rank in range(3):

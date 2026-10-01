@@ -37,8 +37,8 @@ def record(out: Path) -> None:
                 asset_path=cache, save_dir=scratch / "saves")
     encoder = None
     try:
-        build(game, cache)
         puppet.register(game, puppet.KINDS)
+        build(game, cache)
         scene = Scene()
         game.push(scene)
         scene.add_sprite(Sprite(sprites.ground(game, TRISTRAM), position=(0, 0),
@@ -50,7 +50,7 @@ def record(out: Path) -> None:
                                     size=(29, 10), opacity=150, layer=RenderLayer.OBJECTS))
         encoder = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",
                  "-s", "1280x800", "-r", "60", "-i", "-", "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                 "-crf", "18", str(out / "puppet-walk.mp4")], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+                 "-crf", "18", str(out / "motions.mp4")], stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         assert encoder.stdin is not None and encoder.stderr is not None
         frames = []
         pose_seconds = 0.0
@@ -82,7 +82,7 @@ def record(out: Path) -> None:
             contact.paste(frame, (i % 3 * 1280, i // 3 * 800))
         contact.save(out / "contact-sheet.png")
         print(f"24 painted rigs, {len(bodies) * len(puppet.BONES)} parts: mean pose/update {pose_seconds / 420 * 1000:.2f}ms per frame")
-        print(f"wrote {out / 'puppet-walk.mp4'}")
+        print(f"wrote {out / 'motions.mp4'}")
     finally:
         if encoder is not None:
             encoder.kill()
@@ -99,7 +99,7 @@ def record_battle(out: Path) -> None:
     from hellward.sim.model import Monster
     from hellward.ui.battle import BattleScene
 
-    os.environ["HELLWARD_MONSTER_STYLE"] = "puppet"
+    os.environ["HELLWARD_MONSTER_STYLE"] = "painted"
     os.environ.pop("HELLWARD_ART", None)
     os.environ.setdefault("SAGA2D_SILENT", "1")
     out.mkdir(parents=True, exist_ok=True)
@@ -109,7 +109,9 @@ def record_battle(out: Path) -> None:
                 asset_path=cache, save_dir=scratch / "save")
     encoder = None
     try:
+        puppet.register(game, puppet.KINDS)
         art = build(game, cache)
+        art = replace(art, puppets=frozenset(puppet.KINDS), monster_style="puppet")
         lanes = [(kind, style, 3 + i * 2) for i, (kind, style) in enumerate(
                  (pair for kind in puppet.KINDS for pair in ((kind, "painted"), (kind, "puppet"))))]
         routes = tuple(Route(f"{kind}_{style}", ((0, y), (28, y), (28, 8), (32, 8))) for kind, style, y in lanes)
@@ -160,11 +162,14 @@ def record_battle(out: Path) -> None:
             encoder.stdin.write(frame.tobytes())
             if index in (48, 123, 193, 211, 270, 306):
                 frames.append(frame)
-                strip = Image.new("RGB", (6 * 160, 190), (24, 20, 23))
+                strip = Image.new("RGB", (6 * 160, 180), (24, 20, 23))
                 for i, figure in enumerate(figures_by_lane):
                     sx, sy = scene.camera.world_to_screen(figure.x, figure.y)
-                    crop = frame.crop((round(sx - 40), round(sy - 80), round(sx + 40), round(sy + 10)))
-                    strip.paste(crop.resize((160, 180)), (i * 160, 10))
+                    crop = frame.crop((round(sx - 40), round(sy - 67), round(sx + 40), round(sy + 10)))
+                    strip.paste(crop.resize((160, 154)), (i * 160, 26))
+                labels = ImageDraw.Draw(strip)
+                for i, (kind, style, _) in enumerate(lanes):
+                    labels.text((i * 160 + 5, 3), f"{kind} {style}", fill=(255, 235, 200))
                 details.append(strip)
         encoder.stdin.close()
         error = encoder.stderr.read().decode()
@@ -172,10 +177,10 @@ def record_battle(out: Path) -> None:
             raise RuntimeError(error)
         encoder = None
         contact = Image.new("RGB", (2560, 2400))
-        detail = Image.new("RGB", (960, 1140))
+        detail = Image.new("RGB", (960, 1080))
         for i, (frame, strip) in enumerate(zip(frames, details)):
             contact.paste(frame, (i % 2 * 1280, i // 2 * 800))
-            detail.paste(strip, (0, i * 190))
+            detail.paste(strip, (0, i * 180))
         contact.save(out / "battle-contact.png")
         detail.save(out / "battle-detail.png")
         print(f"wrote {out / 'battle.mp4'}")

@@ -7,6 +7,7 @@ from dataclasses import replace
 
 import pytest
 from saga2d import Game, Scene
+from saga2d.rendering.layers import Y_SORT_STEP
 
 from hellward.art import puppet
 from hellward.ui.puppet import PuppetBody
@@ -29,13 +30,16 @@ def test_every_bearing_walks_using_fixed_painted_parts(stage):
     for kind in puppet.KINDS:
         for facing in puppet.BEARINGS:
             body = PuppetBody(scene, kind, facing)
-            body.walk(facing, 0, 500, 300)
+            body.walk(facing, 0, 500, 304)
             names = tuple(sprite.image for sprite in body.sprites)
             previous = tuple(sprite.position for sprite in body.sprites)
             positions = set()
             for i in range(1, 61):
-                body.walk(facing, i / 60 * puppet.CYCLE[kind], 500, 300)
+                body.walk(facing, i / 60 * puppet.CYCLE[kind], 500, 304)
                 assert tuple(sprite.image for sprite in body.sprites) == names
+                # The engine sorts at 8px intervals. Every piece must stay in the
+                # root's interval, even when cancellation happens at a bin boundary.
+                assert {int(sprite.top_left[1] + sprite.height - sprite.ground) // Y_SORT_STEP for sprite in body.sprites} == {304 // Y_SORT_STEP}
                 current = tuple(sprite.position for sprite in body.sprites)
                 assert all(math.dist(a, b) < 4 for a, b in zip(previous, current)), (kind, facing, i)
                 assert all(math.isfinite(value) and value > 0 for sprite in body.sprites for value in sprite.size)
@@ -82,6 +86,31 @@ def test_death_starts_in_place_and_settles_before_fading(stage):
         assert all(sprite.opacity == 0 for sprite in body.sprites)
         body.remove()
 
+
+
+def test_strike_keeps_the_walking_body_and_its_death_continuous(stage):
+    """Starting a strike cannot snap to an unrelated stance; killing it keeps the visible pose."""
+    _, scene = stage
+    for kind in puppet.KINDS:
+        for facing in puppet.BEARINGS:
+            body = PuppetBody(scene, kind, facing)
+            body.walk(facing, 0.17, 500, 300)
+            before = {sprite.image: (sprite.position, sprite.rotation, sprite.size) for sprite in body.sprites}
+            body.update(facing, 0.17, 500, 300, attack=0)
+            for sprite in body.sprites:
+                position, rotation, size = before[sprite.image]
+                assert sprite.position == pytest.approx(position)
+                assert sprite.rotation == pytest.approx(rotation)
+                assert sprite.size == pytest.approx(size)
+            body.update(facing, 0.17, 500, 300, attack=0.32)
+            struck = [(sprite.image, sprite.position, sprite.rotation) for sprite in body.sprites]
+            assert max(math.dist(sprite.position, before[sprite.image][0]) for sprite in body.sprites) > 4
+            body.update(facing, 0.17, 500, 300, death=0)
+            for sprite, (image, position, rotation) in zip(body.sprites, struck):
+                assert sprite.image == image
+                assert sprite.position == pytest.approx(position)
+                assert sprite.rotation == pytest.approx(rotation)
+            body.remove()
 
 def test_battle_uses_live_rigs_through_turns_pause_hits_and_death(tmp_path, monkeypatch):
     """Exercise the new body on the game's clock, including its retained cleanup."""
@@ -136,7 +165,7 @@ def test_battle_uses_live_rigs_through_turns_pause_hits_and_death(tmp_path, monk
             for _ in range(30):
                 game.tick(1 / 60)
             assert all(sprite.is_removed for sprite in figure.puppet.sprites)
-            assert figure.sprite.is_removed and figure.shadow.is_removed
+            assert figure.sprite is None and figure.shadow.is_removed
             assert figure not in scene.view.dying
     finally:
         game.close()

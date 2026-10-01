@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import math
+
 from saga2d import RenderLayer, Scene, Sprite
+from saga2d.rendering.layers import Y_SORT_STEP
 
 from hellward.art import puppet
 
@@ -19,16 +22,20 @@ class PuppetBody:
 
     def draw(self, facing: str, pose: puppet.Endpoints, x: float, y: float, *,
              tint: tuple[float, float, float] = (1.0, 1.0, 1.0), opacity: int = 255) -> None:
+        # Use the middle of the root's sorting interval. Floating point cancellation
+        # at an exact boundary could otherwise send body pieces into different groups.
+        sorting_y = math.floor(y / Y_SORT_STEP) * Y_SORT_STEP + Y_SORT_STEP * 0.5
         for sprite, name in zip(self.sprites, self.order):
             a, b = pose[name]
             transform = puppet.transform(self.kind, facing, name, a, b)
             image = f"puppet/{self.kind}/{facing}/{name}"
             if sprite.image != image:
                 sprite.image = image
-            sprite.size = transform.size
+            if any(abs(a - b) > 1e-6 for a, b in zip(sprite.size, transform.size)):
+                sprite.size = transform.size
             sprite.position = (x + transform.center[0], y + transform.center[1])
             sprite.rotation = transform.rotation
-            sprite.ground = transform.center[1] + transform.size[1] * 0.5
+            sprite.ground = sprite.position[1] + sprite.height * 0.5 - sorting_y
             sprite.tint = tint
             sprite.opacity = opacity
 

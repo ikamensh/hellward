@@ -26,13 +26,40 @@ were sometimes as large as the approved contact-to-contact change, even though o
 have moved partway. We discarded that candidate. More frames only help when identity and surface
 detail stay stable through the motion.
 
+## Painted 2.5D pilot
+
+The flat 3D blockout failed the visual target. Adding animation alone could not repair its silhouette,
+anatomy, or materials. The new [painted rig pilot](painted-rigs.md) instead authors one detailed painted
+body in eight views, splits each into overlapping jointed parts, and reuses those same surfaces in
+continuous walks, impacts, strikes and deaths. Fallen, Skeleton and Zombie are implemented and can
+be selected with `HELLWARD_MONSTER_STYLE=puppet`. The approved frame paintings remain the default
+while the pilot is reviewed. New bind painting provenance, integration checks and reproduction
+commands are recorded in the pilot document.
+
+This is a useful near-term method with the pinned engine: it reduces changing anatomy and texture
+between frames and permits different timing without repainting a strip. It still uses flat limbs and
+view changes. A finished textured 3D character remains the stronger source for arbitrary yaw and
+large limb rotations. The 3D quality measures should be explicit: match the painted silhouette first,
+sculpt the skull/horns/shoulders/hands, unwrap and paint skin/bone/cloth separately, preserve contact
+shadows and edges, then rig and author the character's gait and reactions. An unpainted blockout is
+an inadequate preview of that production route.
+
+A further 2.5D alternative is **weighted painted meshes**: joint weights bend a single painted
+surface across an elbow or shoulder instead of rotating independent rigid pieces. This can hide
+joint seams and add cloth or flesh follow-through, at the cost of mesh/weight authoring and a runtime
+mesh renderer or offline baking. [Spine's weights documentation](https://en.esotericsoftware.com/spine-weights)
+explains that model. A separate **3D-to-painted hybrid** would use a sculpted rig for positions,
+handedness and occlusion, then paint stable UV textures or fixed projected views. It requires both
+finished geometry and a disciplined texture pipeline; independently repainting every rendered frame
+would recreate the original flicker.
+
 ## Choices
 
 | Method | What it solves | New cost | Fit here |
 | --- | --- | --- | --- |
-| **Rigged 3D, rendered offline to sprites** | One model fixes identity, proportions, handedness, and bearing consistency. Curves can supply many walk, hit, and death samples. Saga2D keeps its current sprite renderer. | Model, UV/material, rig, animation, fixed-camera export tooling; many rendered cells and atlas memory. | **Best next production experiment.** |
+| **Rigged 3D, rendered offline to sprites** | One model fixes identity, proportions, handedness, and bearing consistency. Curves can supply many walk, hit, and death samples. Saga2D keeps its current sprite renderer. | Model, UV/material, rig, animation, fixed-camera export tooling; many rendered cells and atlas memory. | Strongest route to fully spatial characters; finish art before judging animation. |
 | **Runtime 3D characters over the 2D floor** | Smooth joint and yaw motion without baking every view; dynamic light and equipment variation. | A new skinned-mesh renderer, depth ordering, camera matching, shadows, lighting and performance work across backends. | Most flexible, highest engine risk. |
-| **Layered 2D bone rig** | Continuous motion from fewer painted parts; small atlas and easy recolors. | Every part needs pivot and overlap rules. Diagonal views, occlusion, and a corpse breaking apart need separate art. | Good for mostly planar creatures, weaker for these eight-bearing humanoids. |
+| **Layered 2D bone rig** | Continuous motion from fewer painted parts; small atlas and easy recolors. | Every part needs pivot and overlap rules. Diagonal views, occlusion, and a corpse breaking apart need separate art. | Current painted pilot; eight authored views make it viable, with planar deformation limits. |
 | **Painted sprites with registration and sequence checks** | Keeps the current visual style and renderer; catches the present defects before merge. | Every bearing and action still needs hand correction; geometry remains independent from frame to frame. | Necessary immediately, but ongoing authoring remains expensive. |
 
 Optical-flow interpolation is a small stopgap only. It invents pixels between incompatible shapes and
