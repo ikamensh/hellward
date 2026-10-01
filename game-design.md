@@ -39,16 +39,11 @@ and exhausting. Damage is not a verb.
 - Prefer verbs that change what the leaders decide. Their planner simulates the real rules, so a mechanic that feeds
   on or punishes a curse is priced by the leaders, and the player watches them adapt. The planner's cheap shortlist
   has to learn each such rule; `tools/curse_quality.py` shows when it has not.
-- Never trigger on per-hit or per-step events (a monster is hit, a monster enters reach): too frequent to see, chosen
-  by nobody, and the road to numbers without end.
-- Consuming a debuff can be a verb. A new debuff per relic is not wanted.
-
-## Predictable, not random
-
-- No chance procs. A relic fires on a count ("once every 10 attacks"), and the count is shown, so the player knows
+- Consuming a debuff can be a verb. 
+- A new mechanic per relic is not wanted, relics interact with existing ones
+- some relics can enable you to use tech you would not have access to otherwise. Many relics come with downsides too.
+- No chance procs. A relic fires on a count ("once every 10 attacks") or other predictable condition (last hit two monsters over last minute)
   when it lands. Simple counter relics are fine; a relic does not have to be clever.
-- Triggers, counters and the enemy's actions on the map are visible before they matter. A great player plans
-  around them, which is how they build the advantage of (3).
 
 ## Real estate
 
