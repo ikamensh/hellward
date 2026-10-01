@@ -50,7 +50,7 @@ func hold(kind: String) -> void:
 	held = kind
 	if _ghost:
 		_ghost.queue_free()
-	_ghost = Models.make("tower_arrow_1" if kind == "arrow" else "tower_" + kind)
+	_ghost = Models.make(Tower.model_name(kind, 0))
 	for mi in _ghost.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_override = _ghost_mat
 		(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

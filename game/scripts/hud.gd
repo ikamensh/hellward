@@ -601,7 +601,7 @@ func _portrait(kind: String, rank: int, px: int, live: bool) -> Array:
 	add_child(vp)
 	var pivot := Node3D.new()
 	vp.add_child(pivot)
-	var model := Models.make("tower_arrow_%d" % (rank + 1) if kind == "arrow" else "tower_" + kind)
+	var model := Models.make(Tower.model_name(kind, rank))
 	pivot.add_child(model)
 	Tower.dress_fx(model, kind, rank)
 	var box := _bounds(model)

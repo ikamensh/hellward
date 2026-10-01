@@ -46,6 +46,11 @@ func _ready() -> void:
 	Vfx.dust(world, global_position, 1.6)
 
 
+## The model a tower of `kind` and `rank` (0..2) wears: Arrow Towers have one per rank, the others grow.
+static func model_name(kind: String, rank: int) -> String:
+	return "tower_arrow_%d" % (rank + 1) if kind == "arrow" else "tower_" + kind
+
+
 func title() -> String:
 	return NAMES[kind]
 
@@ -65,8 +70,7 @@ func threat() -> float:
 func _dress() -> void:
 	if _model:
 		_model.queue_free()
-	var model_name := "tower_%s_%d" % [kind, rank + 1] if kind == "arrow" else "tower_" + kind
-	_model = Models.make(model_name)
+	_model = Models.make(model_name(kind, rank))
 	add_child(_model)
 	if kind != "arrow":
 		_model.scale = Vector3.ONE * (1.0 + 0.14 * rank)
