@@ -100,6 +100,35 @@ func _burn_prop(pos: Vector3, size: float) -> void:
 	add_child(light)
 
 
+## A dry-stone wall round the field on its border ring, broken here and there, open where the road comes in
+## from the portal and leaves for the cathedral, gapped by burning wreckage and the odd gate between piers.
+func _walls() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 9
+	var gaps := [Vector2(12, 35), Vector2(26, 35), Vector2(50, 1), Vector2(64.5, 33)]
+	var runs := [  # start, end, facing: the north and south edges run along x, the west and east along z
+		[Vector2(2, 1), Vector2(64, 1), 0.0], [Vector2(2, 35), Vector2(64, 35), 180.0],
+		[Vector2(1, 2), Vector2(1, 13), 90.0], [Vector2(1, 22), Vector2(1, 34), 90.0],
+		[Vector2(65, 2), Vector2(65, 15), -90.0], [Vector2(65, 24), Vector2(65, 34), -90.0],
+	]
+	for run in runs:
+		var a: Vector2 = run[0]
+		var b: Vector2 = run[1]
+		var n := int(a.distance_to(b) / 4.0)
+		for i in n:
+			var c := a.lerp(b, (i + 0.5) / n)
+			if gaps.any(func(g): return c.distance_to(g) < 3.0):
+				continue
+			if rng.randf() < 0.1:
+				for side in [-1.0, 1.0]:
+					var q: Vector2 = c + (b - a).normalized() * side * 1.6
+					_place("wall_post", Vector3(q.x, 0, q.y), run[2])
+				continue
+			var kind := "wall_broken" if rng.randf() < 0.28 else "wall"
+			var node := _place(kind, Vector3(c.x, 0, c.y), float(run[2]) + rng.randf_range(-2.0, 2.0))
+			node.scale.x = a.distance_to(b) / n / 4.0 * (-1.0 if rng.randf() < 0.5 else 1.0)
+
+
 ## The sacked village's leavings on the mud between the streets, where the monsters never walk:
 ## tipped barrels, crates, rubble, a broken cart, half of them scorched.
 func _verges(scorch: Array) -> void:

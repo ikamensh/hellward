@@ -4,15 +4,19 @@ extends Node
 ## The battle steps at a fixed 30 fps (--fixed-fps 30), as fast as the machine allows.
 
 var failures: Array = []
+var checks := 0
 var _main: Node
 
 
 func _ready() -> void:
-	for t in [test_scene_runs, test_building_obeys_map_and_purse, test_wave_kills_pay_gold,
+	for t in [test_scene_runs, test_intro_hands_over_the_camera, test_building_obeys_map_and_purse, test_wave_kills_pay_gold,
 			test_shaman_curses_and_cleanse_lifts, test_mouse_builds_a_tower, test_scripted_defence_holds_tristram]:
 		_main = null
 		print("-- ", t.get_method())
+		var before := checks
 		await t.call()
+		if checks == before:
+			failures.append("%s ran no checks (a script error stopped it)" % t.get_method())
 		if is_instance_valid(_main):
 			_main.queue_free()
 			await get_tree().process_frame
@@ -24,6 +28,7 @@ func _ready() -> void:
 
 
 func check(ok: bool, what: String) -> void:
+	checks += 1
 	if not ok:
 		failures.append(what)
 		print("   FAIL ", what)
@@ -31,6 +36,7 @@ func check(ok: bool, what: String) -> void:
 
 func start(args := {}) -> Node:
 	_main = load("res://scenes/main.tscn").instantiate()
+	args["nointro"] = ""
 	_main.args = args
 	add_child(_main)
 	await frames(2)
@@ -51,6 +57,22 @@ func test_scene_runs() -> void:
 	await seconds(3)
 	check(m.world.outcome == "", "the battle has not ended by itself")
 	check(m.world.gold == int(m.level.data["start_gold"]), "gold starts at the location's purse")
+
+
+## Played normally, the opening flies over the village, then hands the camera to the player; a key skips it.
+func test_intro_hands_over_the_camera() -> void:
+	_main = load("res://scenes/main.tscn").instantiate()
+	_main.args = {}
+	add_child(_main)
+	await frames(2)
+	check(not _main.rig.user_control, "the opening holds the camera")
+	await seconds(1)
+	var key := InputEventKey.new()
+	key.keycode = KEY_ESCAPE
+	key.pressed = true
+	_main.get_viewport().push_input(key)
+	await seconds(4)
+	check(_main.rig.user_control, "a key skips the opening and the player has the camera")
 
 
 ## Towers stand only on buildable floor, never on a lane or another tower, and cost exactly their price.

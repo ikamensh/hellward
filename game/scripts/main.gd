@@ -55,7 +55,13 @@ func _ready() -> void:
 		d.name = "Demo"
 		add_child(d)
 		d.setup(self, args.has("film"))
-	if not args.has("film"):
+	var staged: bool = args.has("shot") or args.has("gallery") or args.has("snap") or args.has("record") or args.has("nointro")
+	if not args.has("demo") and not staged:
+		var intro := Intro.new()
+		intro.name = "Intro"
+		add_child(intro)
+		intro.play(self)
+	elif not args.has("film"):
 		world.announce.emit("Tristram", "The village under the cathedral burns. Hold the sanctuary.")
 	Sfx.music("battle_tristram")
 	if args.has("shot"):
