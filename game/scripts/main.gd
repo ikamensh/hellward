@@ -1,6 +1,8 @@
 extends Node3D
 ## Hellward 3D: Tristram burns. Builds the world, then hands the battle to World and the screen to Hud.
-## User args (after `--`): `shot=NAME` frames a named view for captures; `demo` lets a scripted defender play.
+## User args (after `--`): `demo` lets a scripted defender play, `film` also directs the camera; captures
+## (tools/shot.sh, gallery.sh, record.sh) pass `shot=VIEW`, `snap=PNG`, `gallery=V,V out=DIR`,
+## `record=DIR every=N` with `frames=N`; `nointro` skips the opening (tests).
 
 var level: Level
 var world: World
@@ -29,11 +31,10 @@ func _ready() -> void:
 	add_child(dressing)
 	dressing.build(level, scorch)
 	level.build_floor(scorch)
-	if not args.has("noscatter"):
-		var scatter := Scatter.new()
-		scatter.name = "Scatter"
-		add_child(scatter)
-		scatter.build(level, dressing.footprints)
+	var scatter := Scatter.new()
+	scatter.name = "Scatter"
+	add_child(scatter)
+	scatter.build(level, dressing.footprints)
 	rig = CameraRig.new()
 	rig.name = "Camera"
 	add_child(rig)

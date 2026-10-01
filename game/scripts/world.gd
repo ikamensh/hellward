@@ -13,8 +13,7 @@ const MANA_MAX := 100.0
 const MANA_REGEN := 1.5
 const CLEANSE_COST := 35.0
 const EARLY_BONUS := 2               # gold for calling a wave before the field is clear
-# the demo shows the families the campaign opens later; Storm gets a forged coil's leap to show it off
-const OFFERED := ["arrow", "pyre", "frost", "storm"]
+# the demo offers the families the campaign opens later; Storm gets a forged coil's leap to show it off
 const STORM_LEAPS := 2
 # skeletons join the later waves: the demo shows the first four kinds
 const EXTRA := {3: [{"kind": "skeleton", "count": 4, "interval": 2.0, "start": 6.0}],
@@ -26,6 +25,7 @@ var gold := 0
 var lives := START_LIVES
 var mana := 60.0
 var wave := -1                       # the latest wave called; -1 before the first
+var paid := -1                       # the latest wave whose clear bonus was paid
 var spawners: Array = []             # {kind, left, interval, next, life}
 var monsters: Array = []
 var towers: Array = []
@@ -139,20 +139,19 @@ func _process(delta: float) -> void:
 		if m.gone:
 			monsters.erase(m)
 			m.queue_free()
-	if wave >= 0 and not wave_active():
+	if wave > paid and not wave_active():
+		paid = wave
 		var w: Dictionary = waves()[wave]
-		if not w.get("paid", false):
-			w["paid"] = true
-			gold += int(w["clear_bonus"])
-			if wave == waves().size() - 1:
-				outcome = "won"
-				announce.emit("Tristram holds", "The last wave is broken. The lamp still burns.")
-				Sfx.play("victory")
-				finished.emit(true)
-			else:
-				announce.emit("Wave cleared", "+%d gold. Build, then summon the next wave." % int(w["clear_bonus"]))
-				Sfx.play("cleared")
-			changed.emit()
+		gold += int(w["clear_bonus"])
+		if wave == waves().size() - 1:
+			outcome = "won"
+			announce.emit("Tristram holds", "The last wave is broken. The lamp still burns.")
+			Sfx.play("victory")
+			finished.emit(true)
+		else:
+			announce.emit("Wave cleared", "+%d gold. Build, then summon the next wave." % int(w["clear_bonus"]))
+			Sfx.play("cleared")
+		changed.emit()
 
 
 func _spawn(kind: String, life: float) -> void:
