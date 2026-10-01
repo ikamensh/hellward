@@ -3,8 +3,7 @@
 # Fails on a failed check, a non-zero exit, or any script error printed along the way.
 cd "$(dirname "$0")/.."
 log=$(mktemp /tmp/hw3d-test.XXXXXX)
-godot=/Applications/Godot.app/Contents/MacOS/Godot
-$godot --headless --path game --import >/dev/null 2>&1
+godot=tools/godot-capture.sh   # the shim keeps even headless runs out of the Dock
 $godot --headless --path game --resolution 1920x1080 --fixed-fps 30 res://tests/run.tscn >"$log" 2>&1
 code=$?
 grep -E "^-- |FAIL|all passed|FAILED" "$log"
