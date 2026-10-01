@@ -79,15 +79,23 @@ func _ready() -> void:
 ## (the closing shot), then quit (tools/record.sh).
 func _record(frames: int, every: int, dir: String) -> void:
 	var ended := -1
+	var saving: Array[int] = []
 	for i in frames:
 		Sfx.tick(i)
 		await RenderingServer.frame_post_draw
 		if i % every == 0:
-			get_viewport().get_texture().get_image().save_jpg("%s/%05d.jpg" % [dir, i / every], 0.92)
+			# the readback must happen now; the encoding goes to a worker so the next frame renders meanwhile
+			var img := get_viewport().get_texture().get_image()
+			var path := "%s/%05d.jpg" % [dir, i / every]
+			saving.append(WorkerThreadPool.add_task(func(): img.save_jpg(path, 0.92)))
+			while saving.size() > 8:
+				WorkerThreadPool.wait_for_task_completion(saving.pop_front())
 		if world.outcome != "" and ended < 0:
 			ended = i
 		if ended >= 0 and i - ended > 14 * 30:
 			break
+	for task in saving:
+		WorkerThreadPool.wait_for_task_completion(task)
 	get_tree().quit()
 
 
