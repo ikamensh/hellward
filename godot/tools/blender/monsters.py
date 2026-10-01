@@ -368,6 +368,11 @@ class Rig:
         self.name = name
         self.defs: dict[str, tuple] = {}
         self.actions: list[tuple[str, int]] = []
+        # a foot's ground contact for the walk (foot_track's ankle_z, heel, toe; lift, strike, push), when it is
+        # not the imps' default (a hoof standing high on a long foot)
+        self.sole: dict | None = None
+        # bones that lag behind the pose (ears, feathers, cloth): {bone: (stiffness in 1/s², damping ratio)}
+        self.springs: dict[str, tuple[float, float]] = {}
 
     def bone(self, name: str, head, tail, parent: str | None = None) -> str:
         self.defs[name] = (Vector(head), Vector(tail), parent)
@@ -403,8 +408,22 @@ class Rig:
         self.head = {b.name: b.head_local.copy() for b in data.bones}
         self.tail = {b.name: b.tail_local.copy() for b in data.bones}
         self.rest = {b.name: b.matrix_local.to_quaternion() for b in data.bones}
+        self.fix: dict[str, Quaternion] = {}
+        self.fix_turn: dict[str, Quaternion] = {}
         for pb in obj.pose.bones:
             pb.rotation_mode = "QUATERNION"
+
+    def repose(self, fix: Pose) -> None:
+        """Pose and animate from a different rest than the one the mesh was bound in: `fix` turns the bound rest
+        (a generated body's A-pose, arms out and feet apart) into the rest the pose functions expect (arms
+        hanging, feet under the hips). Every pose is then relative to that rest; `apply` composes the two."""
+        order = list(self.defs)
+        self.fix = {b: fix.q.get(b, Quaternion()) for b in order}
+        self.fix_turn = {b: self.delta(fix, b).to_quaternion() for b in order}
+        self.unfix = {b: self.delta(fix, b).inverted() for b in order}   # posing rest -> bound rest, per bone
+        heads = {b: self.delta(fix, self.parent[b]) @ self.head[b] for b in order}
+        tails = {b: self.delta(fix, b) @ self.tail[b] for b in order}
+        self.head, self.tail = heads, tails
 
     # -- forward kinematics in character axes
 
@@ -462,19 +481,99 @@ class Rig:
         for name in self.defs:
             pb = self.obj.pose.bones[name]
             b = self.rest[name]
-            pb.rotation_quaternion = b.inverted() @ pose.q.get(name, Quaternion()) @ b
-            pb.location = b.inverted() @ pose.loc.get(name, Vector())
+            q = pose.q.get(name, Quaternion())
+            loc = pose.loc.get(name, Vector())
+            if self.fix:   # from the posing rest to the bound one (repose): Rp^-1 q Rp f
+                rp = self.fix_turn.get(self.parent[name], Quaternion()) if self.parent[name] else Quaternion()
+                q = rp.inverted() @ q @ rp @ self.fix[name]
+                loc = rp.inverted() @ loc
+            pb.rotation_quaternion = b.inverted() @ q @ b
+            pb.location = b.inverted() @ loc
             s = pose.size.get(name, 1.0)
             pb.scale = (s, s, s)
 
-    def action(self, name: str, seconds: float, fn, loop: bool = False) -> None:
+    def follow(self, poses: list[Pose], loop: bool) -> list[Pose]:
+        """Follow-through: each bone in `springs` lags behind where the pose puts it. Its tail is a damped mass
+        pulled toward its posed place and the bone is turned to point at it, parents before children (a child
+        hangs from its parent's lagging tail). A loop is run three times round so its end meets its start; a clip
+        that ends in the pose it began with (a hit, an attack) eases the lag out over its last quarter, so the
+        clip after it starts from rest."""
+        if not self.springs:
+            return poses
+        dt = 1.0 / FPS
+        order = [b for b in self.defs if b in self.springs]
+        n = len(poses) - 1 if loop else len(poses)
+        first, last = poses[0], poses[-1]
+        returns = not loop and all(abs(first.q.get(b, Quaternion()).dot(last.q.get(b, Quaternion()))) > 0.9999
+                                   for b in self.defs)
+        state: dict[str, list[Vector]] = {}
+        out = list(poses)
+        for run in range(3 if loop else 1):
+            for i in range(n):
+                p = poses[i].copy()
+                for b in order:
+                    k, zeta = self.springs[b]
+                    head = self.where(p, b, self.head[b])
+                    target = self.where(p, b, self.tail[b])
+                    length = (target - head).length
+                    pos, vel = state.get(b, (target.copy(), Vector()))
+                    vel = vel + ((target - pos) * k - vel * (2 * zeta * math.sqrt(k))) * dt
+                    pos = pos + vel * dt
+                    d = pos - head
+                    pos = head + (d.normalized() if d.length > 1e-6 else (target - head).normalized()) * length
+                    state[b] = [pos, vel]
+                    lag = (target - head).rotation_difference(pos - head)
+                    if returns:
+                        lag = Quaternion().slerp(lag, 1.0 - smooth((i / (len(poses) - 1) - 0.75) / 0.25))
+                    self.orient(p, b, lag @ self.turn(p, b))
+                out[i] = p
+        if loop:
+            out[-1] = out[0]
+        return out
+
+    def lows(self, body: bpy.types.Object, frames: int) -> list[float]:
+        """The skinned body's lowest point at each frame of the action being baked."""
+        scene = bpy.context.scene
+        out = []
+        for f in range(frames + 1):
+            scene.frame_set(f)
+            ev = body.evaluated_get(bpy.context.evaluated_depsgraph_get())
+            m = ev.to_mesh()
+            out.append(min(v.co.z for v in m.vertices))
+            ev.to_mesh_clear()
+        scene.frame_set(0)
+        return out
+
+    def action(self, name: str, seconds: float, fn, loop: bool = False, ground_from: float | None = None,
+               body: bpy.types.Object | None = None) -> None:
+        """Bake fn(t) as action `name`. With `ground_from` (and the skinned `body`), every frame from that time on
+        is lifted by the hips just enough that no part of the body is under the ground: a fall's flailing hoof or a
+        hem that the pose functions cannot see."""
         frames = max(1, round(seconds * FPS))
+        poses = self.follow([fn(f / frames) for f in range(frames + 1)], loop)
+        self._bake(name, frames, poses, loop)
+        if ground_from is not None:
+            self.obj.animation_data.action = bpy.data.actions[name]
+            low = self.lows(body, frames)
+            self.obj.animation_data.action = None
+            need = [max(0.0, -z - 0.002) if f / frames >= ground_from else 0.0 for f, z in enumerate(low)]
+            lift = [max(need[max(0, f - 2):f + 3]) for f in range(frames + 1)]   # eased in and out over 2 frames
+            if max(lift) > 0:
+                bpy.data.actions.remove(bpy.data.actions[name])
+                self.actions.pop()
+                for f, dz in enumerate(lift):
+                    if dz:
+                        poses[f] = poses[f].copy().move("hips", z=dz)
+                self._bake(name, frames, poses, loop)
+                print(f"  {name}: lifted up to {max(lift) * 100:.1f} cm off the ground")
+
+    def _bake(self, name: str, frames: int, poses: list[Pose], loop: bool) -> None:
         act = bpy.data.actions.new(name)
         act.use_fake_user = True
         self.obj.animation_data.action = act
         prev: dict[str, Quaternion] = {}
         for f in range(frames + 1):
-            self.apply(fn(f / frames))
+            self.apply(poses[f])
             for pb in self.obj.pose.bones:
                 q = pb.rotation_quaternion.copy()
                 if pb.name in prev and prev[pb.name].dot(q) < 0:
@@ -584,6 +683,26 @@ def lift_feet(rig: Rig, pose: Pose, min_z: float, pole=(0, 1, -0.3)) -> None:
             ankle.z = min_z
             rig.reach(pose, f"thigh.{side}", sn, ankle, (s * 0.3 + pole[0], pole[1], pole[2]))
             rig.orient(pose, ft, q_foot)
+
+
+def keep_above(rig: Rig, pose: Pose, bones, floor: float | None = None, reach: float = 1.0) -> None:
+    """Tip each of `bones` (feet, hands) up about its joint just enough that its far end stays above `floor`
+    (default: where that end rests in the rest pose, a toe's or claw's own height). `reach` moves the tested end
+    past the bone's tail, to toe tips that stick out beyond it."""
+    for bone in bones:
+        head = rig.where(pose, bone, rig.head[bone])
+        end = rig.head[bone] + (rig.tail[bone] - rig.head[bone]) * reach
+        tip = rig.where(pose, bone, end)
+        low = max(end.z, 0.005) if floor is None else floor
+        if tip.z >= low:
+            continue
+        d = tip - head
+        flat = Vector((d.x, d.y, 0.0))
+        if flat.length < 1e-6:
+            continue
+        z = min(low - head.z, d.length * 0.999)
+        want = flat.normalized() * math.sqrt(max(d.length ** 2 - z * z, 0.0)) + Vector((0, 0, z))
+        rig.orient(pose, bone, d.rotation_difference(want) @ rig.turn(pose, bone))
 
 
 # ------------------------------------------------------------------------------------------------ export
@@ -941,8 +1060,11 @@ def imp_walk(rig: Rig, k: float, t: float, stride: float = 0.16, hold=None) -> P
         hold(p, t)
     feet = {}
     for s, side in SIDES:
-        dy, z, pitch = foot_track(t + (0.5 if s > 0 else 0.0), stride * k, 0.07 * k, duty=IMP_DUTY, ankle_z=0.07 * k,
-                                  heel=(-0.06 * k, -0.068 * k), toe=(0.14 * k, -0.066 * k))
+        sole = getattr(rig, "sole", None) or {"ankle_z": 0.07 * k, "heel": (-0.06 * k, -0.068 * k),
+                                              "toe": (0.14 * k, -0.066 * k)}
+        dy, z, pitch = foot_track(t + (0.5 if s > 0 else 0.0), stride * k, sole.get("lift", 0.07 * k),
+                                  duty=IMP_DUTY, ankle_z=sole["ankle_z"], heel=sole["heel"], toe=sole["toe"],
+                                  strike=sole.get("strike", 12.0), push=sole.get("push", -30.0))
         a = rig.head[f"foot.{side}"]
         feet[side] = (Vector((a.x + s * 0.01 * k, a.y + dy, z)), pitch, -s * 6)
     plant_legs(rig, p, feet)
@@ -987,7 +1109,7 @@ def imp_hit(rig: Rig, k: float, t: float, hold=None) -> Pose:
 
 
 def imp_die(rig: Rig, k: float, t: float, lie_z: float = 0.1, hand_r: Quaternion | None = None,
-            hand_fall: Quaternion | None = None, wrist_z: float = 0.03, hold=None) -> Pose:
+            hand_fall: Quaternion | None = None, wrist_z: float = 0.03, hold=None, foot_pitch=(0.0, 75.0)) -> Pose:
     """Struck back, the knees buckle, it topples onto its back and the light leaves its eyes."""
     base = imp_stance(k)
     recoil = imp_stance(k).move("hips", y=-0.06 * k).rot("hips", p=10)
@@ -1006,9 +1128,9 @@ def imp_die(rig: Rig, k: float, t: float, lie_z: float = 0.1, hand_r: Quaternion
         fall.rot(f"ear.{side}", r=-s * 10)
     if hand_fall is not None:
         rig.orient(fall, "hand.R", hand_fall)
-    lie = imp_corpse(rig, k, lie_z, hand_r=hand_r, wrist_z=wrist_z)
-    lie_b = imp_corpse(rig, k, lie_z + 0.03, bounce=1.0, hand_r=hand_r, wrist_z=wrist_z)
-    settle = imp_corpse(rig, k, lie_z, settle=1.0, hand_r=hand_r, wrist_z=wrist_z)
+    lie = imp_corpse(rig, k, lie_z, hand_r=hand_r, wrist_z=wrist_z, foot_pitch=foot_pitch)
+    lie_b = imp_corpse(rig, k, lie_z + 0.03, bounce=1.0, hand_r=hand_r, wrist_z=wrist_z, foot_pitch=foot_pitch)
+    settle = imp_corpse(rig, k, lie_z, settle=1.0, hand_r=hand_r, wrist_z=wrist_z, foot_pitch=foot_pitch)
     feet = imp_feet(rig, k)
     if hold:   # called with each key's time, so a held weapon can follow the collapse
         for q, tk in ((base, 0.0), (recoil, 0.12), (buckle, 0.34)):
@@ -1022,12 +1144,16 @@ def imp_die(rig: Rig, k: float, t: float, lie_z: float = 0.1, hand_r: Quaternion
                   (0.72, lie, ease_in), (0.8, lie_b, ease_out), (0.9, lie, ease_in), (1.0, settle, smooth)])
     if t < 0.34:
         plant_legs(rig, p, feet)
+    else:   # the legs fly free: no hoof through the ground
+        lift_feet(rig, p, 0.06 * k)
+        keep_above(rig, p, ("foot.R", "foot.L"), floor=0.05, reach=1.1)   # a hoof is 4 cm thick
     return p
 
 
 def imp_corpse(rig: Rig, k: float, lie_z: float, bounce: float = 0.0, settle: float = 0.0,
-               hand_r: Quaternion | None = None, wrist_z: float = 0.03) -> Pose:
-    """Flat on its back, head lolled aside, one knee up, arms flung out on the ground."""
+               hand_r: Quaternion | None = None, wrist_z: float = 0.03, foot_pitch=(0.0, 75.0)) -> Pose:
+    """Flat on its back, head lolled aside, one knee up, arms flung out on the ground. `foot_pitch` tips the
+    right (raised knee) and left foot up from rest: a long hoofed foot needs it to stay above the ground."""
     p = Pose().move("hips", y=-0.32 * k, z=lie_z * k - rig.head["hips"].z).rot("hips", p=90)
     p.rot("spine", p=3 - 6 * bounce).rot("chest", p=5 - 4 * bounce).rot("neck", p=-4).rot("head", p=-2, y=16 + 6 * settle)
     p.rot("jaw", p=-18)
@@ -1047,7 +1173,7 @@ def imp_corpse(rig: Rig, k: float, lie_z: float, bounce: float = 0.0, settle: fl
         ankle = h + (Vector((0.08, 0.2, 0)) if s > 0 else Vector((-0.06, 0.4, 0))) * k
         ankle.z = (0.07 if s > 0 else 0.04) * k
         rig.reach(p, f"thigh.{side}", f"shin.{side}", ankle, (s * 0.4, 0, 1))
-        rig.orient(p, f"foot.{side}", Q(p=0 if s > 0 else 75, r=0 if s > 0 else s * 35))
+        rig.orient(p, f"foot.{side}", Q(p=foot_pitch[0] if s > 0 else foot_pitch[1], r=0 if s > 0 else s * 35))
     return p
 
 

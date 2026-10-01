@@ -1,6 +1,6 @@
 extends Node3D
 ## Renders one model for review under the game's night lighting (tools/preview.sh drives it).
-## User args: model=/abs/file.glb out=DIR [anim=walk] [views=8] [dist=0 (auto)] [pitch=25] [yaw=35]
+## User args: model=/abs/file.glb out=DIR [anim=walk] [views=8] [dist=0 (auto)] [pitch=25] [yaw=35] [focus=Y]
 ## Without anim: a turntable of `views` frames. With anim: `views` samples across the animation from `yaw`.
 ## Each view is saved as DIR/fNN.png, then the run quits.
 
@@ -34,6 +34,8 @@ func _ready() -> void:
 	var box := _bounds(_model)
 	_centre = box.get_center()
 	_radius = max(box.size.length() * 0.5, 0.3)
+	if _args.has("focus"):   # a close-up: look at this height, from `dist`
+		_centre.y = float(_args["focus"])
 	print("bounds: ", box)
 	_cam = Camera3D.new()
 	_cam.fov = 30
@@ -88,8 +90,9 @@ func _bounds(root: Node) -> AABB:
 
 func _build_stage() -> void:
 	Atmosphere.night(self)   # the game's own night, so a sheet shows the in-game look
-	var fire := Fx.fire_light(9.0, 11.0, true)   # and a brazier's light, as most things stand near one
-	fire.position = Vector3(2.5, 1.6, 2.5)
+	var fire := Fx.fire_light(9.0, 11.0, true)   # and a brazier's light, as most things stand near one,
+	var side := deg_to_rad(float(_args.get("yaw", "35")) + 10.0)   # a little to the camera's side
+	fire.position = Vector3(sin(side) * 3.5, 1.6, cos(side) * 3.5)
 	add_child(fire)
 	var floor := MeshInstance3D.new()
 	var pm := PlaneMesh.new()

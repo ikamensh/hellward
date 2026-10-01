@@ -1,7 +1,8 @@
 shader_type spatial;
 // Drawn over a monster or tower: a warm rim when hit, a frost rim when chilled, a violet pulse when cursed, and
 // far from the camera a rim in the monster's own colour so the kinds tell apart from overhead. With `xray`, the
-// parts of a monster hidden behind a tower or a house show as a faint outline in that colour.
+// parts of a monster hidden behind a tower or a house show as a faint outline in that colour; parts hidden only by
+// the body's own folds draw nothing.
 render_mode blend_add, unshaded, fog_disabled, depth_draw_never, depth_test_disabled, cull_back;
 
 uniform float flash = 0.0;
@@ -16,8 +17,11 @@ uniform sampler2D depth_tex : hint_depth_texture, filter_nearest;
 void fragment() {
 	float edge = 1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0);
 	vec4 seen = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, texture(depth_tex, SCREEN_UV).r, 1.0);
-	bool hidden = -VERTEX.z > -seen.z / seen.w + 0.8;
-	if (hidden) {
+	float behind = -VERTEX.z + seen.z / seen.w;   // how far behind what the camera sees here
+	if (behind > 0.03 && behind <= 0.8) {
+		discard;   // folds of the body itself (the depth test is off for the x-ray): never rim them
+	}
+	if (behind > 0.8) {
 		ALBEDO = kind_rim * (0.15 + pow(edge, 2.0) * 0.6) * 0.5 * xray;
 	} else {
 		float rim = pow(edge, 2.5);

@@ -97,7 +97,34 @@ static func _make(key: String) -> Material:
 		"glow_window": return glow(Color(1.0, 0.55, 0.2), 2.0)
 		"glow_holy": return glow(Color(1.0, 0.7, 0.4), 1.6)
 		"glow_portal": return glow(Color(1.0, 0.15, 0.04), 8.0)
+	if key.begins_with("mon_"):
+		return monster(key)
 	return null
+
+
+## A generated monster's own maps (assets/textures/<kind>/: albedo, normal, orm, emission; docs/monsters.md).
+# the colour a monster's flesh shows lit from behind (the imps' thin ears and fingers glow red against a fire).
+# Screen-space subsurface scattering looked softer but cost 2 ms with a wave on screen; the backlight is free.
+const FLESH := {"mon_fallen": Color(0.55, 0.06, 0.02), "mon_shaman": Color(0.55, 0.06, 0.02),
+	"mon_zombie": Color(0.16, 0.18, 0.1)}
+
+
+static func monster(kind: String) -> ORMMaterial3D:
+	var dir := TEX + kind + "/"
+	var m := ORMMaterial3D.new()
+	if FLESH.has(kind):
+		m.backlight_enabled = true
+		m.backlight = FLESH[kind]
+	m.albedo_texture = load(dir + "albedo.webp")
+	m.normal_enabled = true
+	m.normal_texture = load(dir + "normal.webp")
+	m.orm_texture = load(dir + "orm.webp")
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	if ResourceLoader.exists(dir + "emission.webp"):   # eyes, embers
+		m.emission_enabled = true
+		m.emission_texture = load(dir + "emission.webp")
+		m.emission_energy_multiplier = 3.0
+	return m
 
 
 static func _ice() -> StandardMaterial3D:

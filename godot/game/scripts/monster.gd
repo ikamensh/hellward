@@ -11,7 +11,7 @@ const BODY := 1.3                    # bodies a size up from life, so they read 
 const RIM := {"fallen": Color(1.0, 0.32, 0.1), "shaman": Color(0.8, 0.3, 1.0), "zombie": Color(0.35, 0.7, 0.25),
 	"skeleton": Color(0.9, 0.88, 0.75)}
 # how fast each walk cycle carries the body at speed_scale 1 (m/s): the walk plays faster as the body speeds up
-const WALK := {"fallen": 0.67, "shaman": 0.72, "zombie": 0.75, "skeleton": 0.81}
+const WALK := {"fallen": 0.67, "shaman": 0.72, "zombie": 0.46, "skeleton": 0.92}
 # a kind without a model: [the model it borrows, its tint]; its height follows its size in the rules
 const STAND_INS := {
 	"goatman": ["zombie", Color(0.55, 0.38, 0.22)], "overlord": ["zombie", Color(0.75, 0.2, 0.12)],
