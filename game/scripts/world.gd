@@ -66,6 +66,7 @@ func call_wave() -> void:
 		spawners.append({"kind": g["kind"], "left": int(g["count"]), "interval": float(g["interval"]),
 			"next": time + float(g["start"]), "life": float(w["life"])})
 	announce.emit("Wave %d of %d" % [wave + 1, waves().size()], w["name"])
+	Sfx.play("wave")
 	changed.emit()
 
 
@@ -83,6 +84,7 @@ func build(kind: String, tile: Vector2i) -> Tower:
 	add_child(t)
 	towers.append(t)
 	level.occupied[tile] = true
+	Sfx.play("build", level.tile_pos(tile))
 	changed.emit()
 	return t
 
@@ -95,6 +97,7 @@ func upgrade(t: Tower) -> bool:
 		return false
 	gold -= cost
 	t.promote()
+	Sfx.play("upgrade", t.global_position)
 	changed.emit()
 	return true
 
@@ -103,6 +106,7 @@ func sell(t: Tower) -> void:
 	if t.cursed > 0.0:
 		return
 	gold += int(t.spent * 0.7)
+	Sfx.play("sell", t.global_position)
 	level.occupied.erase(t.tile)
 	towers.erase(t)
 	t.dismantle()
@@ -114,6 +118,7 @@ func cleanse(t: Tower) -> bool:
 		return false
 	mana -= CLEANSE_COST
 	t.lift_curse()
+	Sfx.play("cleanse", t.global_position)
 	changed.emit()
 	return true
 
@@ -142,9 +147,11 @@ func _process(delta: float) -> void:
 			if wave == waves().size() - 1:
 				outcome = "won"
 				announce.emit("Tristram holds", "The last wave is broken. The lamp still burns.")
+				Sfx.play("victory")
 				finished.emit(true)
 			else:
 				announce.emit("Wave cleared", "+%d gold. Build, then summon the next wave." % int(w["clear_bonus"]))
+				Sfx.play("cleared")
 			changed.emit()
 
 
@@ -168,12 +175,14 @@ func breached(m: Monster) -> void:
 	if lives == 0 and outcome == "":
 		outcome = "lost"
 		announce.emit("The lamp goes out", "Tristram falls to the Fallen.")
+		Sfx.play("defeat")
 		finished.emit(false)
 
 
 func killed(m: Monster) -> void:
 	gold += int(m.stats["bounty"])
 	Vfx.coin(self, m.global_position + Vector3(0, m.height + 0.3, 0), int(m.stats["bounty"]))
+	Sfx.play("gold", m.global_position)
 	changed.emit()
 
 

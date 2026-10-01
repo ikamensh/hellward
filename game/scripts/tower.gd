@@ -189,22 +189,28 @@ func _fire(target: Monster) -> void:
 	_threat += dmg
 	match kind:
 		"arrow":
+			Sfx.play("arrow_cast", _muzzle_pos())
 			Bolt.launch(world, "arrow", _muzzle_pos(), target, speed * 1.4, func(m):
-				if m: m.hurt(dmg, "physical")
+				if m:
+					m.hurt(dmg, "physical")
+					Sfx.play("arrow_hit", m.chest())
 				Vfx.impact(world, target.chest() if is_instance_valid(target) else _muzzle_pos(), Color(1.0, 0.85, 0.6), 10))
 			if _turret:
 				var kick := create_tween()
 				kick.tween_property(_turret, "scale", Vector3(1.0, 1.0, 0.92), 0.05)
 				kick.tween_property(_turret, "scale", Vector3.ONE, 0.25)
 		"pyre":
+			Sfx.play("fire_cast", _muzzle_pos())
 			Bolt.launch(world, "fire", _muzzle_pos(), target, speed, func(m):
 				var at: Vector3 = m.chest() if m else _muzzle_pos()
+				Sfx.play("fireball", at)
 				if m: m.hurt(dmg, "fire")
 				Vfx.explosion(world, at, Color(1.0, 0.45, 0.1)))
 		"frost":
 			var lv := level()
 			Bolt.launch(world, "frost", _muzzle_pos(), target, speed, func(m):
 				var at: Vector3 = m.chest() if m else _muzzle_pos()
+				Sfx.play("frost", at)
 				if m:
 					m.hurt(dmg, "cold")
 					m.chill(float(lv["chill"]), float(lv["chill_time"]))
@@ -225,5 +231,6 @@ func _fire(target: Monster) -> void:
 			for i in chain.size():
 				points.append(chain[i].chest())
 			Vfx.lightning(world, points)
+			Sfx.play("lightning", target.chest())
 			for i in chain.size():
 				chain[i].hurt(dmg * pow(0.7, i), "lightning")

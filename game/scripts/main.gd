@@ -8,13 +8,16 @@ var hud: Hud
 var builder: Builder
 var rig: CameraRig
 var env: Environment
-var args := {}
+var args = null   # the user args as a Dictionary; a test sets them before adding the scene
 
 
 func _ready() -> void:
-	for a in OS.get_cmdline_user_args():
-		var kv := a.split("=", true, 1)
-		args[kv[0]] = kv[1] if kv.size() > 1 else ""
+	if args == null:
+		args = {}
+		for a in OS.get_cmdline_user_args():
+			var kv := a.split("=", true, 1)
+			args[kv[0]] = kv[1] if kv.size() > 1 else ""
+	Sfx.setup(self, args["record"] + "/sound.log" if args.has("record") else "")
 	level = Level.new()
 	level.name = "Level"
 	add_child(level)
@@ -53,6 +56,7 @@ func _ready() -> void:
 		add_child(d)
 		d.setup(self, args.has("film"))
 	world.announce.emit("Tristram", "The village under the cathedral burns. Hold the sanctuary.")
+	Sfx.music("battle_tristram")
 	if args.has("shot"):
 		Shots.frame(self, args["shot"])
 	if args.has("snap"):
@@ -66,6 +70,7 @@ func _ready() -> void:
 ## Save every `every`-th frame of the first `frames` as DIR/NNNNN.jpg, then quit (tools/record.sh).
 func _record(frames: int, every: int, dir: String) -> void:
 	for i in frames:
+		Sfx.tick(i)
 		await RenderingServer.frame_post_draw
 		if i % every == 0:
 			get_viewport().get_texture().get_image().save_jpg("%s/%05d.jpg" % [dir, i / every], 0.92)

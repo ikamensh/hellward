@@ -198,6 +198,7 @@ func _die() -> void:
 	_bar.visible = false
 	_drop_beam()
 	world.killed(self)
+	Sfx.play("death_" + kind, chest())
 	Vfx.blood(world, global_position, 0.5 + height * 0.25)
 	if leader:
 		Vfx.burst(world, chest(), Color(0.7, 0.2, 1.0), 40)
@@ -210,6 +211,7 @@ func _enter_door() -> void:
 	_play("attack")
 	_drop_beam()
 	world.breached(self)
+	Sfx.play("leak")
 	var tw := create_tween()
 	tw.tween_interval(0.6)
 	tw.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.8)
@@ -234,6 +236,7 @@ func _ponder() -> void:
 	_anim.speed_scale = 1.0
 	_play("idle")
 	Vfx.ponder(self)
+	Sfx.play("ponder", chest())
 
 
 func _chant() -> void:
@@ -245,6 +248,7 @@ func _chant() -> void:
 	var tip := Models.node(_model, "fx_cast")
 	_beam = Vfx.curse_beam(world, tip if tip else self, _curse_target)
 	_curse_target.chanted_at(1.9)
+	Sfx.play("chant", chest())
 
 
 func _curse_lands() -> void:
@@ -252,6 +256,7 @@ func _curse_lands() -> void:
 		if not t.removed and t.global_position.distance_to(_curse_target.global_position) <= CURSE_RADIUS:
 			t.curse(CURSE_TIME)
 	Vfx.burst(world, _curse_target.global_position + Vector3(0, 1.0, 0), Color(0.7, 0.2, 1.0), 60)
+	Sfx.play("curse", _curse_target.global_position)
 	world.announce.emit("", "The Fallen Shaman curses the %s." % _curse_target.title())
 	_resume()
 

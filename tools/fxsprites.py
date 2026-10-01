@@ -26,10 +26,13 @@ def save(name: str, a: np.ndarray, size: int) -> None:
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    for name in ("fire_sheet", "rune_circle", "portal_swirl"):
+    for name in ("fire_sheet", "portal_swirl"):
         rgb = load(name)
         rgb[rgb.max(axis=2) < 0.04] = 0.0     # the painter's near-black is not quite black
         save(name, rgb, 1024)
+    rune = load("rune_circle")                # a decal: its glow needs alpha to cut the black square out
+    alpha = ((rune.max(axis=2) - 0.06) / 0.35).clip(0, 1)
+    save("rune_circle", np.dstack([rune / np.maximum(rune.max(axis=2, keepdims=True), 0.05), alpha]), 1024)
     smoke = load("smoke_sheet")
     lum = smoke.mean(axis=2)
     alpha = ((lum - 0.03) / 0.6).clip(0, 1)

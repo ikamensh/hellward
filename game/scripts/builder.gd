@@ -87,11 +87,10 @@ func _show_reach(at: Vector3, reach: float, color: Color) -> void:
 	m.set_shader_parameter("color", color)
 
 
-## The tile under the mouse, from a ray onto the ground plane.
-func _tile_under_mouse() -> Vector2i:
-	var mouse := get_viewport().get_mouse_position()
-	var origin := rig.cam.project_ray_origin(mouse)
-	var dir := rig.cam.project_ray_normal(mouse)
+## The tile under a point on the screen, from a ray onto the ground plane.
+func _tile_at(screen: Vector2) -> Vector2i:
+	var origin := rig.cam.project_ray_origin(screen)
+	var dir := rig.cam.project_ray_normal(screen)
 	if abs(dir.y) < 0.001:
 		return Vector2i(-99, -99)
 	var t := -origin.y / dir.y
@@ -101,7 +100,7 @@ func _tile_under_mouse() -> Vector2i:
 func _process(_delta: float) -> void:
 	if held == "":
 		return
-	var tile := _tile_under_mouse()
+	var tile := _tile_at(get_viewport().get_mouse_position())
 	var ok := world.level.buildable(tile) and world.gold >= world.tower_cost(held, 0)
 	var at := world.level.tile_pos(tile)
 	_ghost.visible = world.level.cell(tile) != "#"
@@ -118,7 +117,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
-			_click()
+			_click(mb.position)
 		elif mb.button_index == MOUSE_BUTTON_RIGHT:
 			let_go()
 			choose(null)
@@ -137,8 +136,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				choose(null)
 
 
-func _click() -> void:
-	var tile := _tile_under_mouse()
+func _click(screen: Vector2) -> void:
+	var tile := _tile_at(screen)
 	if held != "":
 		var t := world.build(held, tile)
 		if t and not Input.is_key_pressed(KEY_SHIFT):
