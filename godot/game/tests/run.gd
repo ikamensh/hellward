@@ -75,6 +75,13 @@ func until(ready: Callable, limit: float) -> bool:
 	return ready.call()
 
 
+## Let a battle run until it is decided or `limit` seconds of its own time pass, however slowly the machine steps it.
+func play_out(w: World, limit: float) -> bool:
+	while w.outcome == "" and w.time < limit:
+		await frames(30)
+	return w.outcome != ""
+
+
 func press(vp: Viewport, keycode: Key) -> void:
 	var key := InputEventKey.new()
 	key.keycode = keycode
@@ -247,7 +254,7 @@ func test_the_watched_defence_holds_and_ends_with_victory() -> void:
 		if text.length() > largest[0].length():
 			largest[0] = text
 	Net.frame.connect(keep)
-	check(await until(func(): return w.outcome != "", 900.0), "the watched defence ends")
+	check(await play_out(w, 900.0), "the watched defence ends")
 	Net.frame.disconnect(keep)
 	var started := Time.get_ticks_usec()
 	for i in 100:
