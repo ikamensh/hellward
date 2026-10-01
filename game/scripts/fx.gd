@@ -320,6 +320,6 @@ static func fire_light(energy: float, reach: float, shadows := false, color := C
 	l.omni_range = reach
 	l.omni_attenuation = 1.0
 	l.shadow_enabled = shadows
-	l.light_volumetric_fog_energy = 0.25
+	l.light_volumetric_fog_energy = 1.0   # every fire a halo of lit smoke
 	l.set_script(load("res://scripts/flicker.gd"))
 	return l

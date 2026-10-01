@@ -84,6 +84,7 @@ func _ready() -> void:
 	_overlay.shader = preload("res://shaders/overlay.gdshader")
 	_overlay.set_shader_parameter("kind_rim", RIM[kind])
 	_overlay.set_shader_parameter("xray", 1.0)
+	_overlay.set_shader_parameter("moonrim", 0.3)
 	for mi in _model.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_overlay = _overlay
 		(mi as MeshInstance3D).layers = 2   # decals (cull_mask 1) never land on a body

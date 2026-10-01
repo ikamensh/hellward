@@ -44,9 +44,9 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	_frame += 1
 	var i: int = _frame - SKIP
-	if i < 0:
-		return
 	var views := int(_args.get("views", "8"))
+	if i < 0 or i > views:   # quit() takes effect after the frame it is called in
+		return
 	if i > 0:
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("%s/f%02d.png" % [_args["out"], i - 1])
@@ -87,29 +87,10 @@ func _bounds(root: Node) -> AABB:
 
 
 func _build_stage() -> void:
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.05, 0.05, 0.07)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.35, 0.4, 0.55)
-	env.ambient_light_energy = 0.6
-	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.glow_enabled = true
-	env.ssao_enabled = true
-	var we := WorldEnvironment.new()
-	we.environment = env
-	add_child(we)
-	var moon := DirectionalLight3D.new()
-	moon.light_color = Color(0.6, 0.7, 1.0)
-	moon.light_energy = 0.8
-	moon.shadow_enabled = true
-	moon.rotation_degrees = Vector3(-50, -40, 0)
-	add_child(moon)
-	var key := DirectionalLight3D.new()
-	key.light_color = Color(1.0, 0.7, 0.45)
-	key.light_energy = 1.4
-	key.rotation_degrees = Vector3(-30, 140, 0)
-	add_child(key)
+	Atmosphere.night(self)   # the game's own night, so a sheet shows the in-game look
+	var fire := Fx.fire_light(9.0, 11.0, true)   # and a brazier's light, as most things stand near one
+	fire.position = Vector3(2.5, 1.6, 2.5)
+	add_child(fire)
 	var floor := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
 	pm.size = Vector2(12, 12)
