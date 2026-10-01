@@ -1,0 +1,5 @@
+game/.godot/
+.venv/
+__pycache__/
+art/paint.log
+build/
