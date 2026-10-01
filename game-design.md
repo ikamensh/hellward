@@ -24,7 +24,10 @@ We should have absolute armor (damage reduction) because it quickly makes it int
 
 Bosses: we can make it so that any mob that passes attacks our holy shrine. Normal mobs get obliterated on hitting it (different visual than before - attack and getting destroyed, same math), bosses are just sent back as they are to the portal, so they need to pass again to hit again.
 
+Global spells:
+a small bit of action rpg and direct action to keep player from sleeping. Remove curse dispel, this makes it grindy to click around urgently dispelling curses. Keep global spells mostly a way to kill 1-2 stray mobes when you got unlucky with tower targeting.
 
+we can also allow spells that significantly boost towers, but this should be fragile because smart curse AI will likely disable a boosted tower. A nice interaction.
 
 ## Verbs: what mechanics and relics trigger on
 
