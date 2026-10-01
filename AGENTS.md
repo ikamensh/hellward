@@ -7,6 +7,11 @@ dependency. `docs/design.md` is one defence; `docs/campaign.md` is the campaign 
 locations, the skill tree, the spells, the world maps, the story, and how it is tuned); `docs/story.md` is the
 story's cast and rules.
 
+**Direction (2026-10-01): Hellward moves to a Godot client over a Python server**, built on the 3D demo in
+`../hellward3d`; the saga2d client is retired. Requirements and order of work: [docs/godot-client.md](docs/godot-client.md)
+([ADR 0002](docs/adr/0002-python-server-godot-client.md)). Don't put new work into the saga2d screens, sprites or
+rigs; `hellward/sim/` and the tools carry over unchanged.
+
 ## Commands
 
 ```bash
