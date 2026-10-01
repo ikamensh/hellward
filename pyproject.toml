@@ -1,0 +1,9 @@
+[project]
+name = "hellward3d-tools"
+version = "0.1.0"
+description = "Asset tools for the Hellward 3D demo (Godot project in game/)"
+requires-python = ">=3.12"
+dependencies = ["numpy", "pillow", "scipy"]
+
+[tool.uv]
+package = false
