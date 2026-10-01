@@ -66,10 +66,11 @@ func build(lvl: Level, scorch: Array) -> void:
 		if p.size() > 4:
 			_burn_prop(pos, p[4])
 			scorch.append([pos, float(p[4]) * 2.0])
-	for f in FARMS:
+	for i in FARMS.size():
+		var f: Vector2 = FARMS[i]
 		var pos := Vector3(f.x, 0.0, f.y)
 		pos.y = level.pad(f.x, f.y, 5.0)
-		var node := _place("house_ruin", pos, randf() * 360.0)
+		var node := _place("house_ruin", pos, i * 67.0)
 		node.scale = Vector3.ONE * 0.85
 		var flame := Fx.fire(3.0)
 		flame.position = pos + Vector3(0, 2.0, 0)
@@ -99,7 +100,8 @@ func _burn_prop(pos: Vector3, size: float) -> void:
 	smoke.position = pos + Vector3(0, size + 0.5, 0)
 	add_child(smoke)
 	var light := Fx.fire_light(5.0 * size, 8.0 + 2.0 * size, size >= 1.3)   # long tower shadows toward the camera
-	light.position = pos + Vector3(0, 1.5, 0)
+	light.position = pos + Vector3(0, 2.5, 0)
+	light.omni_attenuation = 0.75
 	add_child(light)
 
 
@@ -203,11 +205,12 @@ func _street_braziers() -> void:
 				if placed.any(func(q): return (q as Vector3).distance_to(at) < 6.0):
 					continue
 				placed.append(at)
-				var brazier := _place("brazier", at, randf() * 360.0)
+				var brazier := _place("brazier", at, placed.size() * 47.0)
 				var coals := Models.node(brazier, "fx_fire_1")
 				coals.add_child(Fx.fire(0.8))
-				var light := Fx.fire_light(9.0, 11.0)
-				light.position = Vector3(0, 0.8, 0)
+				var light := Fx.fire_light(7.0, 13.0)
+				light.position = Vector3(0, 1.4, 0)   # above the coals: the ground is not lit at grazing angles
+				light.omni_attenuation = 0.75
 				coals.add_child(light)
 			walked -= seg
 
@@ -340,6 +343,10 @@ func _burn(node: Node3D, pos: Vector3) -> void:
 	pall.position = pos + Vector3(0, 8.0, 0)
 	add_child(pall)
 	_burning += 1
+	var flames := node.find_children("fx_flame*", "", true, false)   # flames licking out of every other upper window
+	for i in range(0, flames.size(), 2):
+		(flames[i] as Node3D).add_child(Fx.fire(0.7))
 	var light := Fx.fire_light(11.0, 15.0, _burning % 3 == 1)   # shadows from every third fire: each costs six passes
+	light.light_volumetric_fog_energy = 0.35   # a warm haze, not a glowing ball swallowing the flames
 	light.position = pos + Vector3(0, 3.5, 3.0 if pos.z < 18.0 else -3.0)
 	add_child(light)

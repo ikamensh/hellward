@@ -62,7 +62,7 @@ static func curve(points: Array) -> CurveTexture:
 ## Flames `size` metres across, rooted where they burn and licking upward; additive, so glow turns them into light.
 static func fire(size: float, intensity := 1.0) -> GPUParticles3D:
 	var p := GPUParticles3D.new()
-	p.amount = int(clamp(20 * size, 12, 64))
+	p.amount = int(clamp(13 * size, 10, 40))   # more overlapping additive flames sum to white
 	p.lifetime = 0.9
 	p.preprocess = 1.0
 	p.local_coords = false
@@ -82,7 +82,9 @@ static func fire(size: float, intensity := 1.0) -> GPUParticles3D:
 	pm.angle_min = -8.0
 	pm.angle_max = 8.0
 	pm.anim_offset_min = 0.0
-	pm.anim_offset_max = 1.0
+	pm.anim_offset_max = 0.5
+	pm.anim_speed_min = 1.0   # each flame plays through the painted shapes as it rises
+	pm.anim_speed_max = 1.0
 	pm.turbulence_enabled = true
 	pm.turbulence_noise_strength = 0.4
 	pm.turbulence_noise_scale = 2.5
@@ -121,7 +123,7 @@ static func smoke(size: float, height := 14.0) -> GPUParticles3D:
 	pm.gravity = Vector3(0.25, 0.1, 0.05)
 	pm.scale_min = 1.0
 	pm.scale_max = 1.6
-	pm.scale_curve = curve([[0.0, 0.3], [1.0, 1.0]])
+	pm.scale_curve = curve([[0.0, 0.15], [1.0, 1.0]])   # a thin root, gathering as it rises
 	pm.angle_min = 0.0
 	pm.angle_max = 360.0
 	pm.angular_velocity_min = -12.0
@@ -131,9 +133,8 @@ static func smoke(size: float, height := 14.0) -> GPUParticles3D:
 	pm.turbulence_noise_scale = 6.0
 	pm.anim_offset_min = 0.0
 	pm.anim_offset_max = 1.0
-	pm.color_ramp = ramp([[0.0, Color(0.55, 0.26, 0.1, 0.0)], [0.08, Color(0.5, 0.24, 0.1, 0.6)],
-		[0.25, Color(0.24, 0.17, 0.14, 0.6)], [0.6, Color(0.15, 0.14, 0.14, 0.42)],
-		[1.0, Color(0.11, 0.11, 0.12, 0.0)]])
+	pm.color_ramp = ramp([[0.0, Color(0.4, 0.18, 0.07, 0.0)], [0.1, Color(0.3, 0.16, 0.09, 0.28)],
+		[0.3, Color(0.19, 0.15, 0.13, 0.5)], [0.65, Color(0.13, 0.12, 0.12, 0.38)], [1.0, Color(0.1, 0.1, 0.11, 0.0)]])
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(size * 2.4, size * 2.4)

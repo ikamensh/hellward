@@ -2,7 +2,7 @@ shader_type spatial;
 // Drawn over a monster or tower: a warm rim when hit, a frost rim when chilled, a violet pulse when cursed, and
 // far from the camera a rim in the monster's own colour so the kinds tell apart from overhead. With `xray`, the
 // parts of a monster hidden behind a tower or a house show as a faint outline in that colour.
-render_mode blend_add, unshaded, depth_draw_never, depth_test_disabled, cull_back;
+render_mode blend_add, unshaded, fog_disabled, depth_draw_never, depth_test_disabled, cull_back;
 
 uniform float flash = 0.0;
 uniform float chill = 0.0;

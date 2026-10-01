@@ -1,6 +1,6 @@
 shader_type spatial;
 // A monster's life over its head, always facing the camera and drawn over the scene.
-render_mode unshaded, depth_test_disabled, cull_disabled, shadows_disabled;
+render_mode unshaded, fog_disabled, depth_test_disabled, cull_disabled, shadows_disabled;
 
 instance uniform float fill = 1.0;
 

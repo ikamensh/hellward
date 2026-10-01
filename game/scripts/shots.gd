@@ -21,3 +21,4 @@ static func frame(main: Node, name: String) -> void:
 	var v: Array = VIEWS[name]
 	main.rig.user_control = false
 	main.rig.snap(v[0], v[1], v[2], v[3])
+	main.hud.cinematic(name != "overview" and name != "wide", 0.01)   # beauty shots without the HUD

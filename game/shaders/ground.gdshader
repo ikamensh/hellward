@@ -18,7 +18,7 @@ uniform sampler2D flag_a : source_color, filter_linear_mipmap_anisotropic, repea
 uniform sampler2D flag_n : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform vec2 portal_xz;
 
-uniform float cob_scale = 2.2;     // metres per repeat
+uniform float cob_scale = 1.4;     // metres per repeat
 uniform float earth_scale = 5.0;
 uniform float grass_scale = 4.0;
 
@@ -80,7 +80,7 @@ void fragment() {
 	nrm = mix(nrm, en, worn);
 	col = mix(col, fa * vec3(0.85, 0.82, 0.78), flag);
 	nrm = mix(nrm, fn, flag);
-	col = mix(col, col * 0.55, puddle);
+	col = mix(col, col * 0.3, puddle);
 	float scorch = clamp(m.b + (n2 - 0.5) * 0.6, 0.0, 1.0);
 	col *= mix(1.0, 0.25, scorch);
 	col = mix(col, col * 0.2, hell);
@@ -89,10 +89,11 @@ void fragment() {
 	nrm = mix(nrm, vec3(0.5, 0.5, 1.0), puddle);
 	NORMAL_MAP = nrm;
 	ROUGHNESS = mix(mix(mix(0.92, mix(0.58, 0.82, ch), lane), 0.7, flag), 0.3, puddle);
-	SPECULAR = mix(0.35, 0.25, puddle);
+	SPECULAR = mix(0.35, 0.08, puddle);   // dark wet mud, not a mirror of the sky
 	// meandering cracks that glow and pulse outward from the gate; ember beds under the burning houses
 	float n5 = texture(noise, p * 0.32 + 9.1).r;
-	float fissure = (1.0 - smoothstep(0.0, 0.035, abs(n5 - 0.5))) * hell;
+	float n6 = texture(noise, p * 0.13 + 4.3).r;   // a lower frequency: few, long cracks
+	float fissure = (1.0 - smoothstep(0.0, 0.022, abs(n6 - 0.5))) * hell;
 	EMISSION = vec3(1.0, 0.2, 0.03) * fissure * (2.0 + 1.2 * sin(TIME * 1.6 - dp * 0.7));
-	EMISSION += vec3(1.0, 0.32, 0.06) * smoothstep(0.8, 0.95, m.b) * pow(n5, 6.0) * 4.0;
+	EMISSION += vec3(1.0, 0.32, 0.06) * smoothstep(0.85, 0.98, m.b) * pow(n5, 8.0) * 4.0;
 }

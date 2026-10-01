@@ -1,6 +1,6 @@
 shader_type spatial;
 // A flat marker on the ground: a tower's reach as a ring (`radius`, metres) or a tile's square outline.
-render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled;
+render_mode unshaded, fog_disabled, cull_disabled, depth_draw_never, shadows_disabled;
 
 uniform vec4 color : source_color = vec4(1.0, 0.8, 0.4, 1.0);
 uniform float radius = 5.0;

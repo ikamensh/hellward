@@ -95,7 +95,7 @@ static func _make(key: String) -> Material:
 		"glow_storm": return glow(Color(0.35, 0.55, 1.0), 6.0)
 		"glow_curse": return glow(Color(0.65, 0.2, 1.0), 6.0)
 		"glow_window": return glow(Color(1.0, 0.55, 0.2), 2.0)
-		"glow_holy": return glow(Color(1.0, 0.7, 0.4), 2.4)
+		"glow_holy": return glow(Color(1.0, 0.7, 0.4), 1.6)
 		"glow_portal": return glow(Color(1.0, 0.15, 0.04), 8.0)
 	return null
 
