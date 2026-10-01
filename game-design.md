@@ -53,7 +53,7 @@ The map is a resource: where a tower stands matters as much as what it is.
   of the routes.
 - Upgrading buys less power per gold than building another tower, but more power per cell. Rank is how a player gets
   more out of a prime cell; more towers is how they spend gold efficiently on poor ones.
-- Scarcity keeps the tower count low (2) without a hard cap.
+- Scarcity keeps the tower count low without a hard cap.
 - Scarcity and area curses pull against each other: the best cells sit together near chokes, and leaders punish
   towers that sit together.
 - The map changes during a defence: monsters can take cells away from later building. An enemy's action on the map
