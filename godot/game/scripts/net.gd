@@ -209,6 +209,10 @@ func stop() -> void:
 		send({"t": "quit"})
 		_peer.disconnect_from_host()
 	_peer = null
+	for i in 50:   # it closes its worker processes on the way out; a second at most, then it is ended
+		if _pid <= 0 or not OS.is_process_running(_pid):
+			break
+		OS.delay_msec(20)
 	if _pid > 0 and OS.is_process_running(_pid):
 		OS.kill(_pid)
 	_pid = -1

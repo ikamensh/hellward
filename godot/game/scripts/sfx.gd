@@ -20,6 +20,17 @@ static var _music: AudioStreamPlayer
 static var _music_name := ""
 
 
+## The music's and the sounds' volume, 0..1 each, on buses of their own.
+static func volumes(music_level: float, sfx_level: float) -> void:
+	for pair in [["Music", music_level], ["Sfx", sfx_level]]:
+		var bus := AudioServer.get_bus_index(pair[0])
+		if bus < 0:
+			AudioServer.add_bus()
+			bus = AudioServer.bus_count - 1
+			AudioServer.set_bus_name(bus, pair[0])
+		AudioServer.set_bus_volume_db(bus, linear_to_db(max(float(pair[1]), 0.0001)))
+
+
 ## Sounds live under the scene tree's root, so music carries across screens. `log_path` records (tools/record.sh).
 static func setup(node: Node, log_path: String) -> void:
 	_root = node.get_tree().root
@@ -46,7 +57,7 @@ static func _streams(cue: String) -> Array:
 
 
 static func play(cue: String, at = null) -> void:
-	var live: Array = _sounding.get(cue, []).filter(func(p): return is_instance_valid(p) and p.playing)
+	var live: Array = _sounding.get(cue, []).filter(func(p): return is_instance_valid(p) and (p.playing or not p.is_inside_tree()))
 	if live.size() >= VOICES:
 		return
 	var stems := _streams(cue)
@@ -58,19 +69,21 @@ static func play(cue: String, at = null) -> void:
 		p3.unit_size = 28.0
 		p3.max_distance = 220.0
 		p3.volume_db = gain
-		_root.add_child(p3)
-		p3.global_position = at
+		p3.bus = "Sfx"
+		p3.position = at   # under the tree's root, its position is its place in the world
 		p3.stream = load(DIR + stem + ".wav")
-		p3.play()
+		p3.autoplay = true
 		p3.finished.connect(p3.queue_free)
+		_root.add_child.call_deferred(p3)
 		player = p3
 	else:
 		var p2 := AudioStreamPlayer.new()
 		p2.volume_db = gain
-		_root.add_child(p2)
+		p2.bus = "Sfx"
 		p2.stream = load(DIR + stem + ".wav")
-		p2.play()
+		p2.autoplay = true
 		p2.finished.connect(p2.queue_free)
+		_root.add_child.call_deferred(p2)
 		player = p2
 	live.append(player)
 	_sounding[cue] = live
@@ -91,8 +104,9 @@ static func music(name: String, volume_db := -8.0, fade := 2.0) -> void:
 	_music = AudioStreamPlayer.new()
 	_music.stream = stream
 	_music.volume_db = volume_db
-	_root.add_child(_music)
-	_music.play()
+	_music.bus = "Music"
+	_music.autoplay = true
+	_root.add_child.call_deferred(_music)   # the root may be busy adding the game's own nodes
 	_music_name = name
 	_note("music_" + name, volume_db, fade)
 

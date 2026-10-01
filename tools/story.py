@@ -25,8 +25,8 @@ from intro import paint  # noqa: E402
 import numpy as np  # noqa: E402
 from PIL import Image, ImageDraw, ImageFont  # noqa: E402
 
-STORY_DIR = ROOT / "hellward" / "assets" / "story"
-REFS_DIR = STORY_DIR / "refs"
+STORY_DIR = ROOT / "godot" / "game" / "assets" / "story"   # the panels the client shows
+REFS_DIR = ROOT / "hellward" / "assets" / "story" / "refs"   # what the painter is shown
 PROLOGUE_DIR = STORY_DIR / "prologue"
 
 ACT1_REFS = ("you", "akara", "priest", "lamp", "seal")

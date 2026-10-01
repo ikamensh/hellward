@@ -8,7 +8,8 @@ shim="$here/capture/noactivate.dylib"
 # new or changed assets need importing, and a new class_name script is unknown until the editor rescans
 game="$here/../game"
 cache="$game/.godot/global_script_class_cache.cfg"
-if [ ! -f "$cache" ] || [ -n "$(find "$game/scripts" "$game/assets" "$game/shaders" -type f ! -name '*.import' -newer "$cache" | head -1)" ]; then
+# HW_NO_IMPORT=1 skips it: parallel captures must not import into the same cache at once
+if [ -z "$HW_NO_IMPORT" ] && { [ ! -f "$cache" ] || [ -n "$(find "$game/scripts" "$game/assets" "$game/shaders" -type f ! -name '*.import' -newer "$cache" | head -1)" ]; }; then
   DYLD_INSERT_LIBRARIES="$shim" /Applications/Godot.app/Contents/MacOS/Godot --headless --path "$game" --import >/dev/null 2>&1
   touch "$cache"
 fi

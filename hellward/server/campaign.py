@@ -219,7 +219,8 @@ class Campaign:
             "arsenal": arsenal, "best": won, "next_sigil": next_sigil, "waste": waste,
             "breach": None if breach is None else {"name": breach.name, "blurb": breach.blurb,
                                                    "claimed": p.breach_claims.get(loc.key)},
-            "story": story(STORIES[before_key]) if story_first else None,
+            "story": story(STORIES[before_key]) if story_first else None,   # owed before the intro shows
+            "before": story(STORIES[before_key]) if before_key in STORIES else None,   # the intro's Story button
             "opened": p.opened(loc),
         }
 
