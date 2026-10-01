@@ -55,7 +55,8 @@ func _ready() -> void:
 		d.name = "Demo"
 		add_child(d)
 		d.setup(self, args.has("film"))
-	world.announce.emit("Tristram", "The village under the cathedral burns. Hold the sanctuary.")
+	if not args.has("film"):
+		world.announce.emit("Tristram", "The village under the cathedral burns. Hold the sanctuary.")
 	Sfx.music("battle_tristram")
 	if args.has("shot"):
 		Shots.frame(self, args["shot"])

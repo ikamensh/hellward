@@ -33,6 +33,27 @@ var _pace: Button
 var _selected: Tower
 
 
+var _root: Control
+
+
+## Film mode: the panel and orbs fade away, leaving the battle and the banners.
+func cinematic(on: bool, seconds := 1.0) -> void:
+	var tw := create_tween()
+	tw.tween_property(_root, "modulate:a", 0.0 if on else 1.0, seconds)
+
+
+## A title card over the picture: the banner, held for `hold` seconds.
+func title_card(title: String, line: String, hold := 3.0) -> void:
+	_banner_title.text = title
+	_banner_line.text = line
+	if _banner_tween:
+		_banner_tween.kill()
+	_banner_tween = create_tween()
+	_banner_tween.tween_property(_banner, "modulate:a", 1.0, 1.2)
+	_banner_tween.tween_interval(hold)
+	_banner_tween.tween_property(_banner, "modulate:a", 0.0, 1.2)
+
+
 func setup(w: World) -> void:
 	world = w
 	world.changed.connect(refresh)
@@ -46,6 +67,10 @@ func _build() -> void:
 	root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
+	_root = Control.new()
+	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(_root)
 
 	# the bottom panel, dark iron with a gold edge
 	var panel := Panel.new()
@@ -61,13 +86,13 @@ func _build() -> void:
 	sb.shadow_color = Color(0, 0, 0, 0.6)
 	sb.shadow_size = 18
 	panel.add_theme_stylebox_override("panel", sb)
-	root.add_child(panel)
+	_root.add_child(panel)
 
 	_life_orb = _orb(Color(0.78, 0.05, 0.04))
 	_life_orb.position = Vector2(26, -190)
 	_life_orb.anchor_top = 1.0
 	_life_orb.anchor_bottom = 1.0
-	root.add_child(_life_orb)
+	_root.add_child(_life_orb)
 	_life_text = _label(Style.title_font(), 46, Style.PALE_GOLD)
 	_life_orb.add_child(_life_text)
 	_life_text.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -80,7 +105,7 @@ func _build() -> void:
 	_mana_orb.anchor_top = 1.0
 	_mana_orb.anchor_bottom = 1.0
 	_mana_orb.position = Vector2(-206, -190)
-	root.add_child(_mana_orb)
+	_root.add_child(_mana_orb)
 	_mana_text = _label(Style.title_font(), 40, Style.PALE_GOLD)
 	_mana_orb.add_child(_mana_text)
 	_mana_text.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -97,7 +122,7 @@ func _build() -> void:
 	bar.offset_top = -118
 	bar.offset_bottom = -10
 	bar.add_theme_constant_override("separation", 14)
-	root.add_child(bar)
+	_root.add_child(bar)
 	for i in SLOTS.size():
 		bar.add_child(_slot(SLOTS[i], i + 1))
 	var cleanse := _slot_button("C", Style.CURSE)
@@ -160,7 +185,7 @@ func _build() -> void:
 	_orders.offset_right = 300
 	_orders.offset_top = -258
 	_orders.offset_bottom = -146
-	root.add_child(_orders)
+	_root.add_child(_orders)
 	var ov := VBoxContainer.new()
 	_orders.add_child(ov)
 	_orders_title = _label(Style.title_font(), 28, Style.GOLD)

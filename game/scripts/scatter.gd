@@ -27,6 +27,7 @@ func build(lvl: Level, keep_clear: Array) -> void:
 			stones.append(p)
 	add_child(_tufts(tufts))
 	add_child(_stones(stones))
+	add_child(_forest())
 
 
 func _lane_weight(p: Vector3) -> float:
@@ -120,3 +121,64 @@ func _stones(points: Array) -> MultiMeshInstance3D:
 	mi.multimesh = mm
 	mi.material_override = Mats.named("stone")
 	return mi
+
+
+## A dark pine forest on the hills around the village: a silhouette against the burning sky.
+func _forest() -> MultiMeshInstance3D:
+	var noise := FastNoiseLite.new()
+	noise.seed = 7
+	noise.frequency = 0.012
+	var c := level.centre()
+	var points: Array = []
+	for i in 2400:
+		var a := _rng.randf() * TAU
+		var r := _rng.randf_range(62.0, 230.0)
+		var p := c + Vector3(cos(a) * r * 1.25, 0.0, sin(a) * r)
+		if abs(p.z - c.z) < 30.0 and (p.x < -20.0 or p.x > 85.0) and abs(p.x - c.x) < 95.0:
+			continue   # keep the portal's field and the cathedral's approach open
+		if p.z > c.z and r < 125.0:
+			continue   # the cameras look from the south: no trunks in front of the lens
+		p.y = level.ground_height(p.x, p.z, noise) - 0.3
+		points.append(p)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
+	mm.mesh = _pine_mesh()
+	mm.instance_count = points.size()
+	for i in points.size():
+		var s := _rng.randf_range(0.7, 1.5)
+		var b := Basis(Vector3.UP, _rng.randf() * TAU).scaled(Vector3(s, s * _rng.randf_range(0.9, 1.3), s))
+		mm.set_instance_transform(i, Transform3D(b, points[i]))
+		mm.set_instance_color(i, Color(0.05, 0.07, 0.05).lerp(Color(0.09, 0.1, 0.07), _rng.randf()))
+	var mi := MultiMeshInstance3D.new()
+	mi.multimesh = mm
+	var m := StandardMaterial3D.new()
+	m.vertex_color_use_as_albedo = true
+	m.roughness = 0.95
+	mi.material_override = m
+	return mi
+
+
+## A pine: a trunk and four stacked, drooping cones, about 11 m tall.
+func _pine_mesh() -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_color(Color.WHITE)
+	_cone(st, 0.0, 3.0, 0.25, 0.2, 6)
+	var tiers := [[2.0, 5.5, 3.0], [4.0, 7.5, 2.4], [6.0, 9.4, 1.8], [8.0, 11.2, 1.1]]
+	for t in tiers:
+		_cone(st, t[0], t[1], t[2], 0.0, 9)
+	st.generate_normals()
+	return st.commit()
+
+
+func _cone(st: SurfaceTool, y0: float, y1: float, r0: float, r1: float, sides: int) -> void:
+	for i in sides:
+		var a0 := TAU * i / sides
+		var a1 := TAU * (i + 1) / sides
+		var p0 := Vector3(cos(a0) * r0, y0, sin(a0) * r0)
+		var p1 := Vector3(cos(a1) * r0, y0, sin(a1) * r0)
+		var q0 := Vector3(cos(a0) * r1, y1, sin(a0) * r1)
+		var q1 := Vector3(cos(a1) * r1, y1, sin(a1) * r1)
+		st.add_vertex(p0); st.add_vertex(q0); st.add_vertex(p1)
+		st.add_vertex(p1); st.add_vertex(q0); st.add_vertex(q1)

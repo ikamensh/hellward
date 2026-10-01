@@ -11,8 +11,10 @@ var bounds := AABB(Vector3(-10, 0, -10), Vector3(90, 0, 60))
 var user_control := true
 
 var cam: Camera3D
+var follow: Node3D          # when set, the target keeps to this node (a monster being filmed)
 var _goal := {}
 var _turning := false
+var _glide: Tween
 
 
 func _ready() -> void:
@@ -27,6 +29,18 @@ func _ready() -> void:
 
 func fly_to(t: Vector3, y: float, p: float, d: float) -> void:
 	_goal = {"target": t, "yaw": y, "pitch": p, "distance": d}
+
+
+## A filmed move: ease from here to there over `seconds`, both ends at rest.
+func glide(t: Vector3, y: float, p: float, d: float, seconds: float) -> void:
+	_goal = {}
+	if _glide:
+		_glide.kill()
+	_glide = create_tween().set_parallel().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_glide.tween_property(self, "target", t, seconds)
+	_glide.tween_property(self, "yaw", y, seconds)
+	_glide.tween_property(self, "pitch", p, seconds)
+	_glide.tween_property(self, "distance", d, seconds)
 
 
 func snap(t: Vector3, y: float, p: float, d: float) -> void:
@@ -55,6 +69,9 @@ func _process(delta: float) -> void:
 			var basis_y := Basis(Vector3.UP, deg_to_rad(yaw))
 			target += basis_y * move.normalized() * distance * 0.9 * delta
 			target = target.clamp(bounds.position, bounds.end)
+	if is_instance_valid(follow):
+		var k_follow: float = 1.0 - exp(-delta * 2.5)
+		target = target.lerp(follow.global_position, k_follow)
 	if not _goal.is_empty():
 		var k: float = 1.0 - exp(-delta * 1.6)
 		target = target.lerp(_goal["target"], k)

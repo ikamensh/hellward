@@ -76,49 +76,52 @@ func _route_path(points: Array) -> PackedVector3Array:
 	return raw
 
 
-## The floor mask: r = lane, g = bare earth, b = scorch; drawn a pixel per metre, then smoothed.
+## The floor mask, a pixel per metre, smoothed: r = the cobbled street along each route (5 m wide, room for
+## the monsters' wander), g = trampled mud (the rest of the 2D game's monster halls, the verges), b = scorch,
+## a = the cathedral's flagstone forecourt.
 func floor_mask(scorch_points: Array) -> ImageTexture:
-	var w := int(MASK_SIZE.x / TILE)
-	var h := int(MASK_SIZE.y / TILE)
+	var w := int(MASK_SIZE.x)
+	var h := int(MASK_SIZE.y)
+	var road := PackedFloat32Array()
+	road.resize(w * h)
+	road.fill(99.0)
+	for route in routes:
+		for i in route.size() - 1:
+			var n := int(ceil(route[i].distance_to(route[i + 1]) / 0.5))
+			for k in n:
+				var q: Vector3 = route[i].lerp(route[i + 1], float(k) / n)
+				var c := Vector2(q.x - MASK_ORIGIN.x, q.z - MASK_ORIGIN.y)
+				for y in range(int(c.y) - 6, int(c.y) + 7):
+					for x in range(int(c.x) - 6, int(c.x) + 7):
+						if x >= 0 and y >= 0 and x < w and y < h:
+							road[y * w + x] = min(road[y * w + x], Vector2(x + 0.5, y + 0.5).distance_to(c))
 	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 1))
-	var ox := int(-MASK_ORIGIN.x / TILE)
-	var oz := int(-MASK_ORIGIN.y / TILE)
+	var court := Rect2(door_pos.x - 9.0, door_pos.z - 7.0, 13.0, 14.0)
 	for y in h:
 		for x in w:
-			var t := Vector2i(x - ox, y - oz)
-			var c := cell(t)
-			var lane := 1.0 if c == "P" else 0.0
-			var earth := 0.0
-			for dy in range(-2, 3):
-				for dx in range(-2, 3):
-					if cell(t + Vector2i(dx, dy)) == "P":
-						earth = max(earth, 0.6 - 0.12 * (abs(dx) + abs(dy)))
-			img.set_pixel(x, y, Color(lane, earth, 0.0, 1.0))
-	# the approaches outside the grid: from the portal and on to the cathedral door
-	for route in routes:
-		for p in route:
-			var t := tile_at(p)
-			if cell(t) == "#" and (t.x < 0 or t.x >= width):
-				for dy in range(-1, 2):
-					var q := Vector2i(t.x + ox, t.y + oz + dy)
-					if q.x >= 0 and q.y >= 0 and q.x < w and q.y < h:
-						img.set_pixel(q.x, q.y, Color(1.0, 0.8, 0.0, 1.0))
-	for s in scorch_points:
-		var sp: Vector3 = s[0]
-		var radius: float = s[1]
-		var c := Vector2((sp.x - MASK_ORIGIN.x) / TILE, (sp.z - MASK_ORIGIN.y) / TILE)
-		var r := radius / TILE
-		for y in range(int(c.y - r) - 1, int(c.y + r) + 2):
-			for x in range(int(c.x - r) - 1, int(c.x + r) + 2):
+			var world_xz := Vector2(x + 0.5, y + 0.5) + MASK_ORIGIN
+			var d := road[y * w + x]
+			var t := tile_at(Vector3(world_xz.x, 0, world_xz.y))
+			var lane := 1.0 - smoothstep(2.2, 3.0, d)
+			var mud: float = max(0.55 if cell(t) == "P" else 0.0, 1.0 - smoothstep(3.0, 5.5, d))
+			var flag := 0.0
+			if court.has_point(world_xz) or (world_xz.x > door_pos.x - 16.0 and abs(world_xz.y - door_pos.z) < 1.6):
+				flag = 1.0
+			img.set_pixel(x, y, Color(lane, mud, 0.0, flag))
+	for sp in scorch_points:
+		var at: Vector3 = sp[0]
+		var radius: float = sp[1]
+		var c := Vector2(at.x - MASK_ORIGIN.x, at.z - MASK_ORIGIN.y)
+		for y in range(int(c.y - radius) - 1, int(c.y + radius) + 2):
+			for x in range(int(c.x - radius) - 1, int(c.x + radius) + 2):
 				if x < 0 or y < 0 or x >= w or y >= h:
 					continue
-				var k: float = clamp(1.0 - Vector2(x + 0.5, y + 0.5).distance_to(c) / r, 0.0, 1.0)
+				var k: float = clamp(1.0 - Vector2(x + 0.5, y + 0.5).distance_to(c) / radius, 0.0, 1.0)
 				var px := img.get_pixel(x, y)
 				px.b = max(px.b, k)
 				px.g = max(px.g, k * 0.8)
 				img.set_pixel(x, y, px)
-	img.resize(w * 8, h * 8, Image.INTERPOLATE_CUBIC)
+	img.resize(w * 4, h * 4, Image.INTERPOLATE_CUBIC)
 	return ImageTexture.create_from_image(img)
 
 
@@ -129,7 +132,10 @@ func ground_height(x: float, z: float, noise: FastNoiseLite) -> float:
 	var dz: float = max(abs(z - c.z) - height * TILE * 0.5 - 4.0, 0.0)
 	var d := sqrt(dx * dx + dz * dz)
 	var rise: float = clamp(d / 30.0, 0.0, 1.0)
-	return rise * rise * (6.0 + 9.0 * noise.get_noise_2d(x, z)) + rise * 3.0 * noise.get_noise_2d(x * 3.0, z * 3.0)
+	var near := rise * rise * (6.0 + 9.0 * noise.get_noise_2d(x, z)) + rise * 3.0 * noise.get_noise_2d(x * 3.0, z * 3.0)
+	# far off, the land climbs into a ring of hills that closes the horizon
+	var ring: float = clamp((d - 60.0) / 140.0, 0.0, 1.0)
+	return near + ring * ring * (26.0 + 18.0 * noise.get_noise_2d(x * 0.5, z * 0.5))
 
 
 func build_floor(scorch_points: Array) -> MeshInstance3D:
@@ -137,8 +143,8 @@ func build_floor(scorch_points: Array) -> MeshInstance3D:
 	noise.seed = 7
 	noise.frequency = 0.012
 	var c := centre()
-	var size := Vector2(320.0, 240.0)
-	var steps := Vector2i(160, 120)
+	var size := Vector2(640.0, 520.0)
+	var steps := Vector2i(256, 208)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var origin := Vector2(c.x - size.x * 0.5, c.z - size.y * 0.5)
@@ -180,6 +186,9 @@ func build_floor(scorch_points: Array) -> MeshInstance3D:
 	mat.set_shader_parameter("earth_n", load(tex + "earth_normal.png"))
 	mat.set_shader_parameter("grass_a", load(tex + "grass_albedo.png"))
 	mat.set_shader_parameter("grass_n", load(tex + "grass_normal.png"))
+	mat.set_shader_parameter("flag_a", load(tex + "flagstones_albedo.png"))
+	mat.set_shader_parameter("flag_n", load(tex + "flagstones_normal.png"))
+	mat.set_shader_parameter("portal_xz", Vector2(portal_pos.x, portal_pos.z))
 	mi.material_override = mat
 	mi.name = "Floor"
 	add_child(mi)
