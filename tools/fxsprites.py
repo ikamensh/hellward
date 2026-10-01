@@ -3,8 +3,9 @@
 
     uv run python tools/fxsprites.py
 
-Additive sprites (fire, rune circle, portal swirl) keep their black backgrounds, which add nothing.
-Blended ones get alpha: smoke and blood from their brightness over black, the scorch from its darkness over white.
+Additive sprites (fire, portal swirl) keep their black backgrounds, which add nothing. Blended ones get alpha:
+smoke, blood and the rune circle from their brightness over black; the scorch from a filled, blurred mask of the
+painted disc times its darkness (with matte ORM and cooling-ember maps beside it).
 HUD pieces were painted on flat green, which is keyed out.
 """
 from pathlib import Path
