@@ -9,11 +9,8 @@ model=$(cd "$(dirname "$model")" && pwd)/$(basename "$model")
 views=8
 for a in "$@"; do case "$a" in views=*) views=${a#views=} ;; esac; done
 tmp=$(mktemp -d /tmp/hw3d-preview.XXXXXX)
-caffeinate -u -t 2 true
-/Applications/Godot.app/Contents/MacOS/Godot --path game --resolution 960x720 --fixed-fps 30 \
-  --write-movie "$tmp/f.png" --quit-after $((views + 3)) res://scenes/preview.tscn -- "model=$model" "$@" \
-  2>&1 | grep -E "^(animations|bounds|ERROR|SCRIPT ERROR)|error" | head -20 || true
-frames=$(ls "$tmp"/f*.png | tail -n "$views")
-uv run --quiet python tools/sheet.py "$out" $frames --cols 4 >/dev/null
+tools/godot-capture.sh --path game --fixed-fps 30 res://scenes/capture.tscn -- scene=res://scenes/preview.tscn \
+  res=960x720 "model=$model" "out=$tmp" "$@" 2>&1 | grep -E "^(animations|bounds|ERROR|SCRIPT ERROR)|error" | head -20 || true
+uv run --quiet python tools/sheet.py "$out" $(ls "$tmp"/f*.png) --cols 4 >/dev/null
 rm -rf "$tmp"
 echo "$out"

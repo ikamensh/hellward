@@ -60,6 +60,27 @@ SINGLE = {
     "banner": ("A long hanging cloth banner seen straight on, filling a tall frame: deep crimson velvet with a "
                "golden radiant sun sigil and a gold border, frayed lower edge. Plain black around it. No text.",
                "portrait"),
+    # effect sprites: painted on pure black, which the game turns into transparency
+    "fire_sheet": ("A 4 by 4 grid sprite sheet of sixteen separate realistic fire flames for a game particle "
+                   "system, each flame alone in its own equal square cell, centred, upright, not touching the cell "
+                   "edges: licking tongues of bright yellow-white core, orange body and deep red ragged tips, all "
+                   "different shapes. Pure black background everywhere, no glow spilling between cells, no text, "
+                   "no grid lines.", "square"),
+    "smoke_sheet": ("A 4 by 4 grid sprite sheet of sixteen separate soft billowing smoke puffs for a game particle "
+                    "system, each alone in its own equal square cell, centred, round-ish, not touching the cell "
+                    "edges, light grey wispy smoke with soft edges and internal billows. Pure black background, "
+                    "no text, no grid lines.", "square"),
+    "rune_circle": ("A single glowing magic summoning circle seen straight from above, centred, filling the "
+                    "square: thin concentric rings, angular demonic runes and a pentagram-like star, drawn in "
+                    "bright violet-magenta glowing lines. Pure black background, nothing else, no text.", "square"),
+    "portal_swirl": ("A single swirling vortex seen straight on, centred, filling the square: spiralling arms of "
+                     "fire and molten red-orange energy twisting into a black-red centre, wisps and sparks. Pure "
+                     "black outside the circle, no text.", "square"),
+    "blood_decal": ("A single dark red blood splatter seen straight from above, centred: a main pool with "
+                    "spatters and droplets around it. Pure black background, no text.", "square"),
+    "scorch_decal": ("A single scorch mark seen straight from above, centred: soft round burnt blackened ground "
+                     "with ash flecks and a few glowing orange embers, fading to the edges. Pure white background, "
+                     "no text.", "square"),
 }
 
 

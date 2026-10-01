@@ -1,7 +1,8 @@
 extends Node3D
 ## Renders one model for review under the game's night lighting (tools/preview.sh drives it).
-## User args: model=/abs/file.glb [anim=walk] [views=8] [dist=0 (auto)] [pitch=25] [yaw=35]
+## User args: model=/abs/file.glb out=DIR [anim=walk] [views=8] [dist=0 (auto)] [pitch=25] [yaw=35]
 ## Without anim: a turntable of `views` frames. With anim: `views` samples across the animation from `yaw`.
+## Each view is saved as DIR/fNN.png, then the run quits.
 
 const SKIP := 3   # frames rendered before the first kept one, while shaders settle
 
@@ -42,7 +43,16 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_frame += 1
-	var i: int = max(_frame - SKIP, 0)
+	var i: int = _frame - SKIP
+	if i < 0:
+		return
+	var views := int(_args.get("views", "8"))
+	if i > 0:
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("%s/f%02d.png" % [_args["out"], i - 1])
+	if i == views:
+		get_tree().quit()
+		return
 	_place_camera(i)
 
 

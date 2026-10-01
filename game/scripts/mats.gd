@@ -71,7 +71,7 @@ static func _make(key: String) -> Material:
 		"copper": return textured("iron", Color(1.1, 0.55, 0.3), 1.0, 0.8, 0.6)
 		"gold": return textured("iron", Color(1.4, 1.0, 0.4), 0.6, 1.0, 0.45)
 		"demon_skin": return textured("demon_skin", Color(1.0, 0.85, 0.85), 1.2, 0.0, 0.9)
-		"corpse_skin": return textured("corpse_skin", Color(0.85, 0.9, 0.8), 1.2)
+		"corpse_skin": return textured("corpse_skin", Color(0.8, 1.12, 1.05), 1.2)
 		"bone": return textured("bone", Color(0.85, 0.8, 0.7), 0.8)
 		"cloth": return textured("cloth")
 		"leather": return textured("cloth", Color(0.45, 0.3, 0.22), 1.0, 0.0, 0.7)
@@ -87,6 +87,7 @@ static func _make(key: String) -> Material:
 		"blood": return flat(Color(0.18, 0.0, 0.0), 0.25)
 		"banner": return flat(Color(0.35, 0.02, 0.02), 0.85)
 		"ice": return _ice()
+		"stained_glass": return _picture("stained_glass", 2.2)
 		"glass": return flat(Color(0.3, 0.2, 0.15), 0.1)
 		"glow_fire": return glow(Color(1.0, 0.45, 0.12), 6.0)
 		"glow_eye": return glow(Color(1.0, 0.75, 0.15), 8.0)
@@ -111,4 +112,20 @@ static func _ice() -> StandardMaterial3D:
 	m.rim_enabled = true
 	m.rim = 1.0
 	m.rim_tint = 0.2
+	return m
+
+
+## A painted picture on 0..1 UVs, cut out where the painting is black, glowing by `energy`.
+static func _picture(tex: String, energy: float) -> StandardMaterial3D:
+	var m := StandardMaterial3D.new()
+	var t: Texture2D = load(TEX + tex + ".png")
+	m.albedo_texture = t
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	m.alpha_scissor_threshold = 0.5
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	m.roughness = 0.85
+	m.emission_enabled = true
+	m.emission_texture = t
+	m.emission_energy_multiplier = energy
+	m.albedo_color = Color(0.2, 0.2, 0.2)
 	return m
