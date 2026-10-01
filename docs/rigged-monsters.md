@@ -7,14 +7,17 @@ The 3D set samples an interpolated sixteen-frame walk from the existing eight
 joint poses. It also includes each monster's hit, door strike, and distinct death
 poses. No mesh is rendered while the battle runs.
 
-The game defaults to **mixed**: each Skeleton and Zombie spawn independently
-chooses a style from its kind and monster ID. The choice is stable across replay,
-pause, hits, turning, and death, and it never consumes the simulation's random
-stream. Other monster kinds keep their existing art. Use these modes to compare:
+The game defaults to **painted**. The 3D meshes are blockout geometry: they
+validate articulation and directional playback, but their anatomy and materials
+are visibly below the approved painted art. The **mixed** comparison is opt-in:
+each Skeleton and Zombie spawn independently chooses a style from its kind and
+monster ID. The choice is stable across replay, pause, hits, turning, and death,
+and it never consumes the simulation's random stream. Other monster kinds keep
+their existing art. Use these modes to compare:
 
 ```bash
-uv run hellward                                   # mixed (default)
-HELLWARD_MONSTER_STYLE=painted uv run hellward    # existing sprites only
+uv run hellward                                   # painted (default)
+HELLWARD_MONSTER_STYLE=mixed uv run hellward      # painted and baked 3D comparison
 HELLWARD_MONSTER_STYLE=rigged uv run hellward     # baked 3D for Skeleton/Zombie
 ```
 
@@ -32,8 +35,17 @@ uv run pytest -q tests/test_rigged_monsters.py tests/test_monster_animation.py
 ```
 
 The loader rejects missing or misregistered frames. The 3D bakes are a motion
-and structure comparison: their flat shaded materials and simple geometry are
-visibly less finished than the painted art. They demonstrate what a shared
-model fixes (proportion and directional identity) and what it does not (surface
-quality, timing, and foot contact). The next art step is a textured Skeleton
-and Zombie mesh with the same export contract, followed by a game-scale review.
+and structure comparison. Their flat shaded materials and simple geometry are
+visibly less finished than the painted art. A trial of painted material swatches
+on these same mesh faces increased surface detail but did not repair the crude
+silhouettes, so that trial was not installed.
+
+For a production 3D replacement, build a real creature model for each monster:
+sculpt the head, hands, torso and silhouette against the painted reference;
+unwrap it; paint diffuse, roughness and emissive maps; rig the joints; animate
+walk, hit, strike and death with planted foot contacts; then render every pose
+through a fixed orthographic camera with consistent lights and a shared ground
+pivot. Bake into the existing sprite-sheet contract so Saga2D needs no runtime
+3D renderer. Review all eight bearings and transitions at battle scale before
+switching the default. A textured blockout or independently repainted frames
+are insufficient quality gates.

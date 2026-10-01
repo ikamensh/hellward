@@ -249,7 +249,7 @@ def _tower_outline(image: Image.Image) -> Image.Image:
 def register(game: Game, cache_dir: Path) -> Art:
     cache = warm(cache_dir)
     assets = game.assets
-    style = os.environ.get("HELLWARD_MONSTER_STYLE", "mixed")
+    style = os.environ.get("HELLWARD_MONSTER_STYLE", "painted")
     if style not in {"painted", "mixed", "rigged"}:
         raise ValueError(f"HELLWARD_MONSTER_STYLE must be painted, mixed, or rigged; got {style!r}")
     if procedural():

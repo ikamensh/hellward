@@ -45,9 +45,41 @@ def test_committed_3d_frames_match_the_current_rigs():
                 assert atlas[f"{facing}/{frame}"].tobytes() == visible.tobytes()
 
 
+def test_normal_battle_uses_painted_monsters(tmp_path, monkeypatch):
+    """Blockout 3D is an opt-in comparison, never an ordinary spawn."""
+    monkeypatch.delenv("HELLWARD_MONSTER_STYLE", raising=False)
+    monkeypatch.delenv("HELLWARD_ART", raising=False)
+    game = Game("Hellward painted default test", backend="mock", resolution=(WIDTH, HEIGHT),
+                asset_path=tmp_path / "cache", save_dir=tmp_path / "saves")
+    try:
+        art = build(game, tmp_path / "cache")
+        assert art.monster_style == "painted"
+        assert not art.rigged
+        scene = stage(game, art)
+        for kind in ("fallen", "skeleton", "zombie"):
+            spec = MONSTERS[kind]
+            monster = Monster(100, spec, 0, 0.0, 0.0, spec.hp, 0.0, route="tour")
+            scene.world.monsters.append(monster)
+            scene.view.spawn(monster)
+            figure = scene.view.figures[monster.id]
+            assert figure.sprite.image.startswith(f"mon/{kind}/")
+            scene.view.hit(monster.id, "physical")
+            for _ in range(18):
+                scene.view.sync(1.0, 1 / 60, animation_dt=1 / 60)
+                assert figure.sprite.image.startswith(f"mon/{kind}/")
+            scene.view.kill(monster.id)
+            for _ in range(35):
+                scene.view.sync(1.0, 1 / 60, animation_dt=1 / 60)
+                assert figure.sprite.image.startswith(f"mon/{kind}/")
+            scene.world.monsters.remove(monster)
+            scene.view.vanish(monster.id)
+    finally:
+        game.close()
+
+
 def test_two_rigged_monsters_mix_with_painted_spawns_in_battle(tmp_path, monkeypatch):
     """A battle can display both baked 3D and painted bodies of each supported kind."""
-    monkeypatch.delenv("HELLWARD_MONSTER_STYLE", raising=False)  # the game defaults to mixing both styles
+    monkeypatch.setenv("HELLWARD_MONSTER_STYLE", "mixed")
     monkeypatch.delenv("HELLWARD_ART", raising=False)
     game = Game("Hellward rigged mix test", backend="mock", resolution=(WIDTH, HEIGHT),
                 asset_path=tmp_path / "cache", save_dir=tmp_path / "saves")
