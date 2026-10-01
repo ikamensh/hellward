@@ -128,6 +128,7 @@ func _stones(points: Array) -> MultiMeshInstance3D:
 	var mi := MultiMeshInstance3D.new()
 	mi.multimesh = mm
 	mi.material_override = Mats.named("stone")
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF   # pebbles: their shadows cost four cascades
 	return mi
 
 
@@ -161,6 +162,7 @@ func _forest() -> MultiMeshInstance3D:
 	m.vertex_color_use_as_albedo = true
 	m.roughness = 0.95
 	mi.material_override = m
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF   # far beyond the battle; shadows here cost a lot
 	return mi
 
 
@@ -223,6 +225,7 @@ func _dead_wood(keep_clear: Array) -> void:
 			mm.set_instance_transform(k, transforms[k] * local)
 		var mmi := MultiMeshInstance3D.new()
 		mmi.multimesh = mm
+		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(mmi)
 	tree.free()
 

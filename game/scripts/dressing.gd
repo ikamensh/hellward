@@ -346,7 +346,7 @@ func _burn(node: Node3D, pos: Vector3) -> void:
 	var flames := node.find_children("fx_flame*", "", true, false)   # flames licking out of every other upper window
 	for i in range(0, flames.size(), 2):
 		(flames[i] as Node3D).add_child(Fx.fire(0.7))
-	var light := Fx.fire_light(11.0, 15.0, _burning % 3 == 1)   # shadows from every third fire: each costs six passes
+	var light := Fx.fire_light(11.0, 15.0)   # no shadows: an omni light's shadow re-renders the scene six times
 	light.light_volumetric_fog_energy = 0.35   # a warm haze, not a glowing ball swallowing the flames
 	light.position = pos + Vector3(0, 3.5, 3.0 if pos.z < 18.0 else -3.0)
 	add_child(light)

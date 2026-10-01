@@ -101,7 +101,7 @@ static func dress_fx(model: Node3D, kind: String, rank: int) -> void:
 		"pyre":
 			var f := Models.node(model, "fx_fire")
 			f.add_child(Fx.fire(0.9 + 0.15 * rank, 1.1))
-			light = Fx.fire_light(3.0 + rank, 9.0, true)
+			light = Fx.fire_light(3.0 + rank, 9.0)
 			f.add_child(light)
 		"frost":
 			light = OmniLight3D.new()

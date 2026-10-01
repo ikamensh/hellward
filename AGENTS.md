@@ -33,6 +33,15 @@ viewport never asks for one. The wrapper re-imports when assets or scripts chang
 until then and the scene fails to parse); captures quit on a watchdog if a scene hangs. `--headless` cannot
 render on macOS (the dummy renderer only), but runs the tests.
 
+## Frame time
+
+Profile with `tools/godot-capture.sh --path game --fixed-fps 30 res://scenes/capture.tscn -- scene=res://scenes/main.tscn
+shot=overview snap=/tmp/x.png frames=460 demo perf [off=omnishadow,grass,...]` (`scripts/capture.gd`): it prints
+frame and render times; `off=` switches features off to bisect. On this M4 the battle runs ~19 ms at 1080p. What
+cost the most: shadowed omni lights (each re-renders the scene six times; only the portal, the door's spot, the
+forecourt braziers and burning props in the field cast shadows), and clutter casting into the moon's cascades.
+3D renders at most a 1080p frame's pixels and FSR upscales it (`main.gd _fit_resolution`).
+
 ## Layout
 
 - `game/scripts/` — `main.gd` (wiring, mist, vignette; user args), `atmosphere.gd` (the night: sky, moon,

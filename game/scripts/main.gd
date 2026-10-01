@@ -25,6 +25,8 @@ func _ready() -> void:
 	add_child(level)
 	level.load_location("tristram")
 	_environment()
+	_fit_resolution()
+	get_viewport().size_changed.connect(_fit_resolution)
 	var scorch: Array = []
 	var dressing := Dressing.new()
 	dressing.name = "Dressing"
@@ -131,6 +133,17 @@ func _environment() -> void:
 	env = Atmosphere.night(self)
 	_ground_mist()
 	_vignette()
+
+
+## 3D renders at no more than a 1080p frame's worth of pixels, upscaled with FSR: a Retina window would
+## otherwise draw four times the pixels for little visible gain. The HUD stays sharp at full resolution.
+func _fit_resolution() -> void:
+	var vp := get_viewport()
+	var px: Vector2 = Vector2(get_window().size) if vp == get_tree().root else Vector2((vp as SubViewport).size)
+	var scale: float = clamp(sqrt(1920.0 * 1080.0 / max(px.x * px.y, 1.0)), 0.5, 1.0)
+	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR if scale < 1.0 else Viewport.SCALING_3D_MODE_BILINEAR
+	vp.scaling_3d_scale = scale
+	vp.fsr_sharpness = 0.4
 
 
 ## A low, drifting mist over the field that the fires light from inside.
