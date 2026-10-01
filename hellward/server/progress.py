@@ -1,14 +1,13 @@
 """The campaign's sigils, skills, banked loot, forged patterns and map position.
 
-Saved in the game's save folder (slot ``campaign``) after every change.
+Saved in the save folder (:class:`~hellward.server.saves.Saves`, slot ``campaign``) after every change.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from saga2d import Game
-
+from hellward.server.saves import Saves
 from hellward.sim.breaches import BREACHES
 from hellward.sim.campaign import ACTS, LOCATIONS, ORDER, Location, sigils
 from hellward.sim.items import PATTERNS, Loadout, Pattern
@@ -25,12 +24,11 @@ def slot_for_profile(profile: str) -> str:
     return SLOT if profile == "main" else f"{SLOT}_{profile}"
 
 
-def campaign_profiles(game: Game) -> tuple[str, ...]:
+def campaign_profiles(saves: Saves) -> tuple[str, ...]:
     """The main campaign and named campaign saves visible in the title's picker."""
-    prefix = f"save_{SLOT}_"
     names = {"main"}
-    for path in (game.data_dir / "saves").glob(f"{prefix}*.json"):
-        name = path.name[len(prefix):-len(".json")]
+    for slot in saves.slots(f"{SLOT}_"):
+        name = slot[len(SLOT) + 1:]
         if name.isidentifier():
             names.add(name)
     return ("main", *sorted(names - {"main"}, key=lambda name: (name.casefold(), name)))
@@ -58,15 +56,15 @@ class Progress:
     patterns: frozenset[str] = frozenset()   # forged patterns, owned permanently
     loadout: Loadout = field(default_factory=Loadout)
     profile: str = "main"
-    game: Game | None = field(default=None, repr=False, compare=False)
+    saves: Saves | None = field(default=None, repr=False, compare=False)
 
     # -- Saving -----------------------------------------------------------------------------------
 
     @classmethod
-    def load(cls, game: Game, profile: str = "main") -> Progress:
-        data = game.save_manager.load(slot_for_profile(profile))
+    def load(cls, saves: Saves, profile: str = "main") -> Progress:
+        data = saves.load(slot_for_profile(profile))
         if data is None:
-            return cls(profile=profile, game=game)
+            return cls(profile=profile, saves=saves)
         state = data["state"]
         won = state["won"]["normal"] if "difficulty" in state else state["won"]   # a save from before the acts
         stage = min(len(ORDER) - 1, max((ORDER.index(key) + 1 for key in won), default=0))
@@ -82,18 +80,18 @@ class Progress:
                        salvage_best=dict(state.get("salvage_best", {})), salvage=state.get("salvage", 0),
                        breach_claims=dict(state.get("breach_claims", {})),
                        trophies=frozenset(state.get("trophies", ())), patterns=owned, loadout=loadout,
-                       profile=profile, game=game)
+                       profile=profile, saves=saves)
         check(progress.learned)
         return progress
 
     def save(self) -> None:
-        if self.game is not None:
+        if self.saves is not None:
             state = {"won": self.won, "learned": sorted(self.learned), "at": self.at, "seen": sorted(self.seen),
                      "salvage_best": self.salvage_best, "salvage": self.salvage,
                      "breach_claims": self.breach_claims, "trophies": sorted(self.trophies),
                      "patterns": sorted(self.patterns), "loadout": list(self.loadout.equipped)}
-            self.game.save_manager.save(slot_for_profile(self.profile), state, "Progress",
-                                        summary={"sigils": self.sigils, "at": self.at})
+            self.saves.save(slot_for_profile(self.profile), state, "Progress",
+                            summary={"sigils": self.sigils, "at": self.at})
 
     def see(self, key: str) -> None:
         """Remember a story key as shown (opening counts, even when skipped) and save."""
