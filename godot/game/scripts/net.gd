@@ -63,19 +63,29 @@ func start() -> void:
 
 
 ## The server's command line: HELLWARD_SERVER (a full command, for tools), a release's bundled Python beside the
-## game, or the checkout's virtual environment two levels above this project.
+## game (Hellward.app/Contents/Resources/server, or server\ next to Hellward.exe: python, the hellward package and
+## its compiled build), or the checkout's virtual environment two levels above this project.
 static func server_command() -> PackedStringArray:
 	var override := OS.get_environment("HELLWARD_SERVER")
 	if override != "":
 		return PackedStringArray(override.split(" ", false))
 	var exe_dir := OS.get_executable_path().get_base_dir()
-	for bundled in [exe_dir + "/../Resources/server/bin/hellward-server", exe_dir + "/server/hellward-server.exe"]:
-		if FileAccess.file_exists(bundled):
-			return PackedStringArray([bundled])
+	for server in [exe_dir.path_join("../Resources/server").simplify_path(), exe_dir.path_join("server")]:
+		# pythonw on Windows: the server's process must not open a console window
+		for python in [server.path_join("python/bin/python3"), server.path_join("python/pythonw.exe")]:
+			if FileAccess.file_exists(python):
+				if OS.get_name() == "macOS":
+					# a downloaded app's files carry the quarantine mark; the player opened the app itself, so its own
+					# server may run without macOS asking again (a read-only, translocated copy keeps the mark)
+					OS.execute("/usr/bin/xattr", ["-dr", "com.apple.quarantine", server])
+				OS.set_environment("PYTHONPATH", server)
+				OS.set_environment("HELLWARD_BUILDS", server.path_join("build"))
+				OS.set_environment("PYTHONDONTWRITEBYTECODE", "1")
+				return PackedStringArray([python, "-m", "hellward.server"])
 	var repo := ProjectSettings.globalize_path("res://").path_join("../..").simplify_path()
-	var python := repo.path_join(".venv/bin/python")
-	if FileAccess.file_exists(python):
-		return PackedStringArray([python, "-m", "hellward.server"])
+	for venv in [repo.path_join(".venv/bin/python"), repo.path_join(".venv/Scripts/python.exe")]:
+		if FileAccess.file_exists(venv):
+			return PackedStringArray([venv, "-m", "hellward.server"])
 	return PackedStringArray(["uv", "run", "--project", repo, "python", "-m", "hellward.server"])
 
 

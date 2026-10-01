@@ -247,7 +247,7 @@ func die(element: String, bounty: int) -> void:
 	if bounty > 0:
 		Vfx.coin(world, global_position + Vector3(0, height + 0.3, 0), bounty)
 		Sfx.play("gold", global_position)
-	Sfx.play("death_" + (_base if kind == _base else _base), chest())
+	Sfx.play("death_" + kind, chest())
 	Vfx.blood(world, global_position, 0.5 + height * 0.25)
 	if leader:
 		Vfx.burst(world, chest(), Color(0.7, 0.2, 1.0), 40)

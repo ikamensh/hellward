@@ -101,6 +101,22 @@ SINGLE = {
                 "cross set with a pale blue gem, wreathed in soft golden-white holy light and a few drifting motes, "
                 "violet wisps of a curse dissolving away from it. Painterly dark-fantasy style. The whole background "
                 "is flat pure green #00FF00. No cast shadow, no text.", "square"),
+    "smite": ("A single game ability icon, centred, filling most of the square: a bolt of white-gold holy lightning "
+              "striking down from above through a radiant halo onto a small horned silhouette, sparks and light "
+              "spraying. Painterly dark-fantasy style. The whole background is flat pure green #00FF00. No cast "
+              "shadow, no text.", "square"),
+    "meteor": ("A single game ability icon, centred, filling most of the square: a blazing meteor of molten rock "
+               "falling diagonally from the upper right, trailing orange fire and black smoke, a burst of embers "
+               "where it is about to strike. Painterly dark-fantasy style. The whole background is flat pure green "
+               "#00FF00. No cast shadow, no text.", "square"),
+    "orb": ("A single game ability icon, centred, filling most of the square: a glowing sphere of pale blue ice and "
+            "frost light with jagged ice shards spinning around it, cold mist curling off it. Painterly "
+            "dark-fantasy style. The whole background is flat pure green #00FF00. No cast shadow, no text.", "square"),
+    "icon": ("An app icon for a gothic dark-fantasy tower-defence game called Hellward, square, full-bleed: a lone "
+             "gothic watchtower of dark stone with a burning lantern at its top, seen from slightly below, a ring "
+             "of violet curse runes closing round its foot, a red hellish sky behind. Bold, simple, readable at "
+             "small sizes, rich contrast, painterly. Fill the whole square edge to edge, no rounded corners, no "
+             "border, no text, no letters.", "square"),
     "coin": ("A single old gold coin for a game HUD icon, seen straight on, centred, filling most of the frame: thick, "
              "worn and slightly irregular, stamped with a radiant sun, a bright rim and warm highlights. The whole "
              "background is flat pure green #00FF00. No cast shadow, no text.", "square"),

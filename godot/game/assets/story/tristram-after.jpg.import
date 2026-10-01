@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://kmnl5ep3fwam"
-path.s3tc="res://.godot/imported/tristram-after.jpg-cc04e15ec5833b0f23afed93d590795e.s3tc.ctex"
+path="res://.godot/imported/tristram-after.jpg-cc04e15ec5833b0f23afed93d590795e.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/tristram-after.jpg"
-dest_files=["res://.godot/imported/tristram-after.jpg-cc04e15ec5833b0f23afed93d590795e.s3tc.ctex"]
+dest_files=["res://.godot/imported/tristram-after.jpg-cc04e15ec5833b0f23afed93d590795e.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

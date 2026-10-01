@@ -16,7 +16,7 @@ from enum import Enum
 from typing import Any
 
 from hellward.sim.campaign import Location
-from hellward.sim.content import CURSES, DOOR, MONSTERS, SELL_REFUND, SPELLS, TOWERS
+from hellward.sim.content import CURSES, MONSTERS, SELL_REFUND, SPELLS, TOWERS
 from hellward.sim.model import SIM_DT, Bolt, Monster, Tower, World
 
 # monster flags, one bit each
@@ -132,7 +132,8 @@ def location_facts(location: Location) -> dict:
 
 
 def battle_start(world: World, *, demo: bool, breach_claim: str | None) -> dict:
-    """Everything about a defence that never changes, sent once: the map, the waves, and the tables."""
+    """Everything about a defence that never changes, sent once: the map, the waves, and the tables. ``demo``: it is
+    watched and counts for nothing (the title's demo)."""
     location, level = world.location, world.level
     kinds = sorted({g.kind for wave in world.waves for g in wave.groups}
                    | {MONSTERS[k].leader.raises for k in location.monsters if MONSTERS[k].leader and MONSTERS[k].leader.raises})
@@ -156,7 +157,8 @@ def battle_start(world: World, *, demo: bool, breach_claim: str | None) -> dict:
                    for c, s in CURSES.items()},
         "spells": {key: {"name": s.name, "aim": s.aim, "blurb": s.blurb, "radius": s.radius, "delay": s.delay,
                          "recharge": s.recharge} for key, s in SPELLS.items() if key in location.arsenal.spells},
-        "gate": {"life": world.gate_life, "blurb": DOOR.blurb} if location.arsenal.gates else None,
+        "gate": {"life": world.gate_life, "blurb": "Bars an arch: walkers must break it; flyers pass over."}
+        if location.arsenal.gates else None,
         "breach": None if world.breach_spec is None else breach_table(world, breach_claim),
         "loadout": list(world.loadout.equipped),
         "state": state(world),

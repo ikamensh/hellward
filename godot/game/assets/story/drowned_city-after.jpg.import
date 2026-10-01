@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://domp2dpjwvx5x"
-path.s3tc="res://.godot/imported/drowned_city-after.jpg-2c76c964e77755235cefb2f2827b8b03.s3tc.ctex"
+path="res://.godot/imported/drowned_city-after.jpg-2c76c964e77755235cefb2f2827b8b03.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/drowned_city-after.jpg"
-dest_files=["res://.godot/imported/drowned_city-after.jpg-2c76c964e77755235cefb2f2827b8b03.s3tc.ctex"]
+dest_files=["res://.godot/imported/drowned_city-after.jpg-2c76c964e77755235cefb2f2827b8b03.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

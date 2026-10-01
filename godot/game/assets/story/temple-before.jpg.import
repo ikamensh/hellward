@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ce54e8uue3b23"
-path.s3tc="res://.godot/imported/temple-before.jpg-0b08c0ebda2c7aec65ad9f494df228db.s3tc.ctex"
+path="res://.godot/imported/temple-before.jpg-0b08c0ebda2c7aec65ad9f494df228db.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/temple-before.jpg"
-dest_files=["res://.godot/imported/temple-before.jpg-0b08c0ebda2c7aec65ad9f494df228db.s3tc.ctex"]
+dest_files=["res://.godot/imported/temple-before.jpg-0b08c0ebda2c7aec65ad9f494df228db.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -1,22 +1,19 @@
 """The campaign's progress: fresh lanterns, sigils from defences, learned skills, the way down, and saving."""
 
-import subprocess
-import sys
 
 import pytest
-from saga2d import Game
 
 from hellward.sim import campaign
 from hellward.sim.items import PATTERNS
 from hellward.sim.skills import SKILLS, can_learn
-from hellward.ui.progress import BREACH_SITES, Progress
+from hellward.server.progress import BREACH_SITES, Progress
+from hellward.server.saves import Saves
 
 
 @pytest.fixture
 def game(tmp_path):
-    g = Game("Hellward", backend="mock", resolution=(1280, 800), save_dir=tmp_path / "saves")
-    yield g
-    g.close()
+    """The save folder a campaign lives in (the fixture keeps the 2D tests' name)."""
+    return Saves(tmp_path / "saves")
 
 
 def test_a_new_lantern_holds_nothing_learns_nothing_and_stands_at_the_top(game):
@@ -42,7 +39,7 @@ def test_a_worse_later_defence_adds_nothing_and_a_better_one_adds_only_the_diffe
     assert progress.record("tristram", "victory", 5) == 0
     assert progress.best("tristram") == 3
     assert progress.sigils == 3
-    climbing = Progress(game=game)
+    climbing = Progress(saves=game)
     assert climbing.record("tristram", "victory", 5) == 1
     assert climbing.record("tristram", "victory", 18) == 2
     assert climbing.best("tristram") == 3
@@ -50,23 +47,14 @@ def test_a_worse_later_defence_adds_nothing_and_a_better_one_adds_only_the_diffe
 
 
 def test_sigils_learning_and_the_lantern_last_to_the_next_session(tmp_path):
-    saves = tmp_path / "saves"
-    first = Game("Hellward", backend="mock", resolution=(1280, 800), save_dir=saves)
-    try:
-        progress = Progress.load(first)
-        assert progress.record("tristram", "victory", 18) == 3
-        assert progress.learn("adept_fire")
-        progress.move("graveyard")
-    finally:
-        first.close()
-    second = Game("Hellward", backend="mock", resolution=(1280, 800), save_dir=saves)
-    try:
-        again = Progress.load(second)
-        assert again.won == progress.won
-        assert again.learned == progress.learned
-        assert again.at == progress.at
-    finally:
-        second.close()
+    progress = Progress.load(Saves(tmp_path / "saves"))
+    assert progress.record("tristram", "victory", 18) == 3
+    assert progress.learn("adept_fire")
+    progress.move("graveyard")
+    again = Progress.load(Saves(tmp_path / "saves"))
+    assert again.won == progress.won
+    assert again.learned == progress.learned
+    assert again.at == progress.at
 
 
 def test_a_named_profile_starts_fresh_and_keeps_the_existing_campaign(game):
@@ -87,22 +75,13 @@ def test_a_named_profile_starts_fresh_and_keeps_the_existing_campaign(game):
     assert Progress.load(game, "playtest").salvage == 1
 
 
-def test_command_line_offers_a_named_campaign_profile():
-    result = subprocess.run([sys.executable, "-m", "hellward", "--help"], capture_output=True, text=True, check=True)
-    assert "--profile" in result.stdout
-
-
 def test_profile_names_cannot_escape_the_campaign_save_slots(game):
     with pytest.raises(ValueError, match="simple word"):
         Progress.load(game, "../main")
-    result = subprocess.run([sys.executable, "-m", "hellward", "--profile", "../main"],
-                            capture_output=True, text=True)
-    assert result.returncode == 2
-    assert "simple word" in result.stderr
 
 
 def test_a_save_listing_a_removed_mastery_loads_with_it_forgotten(game):
-    game.save_manager.save("campaign", {"won": {"tristram": 3}, "learned": ["fire_mastery", "adept_fire"],
+    game.save("campaign", {"won": {"tristram": 3}, "learned": ["fire_mastery", "adept_fire"],
                                         "at": "tristram"}, "Progress", summary={})
     progress = Progress.load(game)
     assert progress.learned == frozenset({"adept_fire"})
@@ -112,7 +91,7 @@ def test_a_save_listing_a_removed_mastery_loads_with_it_forgotten(game):
 def test_the_save_ilya_played_before_the_new_tree_loads(game):
     """His 2026-09-26 save: Blaze stays learned in the file, but the new tree puts Master of Fire above it, which
     the save does not have. Every skill that lost a step above it goes; the save loads and its sigils are free."""
-    game.save_manager.save("campaign", {
+    game.save("campaign", {
         "won": {"normal": {k: 3 for k in ("tristram", "graveyard", "cathedral", "catacombs", "caves", "hells_gate")},
                 "hell": {}},
         "learned": ["blaze", "chain_lightning", "cold_mastery", "fire_ball", "fire_mastery", "glacial_spike",
@@ -127,7 +106,7 @@ def test_a_save_whose_skills_now_cost_more_than_its_sigils_loads_with_none_owed(
     """Property: whatever a save lists, the loaded tree never spends more sigils than were won, and what it keeps
     still has every skill above it."""
     from hellward.sim.skills import SKILLS, check
-    game.save_manager.save("campaign", {"won": {"tristram": 3}, "learned": sorted(SKILLS), "at": "tristram"},
+    game.save("campaign", {"won": {"tristram": 3}, "learned": sorted(SKILLS), "at": "tristram"},
                            "Progress", summary={})
     progress = Progress.load(game)
     assert progress.free >= 0 and progress.learned
@@ -135,7 +114,7 @@ def test_a_save_whose_skills_now_cost_more_than_its_sigils_loads_with_none_owed(
 
 
 def test_an_old_save_with_a_difficulty_loads_its_normal_sigils(game):
-    game.save_manager.save("campaign", {"won": {"normal": {"tristram": 3}, "hell": {}},
+    game.save("campaign", {"won": {"normal": {"tristram": 3}, "hell": {}},
                                         "learned": [], "at": "tristram", "difficulty": "hell"},
                            "Progress", summary={})
     assert Progress.load(game).won == {"tristram": 3}
@@ -307,7 +286,7 @@ def test_six_breach_trophies_can_be_spent_once_across_the_late_recipes(game):
 def test_a_victory_writes_all_rewards_in_one_save(game, monkeypatch):
     """Sigils, salvage, and a trophy are committed at the same outcome boundary."""
     progress = Progress.load(game)
-    original = game.save_manager.save
+    original = game.save
     saves = 0
 
     def counted(*args, **kwargs):
@@ -315,7 +294,7 @@ def test_a_victory_writes_all_rewards_in_one_save(game, monkeypatch):
         saves += 1
         return original(*args, **kwargs)
 
-    monkeypatch.setattr(game.save_manager, "save", counted)
+    monkeypatch.setattr(game, "save", counted)
     progress.record_result("graveyard", "victory", 18, salvage=2, breach_mode="trophy", breach_cleared=True)
     assert saves == 1
     reloaded = Progress.load(game)
@@ -331,12 +310,12 @@ def test_invalid_breach_receipt_changes_nothing(game):
         progress.record_result("tristram", "victory", 18, salvage=5,
                                breach_mode="trophy", breach_cleared=True)
     assert progress.won == {} and progress.salvage == 0 and progress.breach_claims == {}
-    assert game.save_manager.load("campaign") is None
+    assert game.load("campaign") is None
 
 
 def test_a_saved_loadout_cannot_equip_a_pattern_that_is_not_owned(game):
     """Ownership is checked when a save is loaded, before a defence can use its modifiers."""
-    game.save_manager.save("campaign", {"won": {}, "learned": [], "at": "tristram",
+    game.save("campaign", {"won": {}, "learned": [], "at": "tristram",
                                         "patterns": ["honed_string"], "loadout": ["laminated_limbs"]},
                            "Progress", summary={})
     with pytest.raises(ValueError, match="not owned"):
@@ -345,7 +324,7 @@ def test_a_saved_loadout_cannot_equip_a_pattern_that_is_not_owned(game):
 
 def test_a_saved_pattern_must_still_exist_in_the_recipe_catalog(game):
     """A removed recipe is reported clearly instead of silently granting a ghost item."""
-    game.save_manager.save("campaign", {"won": {}, "learned": [], "at": "tristram",
+    game.save("campaign", {"won": {}, "learned": [], "at": "tristram",
                                         "patterns": ["missing_pattern"], "loadout": []},
                            "Progress", summary={})
     with pytest.raises(ValueError, match="Unknown tower pattern"):

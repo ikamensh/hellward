@@ -18,6 +18,7 @@ signal towers_changed                # a tower was sold
 const MAX_AHEAD := 4                 # steps asked for and not yet back before the clock waits (a slow planner)
 
 var level: Level
+var dressing: Dressing               # the scenery: it shows each arch's gate as the server says
 var start: Dictionary                # the battle message: map, waves, tables
 var state: Dictionary                # the latest frame's purse and clocks
 var monsters := {}                   # id -> Monster
@@ -36,7 +37,8 @@ var time := 0.0
 var step := 0
 var alpha := 1.0                     # how far between the last two steps the picture is
 var slain := {}                      # wave -> its monsters killed, counted from deaths (the HUD's tally)
-var demo := false
+var demo := false                    # a scripted player plays (the demo, or a playtest): this side only watches
+var minds := true                    # say what the leaders weighed (the settings' "leaders' minds")
 var paused := false
 var dt := 0.05
 
@@ -49,7 +51,7 @@ func setup(lvl: Level, battle: Dictionary) -> void:
 	level = lvl
 	start = battle
 	dt = float(battle["sim_dt"])
-	demo = bool(battle["demo"])
+	demo = bool(battle["scripted"])
 	_take_state(battle["state"])
 	start_lives = lives
 	Net.frame.connect(_on_frame)
@@ -159,7 +161,15 @@ func _on_frame(m: Dictionary) -> void:
 	for e in m["events"]:
 		_event(e)
 	_take_state(m["state"])
+	for d in m["doors"]:   # a gate losing life: the monsters at it are battering it
+		for was in doors:
+			if int(was[0]) == int(d[0]) and float(d[1]) < float(was[1]) and bool(d[2]):
+				Sfx.play("door_hit", level.tile_pos(_arch(int(d[0]))))
 	doors = m["doors"]
+	if dressing:
+		var life: float = float(start["gate"]["life"]) if start["gate"] != null else 1.0
+		for d in doors:
+			dressing.gate(int(d[0]), bool(d[2]), bool(d[3]), float(d[1]) / max(life, 1.0))
 	hazards = m["hazards"]
 	var alive := {}
 	for entry in m["monsters"]:
@@ -237,10 +247,10 @@ func _event(e: Array) -> void:
 		"salvage_sold":
 			Sfx.play("gold")
 		"door_built":
-			Sfx.play("build", level.tile_pos(_arch(int(e[1]))))
+			Sfx.play("door_build", level.tile_pos(_arch(int(e[1]))))
 		"door_broken":
 			Vfx.dust(self, level.tile_pos(_arch(int(e[1]))), 2.5)
-			Sfx.play("sell", level.tile_pos(_arch(int(e[1]))))
+			Sfx.play("door_break", level.tile_pos(_arch(int(e[1]))))
 		"cleansed":
 			var t: Tower = towers.get(int(e[1]))
 			if t:
@@ -251,19 +261,20 @@ func _event(e: Array) -> void:
 			var at := ground(e[2])
 			Vfx.lightning(self, [at + Vector3(0, 22, 0), at + Vector3(0, 1.0, 0)])
 			Vfx.holy(self, at)
-			Sfx.play("lightning", at)
+			Sfx.play("smite", at)
 		"meteor_cast":
 			Vfx.meteor(self, ground([e[1], e[2]]), float(e[3]))
+			Sfx.play("meteor_fall", ground([e[1], e[2]]))
 		"meteor":
 			var at := ground([e[1], e[2]])
 			Vfx.explosion(self, at, Color(1.0, 0.45, 0.1), true)
 			Vfx.scorch(self, at, 3.0)
-			Sfx.play("fireball", at)
+			Sfx.play("meteor", at)
 		"orb":
 			var at := ground([e[1], e[2]])
 			Vfx.frost_burst(self, at + Vector3(0, 1.0, 0))
 			Vfx.burst(self, at + Vector3(0, 1.0, 0), Color(0.5, 0.75, 1.0), 80)
-			Sfx.play("frost", at)
+			Sfx.play("orb", at)
 		"wave":
 			wave = int(e[1])
 			var w: Dictionary = waves()[wave]
@@ -289,15 +300,18 @@ func _event(e: Array) -> void:
 			var m: Monster = monsters.get(int(e[1]))
 			if m:
 				m.broken()
+				Sfx.play("broken", m.chest())
 				announce.emit("", "The %s's curse is broken." % m.title())
 		"fizzle":
 			var m: Monster = monsters.get(int(e[1]))
 			if m:
 				m.stop_chant()
+			Sfx.play("fizzle", level.tile_pos(Vector2i(int(e[2][0]), int(e[2][1]))))
 		"ward_holds":
 			var t: Tower = towers.get(int(e[2]))
 			if t:
 				Vfx.holy(self, t.global_position)
+				Sfx.play("ward", t.global_position)
 			var m: Monster = monsters.get(int(e[1]))
 			if m:
 				m.stop_chant()
@@ -375,7 +389,10 @@ func _event(e: Array) -> void:
 		"breach_cash":
 			announce.emit("", "The side cache pays %d gold." % int(e[1]))
 			Sfx.play("gold")
-		"plan", "victory", "defeat":
+		"plan":
+			if minds:
+				_thought(monsters.get(int(e[1])), e[2])
+		"victory", "defeat":
 			pass
 		_:
 			push_warning("an event this client does not show: %s" % kind)
@@ -416,6 +433,19 @@ func _cursed(leader_id: int, spot: Vector2i, curse: String, caught: Array) -> vo
 		announce.emit("", "%s's %s falls on bare ground." % [who, curse_name])
 	else:
 		announce.emit("", "%s lays %s on the %s." % [who, curse_name, " and the ".join(names)])
+
+
+## What a leader weighed, as the chronicle tells it: the curse it chose and the life it saves its pack, or why it holds.
+func _thought(leader: Monster, decision: Dictionary) -> void:
+	if leader == null or decision["options"].is_empty():
+		return
+	var best: Array = decision["options"][0]
+	var curse := String(start["curses"][String(best[0])]["name"])
+	if decision["cast"] != null:
+		announce.emit("", "%s weighs %d futures: %s, %+d life for its pack." % [leader.title(), int(decision["rollouts"]),
+			curse, int(round(float(best[3])))])
+	elif float(best[2]) > 0.0:
+		announce.emit("", "%s waits: in %d s its %s is worth more." % [leader.title(), int(best[2]), curse])
 
 
 func _arch(index: int) -> Vector2i:

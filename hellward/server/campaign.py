@@ -339,12 +339,15 @@ class Campaign:
 
     # -- Battles ----------------------------------------------------------------------------------
 
-    def defend(self, location: str) -> Battle:
+    def defend(self, location: str, player: str | None = None) -> Battle:
+        """The profile's defence of a location: its result goes into the campaign. A named scripted player may defend
+        it in the person's place (a playtest's shortcut, and the tests' way to win honestly)."""
         loc = self._location(location)
         if not self.progress.opened(loc):
             raise Refusal(f"The way to {loc.called} is not open yet.")
         p = self.progress
         self.battle = Battle(loc, learned=p.learned, loadout=p.loadout, seed=self.seed, planner=self.planner,
+                             player=PLAYERS[player](self.seed) if player is not None else None,
                              breach_claim=p.breach_claims.get(loc.key), replays=self.data / "replays",
                              on_outcome=self._keep)
         return self.battle

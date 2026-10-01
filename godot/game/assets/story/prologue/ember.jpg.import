@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://117btyg6a046"
-path.s3tc="res://.godot/imported/ember.jpg-b5b29634f001e5dde41e604b2da85c6c.s3tc.ctex"
+path="res://.godot/imported/ember.jpg-b5b29634f001e5dde41e604b2da85c6c.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/prologue/ember.jpg"
-dest_files=["res://.godot/imported/ember.jpg-b5b29634f001e5dde41e604b2da85c6c.s3tc.ctex"]
+dest_files=["res://.godot/imported/ember.jpg-b5b29634f001e5dde41e604b2da85c6c.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

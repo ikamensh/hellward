@@ -1,10 +1,9 @@
 """Hellward's compiled simulation recipe and source/compiled bootstrap.
 
-Saga2D owns the mypyc build cache and import handoff. This module chooses the
-simulation modules and registers frozen dataclasses for pickle after attach;
-the source simulation remains independent of Saga2D. Tools and the game must
-activate before importing any module in :data:`MODULES`. Spawned workers use
-the build selected by their parent through :data:`ENV`.
+:mod:`hellward.compiled` owns the mypyc build cache and import handoff. This module chooses the simulation modules
+and registers frozen dataclasses for pickle after attach. The server and the tools must activate before importing
+any module in :data:`MODULES`. Spawned workers use the build selected by their parent through :data:`ENV`.
+:data:`BUILDS` may be moved with ``HELLWARD_BUILDS`` (a release ships its build there).
 """
 
 from __future__ import annotations
@@ -17,10 +16,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-from saga2d.compiled import CompiledPackage, NoToolchain  # type: ignore[import-untyped]
+from hellward.compiled import CompiledPackage, NoToolchain
 
 PACKAGE = Path(__file__).resolve().parent
-BUILDS = PACKAGE.parent / "build" / "fastsim"
+BUILDS = Path(os.environ.get("HELLWARD_BUILDS") or PACKAGE.parent / "build" / "fastsim")
 MODULES = ("sim.sums", "sim.content", "sim.level", "sim.campaign", "sim.skills", "sim.model", "sim.planner",
            "sim.players.hands", "sim.players.ordinary", "sim.players.apprentice")
 FLAGS = () if os.name == "nt" else ("-ffp-contract=off",)

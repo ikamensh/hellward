@@ -22,7 +22,7 @@ static var _display: Font
 static func title_font() -> Font:
 	if _title == null:
 		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Luminari", "Palatino", "Georgia", "serif"])
+		f.font_names = PackedStringArray(["Luminari", "Palatino", "Palatino Linotype", "Book Antiqua", "Georgia", "serif"])
 		_title = f
 	return _title
 
@@ -30,7 +30,7 @@ static func title_font() -> Font:
 static func text_font() -> Font:
 	if _text == null:
 		var f := SystemFont.new()
-		f.font_names = PackedStringArray(["Baskerville", "Georgia", "serif"])
+		f.font_names = PackedStringArray(["Baskerville", "Baskerville Old Face", "Palatino Linotype", "Georgia", "serif"])
 		_text = f
 	return _text
 
@@ -39,7 +39,7 @@ static func text_font() -> Font:
 static func display_font() -> Font:
 	if _display == null:
 		var base := SystemFont.new()
-		base.font_names = PackedStringArray(["Big Caslon", "Baskerville", "Georgia", "serif"])
+		base.font_names = PackedStringArray(["Big Caslon", "Baskerville", "Palatino Linotype", "Georgia", "serif"])
 		var f := FontVariation.new()
 		f.base_font = base
 		f.spacing_glyph = 7
@@ -51,7 +51,7 @@ static func display_font() -> Font:
 static func small_font() -> Font:
 	if _small == null:
 		var base := SystemFont.new()
-		base.font_names = PackedStringArray(["Baskerville", "Georgia", "serif"])
+		base.font_names = PackedStringArray(["Baskerville", "Baskerville Old Face", "Palatino Linotype", "Georgia", "serif"])
 		base.font_weight = 600
 		var f := FontVariation.new()
 		f.base_font = base

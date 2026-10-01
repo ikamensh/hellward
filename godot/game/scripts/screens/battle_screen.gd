@@ -7,4 +7,4 @@ extends Screen
 func _init() -> void:
 	super()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_process_unhandled_key_input(false)
+	set_process_input(false)

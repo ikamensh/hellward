@@ -1,23 +1,19 @@
-"""Hellward's audio: the cue set the scene plays, the rendered files, the bank's rules and the scores.
+"""Hellward's audio: the cue set, the rendered files and the scores.
 
-The cache is prepared once for the module (effects and all eight tracks), the way the game does
-before its first frame; every test reads what the game would play.
+The files are rendered once for the module, as tools/export_audio.py renders them for the client; every test reads
+what the game would play. (Which cues the client plays: tests/test_client_assets.py.)
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-import random
 
 import numpy as np
 import pytest
 
-from hellward.audio import bank as bank_module
-from hellward.audio.bank import BURST, BURST_WINDOW, CROWD, CROWD_WINDOW, VERSION, SoundBank
 from hellward.audio.cues import CUES, files, loudness
 from hellward.audio.music import PIECES
 from hellward.sim.content import MONSTERS
-from saga2d import Game
 from sagaforge.foley import mono, read_wav
 from sagaforge.synth import SAMPLE_RATE, write_wav
 
@@ -30,29 +26,13 @@ STEMS = list(files())
 @pytest.fixture(scope="module")
 def cache(tmp_path_factory: pytest.TempPathFactory) -> Path:
     root = tmp_path_factory.mktemp("hellward-audio")
-    SoundBank.prepare(root, wait=True)
+    (root / "sounds").mkdir()
+    (root / "music").mkdir()
+    for stem, render in files().items():
+        write_wav(root / "sounds" / f"{stem}.wav", render())
+    for name, piece in PIECES.items():
+        write_wav(root / "music" / f"{name}.wav", piece.render())
     return root
-
-
-@pytest.fixture
-def game(cache: Path):
-    g = Game("Hellward test", backend="mock", resolution=(800, 600), asset_path=cache)
-    yield g
-    g.close()
-
-
-class Clock:
-    def __init__(self) -> None:
-        self.now = 100.0
-
-    def __call__(self) -> float:
-        return self.now
-
-
-def played(game: Game) -> list[tuple[str, float]]:
-    """(file stem, pitch) of every effect the mock backend was asked to play."""
-    stems = {game.assets.sound(stem): stem for stem in STEMS}
-    return [(stems[p["handle"]], p["pitch"]) for p in game.backend.sounds_played]
 
 
 def sound(cache: Path, stem: str) -> np.ndarray:
@@ -152,204 +132,6 @@ def test_stingers_last_three_to_six_seconds(cache: Path):
 
 # -- Preparing the cache -----------------------------------------------------------------------
 
-
-def test_prepare_writes_every_file_and_is_idempotent(cache: Path):
-    assert (cache / "sounds" / "VERSION").read_text() == VERSION
-    for stem in STEMS:
-        assert (cache / "sounds" / f"{stem}.wav").exists()
-    for name in PIECES:
-        assert (cache / "music" / f"{name}.wav").exists()
-    before = {p: p.stat().st_mtime_ns for p in cache.rglob("*.wav")}
-    SoundBank.prepare(cache, wait=True)
-    assert {p: p.stat().st_mtime_ns for p in cache.rglob("*.wav")} == before
-
-
-def test_prepare_restores_a_missing_cue(cache: Path):
-    victim = cache / "sounds" / "door_hit_2.wav"
-    kept = cache / "sounds" / "click.wav"
-    stamp = kept.stat().st_mtime_ns
-    victim.unlink()
-    SoundBank.prepare(cache, wait=True)
-    assert victim.exists() and kept.stat().st_mtime_ns == stamp
-
-
-def test_a_new_version_discards_the_whole_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(bank_module, "COMPOSE_ORDER", ())  # composing is covered by the module cache
-    (tmp_path / "sounds").mkdir()
-    (tmp_path / "music").mkdir()
-    (tmp_path / "sounds" / "VERSION").write_text("old")
-    (tmp_path / "sounds" / "retired_cue.wav").write_bytes(b"")
-    (tmp_path / "music" / "title.wav").write_bytes(b"")
-    SoundBank.prepare(tmp_path)
-    assert (tmp_path / "sounds" / "VERSION").read_text() == VERSION
-    assert not (tmp_path / "sounds" / "retired_cue.wav").exists() and not (tmp_path / "music" / "title.wav").exists()
-    assert all((tmp_path / "sounds" / f"{stem}.wav").exists() for stem in STEMS)
-
-
-def test_a_bank_needs_a_prepared_cache(tmp_path: Path):
-    g = Game("Hellward test", backend="mock", resolution=(800, 600), asset_path=tmp_path)
-    try:
-        with pytest.raises(RuntimeError, match="prepare"):
-            SoundBank(g)
-    finally:
-        g.close()
-
-
-# -- The bank --------------------------------------------------------------------------------------
-
-
-def test_every_cue_plays_through_the_game(game: Game):
-    clock = Clock()
-    bank = SoundBank(game, clock=clock, seed=1)
-    for cue in CUES:
-        clock.now += 1.0
-        assert bank.play(cue, x=12.5)
-    assert len(game.backend.sounds_played) == len(CUES)
-    with pytest.raises(KeyError):
-        bank.play("trumpet")
-
-
-def test_arrow_release_and_impact_play_as_distinct_rotating_sounds(tmp_path: Path):
-    """Repeated arrows reach the mock game's audio backend with varied takes."""
-    sounds = tmp_path / "sounds"
-    sounds.mkdir()
-    stems = [stem for cue in ("arrow_cast", "arrow_hit") for stem in takes(cue)]
-    renderers = files()
-    for stem in stems:
-        write_wav(sounds / f"{stem}.wav", renderers[stem]())
-    (sounds / "VERSION").write_text(VERSION)
-    game = Game("Hellward arrow test", backend="mock", resolution=(800, 600), asset_path=tmp_path)
-    try:
-        clock = Clock()
-        bank = SoundBank(game, clock=clock, seed=9)
-        for _ in range(3):
-            assert bank.play("arrow_cast")
-            clock.now += 0.2
-            assert bank.play("arrow_hit")
-            clock.now += 0.2
-        names = {game.assets.sound(stem): stem for stem in stems}
-        heard = [names[p["handle"]] for p in game.backend.sounds_played]
-        assert all(stem.startswith("arrow_cast") for stem in heard[::2])
-        assert all(stem.startswith("arrow_hit") for stem in heard[1::2])
-        assert len(set(heard[::2])) >= 2 and len(set(heard[1::2])) >= 2
-    finally:
-        game.close()
-
-
-def test_the_voice_budget_holds_battle_cues_back(game: Game):
-    clock = Clock()
-    bank = SoundBank(game, clock=clock, seed=2)
-    deaths = [cue for cue, spec in CUES.items() if spec.kind == "battle" and cue.startswith("death_")]
-    assert sum(bank.play(cue) for cue in deaths) == BURST
-    assert bank.play("click") and bank.play("wave"), "interface cues and alerts are never held back"
-    for _ in range(3):  # later bursts fill the crowd window, then it is full
-        clock.now += BURST_WINDOW + 0.001
-        for cue in deaths:
-            bank.play(cue)
-    assert sum(CUES[cue_of(stem)].kind == "battle" for stem, _ in played(game)) == CROWD
-    clock.now += CROWD_WINDOW
-    assert bank.play(deaths[0])
-
-
-def test_the_last_voice_of_a_burst_is_kept_for_a_death(game: Game):
-    clock = Clock()
-    bank = SoundBank(game, clock=clock, seed=8)
-    assert bank.play("fire_cast") and bank.play("fire_hit") and bank.play("death_zombie")
-    assert not bank.play("lightning") and not bank.play("venom_cast"), "three voices taken: tower sounds wait"
-    assert bank.play("death_goatman")
-
-
-def test_a_busy_fight_does_not_clip(game: Game, cache: Path):
-    """A second of towers firing and monsters dying, as many as the budget admits, mixed at full volume."""
-    clock = Clock()
-    bank = SoundBank(game, clock=clock, seed=3)
-    rng = random.Random(4)
-    battle = [cue for cue, spec in CUES.items() if spec.kind == "battle"]
-    start = clock.now
-    times = []
-    for at in sorted(rng.uniform(0, 1.0) for _ in range(200)):
-        clock.now = start + at
-        if bank.play(rng.choice(battle)):
-            times.append(at)
-    stems = [stem for stem, _ in played(game)]
-    assert len(stems) >= 12
-    mix = np.zeros(int(8 * SAMPLE_RATE))
-    for at, stem in zip(times, stems):
-        x = mono(sound(cache, stem))
-        i = int(at * SAMPLE_RATE)
-        mix[i:i + len(x)] += x
-    assert np.abs(mix).max() < 1.0
-
-
-def test_takes_rotate_and_the_pitch_wanders(game: Game):
-    clock = Clock()
-    bank = SoundBank(game, clock=clock, seed=5)
-    for _ in range(40):
-        clock.now += 1.0
-        bank.play("door_hit")
-    stems, pitches = zip(*played(game))
-    assert all(a != b for a, b in zip(stems, stems[1:])), "never the same take twice in a row"
-    assert set(stems) == set(takes("door_hit"))
-    assert all(0.96 <= p <= 1.04 for p in pitches) and len(set(pitches)) > 30
-
-
-def test_music_starts_and_crossfades(game: Game):
-    bank = SoundBank(game, seed=6)
-    assert all(bank.ready(name) for name in PIECES)
-    bank.music("title")
-    assert game.audio.music_name == "title"
-    bank.music("battle_cathedral")
-    assert game.audio.music_name == "battle_cathedral"
-    assert len(game.backend.music_players) == 2, "the title fades out under the battle"
-    assert [p["loop"] for p in game.backend.music_players] == [True, False]
-    bank.music("battle_cathedral")
-    assert len(game.backend.music_players) == 2, "asking again changes nothing"
-    bank.stop_music(0.5)
-    assert game.audio.music_name is None
-
-
-def test_dungeon_music_is_played_once(tmp_path: Path):
-    (tmp_path / "sounds").mkdir()
-    (tmp_path / "sounds" / "VERSION").write_text(VERSION)
-    (tmp_path / "music").mkdir()
-    for name in ("battle_cathedral", "boss"):
-        (tmp_path / "music" / f"{name}.wav").write_bytes(b"")
-    g = Game("Hellward test", backend="mock", asset_path=tmp_path)
-    try:
-        bank = SoundBank(g)
-        bank.music("battle_cathedral")
-        assert g.backend.music_players[0]["loop"] is False
-        bank.music("boss")
-        assert g.backend.music_players[-1]["loop"] is False
-    finally:
-        g.close()
-
-
-def test_music_waits_for_its_track(game: Game, cache: Path, monkeypatch: pytest.MonkeyPatch):
-    bank = SoundBank(game, seed=7)
-    track = cache / "music" / "boss.wav"
-    hidden = track.with_name("boss.hidden")
-    track.rename(hidden)
-    try:
-        monkeypatch.setitem(SoundBank._composers, bank.cache_dir, _Alive())
-        bank.music("boss")
-        assert game.audio.music_name is None
-        hidden.rename(track)
-        bank.poll()
-        assert game.audio.music_name == "boss"
-    finally:
-        if hidden.exists():
-            hidden.rename(track)
-
-
-class _Alive:
-    """A composer still at work."""
-
-    def is_alive(self) -> bool:
-        return True
-
-
-# -- The music -----------------------------------------------------------------------------------------
 
 
 def test_every_location_has_its_own_battle_track():

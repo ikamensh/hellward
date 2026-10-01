@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bj3inciho5nyw"
-path.s3tc="res://.godot/imported/docks-before.jpg-887a66dd67af071bbcada8d71fe8289c.s3tc.ctex"
+path="res://.godot/imported/docks-before.jpg-887a66dd67af071bbcada8d71fe8289c.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/docks-before.jpg"
-dest_files=["res://.godot/imported/docks-before.jpg-887a66dd67af071bbcada8d71fe8289c.s3tc.ctex"]
+dest_files=["res://.godot/imported/docks-before.jpg-887a66dd67af071bbcada8d71fe8289c.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

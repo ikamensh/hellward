@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ceo6absepqrk8"
-path.s3tc="res://.godot/imported/orb_mana_frame.png-cc5273d44eaa16701953c0596f01880c.s3tc.ctex"
+path="res://.godot/imported/orb_mana_frame.png-cc5273d44eaa16701953c0596f01880c.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/ui/orb_mana_frame.png"
-dest_files=["res://.godot/imported/orb_mana_frame.png-cc5273d44eaa16701953c0596f01880c.s3tc.ctex"]
+dest_files=["res://.godot/imported/orb_mana_frame.png-cc5273d44eaa16701953c0596f01880c.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -1,8 +1,8 @@
 # Hellward on Godot: Python rules, Godot client
 
-Status: agreed with Ilya on 2026-10-01; not started. The decision is [ADR 0002](adr/0002-python-server-godot-client.md).
-The look to build on is the 3D Tristram demo in [`../hellward3d`](../../hellward3d/README.md): its film and stills are in
-`~/saga/evidence/hellward3d/showcase/`, and why Godot is in [its engine notes](../../hellward3d/docs/engine.md).
+Status: agreed with Ilya on 2026-10-01; steps 1-3 built on 2026-10-01/02 (see "As built" at the end). The decision
+is [ADR 0002](adr/0002-python-server-godot-client.md). The client grew from the 3D Tristram demo, now `godot/`; why
+Godot is in [its engine notes](../godot/docs/engine.md).
 
 ## Goal
 
@@ -114,3 +114,33 @@ GDScript or C#, a Windows build (the transport choice must not rule it out).
 3. The campaign protocol and the Godot screens: title, profiles, map, briefing, skill tree, forge, story.
 4. Content: the other eleven locations, the rest of the monsters, towers, gates, spells and bosses.
 5. A release build: Godot export plus bundled Python, on the Mac first.
+
+## As built (2026-10-02)
+
+- **Transport.** Loopback TCP, the other way round: the client listens on an ephemeral port and starts
+  `python -m hellward.server --connect PORT --token T`, which connects back and says the token and its protocol
+  in its hello; the client answers with its own. No port is agreed in advance, nothing listens but the client,
+  and the server ends when the connection closes (its planner workers end with it). Godot's child stdio was not
+  needed. `Net` (`godot/game/scripts/net.gd`) is the client's side, `hellward/server/__main__.py` the server's.
+- **The clock is the client's.** Rather than the server stepping at 20 Hz on its own, the client counts its
+  frames' time (`Engine.time_scale` is the pace) and asks for the whole steps it adds up to (`advance`); the server
+  answers each with a frame. The battle still runs at 20 Hz times the pace in real time, and it gains: a paused or
+  hidden game asks for nothing, tests and recordings at a fixed frame rate stay in step with what they draw, a
+  slow planner holds the clock (at most four steps asked ahead) instead of bursting, and the client always knows
+  how far between two steps it is drawing. Online play would hand the clock back to the server.
+- **Messages.** `hellward/server/protocol.py` and `service.py` list them: the battle's start (map, routes, gates,
+  waves, arsenal, tables), a frame per step (events with the newcomers' facts, purse and clocks, monsters
+  `[id, s, hp, flags, chill, frozen, poison, door]`, towers `[id, level, reach, curses, ward, upgrade cost, needs,
+  refund]`, gates, burning ground), orders answered by a frame and a reply or by a refusal with its reason, and
+  the campaign's requests answered with finished words (a briefing's lines, a skill's tooltip, the reckoning).
+- **Measured** (`tools/protocol_bench.py`, 2026-10-01, M4, veteran player): a frame is 0.9-1.0 KB on average and
+  2.2 KB at most (17-19 KB/s); the server builds and encodes one in 19-21 us; a request's round trip is 50 us
+  (p99 100 us); Godot parses the largest frame of a defence in 35 us. Held to a budget by
+  `tests/test_protocol_budget.py` and `godot/game/tests/run.gd`.
+- **Verification.** `tests/test_server.py` (a scripted defence through the server is `hands.defend` event for
+  event; a person's orders log a defence whose ghost fights the identical battle), `tests/test_campaign_server.py`
+  (the campaign's rules through the real server, including a defence won by the real rules), `godot/tools/test.sh`
+  (the client against the real server: building by mouse, refusals, waves, a curse and Cleanse, defeat and
+  victory with their music, the frame parse, and a walk through the campaign's screens).
+- **Content.** All twelve locations play with their own scenery; monster and tower kinds without a model of
+  their own yet (step 4) wear a tinted stand-in (`monster.gd` and `tower.gd` `STAND_INS`).

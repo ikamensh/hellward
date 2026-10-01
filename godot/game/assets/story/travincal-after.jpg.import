@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b5hpj75nlrn4r"
-path.s3tc="res://.godot/imported/travincal-after.jpg-946673d4dd509e2bdbb91703038a47be.s3tc.ctex"
+path="res://.godot/imported/travincal-after.jpg-946673d4dd509e2bdbb91703038a47be.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/travincal-after.jpg"
-dest_files=["res://.godot/imported/travincal-after.jpg-946673d4dd509e2bdbb91703038a47be.s3tc.ctex"]
+dest_files=["res://.godot/imported/travincal-after.jpg-946673d4dd509e2bdbb91703038a47be.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

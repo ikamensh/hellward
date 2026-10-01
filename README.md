@@ -1,30 +1,29 @@
 # Hellward
 
-A gothic tower defence on [Saga2D](../saga2d/) in which the demons have **leaders**, and a leader
-curses your towers. It picks the tower and the curse by playing the fight ahead in its head, again
-and again, before it casts. Defend twelve locations in two acts, from burning Tristram through
-Hell's Gate and across Kurast to the Temple of Light. The first defence gives you a single-target
-Arrow Tower and Cleanse; gates, elemental towers, spells and larger attacks arrive gradually.
-Monsters enter from different sides and may wander along longer trails, while runners head straight
-for the sanctuary.
+A gothic tower defence in 3D in which the demons have **leaders**, and a leader curses your towers. It picks
+the tower and the curse by playing the fight ahead in its head, again and again, before it casts. Defend
+twelve locations in two acts, from burning Tristram through Hell's Gate and across Kurast to the Temple of Light.
+The first defence gives you a single-target Arrow Tower and Cleanse; gates, elemental towers, spells and larger
+attacks arrive gradually. Monsters enter from different sides and may wander along longer trails, while runners
+head straight for the sanctuary.
+
+The game is a [Godot 4.7](https://godotengine.org) client (`godot/`) over a Python server (`hellward/server`)
+that plays the rules, the leaders' minds and the campaign: [docs/godot-client.md](docs/godot-client.md).
 
 ## Play the latest version
 
 ```bash
+brew install --cask godot            # once (Godot 4.7)
 cd ~/saga/hellward
+uv sync --extra dev                  # once: the server's environment
 uv run hellward                      # the title screen; Descend begins the campaign
-uv run hellward --profile playtest   # start a separate campaign from Tristram
-uv run hellward --demo               # a scripted player defends the cathedral against the leaders
+uv run hellward -- screen=map        # straight to a screen (title, map, briefing location=KEY, skills, forge...)
 ```
 
-The first launch prepares art and sounds in `~/.hellward/cache` (a few seconds).
-The campaign uses painted monsters by default. An optional
-[painted / baked 3D comparison](docs/rigged-monsters.md) is available for animation experiments.
-The title's **Campaign profiles** button (or **P**) lets you switch between saves or name a new one.
-The default `main` profile keeps your existing save. You can also launch a profile directly with
-`--profile NAME`. Names use letters, numbers and underscores, starting with a letter or underscore.
-Saves live in `~/.hellward/saves`.
-`--seed N` changes seeded run variation; `--fullscreen` fills the screen.
+The client starts the server itself; its first launch in a checkout compiles the leaders' minds (about a
+minute, once). The title's **Campaign profiles** button (or **P**) switches between saves or names a new one;
+the `main` profile keeps your existing save. Saves live in `~/.hellward/saves`, replays of your defences in
+`~/.hellward/replays`; the client's own settings (volumes, fullscreen) stay on this machine.
 
 ## How to play
 
@@ -40,12 +39,13 @@ Saves live in `~/.hellward/saves`.
 | **E** (from the Jungle), then click the floor | Frozen Orb: nearby monsters freeze; an interruptible leader's chant breaks |
 | **V** during a wave break | sell one held salvage for battle gold instead of banking it for the forge |
 | **Space** | call the next wave; ending a break early can grant a small gold bonus |
-| **F** / **P** | double the pace / pause |
-| **Tab** | show or hide the leaders' minds: the life each curse would save its pack |
+| **F** | double the pace |
+| **H** | hide the HUD |
+| arrow keys / screen edges, wheel, middle drag | pan, zoom and turn the camera |
 | right click / **Esc** | let go of what you hold |
-| **Esc** with nothing held, or **Menu** | pause: settings (music and effects volume, fullscreen), start again, the title, leave |
+| **Esc** with nothing held | pause: settings (music and effects volume, fullscreen), start again, the map, the title, leave |
 
-Hover a monster to read its resistances in the bar at the top. Leaders wear a violet ring. When
+Leaders wear a violet ring and their life shows over the field. When
 one ponders, dots rise over its head; when it chants, a violet beam reaches for a tower and a rune
 circle closes round that tower's foot. Later, Smite or Frozen Orb can break an interruptible chant
 before it lands. Marked and resolute curses cannot be interrupted; **Cleanse** removes curses from
@@ -72,4 +72,5 @@ improvement over its previous best banked amount.
 - [Campaign](docs/campaign.md): the locations, the skill tree, the spells, the world map, and tuning by simulation.
 - [Progression redesign](docs/redesign.md): routes, breaches, salvage, patterns and the slower unlock order.
 - [Audio](docs/audio.md): the cues, the music and how they are made.
+- [The Godot client and the server](docs/godot-client.md): who owns what, the protocol, the measured costs.
 - [AGENTS.md](AGENTS.md): commands and layout for development.

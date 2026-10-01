@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dk4ya42snq60o"
-path.s3tc="res://.godot/imported/breach.jpg-b8c8a5115737bd1065c391e02fa5d2a7.s3tc.ctex"
+path="res://.godot/imported/breach.jpg-b8c8a5115737bd1065c391e02fa5d2a7.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/prologue/breach.jpg"
-dest_files=["res://.godot/imported/breach.jpg-b8c8a5115737bd1065c391e02fa5d2a7.s3tc.ctex"]
+dest_files=["res://.godot/imported/breach.jpg-b8c8a5115737bd1065c391e02fa5d2a7.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

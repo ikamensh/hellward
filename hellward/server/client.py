@@ -22,15 +22,18 @@ class Refused(Exception):
 
 
 class Client:
-    def __init__(self, data: Path, *, seed: int = 0, env: dict[str, str] | None = None, timeout: float = 120.0) -> None:
+    def __init__(self, data: Path, *, seed: int = 0, env: dict[str, str] | None = None, timeout: float = 120.0,
+                 command: list[str] | None = None) -> None:
+        """Start the server (``command``, by default this Python's ``-m hellward.server``) and greet it."""
         listener = socket.socket()
         listener.bind(("127.0.0.1", 0))
         listener.listen(1)
         listener.settimeout(timeout)
         token = secrets.token_hex(8)
+        server = command or [sys.executable, "-m", "hellward.server"]
         self.process = subprocess.Popen(
-            [sys.executable, "-m", "hellward.server", "--connect", str(listener.getsockname()[1]), "--token", token,
-             "--data", str(data), "--seed", str(seed)], env={**os.environ, **(env or {})})
+            [*server, "--connect", str(listener.getsockname()[1]), "--token", token, "--data", str(data),
+             "--seed", str(seed)], env={**os.environ, **(env or {})})
         self.sock, _ = listener.accept()
         listener.close()
         self.sock.settimeout(timeout)

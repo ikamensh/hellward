@@ -26,7 +26,20 @@ func _process(delta: float) -> void:
 	_opened += delta
 
 
-func _unhandled_key_input(event: InputEvent) -> void:
+## Keys reach a screen before the interface does (a hovered control's tooltip would take them otherwise), the top
+## overlay first; a focused text field keeps every key but Enter and Esc.
+func _input(event: InputEvent) -> void:
+	var k := event as InputEventKey
+	if k == null or not is_visible_in_tree():
+		return
+	var focus := get_viewport().gui_get_focus_owner()
+	if (focus is LineEdit or focus is TextEdit) and k.keycode not in [KEY_ENTER, KEY_KP_ENTER, KEY_ESCAPE]:
+		return
+	_key(event)
+
+
+## A key for this screen: the button that answers it, else Esc goes back; an overlay takes every key.
+func _key(event: InputEvent) -> void:
 	var k := event as InputEventKey
 	if k == null or not k.pressed or k.echo or _opened < GUARD:
 		return
@@ -40,6 +53,8 @@ func _unhandled_key_input(event: InputEvent) -> void:
 	if k.keycode == KEY_ESCAPE:
 		get_viewport().set_input_as_handled()
 		back()
+	elif game != null and game.is_overlay(self):
+		get_viewport().set_input_as_handled()   # an overlay is modal: keys it does not use stop here
 
 
 ## Esc with no button for it.

@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c8d32qr5mftjm"
-path.s3tc="res://.godot/imported/bones-v2.jpg-0fca5a0f10254b8b54b7f0c87f9f6424.s3tc.ctex"
+path="res://.godot/imported/bones-v2.jpg-0fca5a0f10254b8b54b7f0c87f9f6424.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/prologue/bones-v2.jpg"
-dest_files=["res://.godot/imported/bones-v2.jpg-0fca5a0f10254b8b54b7f0c87f9f6424.s3tc.ctex"]
+dest_files=["res://.godot/imported/bones-v2.jpg-0fca5a0f10254b8b54b7f0c87f9f6424.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -1,7 +1,7 @@
 [project]
-name = "hellward3d-tools"
+name = "hellward-client-tools"
 version = "0.1.0"
-description = "Asset tools for the Hellward 3D demo (Godot project in game/)"
+description = "Asset tools for Hellward's Godot client (game/): painting, PBR maps, effect sprites"
 requires-python = ">=3.12"
 dependencies = ["numpy", "pillow", "scipy"]
 

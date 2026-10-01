@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://6cvspfnllwmb"
-path.s3tc="res://.godot/imported/cathedral-after.jpg-1baedbe563e8c0d111eab4e244a24984.s3tc.ctex"
+path="res://.godot/imported/cathedral-after.jpg-1baedbe563e8c0d111eab4e244a24984.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/cathedral-after.jpg"
-dest_files=["res://.godot/imported/cathedral-after.jpg-1baedbe563e8c0d111eab4e244a24984.s3tc.ctex"]
+dest_files=["res://.godot/imported/cathedral-after.jpg-1baedbe563e8c0d111eab4e244a24984.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

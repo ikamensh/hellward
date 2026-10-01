@@ -18,7 +18,8 @@ func _ready() -> void:
 	for t in [test_battle_starts_with_the_locations_purse, test_intro_hands_over_the_camera, test_mouse_builds_a_tower,
 			test_the_server_refuses_a_tower_on_the_lane, test_a_wave_brings_monsters_that_walk,
 			test_a_curse_lands_and_cleanse_lifts_it, test_defeat_ends_the_battle_and_its_music,
-			test_the_watched_defence_holds_and_ends_with_victory]:
+			test_the_watched_defence_holds_and_ends_with_victory, test_a_campaign_walk_through_every_screen,
+			test_every_location_lays_out_and_plays]:
 		if only != "" and only not in t.get_method():
 			continue
 		_main = null
@@ -240,7 +241,101 @@ func test_the_watched_defence_holds_and_ends_with_victory() -> void:
 	var m := await start({"demo": "", "player": "adaptive"})
 	var w: World = m.world
 	Engine.time_scale = 8.0
+	var largest := [""]
+	var keep := func(f: Dictionary):
+		var text := JSON.stringify(f)
+		if text.length() > largest[0].length():
+			largest[0] = text
+	Net.frame.connect(keep)
 	check(await until(func(): return w.outcome != "", 900.0), "the watched defence ends")
+	Net.frame.disconnect(keep)
+	var started := Time.get_ticks_usec()
+	for i in 100:
+		JSON.parse_string(largest[0])
+	var parse := (Time.get_ticks_usec() - started) / 100.0
+	print("   largest frame %d bytes, parsed in %.0f us" % [largest[0].length(), parse])
+	check(parse < 500.0, "the client parses the largest frame in under half a millisecond (%.0f us)" % parse)
 	check(w.outcome == "victory", "the scripted defence wins (outcome '%s', wave %d, lives %d)" % [w.outcome, w.wave + 1, w.lives])
 	check(w.towers.size() >= 4, "it built a defence (%d towers)" % w.towers.size())
 	check(Sfx.music_name() == "title", "the title's music plays after the victory (%s)" % Sfx.music_name())
+
+
+## The campaign's ways, against the real server: the title, a new profile, the prologue, the map (the lantern walks
+## to Tristram), its before page, the briefing, the skill tree, a defence (lost: no towers), the reckoning, the map
+## again and the title. Keys and clicks as a player gives them.
+func test_a_campaign_walk_through_every_screen() -> void:
+	var game: Game = load("res://scenes/game.tscn").instantiate()
+	_main = game
+	var seen: Array = []
+	game.shown.connect(func(s: Screen): seen.append(s.get_script().get_global_name()))
+	add_child(game)
+	var vp := game.get_viewport()
+	check(await until(func(): return _showing(seen, "TitleScreen"), 10.0), "the title shows (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_P)
+	check(await until(func(): return _showing(seen, "ProfilesScreen"), 5.0), "P opens the profiles (%s)" % [seen])
+	var made = await game.ask("create_profile", {"name": "walker"})
+	check(made != null and made["current"] == "walker", "a new profile is made and chosen")
+	game.close(game._overlays.back())
+	await frames(20)
+	press(vp, KEY_ENTER)
+	check(await until(func(): return _showing(seen, "PrologueScreen"), 5.0), "Descend on a new campaign plays the prologue (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ESCAPE)
+	check(await until(func(): return _showing(seen, "MapScreen"), 5.0), "Esc ends it on the map (%s)" % [seen])
+	check(await until(func(): return _showing(seen, "StoryScreen"), 10.0), "the lantern walks to Tristram and its before page is told (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ESCAPE)
+	check(await until(func(): return _showing(seen, "BriefingScreen"), 5.0), "then its intro (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_K)
+	check(await until(func(): return _showing(seen, "SkillsScreen"), 5.0), "K opens the skill tree (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ESCAPE)
+	await frames(20)
+	check(game._overlays.is_empty(), "Esc closes it over the intro")
+	press(vp, KEY_ENTER)
+	check(await until(func(): return game.battle != null and game.battle.world != null, 10.0), "Defend starts the battle")
+	if game.battle == null:
+		return
+	var w: World = game.battle.world
+	Engine.time_scale = 8.0
+	check(await until(func():
+		if w.can_call():
+			w.order("call_wave")
+		return _showing(seen, "ReckoningScreen"), 600.0), "an undefended Tristram falls to the reckoning (%s)" % [seen])
+	Engine.time_scale = 1.0
+	await frames(40)
+	press(vp, KEY_ESCAPE)
+	check(await until(func(): return _showing(seen, "MapScreen") and game.battle == null, 10.0), "To the map leaves the battle (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ESCAPE)
+	check(await until(func(): return _showing(seen, "TitleScreen"), 5.0), "and Esc goes back to the title (%s)" % [seen])
+	var view = await game.ask("campaign")
+	check(view["profile"] == "walker" and int(view["sigils"]) == 0, "the walker's campaign holds no sigils after a fall")
+
+
+## Every location of both acts lays out (its scenery, its arsenal on the bar) and its battle runs a few seconds,
+## a scripted player defending: a script error anywhere fails the suite (tools/test.sh).
+func test_every_location_lays_out_and_plays() -> void:
+	var view: Dictionary = (await Net.ask("campaign").done)["data"]
+	for act in view["acts"]:
+		for place in act["places"]:
+			var key := String(place["key"])
+			var m := await start({"demo": "", "player": "ordinary", "location": key})
+			var w: World = m.world
+			Engine.time_scale = 8.0
+			await seconds(4)
+			Engine.time_scale = 1.0
+			var arsenal: Dictionary = w.start["arsenal"]
+			var bar: int = arsenal["towers"].size() + (1 if bool(arsenal["gates"]) else 0)
+			check(m.hud.slots().size() == bar, "%s: the bar holds its arsenal (%d of %d)" % [key, m.hud.slots().size(), bar])
+			check(w.time > 5.0 and w.outcome == "", "%s: its battle runs (%.0f s)" % [key, w.time])
+			check(w.level.portals.size() >= 1 and m.has_node("Dressing"), "%s: its scenery stands" % key)
+			_main.queue_free()
+			await frames(2)
+
+
+func _showing(seen: Array, screen: String) -> bool:
+	return not seen.is_empty() and seen.back() == screen
+

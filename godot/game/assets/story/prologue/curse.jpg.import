@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b85874ouo7p3x"
-path.s3tc="res://.godot/imported/curse.jpg-e9829dc6ab52e89de6c54f512a40d5af.s3tc.ctex"
+path="res://.godot/imported/curse.jpg-e9829dc6ab52e89de6c54f512a40d5af.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/prologue/curse.jpg"
-dest_files=["res://.godot/imported/curse.jpg-e9829dc6ab52e89de6c54f512a40d5af.s3tc.ctex"]
+dest_files=["res://.godot/imported/curse.jpg-e9829dc6ab52e89de6c54f512a40d5af.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -107,7 +107,7 @@ func title_card(title: String, line: String, hold := 3.0) -> void:
 
 func setup(w: World) -> void:
 	world = w
-	_slot_keys = Array(world.start["arsenal"]["towers"])
+	_slot_keys = (world.start["arsenal"]["towers"] as Array).duplicate()   # the bar's own list: the gate joins it
 	if world.offers("gate"):
 		_slot_keys.append("gate")
 	_slot_size = min(SLOT, (BAR.x - 2 * INSET - 420.0 - GAP * (_slot_keys.size() - 1)) / max(_slot_keys.size(), 1))
@@ -780,7 +780,8 @@ func _portrait(kind: String, rank: int, px: int, live: bool) -> Array:
 	var bm := StandardMaterial3D.new()
 	bm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	var hue: Color = {"arrow": Color(0.55, 0.32, 0.14), "pyre": Color(0.7, 0.26, 0.08),
-		"frost": Color(0.16, 0.32, 0.6), "storm": Color(0.32, 0.22, 0.62)}[kind]
+		"frost": Color(0.16, 0.32, 0.6), "storm": Color(0.32, 0.22, 0.62), "plague": Color(0.24, 0.5, 0.14),
+		"altar": Color(0.55, 0.5, 0.38), "grove": Color(0.2, 0.48, 0.18)}[kind]
 	var glow := GradientTexture2D.new()
 	glow.gradient = Gradient.new()
 	glow.gradient.colors = PackedColorArray([hue, Color(0.02, 0.018, 0.022)])

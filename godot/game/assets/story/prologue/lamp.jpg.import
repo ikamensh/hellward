@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://d4mjieio6xmar"
-path.s3tc="res://.godot/imported/lamp.jpg-5048caa89b4023befae39c84eb65286b.s3tc.ctex"
+path="res://.godot/imported/lamp.jpg-5048caa89b4023befae39c84eb65286b.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/prologue/lamp.jpg"
-dest_files=["res://.godot/imported/lamp.jpg-5048caa89b4023befae39c84eb65286b.s3tc.ctex"]
+dest_files=["res://.godot/imported/lamp.jpg-5048caa89b4023befae39c84eb65286b.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -1,0 +1,30 @@
+# The Python suite on every push: the simulation (source and compiled), the server, the campaign through the real
+# server, the protocol's budget and the client's assets. The client's own tests run in the Windows package
+# workflow and on the Mac (godot/tools/test.sh).
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: hellward
+      - uses: actions/checkout@v4
+        with:
+          repository: ikamensh/sagaforge
+          path: sagaforge
+      - uses: astral-sh/setup-uv@v6
+      - name: The environment
+        working-directory: hellward
+        run: uv sync --extra dev
+      - name: The suite
+        working-directory: hellward
+        run: uv run pytest -q

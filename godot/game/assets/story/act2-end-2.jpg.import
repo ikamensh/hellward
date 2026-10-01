@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cccl1tyaht0u7"
-path.s3tc="res://.godot/imported/act2-end-2.jpg-976ded7266ba3f9da09b5878ee9cde8b.s3tc.ctex"
+path="res://.godot/imported/act2-end-2.jpg-976ded7266ba3f9da09b5878ee9cde8b.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/act2-end-2.jpg"
-dest_files=["res://.godot/imported/act2-end-2.jpg-976ded7266ba3f9da09b5878ee9cde8b.s3tc.ctex"]
+dest_files=["res://.godot/imported/act2-end-2.jpg-976ded7266ba3f9da09b5878ee9cde8b.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

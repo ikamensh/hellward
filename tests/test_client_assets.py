@@ -1,0 +1,55 @@
+"""The Godot client has what the rules can show: a sound for every cue and track, and a body for every kind.
+
+The client's scripts are read as text: every cue the audio code renders is played somewhere, every cue the client
+plays is rendered, every file is in the client's assets (tools/export_audio.py), and every monster and tower kind
+the rules have wears a model or a stand-in.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+from hellward.audio.cues import CUES, files
+from hellward.audio.music import PIECES
+from hellward.sim.campaign import LOCATIONS
+from hellward.sim.content import MONSTERS, TOWERS
+
+GAME = Path(__file__).resolve().parent.parent / "godot" / "game"
+SCRIPTS = "\n".join(p.read_text() for p in sorted((GAME / "scripts").rglob("*.gd")))
+
+
+def test_every_cue_is_rendered_into_the_client():
+    for stem in files():
+        assert (GAME / "assets" / "audio" / f"{stem}.wav").is_file(), f"{stem}: run tools/export_audio.py"
+
+
+def test_every_track_is_rendered_into_the_client_and_every_location_has_its_battle_music():
+    for name in PIECES:
+        assert (GAME / "assets" / "audio" / f"music_{name}.mp3").is_file(), f"{name}: tools/export_audio.py --music"
+    for key in LOCATIONS:
+        assert f"battle_{key}" in PIECES
+    assert '"battle_" + String(brief["key"])' in SCRIPTS and '"battle_" + String(battle["location"]["key"])' in SCRIPTS
+
+
+def test_the_client_plays_every_cue_and_only_cues_that_exist():
+    played = set(re.findall(r'Sfx\.play\("([a-z_]+)"[,)]', SCRIPTS))
+    named = set(re.findall(r'"([a-z_]+)"', SCRIPTS))
+    for cue in CUES:
+        if cue.startswith("death_"):
+            continue
+        assert cue in named, f"the client never plays {cue}"
+    assert '"death_" + kind' in SCRIPTS, "each kind dies with its own cry"
+    assert played <= set(CUES), f"the client plays cues nobody renders: {sorted(played - set(CUES))}"
+
+
+def test_every_monster_and_tower_kind_wears_a_model_or_a_stand_in():
+    monster = (GAME / "scripts" / "monster.gd").read_text()
+    tower = (GAME / "scripts" / "tower.gd").read_text()
+    models = {p.stem for p in (GAME / "assets" / "models").glob("*.glb")}
+    for kind in MONSTERS:
+        own = f"mon_{kind}" in models
+        assert own or re.search(rf'"{kind}": \["(fallen|shaman|zombie|skeleton)"', monster), kind
+    for kind in TOWERS:
+        own = f"tower_{kind}" in models or f"tower_{kind}_1" in models
+        assert own or re.search(rf'"{kind}": \["(arrow|pyre|frost|storm)"', tower), kind

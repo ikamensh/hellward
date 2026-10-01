@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://c3rjddndbvx45"
-path.s3tc="res://.godot/imported/jungle-after.jpg-88c22da6877c690e6848918307622343.s3tc.ctex"
+path="res://.godot/imported/jungle-after.jpg-88c22da6877c690e6848918307622343.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/jungle-after.jpg"
-dest_files=["res://.godot/imported/jungle-after.jpg-88c22da6877c690e6848918307622343.s3tc.ctex"]
+dest_files=["res://.godot/imported/jungle-after.jpg-88c22da6877c690e6848918307622343.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

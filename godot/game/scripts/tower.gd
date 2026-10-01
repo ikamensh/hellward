@@ -10,6 +10,7 @@ const NAMES := {"arrow": "Arrow Tower", "pyre": "Pyre", "frost": "Frost Shrine",
 const STAND_INS := {"plague": ["frost", Color(0.45, 0.85, 0.3)], "altar": ["storm", Color(0.9, 0.85, 0.7)],
 	"grove": ["pyre", Color(0.4, 0.8, 0.35)]}
 const LOOKS := {"arrow": "arrow", "pyre": "fire", "frost": "frost", "plague": "frost", "altar": "fire", "grove": "fire"}
+const CASTS := {"arrow": "arrow_cast", "pyre": "fire_cast", "plague": "venom_cast", "altar": "fire_cast"}
 
 var world: World
 var id := 0
@@ -214,31 +215,33 @@ func fire(bolt: Dictionary, target: Monster) -> void:
 	var flight: float = max(float(bolt["left"]), 0.05)
 	var to := target.chest() if target else world.ground(bolt["last"]) + Vector3(0, 1.0, 0)
 	var speed := muzzle().distance_to(to) / flight
-	match look:
-		"arrow":
-			Sfx.play("arrow_cast", muzzle())
-			if _turret:
-				var kick := create_tween()
-				kick.tween_property(_turret, "scale", Vector3(1.0, 1.0, 0.92), 0.05)
-				kick.tween_property(_turret, "scale", Vector3.ONE, 0.25)
-		"fire":
-			Sfx.play("fire_cast", muzzle())
+	if CASTS.has(kind):
+		Sfx.play(CASTS[kind], muzzle())
+	if look == "arrow" and _turret:
+		var kick := create_tween()
+		kick.tween_property(_turret, "scale", Vector3(1.0, 1.0, 0.92), 0.05)
+		kick.tween_property(_turret, "scale", Vector3.ONE, 0.25)
 	Bolt.launch(world, look, muzzle(), target, speed, func(_m, _at: Vector3): pass, to)
 
 
 ## Where a bolt lands, as the server says: the blast, the hit and its sound.
 static func impact(w: World, bolt: Dictionary, at: Vector3, target: Monster) -> void:
 	var where := target.chest() if target and target.alive() else at + Vector3(0, 1.0, 0)
-	match LOOKS.get(String(bolt["kind"]), "arrow"):
+	var kind := String(bolt["kind"])
+	var splash := float(bolt["splash"]) > 0.0
+	match LOOKS.get(kind, "arrow"):
 		"arrow":
 			Sfx.play("arrow_hit", where)
 			Vfx.impact(w, where, Color(1.0, 0.85, 0.6), 12)
 		"fire":
-			Sfx.play("fireball", where)
-			Vfx.explosion(w, where, Color(1.0, 0.45, 0.1), float(bolt["splash"]) > 0.0)
+			Sfx.play("fireball" if splash else "fire_hit", where)
+			Vfx.explosion(w, where, Color(1.0, 0.45, 0.1), splash)
 		"frost":
-			Sfx.play("frost", where)
-			Vfx.frost_burst(w, where)
+			Sfx.play("venom_hit" if kind == "plague" else "frost", where)
+			if kind == "plague":
+				Vfx.burst(w, where, Color(0.5, 0.9, 0.2), 24)
+			else:
+				Vfx.frost_burst(w, where)
 
 
 ## Lightning through the points of a chain, from the muzzle.

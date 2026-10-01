@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://7rwoaisixhse"
-path.s3tc="res://.godot/imported/catacombs-before.jpg-7b6f18b0187b90726a83a9eba98d0b95.s3tc.ctex"
+path="res://.godot/imported/catacombs-before.jpg-7b6f18b0187b90726a83a9eba98d0b95.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/story/catacombs-before.jpg"
-dest_files=["res://.godot/imported/catacombs-before.jpg-7b6f18b0187b90726a83a9eba98d0b95.s3tc.ctex"]
+dest_files=["res://.godot/imported/catacombs-before.jpg-7b6f18b0187b90726a83a9eba98d0b95.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

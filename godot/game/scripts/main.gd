@@ -71,6 +71,7 @@ func _build() -> void:
 	world.name = "World"
 	add_child(world)
 	world.setup(level, battle)
+	world.dressing = dressing
 	hud = Hud.new()
 	add_child(hud)
 	hud.setup(world)

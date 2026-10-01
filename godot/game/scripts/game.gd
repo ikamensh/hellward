@@ -57,8 +57,9 @@ func _ready() -> void:
 		title()
 
 
-## Save the frame drawn after `frames` frames to `path`, then quit (captures of a screen).
+## Save the frame drawn `frames` frames after the first screen shows to `path`, then quit (captures of a screen).
 func _snap_after(frames: int, path: String) -> void:
+	await shown
 	for i in frames:
 		await get_tree().process_frame
 	await RenderingServer.frame_post_draw
@@ -87,6 +88,10 @@ func overlay(screen: Screen, with := {}) -> Screen:
 	_overlays.append(screen)
 	_mount(screen, with)
 	return screen
+
+
+func is_overlay(screen: Screen) -> bool:
+	return _overlays.has(screen)
 
 
 ## Close an overlay; the screen under it shows what may have changed.
@@ -239,7 +244,7 @@ func chronicle() -> void:
 	if data == null:
 		return
 	await ask("seen", {"key": "prologue"})
-	show_screen(PrologueScreen.new(), {"then": func(): _chronicle(data["stories"], 0)})
+	show_screen(PrologueScreen.new(), {"then": func(): _chronicle(data["stories"], 0), "skip": title})
 
 
 func _chronicle(stories: Array, i: int) -> void:
@@ -285,10 +290,11 @@ func _battle(start: Dictionary) -> void:
 	show_screen(BattleScreen.new())
 	battle = load(MAIN).instantiate()
 	battle.battle = start
-	battle.args = {"film": ""} if bool(start["demo"]) else {}
+	battle.args = {"film": ""} if bool(start["scripted"]) else {}
 	add_child(battle)
 	battle.menu.connect(pause)
 	battle.ended.connect(_ended)
+	battle.started.connect(func(): battle.world.minds = prefs.minds)
 
 
 func _end_battle() -> void:
@@ -370,8 +376,12 @@ func _open_named(name: String) -> void:
 	var at: String = args.get("location", "tristram")
 	match name:
 		"title": title()
-		"profiles": profiles()
-		"settings": settings()
+		"profiles":
+			title()
+			profiles()
+		"settings":
+			title()
+			settings()
 		"map": open_map(int(args.get("act", "0")), false)
 		"briefing": intro(at)
 		"skills": skills(at if args.has("location") else "")
