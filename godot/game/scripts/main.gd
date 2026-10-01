@@ -1,8 +1,14 @@
 extends Node3D
-## Hellward 3D: Tristram burns. Builds the world, then hands the battle to World and the screen to Hud.
-## User args (after `--`): `demo` lets a scripted defender play, `film` also directs the camera; captures
-## (tools/shot.sh, gallery.sh, record.sh) pass `shot=VIEW`, `snap=PNG`, `gallery=V,V out=DIR`,
-## `record=DIR every=N` with `frames=N`; `nointro` skips the opening (tests).
+## Hellward's battle: the map in 3D, a defence the server plays, the HUD and the player's hands.
+## The game's shell (game.gd) sets `battle` (the server's start message) before adding the scene; run on its own
+## (captures, tests, `godot --path game`), it asks the server for one itself: `demo` watches a scripted player
+## (`player=NAME`, `location=KEY`), else the player defends (`location=KEY`, Tristram by default).
+## `film` also directs the camera; captures (tools/shot.sh, gallery.sh, record.sh) pass `shot=VIEW`, `snap=PNG`,
+## `gallery=V,V out=DIR`, `record=DIR every=N` with `frames=N`; `nointro` skips the opening (tests).
+
+signal started                       # the battle is laid out and running
+signal menu                          # the player asked for the pause menu
+signal ended(result: Dictionary)     # three seconds after the defence was decided: the reckoning's turn
 
 var level: Level
 var world: World
@@ -11,6 +17,7 @@ var builder: Builder
 var rig: CameraRig
 var env: Environment
 var args = null   # the user args as a Dictionary; a test sets them before adding the scene
+var battle := {}  # the server's battle message; the shell sets it, or the scene asks for one
 
 
 func _ready() -> void:
@@ -20,10 +27,27 @@ func _ready() -> void:
 			var kv := a.split("=", true, 1)
 			args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	Sfx.setup(self, args["record"] + "/sound.log" if args.has("record") else "")
+	if battle.is_empty():
+		if not await Net.wait_ready():
+			push_error("no server: " + Net.error)
+			return
+		var location: String = args.get("location", "tristram")
+		var request := {"location": location}
+		if args.has("demo"):
+			request["player"] = args.get("player", "adaptive")
+		var reply: Dictionary = await Net.ask("demo" if args.has("demo") else "defend", request).done
+		if not bool(reply["ok"]):
+			push_error("the server refused the battle: " + String(reply["why"]))
+			return
+		battle = reply["data"]
+	_build()
+
+
+func _build() -> void:
 	level = Level.new()
 	level.name = "Level"
 	add_child(level)
-	level.load_location("tristram")
+	level.load_battle(battle)
 	_environment()
 	_fit_resolution()
 	get_viewport().size_changed.connect(_fit_resolution)
@@ -41,11 +65,12 @@ func _ready() -> void:
 	rig.name = "Camera"
 	add_child(rig)
 	var c := level.centre()
+	rig.bounds = AABB(Vector3(-10, 0, -10), Vector3(level.width * Level.TILE + 20, 0, level.height * Level.TILE + 20))
 	rig.snap(c + Vector3(2, 0, 3), 0.0, 55.0, 52.0)
 	world = World.new()
 	world.name = "World"
 	add_child(world)
-	world.setup(level)
+	world.setup(level, battle)
 	hud = Hud.new()
 	add_child(hud)
 	hud.setup(world)
@@ -53,26 +78,29 @@ func _ready() -> void:
 	builder.name = "Builder"
 	add_child(builder)
 	builder.setup(world, hud, rig)
-	if args.has("demo"):
+	builder.menu.connect(func(): menu.emit())
+	hud.order.connect(func(n: String): if n == "menu": menu.emit())
+	var staged: bool = args.has("shot") or args.has("gallery") or args.has("snap") or args.has("record") or args.has("nointro")
+	if args.has("film") or (world.demo and not staged):
 		var d := Demo.new()
 		d.name = "Demo"
 		add_child(d)
-		d.setup(self, args.has("film"))
-	var staged: bool = args.has("shot") or args.has("gallery") or args.has("snap") or args.has("record") or args.has("nointro")
-	if not args.has("demo") and not staged:
+		d.setup(self)
+	elif not staged:
 		var intro := Intro.new()
 		intro.name = "Intro"
 		add_child(intro)
 		intro.play(self)
-	elif not args.has("film"):
-		world.announce.emit("Tristram", "The village under the cathedral burns. Hold the sanctuary.")
-		Sfx.music("battle_tristram", -8.0, 0.01)
+	else:
+		world.announce.emit(String(battle["location"]["name"]), "Hold the sanctuary. The first wave comes soon.")
+		Sfx.music(music(), -8.0, 0.01)
 	# as in the 2D game: the title's music after a victory, silence under the defeat
 	world.finished.connect(func(won: bool):
 		if won:
 			Sfx.music("title", -6.0, 4.0)
 		else:
-			Sfx.stop_music(4.0))
+			Sfx.stop_music(4.0)
+		get_tree().create_timer(3.0, false).timeout.connect(func(): ended.emit(world.result)))
 	if args.has("shot"):
 		Shots.frame(self, args["shot"])
 	if args.has("snap"):
@@ -81,6 +109,12 @@ func _ready() -> void:
 		_record(int(args.get("frames", "900")), int(args.get("every", "1")), args["record"])
 	if args.has("gallery"):
 		_gallery(int(args.get("frames", "40")), args["gallery"].split(","), args["out"])
+	started.emit()
+
+
+## The location's battle music.
+func music() -> String:
+	return "battle_" + String(battle["location"]["key"])
 
 
 ## Save every `every`-th frame as DIR/NNNNN.jpg for up to `frames` frames, or until 14 s after the battle ends

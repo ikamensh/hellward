@@ -1,8 +1,10 @@
 class_name Monster
 extends Node3D
-## A monster walking its route from the portal to the cathedral. A Fallen Shaman is a leader: now and
-## then it stops, ponders, and chants a curse at the tower hurting its pack most.
+## A monster as the server plays it: where it walks (its route and the distance along it), its life, the cold
+## and poison on it, a leader's pondering and chanting. Between two steps it glides; its walk plays at the pace
+## it moves. Its death, its leak into the sanctuary and a leader's curse come as events (World._event).
 
+# kinds with a model of their own; the others wear the nearest one, tinted and sized (`STAND_INS`) until theirs exist
 const HEIGHTS := {"fallen": 1.15, "shaman": 1.5, "zombie": 1.9, "skeleton": 1.85}
 const BODY := 1.3                    # bodies a size up from life, so they read from the battle camera
 # each kind's rim, faint and only at a distance: Fallen ember, Shaman violet, Zombie grave-green, Skeleton bone
@@ -10,40 +12,50 @@ const RIM := {"fallen": Color(1.0, 0.32, 0.1), "shaman": Color(0.8, 0.3, 1.0), "
 	"skeleton": Color(0.9, 0.88, 0.75)}
 # how fast each walk cycle carries the body at speed_scale 1 (m/s): the walk plays faster as the body speeds up
 const WALK := {"fallen": 0.67, "shaman": 0.72, "zombie": 0.75, "skeleton": 0.81}
+# a kind without a model: [the model it borrows, its tint]; its height follows its size in the rules
+const STAND_INS := {
+	"goatman": ["zombie", Color(0.55, 0.38, 0.22)], "overlord": ["zombie", Color(0.75, 0.2, 0.12)],
+	"azazel": ["zombie", Color(0.6, 0.06, 0.05)], "priest": ["shaman", Color(0.85, 0.8, 0.65)],
+	"witch": ["shaman", Color(0.8, 0.12, 0.2)], "flayer": ["fallen", Color(0.3, 0.45, 0.2)],
+	"zealot": ["skeleton", Color(0.85, 0.7, 0.4)], "spider": ["fallen", Color(0.2, 0.18, 0.2)],
+	"bat": ["fallen", Color(0.5, 0.1, 0.12)], "gargoyle": ["skeleton", Color(0.45, 0.45, 0.5)],
+	"hulk": ["zombie", Color(0.35, 0.55, 0.2)], "drowned": ["zombie", Color(0.3, 0.5, 0.55)],
+	"fetish": ["shaman", Color(0.45, 0.65, 0.25)], "inquisitor": ["shaman", Color(0.95, 0.8, 0.45)],
+	"bone_priest": ["skeleton", Color(0.7, 0.55, 0.95)],
+}
 const MAX_STRIDE := 2.4             # beyond this the legs blur; the feet slide a little instead
-# 3D bodies walk at 0.6 of the 2D game's pace: a 1.1 m imp at 2.7 m/s is a blur, not a Fallen
-const PACE := 0.6
-const LANE := 1.7                    # how far from the route's centre line a monster may wander, metres
-const CURSE_REACH := 7.0             # a leader curses towers within this many metres
-const CURSE_RADIUS := 3.0            # and every tower this close to the one it picked
-const CURSE_TIME := 14.0
+const LANE := 6.0                    # the rules' lane (about ±0.28 tiles) spread to metres across the street
+const FLY := 2.4                     # a flyer's height over the ground
+const EMERGE := 1.2                  # seconds a newcomer takes to come out of its portal
 
 var world: World
+var id := 0
 var kind: String
-var stats: Dictionary
+var stats: Dictionary                # the rules' table for its kind (the battle message)
 var hp := 1.0
 var max_hp := 1.0
 var height := 1.5
 var leader := false
-var wave := -1                      # the wave that sent it
-var gone := false                   # dead and faded, or inside the cathedral: the world frees it
-var progress := 0.0                 # 0..1 along the route, for targeting
+var wave := -1
+var gone := false                    # dead and faded, or inside the sanctuary: the world frees it
+var progress := 0.0                  # 0..1 along its route, for the camera
 
-var _route: PackedVector3Array
-var _cum: PackedFloat32Array
-var _s := 0.0
+var _route := "main"
 var _lateral := 0.0
-var _lateral_goal := 0.0
-var _speed := 1.0                   # metres per second
-var _chill := 0.0
-var _chill_left := 0.0
-var _state := "walk"                # walk, ponder, chant, door, dead
+var _s0 := 0.0                       # the distance along the route at the last two steps
+var _s1 := 0.0
+var _flags := 0
+var _frozen := false
+var _chilled := false
+var _state := "walk"                 # walk, ponder, chant, door, dead
 var _state_t := 0.0
-var _curse_clock := 0.0
+var _age := 0.0
+var _chant_spot := Vector2i(-1, -1)
+var _chant_time := 0.0               # how long the chant or mark lasts, from the rules' table
 var _curse_target: Tower
 var _beam: Node3D
-var _rng := RandomNumberGenerator.new()
-
+var _circle: Node3D
+var _base := "fallen"                # the model it wears
 var _model: Node3D
 var _anim: AnimationPlayer
 var _overlay: ShaderMaterial
@@ -52,40 +64,44 @@ var _ring: MeshInstance3D            # a leader's violet ring on the ground
 var _flash := 0.0
 
 
-func setup(w: World, k: String, st: Dictionary, route: PackedVector3Array, life: float, seed: int) -> void:
+func setup(w: World, ident: int, facts: Dictionary, table: Dictionary) -> void:
 	world = w
-	kind = k
-	stats = st
-	_rng.seed = seed
-	max_hp = float(st["hp"]) * life
+	id = ident
+	kind = String(facts["kind"])
+	stats = table
+	_route = String(facts["route"])
+	_lateral = float(facts["lane"]) * LANE
+	max_hp = float(facts["max_hp"])
 	hp = max_hp
-	height = HEIGHTS[k] * BODY
-	leader = k == "shaman"
-	_speed = float(st["speed"]) * Level.TILE * PACE
-	_route = route
-	_cum = PackedFloat32Array([0.0])
-	for i in range(1, route.size()):
-		_cum.append(_cum[i - 1] + route[i].distance_to(route[i - 1]))
-	_lateral = _rng.randf_range(-LANE, LANE)
-	_lateral_goal = _lateral
-	_curse_clock = _rng.randf_range(4.0, 7.0)
+	wave = int(facts["wave"])
+	leader = table["leader"] != null
+	_base = kind if HEIGHTS.has(kind) else String(STAND_INS.get(kind, ["fallen"])[0])
+	height = HEIGHTS[kind] * BODY if HEIGHTS.has(kind) else float(table["size"]) * 2.3 * BODY
+	_s0 = 0.0
+	_s1 = 0.0
+
+
+func title() -> String:
+	return String(stats["name"])
 
 
 func _ready() -> void:
-	_model = Models.make("mon_" + kind)
-	_model.scale = Vector3.ONE * BODY
+	_model = Models.make("mon_" + _base)
+	_model.scale = Vector3.ONE * BODY * (1.0 if HEIGHTS.has(kind) else height / (HEIGHTS[_base] * BODY))
 	add_child(_model)
 	_anim = Models.player(_model)
 	for n in ["walk", "idle", "cast"]:
 		var found := Models.anim_name(_anim, n)
 		if found != "":
 			_anim.get_animation(found).loop_mode = Animation.LOOP_LINEAR
-	_play("walk", _rng.randf())
+	_play("walk", randf())
 	_overlay = ShaderMaterial.new()
 	_overlay.shader = preload("res://shaders/overlay.gdshader")
-	_overlay.set_shader_parameter("kind_rim", RIM[kind])
+	_overlay.set_shader_parameter("kind_rim", RIM.get(kind, STAND_INS.get(kind, [null, Color(0.9, 0.4, 0.3)])[1]))
 	_overlay.set_shader_parameter("xray", 1.0)
 	_overlay.set_shader_parameter("moonrim", 0.3)
+	if STAND_INS.has(kind):
+		_overlay.set_shader_parameter("tint", STAND_INS[kind][1])
 	for mi in _model.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_overlay = _overlay
 		(mi as MeshInstance3D).layers = 2   # decals (cull_mask 1) never land on a body
@@ -107,20 +123,35 @@ func _ready() -> void:
 		ring.position.y = 0.06
 		add_child(ring)
 		_ring = ring
-	global_position = _place(0.0)
+	global_position = _where(0.0)
+
+
+## The server's word on it this step: [id, s, hp, flags, chill, frozen, poison stacks, door].
+func sync(entry: Array, stepped: bool) -> void:
+	if stepped:
+		_s0 = _s1
+	_s1 = float(entry[1])
+	if hp != float(entry[2]):
+		hp = float(entry[2])
+		_bar.visible = true
+		_bar.set_instance_shader_parameter("fill", max(hp, 0.0) / max_hp)
+	_flags = int(entry[3])
+	_chilled = float(entry[4]) > 0.0
+	_frozen = float(entry[5]) > 0.0
+	if _state == "ponder" and (_flags & 1) == 0 and (_flags & 2) == 0:
+		_resume()   # its question was answered without a curse: it holds
 
 
 func alive() -> bool:
 	return _state != "dead" and _state != "door"
 
 
-## How far a leader's curse has come, 0..1 from its first pondering to the curse landing (ponder 1.1 s, then chant
-## 1.9 s: _process); -1 when it is not cursing.
+## How far a leader's curse has come, 0..1 from its pondering to the curse landing; -1 when it is not cursing.
 func casting() -> float:
 	if _state == "ponder":
-		return min(_state_t, 1.1) / 3.0
+		return min(_state_t, 0.5) / 0.5 * 0.3
 	if _state == "chant":
-		return (1.1 + min(_state_t, 1.9)) / 3.0
+		return 0.3 + 0.7 * clamp(_state_t / max(_chant_time, 0.1), 0.0, 1.0)
 	return -1.0
 
 
@@ -128,9 +159,9 @@ func pondering() -> bool:
 	return _state == "ponder"
 
 
-## The tower a leader is cursing, while it ponders or chants; null otherwise.
+## The tower a leader is cursing, while it chants; null otherwise.
 func curse_target() -> Tower:
-	return _curse_target if casting() >= 0.0 and is_instance_valid(_curse_target) else null
+	return _curse_target if _state == "chant" and is_instance_valid(_curse_target) else null
 
 
 func chest() -> Vector3:
@@ -141,47 +172,25 @@ func head() -> Vector3:
 	return global_position + Vector3(0, height + 0.1, 0)
 
 
-func hurt(amount: float, element: String) -> void:
-	if not alive():
-		return
-	var resist: float = stats["resist"].get(element, 0.0)
-	hp -= amount * (1.0 - resist)
-	_flash = 1.0
-	_bar.visible = true
-	_bar.set_instance_shader_parameter("fill", max(hp, 0.0) / max_hp)
-	if hp <= 0.0:
-		_die()
-
-
-func chill(slow: float, seconds: float) -> void:
-	_chill = max(_chill, slow * (1.0 - float(stats["resist"].get("cold", 0.0))))
-	_chill_left = max(_chill_left, seconds)
+func _where(s: float) -> Vector3:
+	var at := world.level.place(_route, s, _lateral)
+	at.y = world.level.step_height(at) + (FLY if bool(stats["flying"]) else 0.0)
+	return at
 
 
 func _process(delta: float) -> void:
+	_age += delta
 	_flash = max(0.0, _flash - delta * 6.0)
-	_chill_left = max(0.0, _chill_left - delta)
-	if _chill_left <= 0.0:
-		_chill = 0.0
 	_overlay.set_shader_parameter("flash", _flash)
-	_overlay.set_shader_parameter("chill", 1.0 if _chill > 0.0 else 0.0)
+	_overlay.set_shader_parameter("chill", 1.0 if _chilled or _frozen else 0.0)
 	_state_t += delta
 	match _state:
-		"walk":
+		"walk", "ponder", "chant":
 			_walk(delta)
-			if leader:
-				_curse_clock -= delta
-				if _curse_clock <= 0.0:
-					_ponder()
-		"ponder", "chant":
-			if not is_instance_valid(_curse_target) or _curse_target.removed:
-				_resume()   # its tower was sold
-			elif _state == "ponder" and _state_t > 1.1:
-				_chant()
-			elif _state == "chant" and _state_t > 1.9:
-				_curse_lands()
 		"door":
-			if _state_t > 1.4:
+			_state_t = min(_state_t, 1.4)
+			global_position = _where(world.level.route_length(_route) + _state_t * 3.0)
+			if _state_t >= 1.4:
 				gone = true
 		"dead":
 			if _state_t > 3.0:
@@ -191,39 +200,20 @@ func _process(delta: float) -> void:
 
 
 func _walk(delta: float) -> void:
-	var pace := _speed * (1.0 - _chill)
-	_anim.speed_scale = min(pace / (WALK[kind] * BODY), MAX_STRIDE)
-	_s += pace * delta
-	if _rng.randf() < delta * 0.25:
-		_lateral_goal = _rng.randf_range(-LANE, LANE)
-	_lateral = move_toward(_lateral, _lateral_goal, delta * 0.6)
-	var total := _cum[_cum.size() - 1]
-	progress = _s / total
-	if _s >= total - 0.5:
-		_enter_door()
-		return
-	var p := _place(_s)
+	var s := lerpf(_s0, _s1, world.alpha)
+	if _age < EMERGE:   # out of the portal: it comes from the portal's mouth to its place on the route
+		s -= Level.APPROACH / Level.TILE * pow(1.0 - _age / EMERGE, 2.0)
+	var p := _where(s)
 	var step := p - global_position
-	if Vector2(step.x, step.z).length() > 0.001:
+	var pace: float = Vector2(step.x, step.z).length() / max(delta, 0.0001)
+	if _state == "walk":
+		_anim.speed_scale = 0.0 if _frozen else min(pace / (WALK.get(_base, 0.7) * BODY), MAX_STRIDE)
+	else:
+		_anim.speed_scale = 0.0 if _frozen else 1.0
+	if Vector2(step.x, step.z).length() > 0.001 and _state == "walk":
 		rotation.y = lerp_angle(rotation.y, atan2(-step.x, -step.z), min(1.0, delta * 8.0))
 	global_position = p
-
-
-## The point `s` metres along the route, pushed `_lateral` metres to its side.
-func _place(s: float) -> Vector3:
-	var i := _cum.bsearch(s) - 1
-	i = clamp(i, 0, _route.size() - 2)
-	var a := _route[i]
-	var b := _route[i + 1]
-	var seg := _cum[i + 1] - _cum[i]
-	var t: float = 0.0 if seg <= 0.0 else clamp((s - _cum[i]) / seg, 0.0, 1.0)
-	var dir := (b - a).normalized()
-	var side := Vector3(-dir.z, 0, dir.x)
-	# no wandering in the portal's mouth or the cathedral's door
-	var squeeze: float = clamp(min(s, _cum[_cum.size() - 1] - s) / 8.0, 0.0, 1.0)
-	var at := a.lerp(b, t) + side * _lateral * squeeze
-	at.y = world.level.step_height(at)
-	return at
+	progress = s / max(world.level.route_length(_route), 0.01)
 
 
 func _play(action: String, at := 0.0) -> void:
@@ -235,7 +225,15 @@ func _play(action: String, at := 0.0) -> void:
 		_anim.seek(_anim.current_animation_length * at, true)
 
 
-func _die() -> void:
+func hit(element: String) -> void:
+	if not alive():
+		return
+	_flash = 1.0
+
+
+func die(element: String, bounty: int) -> void:
+	if not alive():
+		return
 	_state = "dead"
 	_state_t = 0.0
 	_anim.speed_scale = 1.0
@@ -246,75 +244,84 @@ func _die() -> void:
 	if _ring:
 		_ring.queue_free()
 	_drop_beam()
-	world.killed(self)
-	Sfx.play("death_" + kind, chest())
+	if bounty > 0:
+		Vfx.coin(world, global_position + Vector3(0, height + 0.3, 0), bounty)
+		Sfx.play("gold", global_position)
+	Sfx.play("death_" + (_base if kind == _base else _base), chest())
 	Vfx.blood(world, global_position, 0.5 + height * 0.25)
 	if leader:
 		Vfx.burst(world, chest(), Color(0.7, 0.2, 1.0), 40)
 
 
-func _enter_door() -> void:
+## Gone from the rules unseen (it died in the step it came): it fades where it stands.
+func vanish() -> void:
+	_state = "dead"
+	_state_t = 3.0
+
+
+func leak() -> void:
+	if not alive():
+		return
 	_state = "door"
 	_state_t = 0.0
 	_anim.speed_scale = 1.0
 	_play("attack")
 	_drop_beam()
-	world.breached(self)
-	Sfx.play("leak")
 	var tw := create_tween()
 	tw.tween_interval(0.6)
 	tw.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.8)
 
 
-# a leader's curse: ponder, chant at the tower that hurts the pack most, and the curse lands on it and its neighbours
-func _ponder() -> void:
-	var best: Tower = null
-	for t in world.towers:
-		if t.removed or t.cursed > 0.0:
-			continue
-		if Vector2(t.global_position.x - global_position.x, t.global_position.z - global_position.z).length() > CURSE_REACH:
-			continue
-		if best == null or t.threat() > best.threat():
-			best = t
-	if best == null:
-		_curse_clock = 1.5
+# -- A leader's curse: it ponders (asks its planner), then chants or marks a spot; the curse lands, breaks or fizzles
+
+func ponder() -> void:
+	if not alive():
 		return
-	_curse_target = best
 	_state = "ponder"
 	_state_t = 0.0
-	_anim.speed_scale = 1.0
 	_play("idle")
 	Vfx.ponder(self)
 	Sfx.play("ponder", chest())
 
 
-func _chant() -> void:
+func chant(curse: String, spot: Vector2i, marking: bool) -> void:
+	if not alive():
+		return
 	_state = "chant"
 	_state_t = 0.0
+	_chant_spot = spot
+	var spec: Dictionary = stats["leader"]
+	_chant_time = float(spec["mark"]) if marking and float(spec["mark"]) > 0.0 else float(spec["channel"])
 	_play("cast")
-	var to := _curse_target.global_position - global_position
+	var at := world.level.tile_pos(spot)
+	var to := at - global_position
 	rotation.y = atan2(-to.x, -to.z)
+	_curse_target = world.tower_at(spot)
+	var radius := (float(world.start["curses"][curse]["radius"]) + float(spec["widen"])) * Level.TILE
+	_drop_beam()
 	var tip := Models.node(_model, "fx_cast")
-	_beam = Vfx.curse_beam(world, tip if tip else self, _curse_target)
-	_curse_target.chanted_at(1.9)
+	if _curse_target:
+		_beam = Vfx.curse_beam(world, tip if tip else self, _curse_target)
+	_circle = Vfx.rune_circle_at(world, at, radius, _chant_time)
 	Sfx.play("chant", chest())
 
 
-func _curse_lands() -> void:
-	for t in world.towers:
-		if not t.removed and t.global_position.distance_to(_curse_target.global_position) <= CURSE_RADIUS:
-			t.curse(CURSE_TIME)
-	Vfx.burst(world, _curse_target.global_position + Vector3(0, 1.0, 0), Color(0.7, 0.2, 1.0), 60)
-	Sfx.play("curse", _curse_target.global_position)
-	world.announce.emit("", "The Fallen Shaman curses the %s." % _curse_target.title())
+func broken() -> void:
+	Vfx.burst(world, chest(), Color(1.0, 0.9, 0.6), 40)
+	_resume()
+
+
+func stop_chant() -> void:
 	_resume()
 
 
 func _resume() -> void:
 	_drop_beam()
+	if not alive():
+		return
 	_state = "walk"
 	_state_t = 0.0
-	_curse_clock = _rng.randf_range(9.0, 13.0)
+	_curse_target = null
 	_play("walk")
 
 
@@ -322,3 +329,6 @@ func _drop_beam() -> void:
 	if is_instance_valid(_beam):
 		_beam.queue_free()
 	_beam = null
+	if is_instance_valid(_circle):
+		_circle.queue_free()
+	_circle = null

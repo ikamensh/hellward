@@ -5,10 +5,12 @@ extends CanvasLayer
 ## Banners, a leader's bar and the chronicle of curses live on a layer of their own (`_over`), so H (toggle) puts
 ## the HUD away and film mode (cinematic) fades it while they stay.
 
-signal slot_pressed(kind: String)
-signal order(name: String)            # "wave", "upgrade", "sell", "cleanse", "pace"
+signal slot_pressed(kind: String)     # a tower kind, "gate", or "spell:<key>"
+signal order(name: String)            # "wave", "upgrade", "sell", "cleanse", "pace", "salvage", "breach:<mode>", "menu"
 
-const SLOTS := ["arrow", "pyre", "frost", "storm"]
+const SPELLS := {"cleanse": "C", "smite": "Q", "meteor": "W", "orb": "E"}
+const SPELL_TONES := {"cleanse": Color(1.0, 0.85, 0.45), "smite": Color(1.0, 0.95, 0.7), "meteor": Color(1.0, 0.45, 0.12),
+	"orb": Color(0.45, 0.7, 1.0)}
 const BAR := Vector2(1240, 112)       # the bottom bar, centred, LIFT px above the screen's edge
 const LIFT := 10.0
 const ORB := 176.0                    # an orb's glass, across
@@ -20,7 +22,8 @@ const INSET := 150.0                  # the bar's ends, under the orbs' frames: 
 const SHADE := 260.0                  # the dark the scene sinks into towards the bar
 const NUMERALS := ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
 const ELEMENT_TONES := {"physical": Color(0.82, 0.76, 0.66), "fire": Color(1.0, 0.55, 0.25),
-	"cold": Color(0.55, 0.8, 1.0), "lightning": Color(0.72, 0.72, 1.0)}
+	"cold": Color(0.55, 0.8, 1.0), "lightning": Color(0.72, 0.72, 1.0), "poison": Color(0.55, 0.9, 0.3),
+	"bone": Color(0.9, 0.86, 0.72), "nature": Color(0.45, 0.85, 0.4)}
 const TONES := {"wave": Color(0.95, 0.76, 0.4), "curse": Color(0.76, 0.42, 1.0),
 	"won": Color(0.86, 0.9, 0.55), "lost": Color(0.88, 0.12, 0.07)}
 
@@ -43,7 +46,15 @@ var _pace: Button
 var _slots := {}
 var _slot_pics := {}
 var _costs := {}
-var _cleanse_slot: Button
+var _slot_keys: Array = []           # the build bar: the towers offered here, then the gate
+var _slot_size := SLOT
+var _spell_slots := {}                # spell -> [Button, veil Label, cost Label]
+var _choices: VBoxContainer           # the breach offer and the salvage held, over the bar
+var _choice_title: Label
+var _choice_line: Label
+var _choice_row: HBoxContainer
+var _salvage_line: Label
+var _salvage_sell: Button
 
 var _banner: Control
 var _banner_smoke: ShaderMaterial
@@ -96,10 +107,22 @@ func title_card(title: String, line: String, hold := 3.0) -> void:
 
 func setup(w: World) -> void:
 	world = w
+	_slot_keys = Array(world.start["arsenal"]["towers"])
+	if world.offers("gate"):
+		_slot_keys.append("gate")
+	_slot_size = min(SLOT, (BAR.x - 2 * INSET - 420.0 - GAP * (_slot_keys.size() - 1)) / max(_slot_keys.size(), 1))
 	world.changed.connect(refresh)
 	world.announce.connect(_announce)
+	world.refused.connect(func(why: String): _chronicle_line(why, Color(1.0, 0.62, 0.45)))
 	_build()
+	if world.demo:
+		_root.get_child(0).visible = true
 	refresh()
+
+
+## The build bar's keys, in the order of the number keys.
+func slots() -> Array:
+	return _slot_keys
 
 
 func _reveal(on: bool, seconds: float) -> void:
@@ -133,6 +156,8 @@ func _build() -> void:
 	_build_bar()
 	_build_orbs()
 	_build_slots()
+	_build_spells()
+	_build_choices(top)
 	_build_info()
 	_build_card()
 	_build_banner(top)
@@ -172,12 +197,13 @@ func _build_orbs() -> void:
 	_life_orb = life[0]
 	_life_text = life[1]
 	_life_text.add_theme_font_size_override("font_size", 46)
-	life[2].tooltip_text = "Life: each monster that reaches the cathedral takes some. None left, and Tristram falls."
+	life[2].tooltip_text = "Life: each monster that reaches the sanctuary takes some. None left, and %s falls." % \
+		world.start["location"]["name"]
 	var mana := _orb(1.0, Color(0.06, 0.16, 0.78), Color(0.45, 0.62, 1.0), "orb_mana_frame")
 	_mana_orb = mana[0]
 	_mana_text = mana[1]
 	_mana_text.add_theme_font_size_override("font_size", 38)
-	mana[2].tooltip_text = "Mana: it wells back slowly. Cleanse spends %d to lift a curse." % int(World.CLEANSE_COST)
+	mana[2].tooltip_text = "Mana: it wells back slowly. Cleanse spends %d to lift a curse." % int(world.spell_cost("cleanse"))
 
 
 ## An orb at one end of the bar (`side` -1 left, 1 right): the glass, its sculpted frame over it, its number.
@@ -213,29 +239,155 @@ func _orb(side: float, liquid: Color, glow: Color, frame: String) -> Array:
 func _build_slots() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", GAP)
-	_pin(row, 0.5, 1.0, Rect2(-BAR.x / 2 + INSET, -LIFT - BAR.y / 2 - SLOT / 2, 5 * SLOT + 4 * GAP, SLOT))
+	var n := _slot_keys.size()
+	_pin(row, 0.5, 1.0, Rect2(-BAR.x / 2 + INSET, -LIFT - BAR.y / 2 - _slot_size / 2, n * _slot_size + (n - 1) * GAP,
+		_slot_size))
 	_root.add_child(row)
-	for i in SLOTS.size():
-		var kind: String = SLOTS[i]
-		var b := _slot(str(i + 1), _portrait(kind, 0, 176, kind == "pyre")[0].get_texture(),
-			"%s (%d): %s" % [Tower.NAMES[kind], i + 1, world.data["towers"][kind]["blurb"]])
+	for i in n:
+		var kind: String = _slot_keys[i]
+		var b: Button
+		if kind == "gate":
+			b = _slot(str(i + 1), _icon("gate"), "Warded Gate (%d): bars an arch; walkers must break it, flyers pass over. "
+				% (i + 1) + "Hold it, then click an arch.")
+		else:
+			var table: Dictionary = world.tower_table(kind)
+			b = _slot(str(i + 1), _portrait(kind, 0, 176, kind == "pyre")[0].get_texture(),
+				"%s (%d): %s" % [table["name"], i + 1, table["blurb"]])
+		b.custom_minimum_size = Vector2(_slot_size, _slot_size)
 		b.pressed.connect(func(): slot_pressed.emit(kind))
 		var cost := _cost(b, _coin_icon(15))
 		_slots[kind] = b
 		_costs[kind] = cost
 		row.add_child(b)
-	_cleanse_slot = _slot("C", load("res://assets/ui/cleanse.png"),
-		"Cleanse (C): lift a curse from the chosen tower. %d mana." % int(World.CLEANSE_COST))
-	_cleanse_slot.pressed.connect(func(): order.emit("cleanse"))
-	var drop := ColorRect.new()
-	var dm := ShaderMaterial.new()
-	dm.shader = preload("res://shaders/orb.gdshader")
-	dm.set_shader_parameter("liquid", Color(0.1, 0.25, 0.9))
-	dm.set_shader_parameter("glow", Color(0.5, 0.7, 1.0))
-	dm.set_shader_parameter("noise", _noise(0.05, 2))
-	drop.material = dm
-	_cost(_cleanse_slot, drop).text = str(int(World.CLEANSE_COST))
-	row.add_child(_cleanse_slot)
+
+
+## The spells offered here, in a row over the bar's right end: Cleanse, then the aimed ones.
+func _build_spells() -> void:
+	var keys := []
+	for key in SPELLS:
+		if world.offers(key):
+			keys.append(key)
+	var size := 66.0
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", GAP)
+	row.alignment = BoxContainer.ALIGNMENT_END
+	var width := keys.size() * size + (keys.size() - 1) * GAP
+	_pin(row, 0.5, 1.0, Rect2(BAR.x / 2 - INSET - width, -LIFT - BAR.y - size - 10, width, size))
+	_root.add_child(row)
+	for key in keys:
+		var spell: Dictionary = world.start["spells"][key]
+		var tip := "%s (%s): %s %d mana." % [spell["name"], SPELLS[key], spell["blurb"], int(world.spell_cost(key))]
+		if float(spell["recharge"]) > 0.0:
+			tip += " Then %d s to gather itself. Not while paused." % int(spell["recharge"])
+		var b := _slot(SPELLS[key], _icon(key), tip)
+		b.custom_minimum_size = Vector2(size, size)
+		if key == "cleanse":
+			b.pressed.connect(func(): order.emit("cleanse"))
+		else:
+			b.pressed.connect(func(): slot_pressed.emit("spell:" + key))
+		var drop := ColorRect.new()
+		var dm := ShaderMaterial.new()
+		dm.shader = preload("res://shaders/orb.gdshader")
+		dm.set_shader_parameter("liquid", Color(0.1, 0.25, 0.9))
+		dm.set_shader_parameter("glow", Color(0.5, 0.7, 1.0))
+		dm.set_shader_parameter("noise", _noise(0.05, 2))
+		drop.material = dm
+		var cost := _cost(b, drop)
+		cost.text = str(int(world.spell_cost(key)))
+		var veil := _label(Style.title_font(), 26, Style.PALE_GOLD)
+		veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		veil.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		veil.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		veil.add_theme_constant_override("outline_size", 8)
+		veil.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
+		b.add_child(veil)
+		_spell_slots[key] = [b, veil, cost]
+		row.add_child(b)
+
+
+## A picture for a slot without a tower portrait: its painted icon if there is one, else a glowing rune disc.
+func _icon(key: String) -> Texture2D:
+	var path := "res://assets/ui/%s.png" % key
+	if ResourceLoader.exists(path):
+		return load(path)
+	var g := Gradient.new()
+	var tone: Color = SPELL_TONES.get(key, Color(0.8, 0.7, 0.55))
+	g.set_color(0, Color(tone * 1.2, 1.0))
+	g.set_color(1, Color(tone * 0.15, 1.0))
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.fill = GradientTexture2D.FILL_RADIAL
+	t.fill_from = Vector2(0.5, 0.5)
+	t.fill_to = Vector2(1.0, 0.5)
+	return t
+
+
+## Over the bar: the sealed side entrance's offer while it stands, the salvage held while there is any.
+func _build_choices(top: Control) -> void:
+	_choices = VBoxContainer.new()
+	_choices.add_theme_constant_override("separation", 6)
+	_choices.alignment = BoxContainer.ALIGNMENT_END
+	_pin(_choices, 0.5, 1.0, Rect2(-330, -LIFT - BAR.y - 250, 660, 236))
+	_choices.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(_choices)
+	_choice_title = _label(Style.title_font(), 26, Style.GOLD)
+	_choice_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_choices.add_child(_choice_title)
+	_choice_line = _label(Style.text_font(), 19, Style.BONE)
+	_choice_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_choice_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_choices.add_child(_choice_line)
+	_choice_row = HBoxContainer.new()
+	_choice_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_choice_row.add_theme_constant_override("separation", 10)
+	_choices.add_child(_choice_row)
+	var breach = world.start["breach"]
+	if breach != null:
+		var cash := _button("Open · +%d gold" % int(world.start["breach_cash"]))
+		cash.pressed.connect(func(): order.emit("breach:cash"))
+		_choice_row.add_child(cash)
+		var trophy := _button("Open · trophy")
+		if breach["claimed"] != null:
+			trophy.text = "Trophy forfeited" if String(breach["claimed"]) == "cash" else "Trophy already claimed"
+			trophy.disabled = true
+		trophy.pressed.connect(func(): order.emit("breach:trophy"))
+		_choice_row.add_child(trophy)
+		var keep := _button("Keep sealed")
+		keep.pressed.connect(func(): order.emit("breach:decline"))
+		_choice_row.add_child(keep)
+	var salvage := HBoxContainer.new()
+	salvage.alignment = BoxContainer.ALIGNMENT_CENTER
+	salvage.add_theme_constant_override("separation", 10)
+	_choices.add_child(salvage)
+	_salvage_line = _caps(14, Style.GOLD)
+	salvage.add_child(_salvage_line)
+	_salvage_sell = _button("Sell 1 for %d gold · V" % int(world.start["salvage_sale_gold"]))
+	_salvage_sell.pressed.connect(func(): order.emit("salvage"))
+	salvage.add_child(_salvage_sell)
+
+
+func _refresh_choices() -> void:
+	var st: Dictionary = world.state
+	var breach = st["breach"]
+	var offered: bool = breach != null and bool(breach["offered"]) and not world.demo
+	_choice_title.visible = offered
+	_choice_line.visible = offered
+	_choice_row.visible = offered
+	if offered:
+		var spec: Dictionary = world.start["breach"]
+		_choice_title.text = "Sealed entrance: %s" % spec["name"]
+		var pack := []
+		for g in spec["pack"]:
+			pack.append("%d %s" % [int(g["count"]), world.monster_table(String(g["kind"]))["name"]])
+		_choice_line.text = "%s\nNext wave: %s (%s) · %s. Clear every side enemy for the chosen reward; a trophy is " % [
+			spec["blurb"], spec["elite_name"], world.monster_table(String(spec["elite"]["kind"]))["name"],
+			", ".join(pack)] + "kept only on victory."
+	var held := int(st["salvage"])
+	_salvage_line.get_parent().visible = held > 0 and world.outcome == ""
+	_salvage_line.text = "Salvage held: %d" % held
+	_salvage_sell.visible = st["break_left"] != null and not world.demo
+	if not _salvage_sell.visible:
+		_salvage_line.text += " · bank on victory, sell at a break"
 
 
 ## A slot: a sunken well with its picture, its key top left.
@@ -299,7 +451,8 @@ func _cost(slot: Button, icon: Control) -> Label:
 
 # the wave, its progress, the gold, the summons and the pace, right of the slots
 func _build_info() -> void:
-	var left := -BAR.x / 2 + INSET + 5 * SLOT + 4 * GAP + 18
+	var n := _slot_keys.size()
+	var left := -BAR.x / 2 + INSET + n * _slot_size + (n - 1) * GAP + 18
 	var right := BAR.x / 2 - INSET - 22   # the angel's wing reaches further in
 	var rule := TextureRect.new()
 	rule.texture = _gradient([[0.0, Color(Style.GOLD, 0.0)], [0.5, Color(Style.GOLD, 0.8)], [1.0, Color(Style.GOLD, 0.0)]], true)
@@ -685,7 +838,7 @@ static func _bounds(root: Node3D) -> AABB:
 
 
 func refresh() -> void:
-	_life_orb.set_shader_parameter("level", float(world.lives) / World.START_LIVES)
+	_life_orb.set_shader_parameter("level", float(world.lives) / world.start_lives)
 	_life_text.text = str(world.lives)
 	_gold.text = str(world.gold)
 	var total: int = world.waves().size()
@@ -702,22 +855,30 @@ func refresh() -> void:
 		for g in world.roster(world.wave):
 			count += int(g["count"])
 		var done: int = world.slain.get(world.wave, 0)
-		_progress.set_shader_parameter("fill", float(done) / count)
-		_progress_text.text = "%d / %d slain" % [done, count]
-	_call.disabled = not world.can_call()
-	for kind in SLOTS:
-		var cost := world.tower_cost(kind, 0)
+		_progress.set_shader_parameter("fill", min(1.0, float(done) / max(count, 1)))
+		_progress_text.text = "%d / %d slain" % [min(done, count), count]
+	_call.disabled = not world.can_call() or world.demo
+	var bonus := int(world.state["early_bonus"])
+	_call.text = "Summon the wave · Space" + ("  +%d" % bonus if bonus > 0 else "")
+	for kind in _slot_keys:
+		var cost := int(world.state["door_cost"]) if kind == "gate" else world.tower_cost(kind)
 		_costs[kind].text = str(cost)
 		var poor: bool = world.gold < cost
 		_costs[kind].add_theme_color_override("font_color", Color(0.9, 0.2, 0.12) if poor else Style.GOLD)
 		_slot_pics[_slots[kind]].modulate = Color(0.62, 0.58, 0.58) if poor else Color.WHITE
+	_refresh_choices()
 	_refresh_card()
 
 
 func _process(delta: float) -> void:
-	_mana_orb.set_shader_parameter("level", world.mana / World.MANA_MAX)
+	_mana_orb.set_shader_parameter("level", world.mana / max(world.mana_max, 1.0))
 	_mana_text.text = str(int(world.mana))
-	_slot_pics[_cleanse_slot].modulate = Color.WHITE if world.mana >= World.CLEANSE_COST else Color(0.62, 0.58, 0.62)
+	for key in _spell_slots:
+		var parts: Array = _spell_slots[key]
+		var left := world.recharge(key)
+		var ready: bool = world.mana >= world.spell_cost(key) and left <= 0.0 and not world.paused
+		_slot_pics[parts[0]].modulate = Color.WHITE if ready else Color(0.5, 0.48, 0.55)
+		parts[1].text = str(ceili(left)) if left > 0.0 else ""
 	if _selected and is_instance_valid(_selected):
 		_refresh_card()
 	if _turning:
@@ -751,35 +912,48 @@ func _refresh_card() -> void:
 		_card_title.text = t.title()
 		for i in 3:
 			_pips[i].bg_color = Style.GOLD if i <= t.rank else Color(0.08, 0.06, 0.05)
-		var element: String = Tower.ELEMENT[t.kind]
+		var element: String = world.tower_table(t.kind)["element"]
 		_card_kind.text = "%s damage · rank %s" % [element, NUMERALS[t.rank]]
 		_card_kind.add_theme_color_override("font_color", ELEMENT_TONES[element])
-		_upgrade.icon = load("res://assets/ui/coin.png") if t.rank < 2 else null
-	var lv := t.level()
-	var up: Dictionary = world.data["towers"][t.kind]["levels"][t.rank + 1] if t.rank < 2 else {}
+		_upgrade.icon = load("res://assets/ui/coin.png") if t.upgrade_cost != null else null
+	var levels: Array = world.tower_table(t.kind)["levels"]
+	var lv: Dictionary = levels[t.rank]
+	var up: Dictionary = levels[t.rank + 1] if t.rank + 1 < levels.size() else {}
 	_stat("damage", "%d" % int(lv["damage"]), "%d" % int(up["damage"]) if up else "")
 	_stat("rate", "%s/s" % String.num(float(lv["rate"]), 2), "%s/s" % String.num(float(up["rate"]), 2) if up else "")
-	_stat("reach", "%.1f" % float(lv["range"]), "%.1f" % float(up["range"]) if up else "")
+	_stat("reach", "%.1f" % t.reach, "%.1f" % float(up["range"]) if up else "")
 	_stat("chill", "%d%%" % int(100 * float(lv["chill"])), "%d%%" % int(100 * float(up["chill"])) if up else "")
 	for l in _stats["chill"]:
-		l.visible = t.kind == "frost"
-	var cursed := t.cursed > 0.0
+		l.visible = float(lv["chill"]) > 0.0
+	var cursed := t.cursed()
 	_curse_box.visible = cursed
 	if cursed:
-		_curse_text.text = "Cursed · blows halved · %d s" % ceili(t.cursed)
-		_curse_bar.set_shader_parameter("fill", t.cursed / Monster.CURSE_TIME)
+		var names := []
+		for c in t.curses:
+			names.append(String(world.start["curses"][c]["name"]))
+		_curse_text.text = "%s · %d s" % [" · ".join(names), ceili(t.curse_left())]
+		var longest := 1.0
+		for c in t.curses:
+			longest = max(longest, float(world.start["curses"][c]["duration"]))
+		_curse_bar.set_shader_parameter("fill", t.curse_left() / longest)
 	_card_iron.set_shader_parameter("curse", 1.0 if cursed else 0.0)
 	_card_style.shadow_color = Color(0.5, 0.12, 0.9, 0.5) if cursed else Color(0, 0, 0, 0.6)
-	if t.rank < 2:
-		var cost := world.tower_cost(t.kind, t.rank + 1)
-		_upgrade.text = "UPGRADE · U   %d" % cost
-		_upgrade.disabled = world.gold < cost
+	if t.upgrade_cost != null:
+		var cost := int(t.upgrade_cost)
+		if t.needs != null:
+			_upgrade.text = "NEEDS A SKILL · K"
+			_upgrade.tooltip_text = "Learn the next rank in the skill tree."
+			_upgrade.disabled = true
+		else:
+			_upgrade.text = "UPGRADE · U   %d" % cost
+			_upgrade.tooltip_text = ""
+			_upgrade.disabled = world.gold < cost or world.demo
 	else:
 		_upgrade.text = "HIGHEST RANK"
 		_upgrade.disabled = true
-	_sell.text = "SELL · S  +%d" % int(t.spent * 0.7)
-	_sell.disabled = cursed
-	_cleanse.disabled = not cursed or world.mana < World.CLEANSE_COST
+	_sell.text = "SELL · S  +%d" % t.refund
+	_sell.disabled = cursed or world.demo
+	_cleanse.disabled = not cursed or world.mana < world.spell_cost("cleanse") or world.demo
 	if not was:
 		_card.modulate.a = 0.0
 		_card.create_tween().tween_property(_card, "modulate:a", 1.0, 0.18)
@@ -800,7 +974,7 @@ func _refresh_leader(delta: float) -> void:
 	var cam := get_viewport().get_camera_3d()
 	var best: Monster = null
 	var score := -1.0
-	for m in world.monsters:
+	for m in world.monsters.values():
 		if m.leader and m.alive() and cam and cam.is_position_in_frustum(m.chest()):
 			var s: float = m.progress + (2.0 if m.casting() >= 0.0 else 0.0)   # a cursing one first, then the foremost
 			if s > score:
@@ -809,7 +983,7 @@ func _refresh_leader(delta: float) -> void:
 	_leader.modulate.a = move_toward(_leader.modulate.a, 1.0 if best else 0.0, delta * 4.0)
 	if best == null:
 		return
-	_leader_name.text = best.stats["name"]
+	_leader_name.text = best.title()
 	_leader_life.set_shader_parameter("fill", best.hp / best.max_hp)
 	var cast := best.casting()
 	var target := best.curse_target()
@@ -825,9 +999,9 @@ func _announce(title: String, line: String) -> void:
 		_chronicle_line(line)
 		return
 	var tone: Color = TONES["wave"]
-	if world.outcome == "won":
+	if world.outcome == "victory":
 		tone = TONES["won"]
-	elif world.outcome == "lost":
+	elif world.outcome == "defeat":
 		tone = TONES["lost"]
 	elif "curse" in (title + line).to_lower():
 		tone = TONES["curse"]
@@ -856,7 +1030,7 @@ func _show_banner(title: String, line: String, tone: Color, hold: float, fade_in
 	_banner_tween.chain().tween_property(_banner, "modulate:a", 0.0, 1.0)
 
 
-func _chronicle_line(text: String) -> void:
+func _chronicle_line(text: String, color := Color(0.82, 0.6, 1.0)) -> void:
 	var back := PanelContainer.new()
 	var sb := StyleBoxTexture.new()
 	sb.texture = _gradient([[0.0, Color(0, 0, 0, 0)], [0.35, Color(0.03, 0.0, 0.06, 0.55)], [1.0, Color(0.03, 0.0, 0.06, 0.7)]], false)
@@ -866,7 +1040,7 @@ func _chronicle_line(text: String) -> void:
 	sb.content_margin_bottom = 4
 	back.add_theme_stylebox_override("panel", sb)
 	back.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var l := _label(Style.text_font(), 22, Color(0.82, 0.6, 1.0))
+	var l := _label(Style.text_font(), 22, color)
 	l.text = text
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	back.add_child(l)

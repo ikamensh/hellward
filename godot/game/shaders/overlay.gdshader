@@ -10,6 +10,7 @@ uniform float curse = 0.0;
 uniform vec3 kind_rim = vec3(0.0);
 uniform float xray = 0.0;
 uniform float moonrim = 0.0;   // a cool rim from above at every distance, so dark bodies keep their shape
+uniform vec3 tint = vec3(0.0);   // a stand-in's colour wash, while its kind borrows another's model
 uniform sampler2D depth_tex : hint_depth_texture, filter_nearest;
 
 void fragment() {
@@ -28,6 +29,7 @@ void fragment() {
 		c += kind_rim * pow(edge, 4.5) * 0.6 * far;
 		float up = clamp((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y * 0.6 + 0.4, 0.0, 1.0);
 		c += vec3(0.32, 0.45, 0.75) * moonrim * rim * up;
+		c += tint * (0.12 + rim * 0.5);
 		ALBEDO = c;
 	}
 }

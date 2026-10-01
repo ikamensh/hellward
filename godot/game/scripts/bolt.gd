@@ -21,12 +21,13 @@ var _streak_width := 0.05            # its half-width at the head, metres
 var _streak_color := Color.WHITE
 
 
-static func launch(world: World, look: String, from: Vector3, at: Monster, metres_per_s: float, hit: Callable) -> Bolt:
+static func launch(world: World, look: String, from: Vector3, at: Monster, metres_per_s: float, hit: Callable,
+		aim := Vector3.ZERO) -> Bolt:
 	var b := Bolt.new()
 	b.target = at
 	b.speed = metres_per_s
 	b.on_hit = hit
-	b._aim = at.chest()
+	b._aim = at.chest() if at else aim
 	world.add_child(b)
 	b.global_position = from
 	b._hist = [[from, 0.0]]

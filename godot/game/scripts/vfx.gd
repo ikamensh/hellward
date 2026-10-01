@@ -246,6 +246,30 @@ static func rune_circle(tower: Node3D, radius: float, seconds: float) -> Node3D:
 	return d
 
 
+## A rune circle growing on the ground at `at` for `seconds`: where a chanted curse will fall.
+static func rune_circle_at(parent: Node, at: Vector3, radius: float, seconds: float) -> Node3D:
+	var root := Node3D.new()
+	parent.add_child(root)
+	root.global_position = at
+	var d := rune_circle(root, radius, seconds)
+	d.tree_exited.connect(root.queue_free)
+	return root
+
+
+## A meteor called down: a fireball falling from high over `at`, landing after `delay` seconds.
+static func meteor(parent: Node, at: Vector3, delay: float) -> void:
+	var rock := Fx.fireball(1.4)
+	parent.add_child(rock)
+	var sky := at + Vector3(-6.0, 34.0, 4.0)
+	rock.global_position = sky
+	var light := Fx.fire_light(6.0, 14.0)
+	rock.add_child(light)
+	var tw := rock.create_tween()
+	tw.tween_property(rock, "global_position", at + Vector3(0, 0.8, 0), delay).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN)
+	tw.tween_callback(rock.queue_free)
+	rune_circle_at(parent, at, 2.8, delay)
+
+
 ## A cursed tower's lasting mark: a dim rune circle turning at its foot and violet light.
 static func curse_mark(tower: Node3D) -> Node3D:
 	var root := Node3D.new()

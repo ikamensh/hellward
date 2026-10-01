@@ -1,40 +1,123 @@
 class_name Level
 extends Node3D
-## The battlefield: the 2D game's grid (game/data/<key>.json) laid out in metres, its floor, its routes as
-## world paths, and the questions the rules ask of it (is a tile buildable, where is a tile).
+## The battlefield: the server's grid (the battle message) laid out in metres, its floor, its routes as world
+## paths, and where a monster stands at a distance `s` along its route. One map tile is TILE metres; a point
+## (x, y) of the rules, in tiles, is (x * TILE, y * TILE) here.
 
 const TILE := 2.0
 const MASK_ORIGIN := Vector2(-24.0, -14.0)   # the floor mask covers the field and its approaches
 const MASK_SIZE := Vector2(116.0, 64.0)
+const APPROACH := 9.0                        # metres from the map's edge to a portal and to the sanctuary's door
 
 var data: Dictionary
+var key := ""
+var theme := ""
 var width: int
 var height: int
 var grid: PackedStringArray
-var routes: Array = []        # Array of PackedVector3Array, portal to sanctuary, in metres
-var portal_pos: Vector3
+var routes: Array = []        # Array of PackedVector3Array, portal to sanctuary, in metres, corners rounded (the look)
+var route_keys: Array = []
+var portal_pos: Vector3       # the first route's portal; `portals` holds every entrance's
+var portals: Array = []       # Vector3, one per entrance
 var door_pos: Vector3
-var occupied: Dictionary = {}  # Vector2i -> true where a tower stands
+var arches: Array = []        # [index, tile Vector2i]: the gate sockets
+var _paths := {}              # route key -> {"pts": PackedVector3Array (the rules' polyline, metres), "cum": lengths}
 var pads: Array = []           # [Vector2 centre, radius, height]: levelled plots for buildings on the slopes
 var _road: PackedFloat32Array   # metres to the nearest route centre line, a sample per metre over the floor mask
 var _hills := FastNoiseLite.new()
 
 
-func load_location(key: String) -> void:
+## Lay out a battle from the server's message (or a location exported to res://data/<key>.json, for previews).
+func load_battle(battle: Dictionary) -> void:
+	data = battle
 	_hills.seed = 7
 	_hills.frequency = 0.012
-	var text := FileAccess.get_file_as_string("res://data/%s.json" % key)
-	data = JSON.parse_string(text)
-	width = int(data["width"])
-	height = int(data["height"])
-	grid = PackedStringArray(data["grid"])
-	var first: Array = data["routes"][0]["points"]
+	key = String(battle["location"]["key"]) if battle.has("location") else String(battle["key"])
+	theme = String(battle["location"]["theme"]) if battle.has("location") else "village"
+	width = int(battle["width"])
+	height = int(battle["height"])
+	grid = PackedStringArray(battle["grid"])
+	var seen := {}
+	for r in battle["routes"]:
+		var pts: Array = r["points"]
+		var entry := Vector2i(int(pts[0][0]), int(pts[0][1]))
+		if not seen.has(entry):
+			seen[entry] = true
+			portals.append(tile_pos(entry) + _outward(entry) * APPROACH)
+	var first: Array = battle["routes"][0]["points"]
 	var last: Array = first[first.size() - 1]
-	portal_pos = tile_pos(Vector2i(first[0][0], first[0][1])) + Vector3(-9.0, 0, 0)
-	door_pos = tile_pos(Vector2i(last[0], last[1])) + Vector3(9.0, 0, 0)
-	for r in data["routes"]:
+	var exit := Vector2i(int(last[0]), int(last[1]))
+	portal_pos = portals[0]
+	door_pos = tile_pos(exit) + _outward(exit) * APPROACH
+	for r in battle["routes"]:
+		route_keys.append(String(r["key"]))
 		routes.append(_route_path(r["points"]))
+		var cum := PackedFloat32Array([0.0])
+		var pts: Array = r["points"]
+		for i in range(1, pts.size()):
+			var a := Vector2(float(pts[i - 1][0]), float(pts[i - 1][1]))
+			cum.append(cum[i - 1] + a.distance_to(Vector2(float(pts[i][0]), float(pts[i][1]))) * TILE)
+		var look: PackedVector3Array = routes[routes.size() - 1]
+		var look_cum := PackedFloat32Array([0.0])
+		for i in range(1, look.size()):
+			look_cum.append(look_cum[i - 1] + look[i].distance_to(look[i - 1]))
+		_paths[String(r["key"])] = {"cum": cum, "look": look, "look_cum": look_cum}
+	for d in battle.get("doors", []):
+		arches.append([int(d["index"]), Vector2i(int(d["tile"][0]), int(d["tile"][1]))])
 	_road = _road_field()
+
+
+func load_location(location: String) -> void:
+	load_battle(JSON.parse_string(FileAccess.get_file_as_string("res://data/%s.json" % location)))
+
+
+## Away from the field, at an edge tile: where its portal or the sanctuary stands.
+func _outward(t: Vector2i) -> Vector3:
+	if t.x <= 0:
+		return Vector3(-1, 0, 0)
+	if t.x >= width - 1:
+		return Vector3(1, 0, 0)
+	if t.y <= 0:
+		return Vector3(0, 0, -1)
+	return Vector3(0, 0, 1)
+
+
+## Where a monster `s` tiles along `route` stands, pushed `lateral` metres to its side: on the route's rounded
+## look, at the same fraction of its length as the rules' polyline (corners are cut a little, never the reach).
+## Below 0 it is still in the portal's approach, past the route's length on the steps to the sanctuary's door.
+func place(route: String, s: float, lateral: float) -> Vector3:
+	var p: Dictionary = _paths[route]
+	var cum: PackedFloat32Array = p["cum"]
+	return _along(p["look"], p["look_cum"], s * TILE / cum[cum.size() - 1], lateral)
+
+
+## A route's length in the rules' tiles.
+func route_length(route: String) -> float:
+	var cum: PackedFloat32Array = _paths[route]["cum"]
+	return cum[cum.size() - 1] / TILE
+
+
+## The route's look from its portal to the sanctuary's door, as a fraction 0..1 of the rules' part of it: the
+## approach from the portal and on to the door lie outside 0..1.
+static func _along(look: PackedVector3Array, lengths: PackedFloat32Array, f: float, lateral: float) -> Vector3:
+	var total := lengths[lengths.size() - 1]
+	# the look includes the approaches: the rules' route spans from APPROACH to total - APPROACH
+	var d: float = APPROACH + f * (total - 2.0 * APPROACH)
+	var i := lengths.bsearch(d) - 1
+	i = clamp(i, 0, look.size() - 2)
+	var seg := lengths[i + 1] - lengths[i]
+	var t: float = 0.0 if seg <= 0.0 else clamp((d - lengths[i]) / seg, 0.0, 1.0)
+	var a := look[i]
+	var b := look[i + 1]
+	var dir := (b - a).normalized()
+	var side := Vector3(-dir.z, 0, dir.x)
+	var squeeze: float = clamp(min(d, total - d) / 8.0, 0.0, 1.0)   # no wandering in a portal's mouth or the door
+	return a.lerp(b, t) + side * lateral * squeeze
+
+
+## A point of the rules, in tiles, on the ground here.
+static func point(xy: Array) -> Vector3:
+	return Vector3(float(xy[0]) * TILE, 0.0, float(xy[1]) * TILE)
 
 
 ## Distance to the nearest route centre line at every metre of the floor mask.
@@ -71,8 +154,9 @@ func cell(t: Vector2i) -> String:
 	return grid[t.y][t.x]
 
 
+## Bare floor: where a tower may stand, as far as the map says (the server decides).
 func buildable(t: Vector2i) -> bool:
-	return cell(t) == "." and not occupied.has(t)
+	return cell(t) == "."
 
 
 func centre() -> Vector3:
@@ -82,9 +166,10 @@ func centre() -> Vector3:
 ## A route through tile centres, led in from the portal and on into the cathedral, its corners rounded.
 func _route_path(points: Array) -> PackedVector3Array:
 	var raw := PackedVector3Array()
-	raw.append(portal_pos)
+	var entry := Vector2i(int(points[0][0]), int(points[0][1]))
+	raw.append(tile_pos(entry) + _outward(entry) * APPROACH)
 	for p in points:
-		raw.append(tile_pos(Vector2i(p[0], p[1])))
+		raw.append(tile_pos(Vector2i(int(p[0]), int(p[1]))))
 	raw.append(door_pos)
 	# Chaikin corner cutting, twice: lanes curve instead of kinking
 	for _pass in 2:

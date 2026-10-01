@@ -17,10 +17,12 @@ static var _log: FileAccess
 static var _frame := 0
 static var _root: Node
 static var _music: AudioStreamPlayer
+static var _music_name := ""
 
 
-static func setup(root: Node, log_path: String) -> void:
-	_root = root
+## Sounds live under the scene tree's root, so music carries across screens. `log_path` records (tools/record.sh).
+static func setup(node: Node, log_path: String) -> void:
+	_root = node.get_tree().root
 	if log_path != "":
 		_log = FileAccess.open(log_path, FileAccess.WRITE)
 
@@ -81,7 +83,7 @@ static func play(cue: String, at = null) -> void:
 		_log.flush()
 
 
-## Play a looping track (title, battle_tristram) in place of the current one, which fades out over `fade` s.
+## Play a looping track (title, battle_<location>, boss) in place of the current one, which fades out over `fade` s.
 static func music(name: String, volume_db := -8.0, fade := 2.0) -> void:
 	_fade_out(fade)
 	var stream: AudioStreamMP3 = load(DIR + "music_" + name + ".mp3")
@@ -91,6 +93,7 @@ static func music(name: String, volume_db := -8.0, fade := 2.0) -> void:
 	_music.volume_db = volume_db
 	_root.add_child(_music)
 	_music.play()
+	_music_name = name
 	_note("music_" + name, volume_db, fade)
 
 
@@ -107,6 +110,16 @@ static func _fade_out(fade: float) -> void:
 		tw.tween_property(old, "volume_db", -60.0, fade)
 		tw.tween_callback(old.queue_free)
 	_music = null
+	_music_name = ""
+
+
+## The track playing (its name), or "" when the music is stopped or fading out.
+static func music_name() -> String:
+	return _music_name if is_instance_valid(_music) else ""
+
+
+static func music_playing() -> bool:
+	return music_name() != ""
 
 
 ## Music changes go in the recording's log as "frame stem gain fade" (tools/mixdown.py).
