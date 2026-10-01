@@ -28,7 +28,7 @@ func _land() -> void:
 		return
 	_done = true
 	var lv: Level = main.level
-	main.rig.glide(lv.centre() + Vector3(2, 0, 3), 0.0, 50.0, 44.0, 3.0)
+	main.rig.glide(lv.centre() + Vector3(2, 0, 3), 0.0, 55.0, 52.0, 3.0)
 	main.hud.cinematic(false, 1.5)
 	get_tree().create_timer(3.0).timeout.connect(func(): main.rig.user_control = true)
 

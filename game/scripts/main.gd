@@ -39,7 +39,7 @@ func _ready() -> void:
 	rig.name = "Camera"
 	add_child(rig)
 	var c := level.centre()
-	rig.snap(c + Vector3(2, 0, 3), 0.0, 50.0, 44.0)
+	rig.snap(c + Vector3(2, 0, 3), 0.0, 55.0, 52.0)
 	world = World.new()
 	world.name = "World"
 	add_child(world)
@@ -75,13 +75,19 @@ func _ready() -> void:
 		_gallery(int(args.get("frames", "40")), args["gallery"].split(","), args["out"])
 
 
-## Save every `every`-th frame of the first `frames` as DIR/NNNNN.jpg, then quit (tools/record.sh).
+## Save every `every`-th frame as DIR/NNNNN.jpg for up to `frames` frames, or until 14 s after the battle ends
+## (the closing shot), then quit (tools/record.sh).
 func _record(frames: int, every: int, dir: String) -> void:
+	var ended := -1
 	for i in frames:
 		Sfx.tick(i)
 		await RenderingServer.frame_post_draw
 		if i % every == 0:
 			get_viewport().get_texture().get_image().save_jpg("%s/%05d.jpg" % [dir, i / every], 0.92)
+		if world.outcome != "" and ended < 0:
+			ended = i
+		if ended >= 0 and i - ended > 14 * 30:
+			break
 	get_tree().quit()
 
 
@@ -113,25 +119,26 @@ func _environment() -> void:
 	var sky := Sky.new()
 	var pano := PanoramaSkyMaterial.new()
 	pano.panorama = load("res://assets/textures/sky.png")
-	pano.energy_multiplier = 0.55
+	pano.energy_multiplier = 0.4
 	sky.sky_material = pano
 	env.sky = sky
 	env.sky_rotation = Vector3(0, deg_to_rad(200), 0)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = 1.0
-	env.ambient_light_sky_contribution = 0.35
-	env.ambient_light_color = Color(0.22, 0.28, 0.45)
+	# a night lit by its fires: dim cold ambient and moon, the exposure carried by the firelit pools
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.13, 0.17, 0.26)
+	env.ambient_light_energy = 0.9
 	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.tonemap_exposure = 1.35
+	env.tonemap_exposure = 1.7
+	env.tonemap_agx_contrast = 1.45
 	env.glow_enabled = true
-	env.glow_intensity = 0.55
+	env.glow_intensity = 0.7
 	env.glow_strength = 1.0
-	env.glow_bloom = 0.04
-	env.glow_hdr_threshold = 1.3
-	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_ADDITIVE
+	env.glow_bloom = 0.0
+	env.glow_hdr_threshold = 1.0
+	env.glow_blend_mode = Environment.GLOW_BLEND_MODE_SCREEN
 	for i in 7:
-		env.set_glow_level(i, [0.0, 1.0, 1.0, 0.6, 0.3, 0.0, 0.0][i])
+		env.set_glow_level(i, [0.0, 0.5, 1.0, 0.8, 0.6, 0.35, 0.0][i])
 	env.ssao_enabled = true
 	env.ssao_radius = 1.2
 	env.ssao_intensity = 2.5
@@ -142,33 +149,87 @@ func _environment() -> void:
 	env.ssil_enabled = true
 	env.ssil_intensity = 1.2
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.05, 0.05, 0.07)
+	env.fog_light_color = Color(0.03, 0.035, 0.05)
 	env.fog_light_energy = 1.0
-	env.fog_density = 0.0025
-	env.fog_sky_affect = 0.15
+	env.fog_density = 0.004
+	env.fog_sky_affect = 0.3
 	env.fog_height = 1.0
 	env.fog_height_density = 0.015
+	# fog the lights glow through, not a grey veil
 	env.volumetric_fog_enabled = true
-	env.volumetric_fog_density = 0.004
-	env.volumetric_fog_albedo = Color(0.45, 0.5, 0.62)
-	env.volumetric_fog_emission = Color(0.012, 0.01, 0.014)
-	env.volumetric_fog_anisotropy = 0.5
-	env.volumetric_fog_length = 140.0
-	env.volumetric_fog_ambient_inject = 0.08
+	env.volumetric_fog_density = 0.007
+	env.volumetric_fog_albedo = Color(0.7, 0.72, 0.8)
+	env.volumetric_fog_emission = Color(0, 0, 0)
+	env.volumetric_fog_anisotropy = 0.6
+	env.volumetric_fog_length = 120.0
+	env.volumetric_fog_ambient_inject = 0.0
+	env.volumetric_fog_gi_inject = 0.0
 	env.adjustment_enabled = true
-	env.adjustment_contrast = 1.08
-	env.adjustment_saturation = 1.1
+	env.adjustment_contrast = 1.0
+	env.adjustment_saturation = 1.05
+	env.adjustment_color_correction = _grade()
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 	var moon := DirectionalLight3D.new()
 	moon.name = "Moon"
-	moon.light_color = Color(0.52, 0.64, 1.0)
-	moon.light_energy = 2.3
+	moon.light_color = Color(0.5, 0.66, 0.9)
+	moon.light_energy = 1.4
 	moon.shadow_enabled = true
 	moon.directional_shadow_max_distance = 140.0
-	moon.light_volumetric_fog_energy = 0.6
+	moon.light_volumetric_fog_energy = 0.2
 	moon.rotation_degrees = Vector3(-58, -150, 0)
 	moon.light_angular_distance = 1.2
-	moon.shadow_opacity = 0.85
+	moon.shadow_opacity = 1.0
 	add_child(moon)
+	_ground_mist()
+	_vignette()
+
+
+## The grade: cool shadows, neutral middle, warm highlights.
+func _grade() -> GradientTexture1D:
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.08, 0.25, 0.5, 0.75, 1.0])
+	g.colors = PackedColorArray([Color(0, 0, 0), Color(0.05, 0.065, 0.085), Color(0.21, 0.235, 0.265),
+		Color(0.51, 0.5, 0.48), Color(0.79, 0.75, 0.69), Color(1.0, 0.97, 0.91)])
+	var t := GradientTexture1D.new()
+	t.gradient = g
+	t.width = 256
+	return t
+
+
+## A low, drifting mist over the field that the fires light from inside.
+func _ground_mist() -> void:
+	var mist := FogVolume.new()
+	mist.size = Vector3(170, 1.6, 120)
+	mist.position = level.centre() + Vector3(0, 0.3, 0)
+	var fm := FogMaterial.new()
+	fm.density = 0.025
+	fm.albedo = Color(0.55, 0.6, 0.7)
+	fm.height_falloff = 1.2
+	fm.edge_fade = 0.3
+	var nt := NoiseTexture3D.new()
+	nt.width = 64
+	nt.height = 16
+	nt.depth = 64
+	nt.seamless = true
+	var fn := FastNoiseLite.new()
+	fn.frequency = 0.05
+	nt.noise = fn
+	fm.density_texture = nt
+	mist.material = fm
+	add_child(mist)
+
+
+## Darkened corners, under the HUD: the eye goes to the middle.
+func _vignette() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = -1
+	var rect := ColorRect.new()
+	rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://shaders/vignette.gdshader")
+	rect.material = m
+	layer.add_child(rect)
+	add_child(layer)

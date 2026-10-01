@@ -81,7 +81,10 @@ func build(lvl: Level, scorch: Array) -> void:
 		light.position = pos + Vector3(0, 4.0, 0)
 		add_child(light)
 	_churchyard()
+	_street_braziers()
+	_walls()
 	_verges(scorch)
+	_ash()
 	_portal()
 	_cathedral()
 	scorch.append([level.portal_pos, 9.0])
@@ -95,7 +98,7 @@ func _burn_prop(pos: Vector3, size: float) -> void:
 	var smoke := Fx.smoke(size, 14.0)
 	smoke.position = pos + Vector3(0, size + 0.5, 0)
 	add_child(smoke)
-	var light := Fx.fire_light(5.0 * size, 8.0 + 2.0 * size)
+	var light := Fx.fire_light(5.0 * size, 8.0 + 2.0 * size, size >= 1.3)   # long tower shadows toward the camera
 	light.position = pos + Vector3(0, 1.5, 0)
 	add_child(light)
 
@@ -127,6 +130,86 @@ func _walls() -> void:
 			var kind := "wall_broken" if rng.randf() < 0.28 else "wall"
 			var node := _place(kind, Vector3(c.x, 0, c.y), float(run[2]) + rng.randf_range(-2.0, 2.0))
 			node.scale.x = a.distance_to(b) / n / 4.0 * (-1.0 if rng.randf() < 0.5 else 1.0)
+
+
+## Ash drifting down over the whole village, swaying, lit by whatever burns near it.
+func _ash() -> void:
+	var p := GPUParticles3D.new()
+	p.amount = 1600
+	p.lifetime = 14.0
+	p.preprocess = 14.0
+	p.local_coords = false
+	var pm := ParticleProcessMaterial.new()
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	pm.emission_box_extents = Vector3(60, 1, 42)
+	pm.direction = Vector3.DOWN
+	pm.spread = 20.0
+	pm.initial_velocity_min = 0.4
+	pm.initial_velocity_max = 0.9
+	pm.gravity = Vector3(0.25, -0.35, 0.1)
+	pm.damping_min = 0.3
+	pm.damping_max = 0.6
+	pm.turbulence_enabled = true
+	pm.turbulence_noise_strength = 1.5
+	pm.turbulence_noise_scale = 6.0
+	pm.turbulence_influence_min = 0.05
+	pm.turbulence_influence_max = 0.12
+	pm.angle_min = 0.0
+	pm.angle_max = 360.0
+	pm.scale_min = 0.6
+	pm.scale_max = 1.4
+	var ramp := Gradient.new()
+	ramp.offsets = PackedFloat32Array([0.0, 0.1, 0.85, 1.0])
+	ramp.colors = PackedColorArray([Color(0.6, 0.58, 0.55, 0.0), Color(0.6, 0.58, 0.55, 0.8),
+		Color(0.5, 0.48, 0.46, 0.7), Color(0.5, 0.48, 0.46, 0.0)])
+	var rt := GradientTexture1D.new()
+	rt.gradient = ramp
+	pm.color_ramp = rt
+	p.process_material = pm
+	var q := QuadMesh.new()
+	q.size = Vector2(0.07, 0.07)
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = Fx.dot_texture()
+	m.vertex_color_use_as_albedo = true
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
+	m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	q.material = m
+	p.draw_pass_1 = q
+	p.position = level.centre() + Vector3(0, 16, 0)
+	p.visibility_aabb = AABB(Vector3(-70, -20, -50), Vector3(140, 40, 100))
+	add_child(p)
+
+
+## Braziers along the streets, alternating sides on the mud verge: the roads the monsters take are pools of
+## firelight in the dark, as the lit paths of a Diablo town.
+func _street_braziers() -> void:
+	var placed: Array = []
+	for route in level.routes:
+		var walked := 0.0
+		var side := 1.0
+		for i in route.size() - 1:
+			var a: Vector3 = route[i]
+			var b: Vector3 = route[i + 1]
+			var seg := a.distance_to(b)
+			var dir := (b - a).normalized()
+			while walked < seg:
+				var at := a + dir * walked + Vector3(-dir.z, 0, dir.x) * side * 2.9
+				walked += 9.0
+				side = -side
+				var t := level.tile_at(at)
+				if at.x < 3.0 or at.x > 63.0 or level.cell(t) != "P" or level.road_distance(at) < 2.7:
+					continue
+				if placed.any(func(q): return (q as Vector3).distance_to(at) < 6.0):
+					continue
+				placed.append(at)
+				var brazier := _place("brazier", at, randf() * 360.0)
+				var coals := Models.node(brazier, "fx_fire_1")
+				coals.add_child(Fx.fire(0.8))
+				var light := Fx.fire_light(9.0, 11.0)
+				light.position = Vector3(0, 0.8, 0)
+				coals.add_child(light)
+			walked -= seg
 
 
 ## The sacked village's leavings on the mud between the streets, where the monsters never walk:
@@ -174,7 +257,7 @@ func _place(model: String, pos: Vector3, facing: float) -> Node3D:
 	node.rotation_degrees.y = facing
 	add_child(node)
 	for fx in node.find_children("fx_light*", "", true, false):
-		(fx as Node3D).add_child(Fx.fire_light(1.2, 6.0))
+		(fx as Node3D).add_child(Fx.fire_light(3.0, 8.0))
 	return node
 
 
@@ -203,11 +286,12 @@ func _cathedral() -> void:
 	node.rotation_degrees.y = 90.0
 	add_child(node)
 	var door := Models.node(node, "fx_door")
-	node.position = level.door_pos - (door.global_position - node.global_position)
+	var offset := door.global_position - node.global_position
+	node.position = level.door_pos - Vector3(offset.x, 0.0, offset.z)   # the door marker sits on the top step
 	footprints.append([node.position, 16.0])
 	var glow := SpotLight3D.new()
 	glow.light_color = Color(1.0, 0.75, 0.45)
-	glow.light_energy = 12.0
+	glow.light_energy = 8.0
 	glow.spot_range = 22.0
 	glow.spot_angle = 38.0
 	glow.shadow_enabled = true
@@ -215,6 +299,15 @@ func _cathedral() -> void:
 	door.add_child(glow)
 	glow.position = Vector3(0, 3.5, 2.5)
 	glow.rotation_degrees = Vector3(-18, 0, 0)
+	# braziers at the foot of the steps and at the forecourt's corners, lighting the west front
+	for at in [Vector2(-4.6, -3.4), Vector2(-4.6, 3.4), Vector2(-11.0, -6.2), Vector2(-11.0, 6.2)]:
+		var pos := level.door_pos + Vector3(at.x, 0.0, at.y)
+		var brazier := _place("brazier", pos, 90.0)
+		var coals := Models.node(brazier, "fx_fire_1")
+		coals.add_child(Fx.fire(0.9))
+		var light := Fx.fire_light(8.0, 12.0, abs(at.x) < 5.0)
+		light.position = Vector3(0, 0.8, 0)
+		coals.add_child(light)
 	for fx in node.find_children("fx_light*", "", true, false):
 		var inside := OmniLight3D.new()
 		inside.light_color = Color(1.0, 0.8, 0.5)
@@ -238,7 +331,7 @@ func _burn(node: Node3D, pos: Vector3) -> void:
 	pall.shape = RenderingServer.FOG_VOLUME_SHAPE_ELLIPSOID
 	pall.size = Vector3(16, 9, 16)
 	var fm := FogMaterial.new()
-	fm.density = 0.08
+	fm.density = 0.035
 	fm.albedo = Color(0.18, 0.16, 0.15)
 	fm.emission = Color(0.9, 0.3, 0.08) * 0.25
 	fm.height_falloff = 0.2
@@ -247,6 +340,6 @@ func _burn(node: Node3D, pos: Vector3) -> void:
 	pall.position = pos + Vector3(0, 8.0, 0)
 	add_child(pall)
 	_burning += 1
-	var light := Fx.fire_light(18.0, 15.0, _burning % 3 == 1)   # shadows from every third fire: each costs six passes
+	var light := Fx.fire_light(11.0, 15.0, _burning % 3 == 1)   # shadows from every third fire: each costs six passes
 	light.position = pos + Vector3(0, 3.5, 3.0 if pos.z < 18.0 else -3.0)
 	add_child(light)

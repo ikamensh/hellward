@@ -1,7 +1,8 @@
 class_name Builder
 extends Node3D
 ## The player's hands: hold a tower (1-4 or a slot) and click buildable ground to raise it; click a tower to
-## choose it, then U upgrades, S sells, C cleanses. Space summons a wave, F doubles the pace, Esc lets go.
+## choose it, then U upgrades, S sells, C cleanses. Space summons a wave, F doubles the pace, H hides the HUD,
+## Esc lets go.
 
 var world: World
 var hud: Hud
@@ -13,7 +14,6 @@ var _ghost: Node3D
 var _ghost_mat: StandardMaterial3D
 var _tile_mark: MeshInstance3D
 var _reach_mark: MeshInstance3D
-var _hover := Vector2i(-99, -99)
 
 
 func setup(w: World, h: Hud, r: CameraRig) -> void:
@@ -98,9 +98,10 @@ func _tile_at(screen: Vector2) -> Vector2i:
 
 
 func _process(_delta: float) -> void:
-	if held == "":
-		return
 	var tile := _tile_at(get_viewport().get_mouse_position())
+	if held == "":
+		_hover(tile)
+		return
 	var ok := world.level.buildable(tile) and world.gold >= world.tower_cost(held, 0)
 	var at := world.level.tile_pos(tile)
 	_ghost.visible = world.level.cell(tile) != "#"
@@ -111,6 +112,17 @@ func _process(_delta: float) -> void:
 	var colour := Color(0.5, 1.0, 0.6, 0.9) if ok else Color(1.0, 0.35, 0.3, 0.9)
 	(_tile_mark.material_override as ShaderMaterial).set_shader_parameter("color", colour)
 	_show_reach(at, float(world.data["towers"][held]["levels"][0]["range"]) * Level.TILE, colour)
+
+
+## With nothing held, the tower under the mouse shows its reach faintly; the chosen tower's stays bright.
+func _hover(tile: Vector2i) -> void:
+	if chosen and is_instance_valid(chosen) and not chosen.removed:
+		return
+	for t in world.towers:
+		if t.tile == tile and not t.removed:
+			_show_reach(t.global_position, t.reach(), Color(1.0, 0.8, 0.45, 0.5))
+			return
+	_reach_mark.visible = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -131,6 +143,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_C: _order("cleanse")
 			KEY_SPACE: _order("wave")
 			KEY_F: _order("pace")
+			KEY_H: hud.toggle()
 			KEY_ESCAPE:
 				let_go()
 				choose(null)

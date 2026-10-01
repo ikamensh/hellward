@@ -110,7 +110,7 @@ func _opening() -> void:
 	tw.tween_callback(func(): main.hud.title_card("Hellward", "Tristram burns", 3.0)).set_delay(0.8)
 	tw.tween_callback(func(): main.hud.title_card("Tristram", "Hold the cathedral until the last wave breaks.", 2.5)).set_delay(6.0)
 	tw.tween_callback(func():
-		rig.glide(lv.centre() + Vector3(2, 0, 3), 0.0, 50.0, 44.0, 4.0)
+		rig.glide(lv.centre() + Vector3(2, 0, 3), 0.0, 55.0, 52.0, 4.0)
 		main.hud.cinematic(false, 2.0)).set_delay(1.5)
 
 
@@ -144,7 +144,7 @@ func _direct(delta: float) -> void:
 	_shot_t = 7.0
 	match _shot:
 		0:
-			rig.glide(world.level.centre() + Vector3(2, 0, 3), 0.0, 50.0, 44.0, 2.5)
+			rig.glide(world.level.centre() + Vector3(2, 0, 3), 0.0, 55.0, 52.0, 2.5)
 		1:
 			var lead := _leading()
 			if lead:

@@ -29,7 +29,7 @@ func build(lvl: Level, keep_clear: Array) -> void:
 		tufts.append(p)
 	for i in 2600:
 		var p := Vector3(_rng.randf_range(area.position.x, area.end.x), 0.0, _rng.randf_range(area.position.y, area.end.y))
-		if not _cleared(p, keep_clear):
+		if not _cleared(p, keep_clear) and _lane_weight(p) < 0.2:   # a stone on the street looks like a monster
 			p.y = level.ground_height(p.x, p.z)
 			stones.append(p)
 	add_child(_tufts(tufts))

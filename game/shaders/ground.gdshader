@@ -69,14 +69,14 @@ void fragment() {
 	// worn streets: patches where the setts are gone, and puddles in the ruts and the mud that catch the fire
 	float n3 = texture(noise, p * 0.06 + 3.1).r;
 	float n4 = texture(noise, p * 0.09 + 7.7).r;
-	float worn = smoothstep(0.76, 0.82, n3 + (0.5 - ch) * 0.15) * lane;
+	float worn = smoothstep(0.82, 0.88, n3 + (0.5 - ch) * 0.15) * lane;
 	float wet = clamp(lane * 0.3 + m.g * (1.0 - lane) * 0.9, 0.0, 1.0) * (1.0 - flag) * (1.0 - hell);
 	float puddle = smoothstep(0.7, 0.74, n4 + (0.5 - ch) * 0.12 * lane) * wet * (1.0 - worn * 0.5);
 	vec3 col = mix(ga, ea, earth);
 	vec3 nrm = mix(gn, en, earth);
-	col = mix(col, ca * vec3(0.9, 0.84, 0.76), lane);
+	col = mix(col, ca * vec3(0.62, 0.58, 0.54), lane);
 	nrm = mix(nrm, cn, lane);
-	col = mix(col, ea * 0.8, worn);
+	col = mix(col, ea * 0.5, worn);
 	nrm = mix(nrm, en, worn);
 	col = mix(col, fa * vec3(0.85, 0.82, 0.78), flag);
 	nrm = mix(nrm, fn, flag);
@@ -88,7 +88,7 @@ void fragment() {
 	ALBEDO = col;
 	nrm = mix(nrm, vec3(0.5, 0.5, 1.0), puddle);
 	NORMAL_MAP = nrm;
-	ROUGHNESS = mix(mix(mix(0.92, 0.75, lane), 0.7, flag), 0.3, puddle);
+	ROUGHNESS = mix(mix(mix(0.92, mix(0.58, 0.82, ch), lane), 0.7, flag), 0.3, puddle);
 	SPECULAR = mix(0.35, 0.25, puddle);
 	// meandering cracks that glow and pulse outward from the gate; ember beds under the burning houses
 	float n5 = texture(noise, p * 0.32 + 9.1).r;

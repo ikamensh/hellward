@@ -138,6 +138,13 @@ func floor_mask(scorch_points: Array) -> ImageTexture:
 	return ImageTexture.create_from_image(img)
 
 
+## The cathedral's steps under a monster walking up to the door: 0 at their foot, 0.54 m at the threshold.
+func step_height(p: Vector3) -> float:
+	if abs(p.z - door_pos.z) > 4.5:
+		return 0.0
+	return clamp((p.x - (door_pos.x - 3.6)) / 3.6, 0.0, 1.0) * 0.54
+
+
 ## How far `p` is from the nearest route's centre line (metres; the streets are about 2.6 m to each side).
 func road_distance(p: Vector3) -> float:
 	var x := int(p.x - MASK_ORIGIN.x)

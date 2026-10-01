@@ -70,7 +70,7 @@ func _dress() -> void:
 	_model = Models.make(model_name)
 	add_child(_model)
 	if kind != "arrow":
-		_model.scale = Vector3.ONE * (1.0 + 0.08 * rank)
+		_model.scale = Vector3.ONE * (1.0 + 0.14 * rank)
 	_turret = Models.node(_model, "turret")
 	_muzzle = Models.node(_model, "fx_muzzle")
 	_crystal = Models.node(_model, "crystal")
@@ -78,31 +78,42 @@ func _dress() -> void:
 	_overlay.shader = preload("res://shaders/overlay.gdshader")
 	for mi in _model.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_overlay = _overlay
-	var lantern := OmniLight3D.new()
-	lantern.light_color = Color(1.0, 0.62, 0.32)
-	lantern.light_energy = 2.4
-	lantern.omni_range = 7.5
-	lantern.position = Vector3(0.9, 2.2, 0.9)
-	_model.add_child(lantern)
+		(mi as MeshInstance3D).layers = 2   # decals (cull_mask 1) never land on a tower
+	if kind == "arrow":   # the others carry their own fire or glow
+		var lantern := OmniLight3D.new()
+		lantern.light_color = Color(1.0, 0.75, 0.45)
+		lantern.light_energy = 1.2 + 0.4 * rank
+		lantern.omni_range = 5.0
+		lantern.position = Vector3(0, 4.2, 0)
+		_model.add_child(lantern)
+	_light = dress_fx(_model, kind, rank)
+	_overlay.set_shader_parameter("curse", 1.0 if cursed > 0.0 else 0.0)
+
+
+## A tower model's own fire and glow: the Pyre's flame, the shrine's and the obelisk's light. The HUD's
+## portraits of the towers wear them too.
+static func dress_fx(model: Node3D, kind: String, rank: int) -> OmniLight3D:
+	var light: OmniLight3D = null
 	match kind:
 		"pyre":
-			var f := Models.node(_model, "fx_fire")
+			var f := Models.node(model, "fx_fire")
 			f.add_child(Fx.fire(0.9 + 0.15 * rank, 1.1))
-			_light = Fx.fire_light(3.0 + rank, 9.0, true)
-			f.add_child(_light)
+			light = Fx.fire_light(3.0 + rank, 9.0, true)
+			f.add_child(light)
 		"frost":
-			_light = OmniLight3D.new()
-			_light.light_color = Color(0.4, 0.7, 1.0)
-			_light.light_energy = 2.0 + 0.5 * rank
-			_light.omni_range = 7.0
-			Models.node(_model, "fx_glow").add_child(_light)
+			light = OmniLight3D.new()
+			light.light_color = Color(0.4, 0.7, 1.0)
+			light.light_energy = 2.0 + 0.5 * rank
+			light.omni_range = 7.0
+			Models.node(model, "fx_glow").add_child(light)
 		"storm":
-			_light = OmniLight3D.new()
-			_light.light_color = Color(0.45, 0.6, 1.0)
-			_light.light_energy = 2.0 + 0.5 * rank
-			_light.omni_range = 8.0
-			(_crystal if _crystal else _muzzle).add_child(_light)
-	_overlay.set_shader_parameter("curse", 1.0 if cursed > 0.0 else 0.0)
+			light = OmniLight3D.new()
+			light.light_color = Color(0.45, 0.6, 1.0)
+			light.light_energy = 2.0 + 0.5 * rank
+			light.omni_range = 8.0
+			var crystal := Models.node(model, "crystal")
+			(crystal if crystal else Models.node(model, "fx_muzzle")).add_child(light)
+	return light
 
 
 func promote() -> void:
@@ -190,26 +201,24 @@ func _fire(target: Monster) -> void:
 	match kind:
 		"arrow":
 			Sfx.play("arrow_cast", _muzzle_pos())
-			Bolt.launch(world, "arrow", _muzzle_pos(), target, speed * 1.4, func(m):
+			Bolt.launch(world, "arrow", _muzzle_pos(), target, speed * 1.4, func(m, at: Vector3):
 				if m:
 					m.hurt(dmg, "physical")
-					Sfx.play("arrow_hit", m.chest())
-				Vfx.impact(world, target.chest() if is_instance_valid(target) else _muzzle_pos(), Color(1.0, 0.85, 0.6), 10))
+					Sfx.play("arrow_hit", at)
+				Vfx.impact(world, at, Color(1.0, 0.85, 0.6), 12))
 			if _turret:
 				var kick := create_tween()
 				kick.tween_property(_turret, "scale", Vector3(1.0, 1.0, 0.92), 0.05)
 				kick.tween_property(_turret, "scale", Vector3.ONE, 0.25)
 		"pyre":
 			Sfx.play("fire_cast", _muzzle_pos())
-			Bolt.launch(world, "fire", _muzzle_pos(), target, speed, func(m):
-				var at: Vector3 = m.chest() if m else _muzzle_pos()
+			Bolt.launch(world, "fire", _muzzle_pos(), target, speed, func(m, at: Vector3):
 				Sfx.play("fireball", at)
 				if m: m.hurt(dmg, "fire")
-				Vfx.explosion(world, at, Color(1.0, 0.45, 0.1)))
+				Vfx.explosion(world, at, Color(1.0, 0.45, 0.1), m != null))
 		"frost":
 			var lv := level()
-			Bolt.launch(world, "frost", _muzzle_pos(), target, speed, func(m):
-				var at: Vector3 = m.chest() if m else _muzzle_pos()
+			Bolt.launch(world, "frost", _muzzle_pos(), target, speed, func(m, at: Vector3):
 				Sfx.play("frost", at)
 				if m:
 					m.hurt(dmg, "cold")

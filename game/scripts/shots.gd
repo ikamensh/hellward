@@ -3,8 +3,8 @@ extends RefCounted
 ## Named camera framings for captures (main.gd `shot=NAME`): the same views every time, to compare looks.
 
 const VIEWS := {
-	"overview": [Vector3(35, 0, 20), 0.0, 50.0, 44.0],
-	"wide": [Vector3(34, 0, 18), 0.0, 52.0, 56.0],
+	"overview": [Vector3(35, 0, 21), 0.0, 55.0, 52.0],
+	"wide": [Vector3(34, 0, 18), 0.0, 52.0, 66.0],
 	"portal": [Vector3(4, 0, 17), 60.0, 30.0, 22.0],
 	"cathedral": [Vector3(66, 0, 19), -70.0, 22.0, 34.0],
 	"lane": [Vector3(26, 0, 16), 20.0, 38.0, 20.0],

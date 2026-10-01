@@ -81,6 +81,29 @@ SINGLE = {
     "scorch_decal": ("A single scorch mark seen straight from above, centred: soft round burnt blackened ground "
                      "with ash flecks and a few glowing orange embers, fading to the edges. Pure white background, "
                      "no text.", "square"),
+    # HUD pieces: painted on flat pure green, which tools/fxsprites.py keys out (game/assets/ui/)
+    "orb_life_frame": ("A single sculpted holder for the round life orb of a gothic dark-fantasy game HUD, seen "
+                       "straight on, centred: a thick circular ring of blackened wrought iron edged with worn old "
+                       "gold, gripped from above by a crouching horned gargoyle demon whose claws curl over the top "
+                       "of the ring, its horns and bat wings rising above; thorns and a small skull on the lower "
+                       "ring. The ring's round opening is about half the image wide. Realistic sculpture, warm light "
+                       "from the upper left. The round opening inside the ring is empty, flat pure green #00FF00, "
+                       "and the whole background around the object is the same flat pure green #00FF00. No cast "
+                       "shadow, no text.", "square"),
+    "orb_mana_frame": ("A single sculpted holder for the round mana orb of a gothic dark-fantasy game HUD, seen "
+                       "straight on, centred: a thick circular ring of carved grey stone edged with worn old gold, "
+                       "held from above by a sorrowing stone angel, hooded head bowed and weeping, its feathered "
+                       "wings folding down around both sides of the ring. The ring's round opening is about half "
+                       "the image wide. Realistic weathered marble sculpture, cool light from the upper right. The "
+                       "round opening inside the ring is empty, flat pure green #00FF00, and the whole background "
+                       "around the object is the same flat pure green #00FF00. No cast shadow, no text.", "square"),
+    "cleanse": ("A single game ability icon, centred, filling most of the square: a small ornate silver reliquary "
+                "cross set with a pale blue gem, wreathed in soft golden-white holy light and a few drifting motes, "
+                "violet wisps of a curse dissolving away from it. Painterly dark-fantasy style. The whole background "
+                "is flat pure green #00FF00. No cast shadow, no text.", "square"),
+    "coin": ("A single old gold coin for a game HUD icon, seen straight on, centred, filling most of the frame: thick, "
+             "worn and slightly irregular, stamped with a radiant sun, a bright rim and warm highlights. The whole "
+             "background is flat pure green #00FF00. No cast shadow, no text.", "square"),
 }
 
 

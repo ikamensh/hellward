@@ -87,10 +87,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP and mb.pressed:
-			distance = max(distance * 0.9, 12.0)
+			distance = max(distance * 0.9, 14.0)
 			_goal = {}
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN and mb.pressed:
-			distance = min(distance * 1.1, 80.0)
+			distance = min(distance * 1.1, 90.0)
 			_goal = {}
 		elif mb.button_index == MOUSE_BUTTON_MIDDLE:
 			_turning = mb.pressed
@@ -106,5 +106,6 @@ func _apply() -> void:
 	var y := deg_to_rad(yaw)
 	var back := Vector3(sin(y) * cos(p), sin(p), cos(y) * cos(p))
 	if cam:
+		cam.fov = lerp(40.0, 30.0, clamp((distance - 16.0) / 40.0, 0.0, 1.0))   # a longer lens far out
 		cam.global_position = target + back * distance
 		cam.look_at(target)

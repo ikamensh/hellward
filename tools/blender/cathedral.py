@@ -3,10 +3,11 @@
 A west tower and spire (28 m) over a deep, splayed portal on the +Y front that stands open and glows from
 within; behind it a nave with a clerestory, lower aisles held by flying buttresses and pinnacled piers, and
 a polygonal apse at the east (-Y) end. Stone walls, slate roofs. Window reveals carry a glowing backing
-(glow_window) and a pane of `stained_glass` whose UVs span 0..1 over the window. `fx_door` marks the
-threshold of the portal.
+(glow_window) and a pane of `stained_glass` whose UVs span 0..1 over the window. The portal stands at the
+head of three broad steps; `fx_door` marks its threshold, on the top step.
 """
 import math
+import random
 import sys
 from pathlib import Path
 
@@ -381,6 +382,8 @@ for normal, (fx, fy) in ((0, (0, T1)), (90, (TW, (T0 + T1) / 2)), (270, (-TW, (T
     parts.append(sill)
 # the portal: a gabled porch before the tower, its arch cut in three stepped orders, a passage to the light
 PW, PSPRING = 3.0, 3.3
+STEP_H, STEP_D, STEP_W = 0.18, 1.2, 9.0   # three steps up to the portal
+LIFT = 3 * STEP_H                          # the threshold's height
 PX = 2.8                 # porch half-width
 P0 = T1 - 0.4            # porch back (inside the tower)
 WALL = 6.3               # porch eaves
@@ -406,9 +409,10 @@ for w, y0, y1 in orders:
     xform(roll, Matrix.Translation((0, min(y0, FRONT) - 0.07, 0)))
     parts.append(roll)
     for sx in (-1, 1):
-        parts.append(lathe([(0, 0), (0.14, 0), (0.14, 0.3), (0.09, 0.38), (0.09, PSPRING - 0.3), (0.15, PSPRING - 0.2),
-                            (0.15, PSPRING), (0, PSPRING)], 8, "stone", "shaft",
-                           loc=(sx * (w / 2 + 0.03), min(y0, FRONT) - 0.22, 0)))
+        sh = PSPRING - LIFT   # standing on the threshold
+        parts.append(lathe([(0, 0), (0.14, 0), (0.14, 0.3), (0.09, 0.38), (0.09, sh - 0.3), (0.15, sh - 0.2),
+                            (0.15, sh), (0, sh)], 8, "stone", "shaft",
+                           loc=(sx * (w / 2 + 0.03), min(y0, FRONT) - 0.22, LIFT)))
 # hood over the outer order, ending on carved stops
 hood = arch_ring(PW + 1.45, PSPRING, 0.16, 0.2, k=1.0, n=12, mat="stone", name="order", bottom=PSPRING - 0.2)
 xform(hood, Matrix.Translation((0, FRONT + 0.06, 0)))
@@ -451,11 +455,11 @@ for sx in (-1, 1):
     parts.append(r)
     course(sx * (PX - 0.05), sx * (PX + 0.2), P0 + 0.4, FRONT, WALL - 0.2, 0.2)
     pier(sx * (PX + 0.1), FRONT - 0.3, 0, [(0.75, 0.75, 3.2, 0, 0.05), (0.6, 0.6, 2.9, 0, 0)], (0.42, 2.5))
-# the light within, the open doors folded back against the passage, a worn threshold
+# the light within, the open doors folded back against the passage, the floor raised to the threshold
 light = flat_poly(arch_outline(PW + 0.1, PSPRING, 1.0, 12, bottom=0.0), T1 - 1.25, "glow_holy", "glow")
 glow.append(light)
 # the light lies across the passage floor too, so it shows from above
-glow.append(box((PW - 0.1, 1.3, 0.02), loc=(0, T1 - 0.62, 0.1), mat="glow_holy", name="glow"))
+glow.append(box((PW - 0.1, 1.3, 0.02), loc=(0, T1 - 0.62, LIFT + 0.02), mat="glow_holy", name="glow"))
 for sx in (-1, 1):
     door = box((0.1, 1.25, PSPRING + 0.6), loc=(sx * (PW / 2 - 0.07), T1 - 0.6, 0), base=True, mat="planks",
                bevel=0.015, name="door")
@@ -463,10 +467,23 @@ for sx in (-1, 1):
     parts.append(door)
     for z in (0.6, 1.9, 3.2):
         parts.append(box((0.04, 1.25, 0.1), loc=(sx * (PW / 2 - 0.13), T1 - 0.6, z), mat="iron", name="door"))
-parts.append(box((PW + 1.6, FRONT - T1 + 1.3, 0.1), loc=(0, (FRONT + T1 - 1.3) / 2, 0), base=True, mat="stone",
+parts.append(box((PW + 1.6, FRONT - T1 + 1.3, LIFT), loc=(0, (FRONT + T1 - 1.3) / 2, 0), base=True, mat="stone",
                  bevel=0.03, name="threshold"))
-parts.append(box((PW + 2.6, 0.8, 0.1), loc=(0, FRONT + 0.4, 0), base=True, mat="stone", bevel=0.03,
-                 name="threshold"))
+# the steps: each a row of slabs, joints broken from step to step, a few millimetres out of level
+rng = random.Random(13)
+for i in range(3):   # 0 is the top step, level with the threshold
+    top = LIFT - i * STEP_H
+    y0, y1 = FRONT - 0.1 + i * STEP_D - (0.3 if i else 0.0), FRONT + (i + 1) * STEP_D
+    bottom = top - STEP_H - 0.1 if i < 2 else -0.1
+    x = -STEP_W / 2
+    while x < STEP_W / 2 - 1e-6:
+        w = rng.uniform(1.0, 1.7)
+        if STEP_W / 2 - x - w < 0.7:
+            w = STEP_W / 2 - x
+        dy, dz = rng.uniform(-0.025, 0.0), rng.uniform(-0.01, 0.004)
+        parts.append(box((w - 0.014, y1 + dy - y0, top + dz - bottom), loc=(x + w / 2, (y0 + y1 + dy) / 2, bottom),
+                         base=True, mat="stone", bevel=0.03, name="step"))
+        x += w
 # string courses between the stages, wrapping the tower
 for z in STAGE[1:3]:
     course(-TW - 0.15, TW + 0.15, T0 - 0.15, T1 + 0.15, z - 0.12, 0.24)
@@ -569,11 +586,12 @@ for i, o in enumerate(parts):
         continue
     uvbox(o, STONE_M, i)
 church = merge(parts + glow, "cathedral")
-# centre the footprint on the origin (y), keeping the door's position known
+# centre the footprint on the origin (y) from the apse to the porch's apron (FRONT + 0.8): the steps run out
+# beyond it, and the door keeps the place the level was laid out for
 ys = [v.co.y for v in church.data.vertices]
-shift = -(max(ys) + min(ys)) / 2
+shift = -(min(ys) + FRONT + 0.8) / 2
 church.data.transform(Matrix.Translation((0, shift, 0)))
-empty("fx_door", (0, FRONT + shift, 0))
+empty("fx_door", (0, FRONT + shift, LIFT))
 empty("fx_light", (0, T1 - 2.0 + shift, 2.5))
 tris = sum(len(f.vertices) - 2 for f in church.data.polygons)
 xs = [v.co.x for v in church.data.vertices]
