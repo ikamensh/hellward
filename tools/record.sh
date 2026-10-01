@@ -16,7 +16,7 @@ tools/godot-capture.sh --path game --fixed-fps 30 res://scenes/capture.tscn -- s
 case "$out" in
   *.mp4)
     uv run --quiet python tools/mixdown.py "$dir" "$(ls "$dir"/*.jpg | wc -l | tr -d ' ')" "$dir/sound.wav" >/dev/null
-    ffmpeg -loglevel error -y -framerate 30 -i "$dir/%05d.jpg" -i "$dir/sound.wav" -c:v libx264 -preset slow -crf 18 \
+    ffmpeg -loglevel error -y -framerate 30 -i "$dir/%05d.jpg" -i "$dir/sound.wav" -c:v libx264 -preset medium -crf 23 \
       -pix_fmt yuv420p -c:a aac -b:a 192k -shortest "$out"
     rm -rf "$dir" ;;
 esac
