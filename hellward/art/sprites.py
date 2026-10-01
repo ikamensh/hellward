@@ -22,7 +22,7 @@ from PIL import Image, ImageFilter, ImageOps
 from saga2d import Game
 from sagaforge import restyle
 
-from hellward.art import figures, mapart, rig, rigged, structures, worldmap
+from hellward.art import figures, mapart, puppet, rig, rigged, structures, worldmap
 from hellward.art.rig import DENSITY
 from hellward.sim.content import MONSTERS
 from hellward.sim.campaign import Location
@@ -229,6 +229,7 @@ class Art:
     monster_painted: dict[str, frozenset[str]]  # registered facing/frame names resolved from paintings
     rigged: frozenset[str]             # kinds with a baked 3D alternative registered
     monster_style: str                 # painted, mixed, or rigged; fixed when the game loads art
+    puppets: frozenset[str] = frozenset()
 
 
 def _cell(canvas: tuple[float, float], origin: tuple[float, float]) -> Cell:
@@ -250,8 +251,8 @@ def register(game: Game, cache_dir: Path) -> Art:
     cache = warm(cache_dir)
     assets = game.assets
     style = os.environ.get("HELLWARD_MONSTER_STYLE", "painted")
-    if style not in {"painted", "mixed", "rigged"}:
-        raise ValueError(f"HELLWARD_MONSTER_STYLE must be painted, mixed, or rigged; got {style!r}")
+    if style not in {"painted", "mixed", "rigged", "puppet"}:
+        raise ValueError(f"HELLWARD_MONSTER_STYLE must be painted, mixed, rigged, or puppet; got {style!r}")
     if procedural():
         style = "painted"
     painted: set[str] = set()
@@ -274,7 +275,7 @@ def register(game: Game, cache_dir: Path) -> Art:
             else:
                 assets.image_from_pil(f"mon/{kind}/{facing}/{frame}", image)
     rigged_kinds: set[str] = set()
-    if style != "painted":
+    if style in {"mixed", "rigged"}:
         for kind in rigged.KINDS:
             layout, images = rigged.load(kind)
             if (layout.cell, layout.origin) != (
@@ -285,6 +286,9 @@ def register(game: Game, cache_dir: Path) -> Art:
             for key, image in images.items():
                 assets.image_from_pil(f"mon3d/{kind}/{key}", image)
             rigged_kinds.add(kind)
+    puppet_kinds = frozenset(puppet.KINDS) if style == "puppet" else frozenset()
+    if puppet_kinds:
+        puppet.register(game, puppet.KINDS)
     towers = _painted_cells("towers")
     for kind in structures.TOWER_KINDS:
         for rank in range(3):
@@ -314,7 +318,7 @@ def register(game: Game, cache_dir: Path) -> Art:
     assets.image_from_pil("worldmap", worldmap.picture(act=1))
     assets.image_from_pil("worldmap-2", worldmap.picture(act=2))
     return Art(cells, _cell(*structures.TOWER_CELL), _cell(*structures.GATE_CELL), _cell(*structures.ARCH_CELL),
-               _cell(*structures.PILLAR_CELL), painted, monster_painted, frozenset(rigged_kinds), style)
+               _cell(*structures.PILLAR_CELL), painted, monster_painted, frozenset(rigged_kinds), style, puppet_kinds)
 
 
 def ground(game: Game, location: Location) -> str:

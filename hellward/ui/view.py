@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 from saga2d import RenderLayer, Scene, Sprite, SpriteAnchor
 
-from hellward.art import figures, rigged, sprites
+from hellward.art import figures, puppet, rigged, sprites
 from hellward.art.fx import ELEMENT_COLORS
 from hellward.art.mapart import THEMES
 from hellward.art.rig import PROJECTION, TILE
@@ -24,6 +24,7 @@ from hellward.sim.content import CURSES, Curse
 from hellward.sim.level import Tile
 from hellward.sim.model import Monster, Tower, World
 from hellward.ui.lighting import Light
+from hellward.ui.puppet import PuppetBody
 
 MAP_X, MAP_Y = 40, 0
 T = TILE
@@ -77,6 +78,7 @@ class Figure:
     dying: float = -1.0     # seconds into its fall, or -1 while alive
     fall: int = 1
     rigged: bool = False
+    puppet: PuppetBody | None = None
 
 
 @dataclass
@@ -214,6 +216,11 @@ class WorldView:
                         bool(random.Random(f"{monster.kind.key}:{monster.id}").getrandbits(1)))))
         family = "mon3d" if use_rigged else "mon"
         sprite = self.scene.add_sprite(placed(f"{family}/{monster.kind.key}/{facing}/walk1", cell, x, y))
+        body = None
+        if monster.kind.key in self.art.puppets:
+            sprite.visible = False
+            body = PuppetBody(self.scene, monster.kind.key, facing)
+            body.walk(facing, monster.s, x, y)
         size = monster.kind.size
         shadow = self.scene.add_sprite(Sprite("fx/shadow", position=(x, y + 2),
                                               size=(T * size * 1.1, T * size * 0.4), layer=RenderLayer.OBJECTS))
@@ -222,7 +229,7 @@ class WorldView:
             aura = self.scene.add_sprite(Sprite("fx/ring/curse", position=(x, y + 1),
                                                 size=(T * 0.9, T * 0.5), layer=RenderLayer.OBJECTS, opacity=150))
         self.figures[monster.id] = Figure(monster, sprite, shadow, monster.s, aura=aura, facing=facing,
-                                          x=x, y=y, rigged=use_rigged)
+                                          x=x, y=y, rigged=use_rigged, puppet=body)
 
     def kill(self, monster_id: int) -> Figure | None:
         figure = self.figures.pop(monster_id, None)
@@ -231,7 +238,8 @@ class WorldView:
         enhanced = figure.monster.kind.key in figures.ENHANCED
         figure.dying = 0.0
         figure.hit_time = -1.0
-        figure.facing = self._monster_facing(figure.monster, figure.monster.s, figure.facing)
+        if figure.puppet is None:
+            figure.facing = self._monster_facing(figure.monster, figure.monster.s, figure.facing)
         figure.fall = 1 if monster_id % 2 else -1
         if enhanced:
             # Death starts at the rules' final position, even when it happened between rendered frames.
@@ -249,6 +257,8 @@ class WorldView:
     def vanish(self, monster_id: int) -> None:
         figure = self.figures.pop(monster_id, None)
         if figure is not None:
+            if figure.puppet is not None:
+                figure.puppet.remove()
             for sprite in (figure.sprite, figure.shadow, figure.aura):
                 if sprite is not None:
                     sprite.remove()
@@ -336,7 +346,16 @@ class WorldView:
             figure.x, figure.y = x, y
             if figure.hit_time < 0:
                 figure.facing = self._monster_facing(m, s, figure.facing)
-            if m.kind.key in figures.ENHANCED:
+            hit = figure.hit_time
+            attack = figure.attack_time if m.door >= 0 else -1.0
+            if figure.puppet is not None:
+                frame = "walk1"
+                if figure.hit_time >= 0:
+                    figure.hit_time += motion_dt
+                    if figure.hit_time >= puppet.HIT_LIFE:
+                        figure.hit_time = -1.0
+                figure.attack_time = figure.attack_time + motion_dt if m.door >= 0 else 0.0
+            elif m.kind.key in figures.ENHANCED:
                 hit_frames = figures.hit_frames(m.kind.key)
                 if figure.hit_time >= 0:
                     frame = hit_frames[min(int(figure.hit_time / HIT_FRAME_DT), len(hit_frames) - 1)]
@@ -364,7 +383,8 @@ class WorldView:
                 frame = figures.WALK[int(s / figures.STRIDE) % 4]
             cell = self.art.monster[m.kind.key]
             sprite = figure.sprite
-            self._show_frame(figure, frame)
+            if figure.puppet is None:
+                self._show_frame(figure, frame)
             sprite.position = (x - cell.origin[0], y_draw - cell.origin[1])
             tint = (1.0, 1.0, 1.0)
             if m.frozen > 0:
@@ -377,6 +397,8 @@ class WorldView:
                 figure.flash -= motion_dt
                 tint = figure.flash_tint
             sprite.tint = tint
+            if figure.puppet is not None:
+                figure.puppet.update(figure.facing, s, x, y_draw, hit=hit, attack=attack, tint=tint)
             figure.shadow.position = (x, y + 2)
             figure.shadow.opacity = 150 if not m.kind.flying else 90
             if figure.aura is not None:
@@ -387,7 +409,12 @@ class WorldView:
                 figure.aura.size = (w, w * 0.5)
         for figure in list(self.dying):
             kind = figure.monster.kind.key
-            if kind in figures.ENHANCED:
+            if figure.puppet is not None:
+                lifetime = puppet.DEATH_LIFE[kind]
+                figure.puppet.update(figure.facing, figure.monster.s, figure.x, figure.y,
+                                     death=figure.dying, fall=figure.fall)
+                figure.shadow.opacity = round(150 * min(1.0, max(0.0, (lifetime - figure.dying) / 0.35)))
+            elif kind in figures.ENHANCED:
                 frame_dt, lifetime = DEATH_TIMING[kind]
                 death_frames = figures.death_frames(kind)
                 frame = death_frames[min(int(figure.dying / frame_dt), len(death_frames) - 1)]
@@ -404,6 +431,8 @@ class WorldView:
             figure.dying += motion_dt
             if figure.dying > lifetime:
                 figure.sprite.remove()
+                if figure.puppet is not None:
+                    figure.puppet.remove()
                 if figure.monster.kind.key in figures.ENHANCED:
                     figure.shadow.remove()
                 self.dying.remove(figure)
