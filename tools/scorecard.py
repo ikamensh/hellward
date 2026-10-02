@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import MONSTERS, SPELLS, TOWERS  # noqa: E402
+from tools.maps import LEAST_CLUSTERED, LEAST_OCCUPIED, MOST_PRIME, survey  # noqa: E402
 
 ATTACKS = ("bolt", "chain", "nova", "venom")   # tower attacks that deal damage; the others are mechanics towers
 
@@ -105,14 +106,31 @@ def tower_kinds() -> list[Result]:
             Result("M6", "share of mechanics towers", f"{share:.0%}", share >= 0.4)]
 
 
+def real_estate() -> list[Result]:
+    """Each map's scarce ground, by tools/maps.py: the worst map against each target."""
+    maps = {key: survey(LOCATIONS[key]) for key in ORDER}
+    occupied = min(maps, key=lambda key: maps[key].occupied_share)
+    crowded = max(maps, key=lambda key: len(maps[key].prime))
+    scattered = min(maps, key=lambda key: maps[key].clustered_share)
+    return [
+        Result("R1", "least occupied ground beside the halls", f"{maps[occupied].occupied_share:.0%} ({occupied})",
+               maps[occupied].occupied_share >= LEAST_OCCUPIED),
+        Result("R1", "most prime cells on a map", f"{len(maps[crowded].prime)} ({crowded})",
+               len(maps[crowded].prime) <= MOST_PRIME),
+        Result("R5", "fewest prime cells near another (maps only)",
+               f"{maps[scattered].clustered_share:.0%} ({scattered})",
+               maps[scattered].clustered_share >= LEAST_CLUSTERED),
+    ]
+
+
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
-    bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, tower_kinds,
+    bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, tower_kinds, real_estate,
 )
 
 NOT_YET = (
     "G1.1", "G1.2", "G1.3", "G1.4", "G1.5", "G1.6", "G2.2", "G2.5", "G2.6", "G3.1", "G3.2", "G3.3", "G3.4",
     "M1", "M2", "M3", "M5", "M7", "M9", "M10", "S2", "S3", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
-    "R1", "R2", "R4", "R5", "R6", "R7", "T2", "T4",
+    "R2", "R4", "R6", "R7", "T2", "T4",
 )
 
 
