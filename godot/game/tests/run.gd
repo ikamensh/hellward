@@ -66,13 +66,18 @@ func seconds(s: float) -> void:
 	await frames(int(s * 30))
 
 
-## Wait up to `limit` seconds of game time for `ready` to hold; whether it did.
+## Wait for `ready` to hold: up to `limit` seconds of game time and, as well, of real time (headless frames can
+## outrun a slow server, a CI runner's); whether it did.
 func until(ready: Callable, limit: float) -> bool:
-	for i in int(limit * 30 / Engine.time_scale) + 1:
-		if ready.call():
-			return true
+	var started := Time.get_ticks_msec()
+	var budget := int(limit * 30 / Engine.time_scale) + 1
+	var i := 0
+	while not ready.call():
+		if i >= budget and Time.get_ticks_msec() - started >= limit * 1000:
+			return false
+		i += 1
 		await frames(1)
-	return ready.call()
+	return true
 
 
 ## Let a battle run until it is decided or `limit` seconds of its own time pass, however slowly the machine steps it.
