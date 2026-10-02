@@ -125,6 +125,10 @@ Smite are learned in the Sorcery column.
   - Act II: the Spider.
   - Only empty cells are blighted, so building early protects a prime cell.
 - **Upgrades:** ranks II and III buy less damage per gold than another rank-I tower, but more per cell.
+- **Proportions and room** *(Ilya, 2026-10-02)*: a tower's reach must look generous beside its body. Towers and
+  monsters may be drawn smaller, and maps may be larger, with more ground to build on, part of it potential ground
+  the player unlocks (cleared boulders, opened plots). Scarcity is about the *prime* cells, not the total ground.
+  Stage 2 fixes the scale (section 20).
 
 ## 10. Towers *(Ilya: both charges and separate towers)*
 
@@ -211,6 +215,9 @@ step:
 
 **The pool.** At least 40 at first, growing to 60 or more through the shop; at least a quarter are enablers, since
 relics are the run's variety. Each relic's counter shows on the selected tower and in a relic bar. It holds:
+- **placement relics** *(Ilya)*: a bonus for a pattern of towers on the map, checked when the pattern stands
+  (for example, an Arrow Tower beside two different magic towers hits ×1.25). They reward where towers stand, and
+  they pull against area curses;
 - **converters** (verb → verb);
 - **counters** ("every 10th Arrow attack deals double");
 - **enablers** (use a kind you have not learned, or a charged ability without its skill);
