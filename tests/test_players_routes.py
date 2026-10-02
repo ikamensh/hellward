@@ -14,7 +14,7 @@ from hellward.sim.players.corner import path_corners, tile_value_for_kind
 from hellward.sim.players.hands import defend
 from hellward.sim.players.ordinary import Ordinary, tile_scores
 from hellward.sim.players.planned import _busy
-from hellward.sim.players.warden import _near, tile_value
+from hellward.sim.players.warden import tile_value
 from hellward.sim.content import MONSTERS
 from tools.campaign_balance import leaders_spawned
 
@@ -65,10 +65,8 @@ def test_players_do_not_confuse_equal_distances_on_different_routes():
     world.monsters.append(side)
 
     assert _busy(world, tower)
-    assert _near(world, 4.5, 1.5, 1.0) == [side]
     world.monsters[:] = [main]
     assert not _busy(world, tower)
-    assert _near(world, 4.5, 1.5, 1.0) == []
 
 
 def test_adaptive_study_keeps_side_entrance_separate_from_main_path():

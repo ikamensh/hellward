@@ -10,21 +10,23 @@ still to come weigh in with the trails their kinds usually walk. Which kinds are
 has replayed the location knows: the panel counts the monsters abroad, and each wave's host comes in the same order
 every time.
 
-From that picture every build and upgrade is priced as the damage it would deal per wave, weighted towards the
+From that picture every build and upgrade is priced as the damage it would deal per wave, each hit felt as the
+rules feel it (:func:`~hellward.sim.content.felt_hit`: protections, vulnerabilities, armor), weighted towards the
 kinds that leak and the leaders, per gold; the best is bought, or saved for. A frost shrine is also priced by
-the damage its chill lets the other towers deal, a plague totem only by the venom that finds room, and an
-upgrade loses what the leaders' curses have been taking from its tower. Gates go into arches the towers watch
+the damage its chill lets the other towers deal, a plague totem only by the venom that finds room, a knife post
+by its doubled knives on the small monsters queued at a gate, a hook tower by the damage the towers standing deal
+the small monsters it drags back under them, and an upgrade loses what the leaders' curses have been taking from
+its tower. Gates go into arches the towers watch
 and back up as soon as the arch is clear. In the last stretch, once the last wave has sent everything, only
 the monsters left are priced, and the towers that will never see a monster again, all of them having walked
 past, are sold to stand where the monsters are going: Azazel dies that way on Hell's Gate.
 
 It also keeps, per kind, the damage a monster takes from anywhere on the path to the sanctuary, so it can tell
 which monster is about to get through. Mana is kept for Smite while leaders walk: a chant at a tower that matters
-is broken (two at once with a Frozen Orb, aimed between where the two stood when their beams appeared), a leader
-Smite can finish is finished, and a monster Smite can stop is stopped. What mana is left goes to the damage that
-saves most lives: Meteor on a thick crowd, a Frozen Orb on a gate about to break (its health bar falling fast) or a
-clump getting through, a Smite on whatever costs many lives, and never a full orb wasting its flow. Cleanse lifts
-the curse costing the most. A break is cut short for its gold when the last wave cost nothing and the mana is in
+dies with its leader when one Smite kills it, a leader Smite can finish is finished, and a monster Smite can stop is
+stopped. What mana is left goes to the damage that saves most lives: Meteor on a thick crowd, a Frozen Orb on a gate
+about to break (its health bar falling fast) or a clump getting through, a Smite on whatever costs many lives, a
+Battle Hymn on the tower doing the most, and never a full orb wasting its flow. A break is cut short for its gold when the last wave cost nothing and the mana is in
 hand.
 
 Its skills come from a themed order of the tree (:data:`ORDERS`), cut to the sigils in hand and to what the
@@ -41,12 +43,12 @@ from pathlib import Path
 
 from hellward.sim.campaign import ORDER, Location
 from hellward.sim.content import (
-    CURSES, MONSTERS, SPELLS, TOWERS, Curse, Element, Group, MonsterKind, TowerLevel,
+    CURSES, MONSTERS, SPELLS, TOWERS, Curse, Element, Group, MonsterKind, TowerLevel, felt_hit,
 )
-from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Refused, Tower, World
+from hellward.sim.model import DOOR_STOP, HOOK_PAST, HOOK_PULL, JOSTLE, KNIFE_STANDING, Monster, Refused, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.players.spacing import max_curse_radius, score_with_spacing
-from hellward.sim.skills import SKILLS, can_learn
+from hellward.sim.skills import PHYSICAL, SKILLS, can_learn
 
 SAMPLE = 0.25          # seconds between two looks at where the monsters are
 THINK = 0.25           # seconds between two decisions about gold
@@ -67,24 +69,24 @@ CALL_MANA = 0.92       # share of a full orb an early call needs in hand
 ELEMENTS = tuple(Element)
 SEVERITY = {Curse.WEAKEN: 1.0 - CURSES[Curse.WEAKEN].damage, Curse.DECREPIFY: 1.0 - CURSES[Curse.DECREPIFY].rate,
             Curse.DIM_VISION: 0.5, Curse.BONE_PRISON: 1.0}
-SMITE_SHARE = 0.04     # a chant at a tower doing this share of the damage is worth a Smite
-CLEANSE_SHARE = 0.15   # a curse on a tower doing this share of the damage is worth a Cleanse
+SMITE_SHARE = 0.04     # a chant at a tower doing this share of the damage is worth a Smite that kills its leader
+HYMN_SHARE = 0.08      # a tower doing this share of the damage, with monsters in reach, is worth a Battle Hymn
+HOOK_TRUST = 1.0       # how far the estimate of a hook's pulls is trusted
 PASSED = 0.5           # a monster presses once it has walked past this share of the towers' fire, and would survive
 CALM = 0.25            # damage to a monster the towers will kill anyway, against one that would get through
 HOLD = 2.0             # a Frozen Orb's worth over its damage: the frozen stay under the towers, a gate stops breaking
 METEOR_WORTH = 3.0     # a Meteor falls unpressed where it would take at least this many times its damage off the pack
 ORB_CROWD = 4          # monsters at a gate about to break that are worth a Frozen Orb
-BOSS = 5               # lives a monster costs that make it worth every spare Smite
 
 PLANS = Path(__file__).parent / "plans" / "adaptive.json"
 ORDERS: dict[str, tuple[str, ...]] = {
     "mixed": ("adept_fire", "adept_cold", "holy_shield", "warmth", "fire_ball", "glacial_spike",
-              "adept_lightning", "chain_lightning", "salvation", "adept_poison", "contagion",
+              "adept_lightning", "chain_lightning", "adept_poison", "contagion",
               "soul_harvest", "master_fire", "master_cold", "master_lightning", "master_poison",
               "thorns", "blaze", "shatter", "static_field", "lower_resist", "spell_mastery",
               "adept_bone", "corpse_explosion", "master_bone", "life_tap",
               "adept_nature", "hurricane", "master_nature", "twister"),
-    "warden": ("holy_shield", "warmth", "adept_cold", "salvation", "adept_fire", "adept_poison",
+    "warden": ("holy_shield", "warmth", "adept_cold", "adept_fire", "adept_poison",
                "adept_lightning", "fire_ball", "glacial_spike", "chain_lightning", "contagion",
                "thorns", "soul_harvest", "master_fire", "master_cold", "master_lightning", "master_poison",
                "adept_bone", "corpse_explosion", "master_bone", "life_tap",
@@ -123,9 +125,11 @@ def useful(location: Location, key: str) -> bool:
     leaders = any(MONSTERS[k].leader is not None for k in location.monsters)
     if skill.column in TOWER_OF:
         return TOWER_OF[skill.column] in arsenal.towers
+    if skill.column == "arrow":
+        return any(kind in arsenal.towers for kind in PHYSICAL)
     if key in ("holy_shield", "thorns"):
         return arsenal.gates
-    if key in ("salvation", "soul_harvest"):
+    if key == "soul_harvest":
         return leaders
     if key == "spell_mastery":
         return any(s in arsenal.spells for s in ("smite", "meteor", "orb"))
@@ -203,6 +207,9 @@ class View:
     venom: list[float]
     poisonable: list[float]
     room: list[float]      # venom darts a second the poisonable monsters here can take before stacks are wasted
+    here: dict[str, list[float]]   # per monster kind: its seconds here times what damage to it is worth
+    small: list[float]     # seconds small monsters spend here
+    pace: list[float]      # seconds a small monster here takes to walk a tile
 
 
 class Adaptive:
@@ -226,6 +233,7 @@ class Adaptive:
         self.cheapest = 0
         self.tower_worth: dict[int, float] = {}
         self.density: dict[tuple[str, int], list[float]] = {}
+        self.felt: dict[tuple[str, float, str, float], int] = {}   # a hit as a monster kind feels it (_felt)
         self.firepower: list[float] = []      # per bin: worth of the damage the towers standing deal there
         self.chilled: list[float] = []        # per bin: the deepest chill a frost shrine lays there
         self.darts: list[float] = []          # per bin: venom darts a second from the totems standing
@@ -355,6 +363,9 @@ class Adaptive:
         venom = [0.0] * bins
         pull = [0.0] * bins          # seconds × life³ of poisonable monsters: who a totem aims at
         poisonable = [0.0] * bins
+        valued: dict[str, list[float]] = {}
+        small = [0.0] * bins
+        tiles = [0.0] * bins         # tiles small monsters walk here: with ``small``, their pace
         for key in study.roster:
             kind: MonsterKind = MONSTERS[key]
             came = picture.came.get(key, 0.0)
@@ -378,11 +389,15 @@ class Adaptive:
             value = (1.0 + LEAKY * leaked) * (LEADER if kind.leader is not None else 1.0)
             size = kind.hp ** 3
             poison = _taken(kind, Element.POISON)
+            valued[key] = [t * value for t in here]
             for b in range(bins):
                 t = here[b]
                 if t <= 0:
                     continue
                 seconds[b] += t
+                if kind.small:
+                    small[b] += t
+                    tiles[b] += t * kind.speed
                 for e in ELEMENTS:
                     worth[e][b] += t * value * _taken(kind, e)
                 if poison > 0:
@@ -401,7 +416,8 @@ class Adaptive:
                 venom[b] = venom[b] / pull[b] * poisonable[b]
         room = [VENOM_ROOM * min(2.0, max(1.0, around[b] * poisonable[b] / seconds[b])) if seconds[b] > 0 else 0.0
                 for b in range(bins)]
-        self.view = View(seconds, near, around, worth, venom, poisonable, room)
+        pace = [small[b] / tiles[b] if tiles[b] > 0 else 0.0 for b in range(bins)]
+        self.view = View(seconds, near, around, worth, venom, poisonable, room, valued, small, pace)
         self.density = {}
         for tower_kind in world.location.arsenal.towers:
             for level, stats in enumerate(world.tower_levels[tower_kind]):
@@ -417,26 +433,44 @@ class Adaptive:
         return 1.0 + (URGENCY + 0.1 * self.lost_last) * (b - start) / (end - start)
 
     def _density(self, world: World, kind: str, stats: TowerLevel, b: int) -> float:
-        """Worth of the damage a tower of this kind and rank deals per wave from one bin of path it reaches."""
-        assert self.view is not None
+        """Worth of the damage a tower of this kind and rank deals per wave from one bin of path it reaches: its hits
+        a second, each as the monsters here feel it, weighted by their seconds here and what hurting them is worth."""
+        assert self.view is not None and self.study is not None
         view = self.view
-        attack = TOWERS[kind].attack
-        dps = stats.damage * stats.rate
+        tower = TOWERS[kind]
+        attack = tower.attack
         around = view.around[b]
-        if attack == "nova":
-            return NOVA_TRUST * dps * view.worth[Element.COLD][b]
         if attack == "venom":
             stacks = min(4.0, stats.poison_time * stats.rate)
             crowd = max(1.0, around * view.poisonable[b] / view.seconds[b])
-            return VENOM_TRUST * (dps + stats.poison * stacks) * view.venom[b] / crowd
-        busy = view.worth[TOWERS[kind].element][b] / around
+            return VENOM_TRUST * (stats.damage * stats.rate + stats.poison * stacks) * view.venom[b] / crowd
+        standing = kind == "knife" and b in self.study.queues   # a knife on a small monster queued at a gate
+        felt = 0.0
+        for key, valued in view.here.items():
+            monster = MONSTERS[key]
+            if valued[b] <= 0 or (attack == "hook" and not monster.small):   # a hook hits only what it hooks
+                continue
+            factor = KNIFE_STANDING if standing and monster.small else 1.0
+            felt += valued[b] * self._felt(kind, stats, monster, factor)
+        hits = stats.rate * felt
+        if attack == "nova":
+            return NOVA_TRUST * hits
+        busy = hits / around
         if attack == "chain":
             reached = min(1.0 + stats.chains, around)
             keeps = world.perks.leap_keeps
-            return dps * busy * sum(keeps ** i * min(1.0, reached - i) for i in range(math.ceil(reached)))
+            return busy * sum(keeps ** i * min(1.0, reached - i) for i in range(math.ceil(reached)))
         if stats.splash > 0:
-            return dps * busy * (1.0 + SPLASH_HIT * min(3.0, (view.near[b] - 1.0) * min(1.0, stats.splash / 1.2)))
-        return dps * busy
+            return busy * (1.0 + SPLASH_HIT * min(3.0, (view.near[b] - 1.0) * min(1.0, stats.splash / 1.2)))
+        return busy
+
+    def _felt(self, kind: str, stats: TowerLevel, monster: MonsterKind, factor: float) -> int:
+        """A hit of this tower kind and rank as a monster of this kind feels it, kept once worked out."""
+        key = (kind, stats.damage, monster.key, factor)
+        found = self.felt.get(key)
+        if found is None:
+            found = self.felt[key] = felt_hit(stats.damage, TOWERS[kind].element, monster, factor)
+        return found
 
     def worth(self, kind: str, level: int, stats: TowerLevel, tile: tuple[int, int], chilled: list[float],
               darts: list[float]) -> float:
@@ -458,8 +492,28 @@ class Adaptive:
             for b, share in cover:
                 value += share * density[b] * min(1.0, max(0.1, (room[b] - darts[b]) / stats.rate))
             return value
+        if TOWERS[kind].attack == "hook":
+            return value + self._pulls(stats, tile, cover, density)
         for b, share in cover:
             value += share * density[b]
+        return value
+
+    def _pulls(self, stats: TowerLevel, tile: tuple[int, int], cover: tuple[tuple[int, float], ...],
+               density: list[float]) -> float:
+        """A hook's worth on a tile: its own hits, and its pulls. Past its spot (each route's point nearest it), it
+        hooks a small monster about as often as one is there to hook; each pull walks that monster HOOK_PULL tiles
+        more under the towers there, which deal it what they deal a monster there in that time."""
+        assert self.study is not None and self.view is not None
+        study, view = self.study, self.view
+        value = 0.0
+        for b, share in cover:
+            start, _ = study.bin_bounds[b]
+            if b - start < study.level.nearest(study.bin_route[b], tile) + HOOK_PAST - 0.5:
+                continue   # before its spot: nothing there is hooked
+            value += share * density[b]
+            if view.seconds[b] > 0:
+                pulls = stats.rate * view.small[b] / view.around[b]
+                value += HOOK_TRUST * share * pulls * HOOK_PULL * view.pace[b] * self.firepower[b] / view.seconds[b]
         return value
 
     def _price(self, world: World) -> None:
@@ -533,19 +587,20 @@ class Adaptive:
         study, view = self.study, self.view
         assert study is not None and view is not None
         bins = study.bins
-        hurt = {e: [0.0] * bins for e in ELEMENTS}
-        for t in world.towers.values():
-            stats = t.stats
-            dps = stats.damage * stats.rate
-            if t.kind.attack == "venom":
-                dps += stats.poison * min(4.0, stats.poison_time * stats.rate)
-            for b, share in study.cover(t.tile, stats.range):
-                hurt[t.kind.element][b] += share * dps
         gates = [d for d in world.doors if d.built]
         self.ahead = {}
         for key in study.roster:
             kind = MONSTERS[key]
-            taken = {e: _taken(kind, e) for e in ELEMENTS}
+            hurt = [0.0] * bins   # what the towers deal a monster of this kind a second, as it feels their hits
+            for t in world.towers.values():
+                stats = t.stats
+                if t.kind.attack in ("aura", "amplify"):
+                    continue
+                dps = self._felt(t.kind.key, stats, kind, 1.0) * stats.rate
+                if t.kind.attack == "venom":
+                    dps += stats.poison * min(4.0, stats.poison_time * stats.rate) * kind.taken(Element.POISON)
+                for b, share in study.cover(t.tile, stats.range):
+                    hurt[b] += share * dps
             dwell = [1.0 / kind.speed] * bins
             if not kind.flying:
                 for d in gates:
@@ -556,7 +611,7 @@ class Adaptive:
                 total = 0.0
                 start, end = study.bounds(route.key)
                 for b in range(end - 1, start - 1, -1):
-                    total += dwell[b] * sum(hurt[e][b] * taken[e] for e in ELEMENTS) / view.around[b] ** 0.5
+                    total += dwell[b] * hurt[b] / view.around[b] ** 0.5
                     ahead[b] = total
             self.ahead[key] = ahead
 
@@ -571,7 +626,7 @@ class Adaptive:
         assert self.study is not None
         ahead = self.ahead[m.kind.key]
         passed = ahead[self.study.bin(m.s, m.route)] <= PASSED * ahead[self.study.bin(0.0, m.route)]
-        return self.threat(m) > 0 and (passed or m.kind.lives >= BOSS)
+        return self.threat(m) > 0 and (passed or m.kind.boss)
 
     # -- Gold ----------------------------------------------------------------------------------------
 
@@ -650,8 +705,8 @@ class Adaptive:
 
     def _spells(self, hands: Hands) -> None:
         world = hands.world
-        if "cleanse" in world.location.arsenal.spells:
-            self._cleanse(hands)
+        if world.monsters:
+            self._hymn(hands)
         if world.time - self.aimed_at < self.aim_gap - 1e-9 or not world.monsters:
             return
         if self._answer(hands) or self._strike(hands):
@@ -673,35 +728,27 @@ class Adaptive:
         return ready(world, spell)
 
     def _answer(self, hands: Hands) -> bool:
-        """The leaders first: a Frozen Orb on two chants at once, a Smite on a chant at a tower that matters, a Smite
-        that finishes a leader, and a Smite that stops a monster getting through."""
+        """The leaders first: a Smite that kills a leader chanting at a tower that matters (its curse dies with it),
+        a Smite that finishes a leader, and a Smite that stops a monster getting through."""
         world = hands.world
-        chants = [(sign, world.monster(sign.leader)) for sign in hands.threats() if sign.kind == "chant"]
-        chants = [(sign, m) for sign, m in chants if m is not None]
-        if len(chants) >= 2 and self._can(world, "orb"):
-            radius = SPELLS["orb"].radius
-            for i, (a, _) in enumerate(chants):
-                for b, _ in chants[i + 1:]:
-                    if _dist(a.at, b.at) <= radius:
-                        hands.orb((a.at[0] + b.at[0]) / 2, (a.at[1] + b.at[1]) / 2)
-                        return True
         if not self._can(world, "smite"):
             return False
         full = world.mana >= world.mana_max - 5
-        for sign, m in chants:
-            if sign.curse is not None:
-                share = sum(self._share(t.id) for t in world.caught(sign.spot, sign.radius))
-                if share * SEVERITY[sign.curse] >= SMITE_SHARE or full:
-                    hands.smite(m.id)
-                    return True
         blow = SPELLS["smite"].damage * world.power()
+        for sign in hands.threats():
+            m = world.monster(sign.leader)
+            if sign.kind != "chant" or m is None or sign.curse is None or m.hp > felt_hit(blow, None, m.kind):
+                continue
+            share = sum(self._share(t.id) for t in world.caught(sign.spot, sign.radius))
+            if share * SEVERITY[sign.curse] >= SMITE_SHARE or full:
+                hands.smite(m.id)
+                return True
         for m in world.leaders():
-            assert m is not None
-            if m.hp <= blow:
+            if m.hp <= felt_hit(blow, None, m.kind):
                 hands.smite(m.id)
                 return True
         assert self.study is not None
-        rescue = [m for m in world.monsters if 0 < self.threat(m) <= blow
+        rescue = [m for m in world.monsters if 0 < self.threat(m) <= felt_hit(blow, None, m.kind)
                   and world.remaining(m) < world.level.route(m.route).length * 0.5]
         if rescue:
             hands.smite(max(rescue, key=lambda m: (m.kind.lives, -world.remaining(m))).id)
@@ -767,7 +814,7 @@ class Adaptive:
             got = raw = 0.0
             for m, where in ahead:
                 if _dist(where, at) <= radius:
-                    hurt = min(m.hp, blow * max(0.0, m.kind.taken(element)))
+                    hurt = min(m.hp, felt_hit(blow, element, m.kind))
                     raw += hurt
                     got += hurt * weight(m)
             if got > best:
@@ -785,24 +832,19 @@ class Adaptive:
                 return world.position(batterers[0])
         return None
 
-    def _cleanse(self, hands: Hands) -> None:
+    def _hymn(self, hands: Hands) -> None:
+        """Battle Hymn on the tower doing the most, while monsters are in its reach and the leaders' Smite stays in
+        hand; any tower with work when the orb is full."""
         world = hands.world
-        cost = world.spell_cost("cleanse")
-        if world.mana < cost:
+        if not self._can(world, "hymn") or world.mana - self._reserve(world) < world.spell_cost("hymn"):
             return
-        best, best_harm = None, 0.0
+        best, best_share = None, 0.0
         for t in world.towers.values():
-            if not t.curses:
-                continue
-            left = max(t.curses.values())
-            if left < 2.5:
-                continue
-            harm = self._share(t.id) * max(SEVERITY[c] for c in t.curses) * left / 8.0
-            if harm > best_harm and any(world.in_reach(t, m.s, m.route) for m in world.monsters):
-                best, best_harm = t, harm
-        spare = world.mana - cost - self._reserve(world) * 0.5
-        if best is not None and (best_harm >= CLEANSE_SHARE and spare >= 0 or world.mana >= world.mana_max - 5):
-            hands.cleanse(best.id)
+            share = self._share(t.id)
+            if share > best_share and not t.silenced and any(world.in_reach(t, m.s, m.route) for m in world.monsters):
+                best, best_share = t, share
+        if best is not None and (best_share >= HYMN_SHARE or world.mana >= world.mana_max - 5):
+            hands.hymn(best.id)
 
 
 def _taken(kind: MonsterKind, element: Element) -> float:
@@ -850,6 +892,7 @@ class Study:
         self.routes = level.routes
         self.route_bounds: dict[str, tuple[int, int]] = {}
         self.bin_bounds: list[tuple[int, int]] = []
+        self.bin_route: list[str] = []
         self.centres: list[tuple[float, float]] = []
         for route in self.routes:
             start = len(self.centres)
@@ -857,6 +900,7 @@ class Study:
             end = start + count
             self.route_bounds[route.key] = start, end
             self.bin_bounds.extend([(start, end)] * count)
+            self.bin_route.extend([route.key] * count)
             self.centres.extend(route.point(min(route.length, s + 0.5)) for s in range(count))
         self.bins = len(self.centres)
         self.tiles = [(x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y)]
@@ -894,9 +938,9 @@ class Study:
                         seconds[self.bin(s - DOOR_STOP - JOSTLE / 2, route.key)] += QUEUE_GUESS * share
             self.guess[key] = seconds
         self.guess_seconds = [sum(self.guess[k][b] for k in self.roster) for b in range(self.bins)]
-        queues = {b for bins in self.queue_bins.values() for b in bins} if gates else set()
-        self.guess_near = [4.0 if b in queues else 1.5 for b in range(self.bins)]
-        self.guess_around = [5.0 if b in queues else 3.0 for b in range(self.bins)]
+        self.queues: set[int] = {b for bins in self.queue_bins.values() for b in bins} if gates else set()
+        self.guess_near = [4.0 if b in self.queues else 1.5 for b in range(self.bins)]
+        self.guess_around = [5.0 if b in self.queues else 3.0 for b in range(self.bins)]
 
     def spawn_routes(self, kind: str, authored: str) -> tuple[str, ...]:
         if MONSTERS[kind].movement != "wander":

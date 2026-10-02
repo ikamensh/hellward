@@ -100,21 +100,18 @@ def test_bone_prison_does_not_catch_a_diagonal_neighbour():
     assert [e for e in world.events if e[0] == "fizzle"] == [("fizzle", lid, CENTRE)]
 
 
-def test_a_warded_tower_is_spared_and_the_curse_counts_once():
+def test_every_tower_in_the_circle_is_cursed_and_the_curse_counts_once():
     world = world_with_leader("shaman")
     tiles = [CENTRE, (CENTRE[0] + 1, CENTRE[1]), (CENTRE[0], CENTRE[1] + 1)]
     for tile in tiles:
         world.build("pyre", tile)
-    warded = world.tower_at(CENTRE)
-    warded.ward = 8.0
+    world.tower_at(CENTRE).hymn = 4.0   # a hymned tower is no exception
     lid = leader_id(world, "shaman")
     park(world, lid, CENTRE)
     world.events.clear()
     world._land(lid, Curse.WEAKEN, CENTRE)
-    assert not warded.curses
-    others = sorted(t.id for t in world.towers.values() if t is not warded)
-    assert cursed_events(world) == [("cursed", lid, CENTRE, Curse.WEAKEN, tuple(others))]
-    assert [e for e in world.events if e[0] == "ward_holds"] == [("ward_holds", lid, warded.id, Curse.WEAKEN)]
+    assert all(Curse.WEAKEN in t.curses for t in world.towers.values())
+    assert cursed_events(world) == [("cursed", lid, CENTRE, Curse.WEAKEN, tuple(sorted(world.towers)))]
     assert world.curses_landed == 1
 
 
@@ -175,15 +172,14 @@ def test_frost_chill_follows_cold_resistance():
     assert fallen.chill_left > 0 and skeleton.chill_left > 0
 
 
-def test_a_cold_immune_monster_is_not_chilled_at_all():
-    world, _, s = chill_world()
-    immune = replace(MONSTERS["fallen"], key="icebound", name="Icebound", resist={Element.COLD: 1.0})
-    monster = chill_monster(world, s, immune, 103)
+def test_a_cold_vulnerable_monster_is_chilled_deeper():
+    world, tower, s = chill_world()
+    brittle = replace(MONSTERS["fallen"], key="brittle", name="Brittle", vulnerable=(Element.COLD,))
+    monster = chill_monster(world, s, brittle, 103)
     while not any(e[0] == "impact" for e in world.events):
         world.step(SIM_DT)
         assert world.time < 2
-    assert monster.chill == 0.0
-    assert monster.chill_left == 0.0
+    assert monster.chill == pytest.approx(tower.stats.chill * 1.25)
 
 
 def test_the_planner_prefers_the_spot_whose_circle_holds_more_working_towers():

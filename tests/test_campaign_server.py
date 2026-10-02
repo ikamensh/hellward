@@ -143,8 +143,8 @@ def test_what_a_location_does_not_offer_or_has_not_reached_is_refused_with_why(d
         c.request("defend", location="tristram")
         with pytest.raises(Refused, match="Not in Tristram: it arrives in the Cathedral"):
             c.order("build", kind="pyre", tile=lane_side(c.request("defend", location="tristram")["grid"], 1)[0])
-        with pytest.raises(Refused, match="Smite is not yet yours"):
-            c.order("smite_threat")
+        with pytest.raises(Refused, match="Battle Hymn is not yet yours: you learn it for the Graveyard"):
+            c.order("hymn", tower=0)
 
 
 def test_the_tree_learns_what_free_sigils_pay_for_says_why_not_and_unlearns_for_free(data):
@@ -152,7 +152,7 @@ def test_the_tree_learns_what_free_sigils_pay_for_says_why_not_and_unlearns_for_
     with Client(data) as c:
         tree = c.request("skills")
         assert tree["sigils"] == 3 and tree["free"] == 3 and not tree["any"]
-        with pytest.raises(Refused, match="needs Adept of Arrows first"):
+        with pytest.raises(Refused, match="needs Adept of Steel first"):
             c.request("learn", key="master_arrow")
         tree = c.request("learn", key="adept_arrow")
         assert tree["free"] == 3 - SKILLS["adept_arrow"].cost and tree["any"]
@@ -177,31 +177,26 @@ def test_a_skill_learned_later_is_dormant_at_an_earlier_location_and_counted_as_
         assert waste is not None and "sigils sit in skills that do nothing here" in waste
 
 
-def test_q_smites_the_leader_closest_to_cursing_and_no_spell_is_cast_while_paused(data):
+def test_hymn_quickens_the_tower_it_is_cast_on_and_no_spell_is_cast_while_paused(data):
     campaign(data, won={"tristram": 3})
     with Client(data) as c:
         start = c.request("defend", location="graveyard")
-        assert "smite" in start["arsenal"]["spells"]
-        for tile in lane_side(start["grid"], 6):
-            try:
-                c.order("build", kind="arrow", tile=tile)
-            except Refused:
-                break
-        broke = None
-        while broke is None:
-            last = c.advance(1)[-1]
-            assert last["state"]["outcome"] is None, "a leader cursed before the defence ended"
-            if last["state"]["can_call"]:
-                c.order("call_wave")
-            leaders = [m for m in last["monsters"] if m[3] & 3 and not m[3] & 12]   # pondering or chanting, breakable
-            if leaders and last["state"]["mana"] >= last["state"]["spell_cost"]["smite"] \
-                    and not last["state"]["recharge"].get("smite"):
-                events = [e for f in c.order("smite_threat") for e in f["events"]]
-                broke = events
-        assert [e[0] for e in broke][:2] == ["smite", "broken"]
+        assert {"smite", "hymn"} <= set(start["arsenal"]["spells"]) and "cleanse" not in start["spells"]
+        tile = lane_side(start["grid"], 1)[0]
+        tower = c.order("build", kind="arrow", tile=tile)[-1]["towers"][0]
+        with pytest.raises(Refused, match="That tower is gone"):
+            c.order("hymn", tower=tower[0] + 1)
+        last = c.advance(1)[-1]
+        while last["state"]["mana"] < last["state"]["spell_cost"]["hymn"]:
+            last = c.advance(20)[-1]
+        frame = c.order("hymn", tower=tower[0])[-1]
+        assert ["hymn", tower[0]] in frame["events"]
+        assert frame["state"]["mana"] == pytest.approx(last["state"]["mana"] - last["state"]["spell_cost"]["hymn"])
+        assert frame["towers"][0][4] == start["spells"]["hymn"]["lasting"] > 0, "the tower carries Hymn's seconds"
+        assert 0 < c.advance(20)[-1]["towers"][0][4] < frame["towers"][0][4]
         c.order("pause", paused=True)
         with pytest.raises(Refused, match="resume it first"):
-            c.order("smite_threat")
+            c.order("smite", monster=0)
 
 
 def test_a_breach_is_offered_chosen_and_a_forfeited_trophy_stays_forfeited(data):

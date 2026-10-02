@@ -151,7 +151,7 @@ def upgrade(_: int) -> np.ndarray:
     return room(mix(*notes, (0.22, noise(0.5, 5000, 11000, attack=0.05, tau=0.15, seed=3) * 0.08)), 1.4, 0.3, seed=1)
 
 
-def cleanse(_: int) -> np.ndarray:
+def holy(_: int) -> np.ndarray:
     """Holy light: a bright glass cluster over a soft sung ``ah`` in A major, shimmering up."""
     bells = [(i * 0.04, inst.chime(f, 1.2) * 0.5) for i, f in enumerate(("A5", "C#6", "E6", "A6", "C#7"))]
     voices = mix(*(inst.choir(f, 1.1, attack=0.08, seed=i) * 0.35 for i, f in enumerate(("A4", "E5", "C#5"))))
@@ -258,6 +258,50 @@ def frost(take: int) -> np.ndarray:
     return mix(burst * 0.45, air * 0.35, (0.01, shimmer * 0.5), (0.02, pieces.take("ice_shatter", take, 0.55)))
 
 
+def ballista_cast(take: int) -> np.ndarray:
+    """The heavy arms thrown forward: a deep string slapping free, the frame knocking against its stops."""
+    length = 0.3
+    string = glide(260 + 18 * take, 85, length, partials=((1, 1.0), (2, 0.45), (3, 0.25), (4, 0.1)), seed=740 + take)
+    string *= np.exp(-seconds(length) / 0.06)
+    frame = mix(thump(240, 80, 0.25, attack=0.001, tau=0.05), (0.04, thump(180, 70, 0.2, attack=0.001, tau=0.04) * 0.6))
+    rush = noise(0.22, 300, 2500, attack=0.01, tau=0.06, seed=750 + take)
+    return mix(string * 0.5, frame * 0.6, rush * 0.2)
+
+
+def ballista_hit(take: int) -> np.ndarray:
+    """An iron-headed bolt driven home: a heavy blunt strike and the shaft shuddering."""
+    blow = thump(380 + 30 * take, 95, 0.25, attack=0.0005, tau=0.05)
+    shudder = glide(170, 120, 0.2, partials=((1, 1.0), (2, 0.3)), vibrato=(38, 0.06), seed=760 + take)
+    shudder *= np.exp(-seconds(0.2) / 0.06)
+    crack = noise(0.12, 600, 4500, attack=0.0005, tau=0.02, seed=770 + take)
+    return mix(blow * 0.7, crack * 0.35, (0.01, shudder * 0.3))
+
+
+def knife_cast(take: int) -> np.ndarray:
+    """A knife leaving the hand, whirring end over end as it goes."""
+    length = 0.24
+    t = seconds(length)
+    whirr = noise(length, 1400, 7000, attack=0.01, tau=length, seed=780 + take) * (0.4 + 0.6 * np.abs(np.sin(2 * np.pi * (26 + 3 * take) * t)))
+    return mix(whirr * shape(length, 0.04, 0.12), thump(900, 500, 0.05, attack=0.0005, tau=0.01) * 0.25)
+
+
+def knife_hit(take: int) -> np.ndarray:
+    """A blade biting home: a short bright tick of steel and a dull thud."""
+    steel = tone(2400 + 200 * take, 0.12, attack=0.0005, tau=0.025, partials=((1, 1.0), (2.76, 0.4), (5.4, 0.2)))
+    return mix(steel * 0.4, thump(420, 160, 0.1, attack=0.0005, tau=0.02) * 0.6,
+               noise(0.06, 2000, 9000, attack=0.0005, tau=0.01, seed=790 + take) * 0.3)
+
+
+def hook(take: int) -> np.ndarray:
+    """A hook thrown on its chain: the links rattling out, the bite, and the haul scraping back."""
+    rattle = sputter(0.3, 2200, 8000, rate=110, seed=800 + take) * shape(0.3, 0.02, 0.1)
+    bite = mix(tone(1150 + 80 * take, 0.25, attack=0.0005, tau=0.05, partials=((1, 1.0), (2.4, 0.5), (4.1, 0.25))),
+               thump(300, 110, 0.15, attack=0.0005, tau=0.03))
+    haul = mix(noise(0.4, 180, 1400, attack=0.04, tau=0.2, seed=810 + take) * 0.6,
+               sputter(0.4, 1500, 6000, rate=60, seed=820 + take) * shape(0.4, 0.05, 0.2) * 0.5)
+    return mix(rattle * 0.6, (0.13, bite * 0.6), (0.18, haul))
+
+
 def venom_cast(take: int) -> np.ndarray:
     """A wet spit and bubbles rising off it."""
     rng = np.random.default_rng(500 + take)
@@ -318,7 +362,7 @@ def fizzle(_: int) -> np.ndarray:
 
 def smite(take: int) -> np.ndarray:
     """Holy lightning from the vault: the thunder crack, a deep blow under it, a bright sung chord blooming over it."""
-    return mix(lightning(take) * 0.9, (0.01, thump(110, 38, 0.7, attack=0.001, tau=0.16) * 0.6), (0.05, cleanse(0) * 0.55))
+    return mix(lightning(take) * 0.9, (0.01, thump(110, 38, 0.7, attack=0.001, tau=0.16) * 0.6), (0.05, holy(0) * 0.55))
 
 
 def meteor_fall(_: int) -> np.ndarray:
@@ -342,17 +386,18 @@ def orb(take: int) -> np.ndarray:
                (0.08, ring))
 
 
-def ward(_: int) -> np.ndarray:
-    """A ward closing round a tower: a held bright chord and a rising shimmer, the answer to a curse."""
+def hymn(_: int) -> np.ndarray:
+    """Battle Hymn over a tower: voices holding a bright E major chord, bells climbing it, a drumbeat under them."""
     bells = [(i * 0.05, inst.chime(f, 1.3) * 0.45) for i, f in enumerate(("E5", "G#5", "B5", "E6"))]
-    hum = mix(*(inst.choir(f, 1.2, attack=0.15, seed=10 + i) * 0.3 for i, f in enumerate(("E4", "B4"))))
-    return room(mix(hum, *bells), 1.6, 0.3, seed=5)
+    hum = mix(*(inst.choir(f, 1.2, attack=0.15, seed=10 + i) * 0.3 for i, f in enumerate(("E4", "B4", "G#4"))))
+    drum = mix(*((at, inst.timpani("E2", 0.5, seed=i) * 0.35) for i, at in enumerate((0.0, 0.32))))
+    return room(mix(hum, *bells, drum), 1.6, 0.3, seed=5)
 
 
-def broken(_: int) -> np.ndarray:
-    """A leader's curse broken before it lands: the chant snaps with a glassy crack and collapses."""
-    crack = mix(noise(0.08, 1500, 12000, attack=0.0005, tau=0.02, seed=720), thump(260, 60, 0.3, attack=0.001, tau=0.07) * 0.6)
-    return mix(crack, (0.03, fizzle(0) * 0.8))
+def returned(_: int) -> np.ndarray:
+    """A boss struck back from the shrine: a holy blow, the thunder rolling away, the light ringing after it."""
+    blow = mix(thump(120, 30, 1.0, attack=0.001, tau=0.25), noise(0.3, 60, 1200, attack=0.001, tau=0.08, seed=730) * 0.5)
+    return room(mix(blow, (0.02, lightning(1) * 0.6), (0.08, holy(0) * 0.7)), 2.2, 0.4, seed=10)
 
 
 # -- Waves and outcome ----------------------------------------------------------------------------------
@@ -487,7 +532,6 @@ CUES: dict[str, Cue] = {
     "cleared": Cue(cleared, 1, "alert", ALERT * 0.8),
     "leak": Cue(leak, 1, "alert", ALERT),
     "gold": Cue(gold, 3, "battle", ACTION * 0.8, pitch=0.04, yields=1),
-    "cleanse": Cue(cleanse, 1, "action", ACTION),
     "ponder": Cue(ponder, 1, "alert", ACTION * 0.6),
     "chant": Cue(chant, 1, "alert", ACTION),
     "curse": Cue(curse, 1, "alert", ALERT),
@@ -499,14 +543,19 @@ CUES: dict[str, Cue] = {
     "fireball": Cue(fireball, 3, "battle", BATTLE * 1.1, pitch=0.04, yields=1),
     "lightning": Cue(lightning, 3, "battle", BATTLE, pitch=0.04, yields=1),
     "frost": Cue(frost, 3, "battle", BATTLE, pitch=0.04, yields=1),
+    "ballista_cast": Cue(ballista_cast, 3, "battle", BATTLE * 0.75, pitch=0.04, yields=1),
+    "ballista_hit": Cue(ballista_hit, 3, "battle", BATTLE * 0.85, pitch=0.04, yields=1),
+    "knife_cast": Cue(knife_cast, 3, "battle", BATTLE * 0.5, pitch=0.05, yields=1),
+    "knife_hit": Cue(knife_hit, 3, "battle", BATTLE * 0.6, pitch=0.05, yields=1),
+    "hook": Cue(hook, 2, "battle", BATTLE * 0.9, pitch=0.04),
     "venom_cast": Cue(venom_cast, 3, "battle", BATTLE * 0.8, pitch=0.04, yields=1),
     "venom_hit": Cue(venom_hit, 3, "battle", BATTLE, pitch=0.04, yields=1),
     "smite": Cue(smite, 3, "alert", ALERT * 0.9),
     "meteor_fall": Cue(meteor_fall, 1, "action", ACTION),
     "meteor": Cue(meteor, 2, "alert", ALERT),
     "orb": Cue(orb, 3, "alert", ALERT * 0.9),
-    "ward": Cue(ward, 1, "action", ACTION),
-    "broken": Cue(broken, 1, "alert", ACTION * 1.1),
+    "hymn": Cue(hymn, 1, "action", ACTION),
+    "returned": Cue(returned, 1, "alert", ALERT),
     "victory": Cue(victory, 1, "alert", ALERT),
     "defeat": Cue(defeat, 1, "alert", ALERT),
     **{f"death_{kind}": Cue(_death(kind), fall.takes, "alert" if kind in BOSSES else "battle",

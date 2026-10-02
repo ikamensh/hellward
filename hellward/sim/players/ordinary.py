@@ -1,8 +1,9 @@
 """The ordinary scripted defender: the tests, the clips and the balance tools' baseline.
 
 It is deliberately ordinary: towers on the tiles that watch the most path (a door's queue counts
-extra), elements in rotation, gates in the arches once it can afford them, upgrades with what is left,
-and a Cleanse on the cursed tower that has work to do. It learns no skills and casts no other spell.
+extra), kinds in rotation (the Ballista, the Hook Tower and the Knife Post among them where they are
+offered), gates in the arches once it can afford them, upgrades with what is left, and a Battle Hymn
+on the dearest tower that has work to do. It learns no skills and casts no other spell.
 """
 
 from __future__ import annotations
@@ -12,10 +13,11 @@ from dataclasses import dataclass, field
 from hellward.sim.campaign import Location
 from hellward.sim.content import WAVE_BREAK
 from hellward.sim.model import DOOR_STOP, JOSTLE, Refused, Tower, World
-from hellward.sim.players.hands import Hands, REACT, AIM_GAP
+from hellward.sim.players.hands import Hands, REACT, AIM_GAP, ready
 from hellward.sim.sums import float_sum, int_sum
 
-ROTATION = ("arrow", "pyre", "frost", "storm", "plague", "arrow", "pyre", "storm", "plague", "arrow")
+ROTATION = ("arrow", "pyre", "ballista", "frost", "storm", "plague", "knife", "arrow", "hook", "pyre", "storm",
+            "ballista", "plague", "arrow")
 DOOR_BONUS = 4.0     # path tiles a door queue in reach is worth when ranking a tile
 THINK = 0.5          # seconds between the defender's decisions
 
@@ -46,17 +48,18 @@ class Ordinary:
     name: str = "ordinary"
     reaction: tuple[float, float] = REACT
     aim_gap: float = AIM_GAP
-    cleanse: bool = True
+    hymn: bool = True
     doors: bool = True
     call_early: bool = True
     shift: int = 0        # where in the element rotation this defender starts: variety for the balance tools
+    rotation: tuple[str, ...] = ROTATION   # the kinds it raises in turn (those offered here)
     towers: int = 14
     planned: list[tuple[str, tuple[int, int]]] = field(default_factory=list)
     clock: float = 0.0
 
     def plan(self, world: World) -> None:
         tiles = [tile for _, tile in tile_scores(world)]
-        rotation = [kind for kind in ROTATION if kind in world.location.arsenal.towers]
+        rotation = [kind for kind in self.rotation if kind in world.location.arsenal.towers]
         self.planned = [(rotation[(i + self.shift) % len(rotation)], tile) for i, tile in enumerate(tiles[:self.towers])]
 
     def skills(self, location: Location, sigils: int) -> frozenset[str]:
@@ -69,8 +72,8 @@ class Ordinary:
         self.clock = world.time + THINK
         if not self.planned:
             self.plan(world)
-        if self.cleanse:
-            self._cleanse(hands)
+        if self.hymn:
+            self._hymn(hands)
         if self.doors and world.location.arsenal.gates and world.wave >= 1:
             for door in world.doors:
                 if not door.built and not door.rubble and world.gold >= world.door_cost + world.cost("arrow"):
@@ -102,14 +105,14 @@ class Ordinary:
                 return
             world.upgrade(tower.id)
 
-    def _cleanse(self, hands: Hands) -> None:
+    def _hymn(self, hands: Hands) -> None:
         world = hands.world
-        if world.mana < world.spell_cost("cleanse"):
+        if not ready(world, "hymn"):
             return
         busy: list[Tower] = []
         for t in world.towers.values():
-            if t.curses and max(t.curses.values()) > 3.0:
+            if t.kind.attack not in ("aura", "amplify") and not t.silenced:
                 if any(world.in_reach(t, m.s, m.route) for m in world.monsters):
                     busy.append(t)
         if busy:
-            hands.cleanse(max(busy, key=lambda t: (t.spent, -t.id)).id)
+            hands.hymn(max(busy, key=lambda t: (t.spent, -t.id)).id)

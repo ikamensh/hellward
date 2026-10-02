@@ -2,7 +2,8 @@ class_name Monster
 extends Node3D
 ## A monster as the server plays it: where it walks (its route and the distance along it), its life, the cold
 ## and poison on it, a leader's pondering and chanting. Between two steps it glides; its walk plays at the pace
-## it moves. Its death, its leak into the sanctuary and a leader's curse come as events (World._event).
+## it moves. Its death, its strike on the shrine (an ordinary monster is obliterated, a boss cast back to its
+## portal), a hook's drag and a leader's curse come as events (World._event).
 
 # kinds with a model of their own; the others wear the nearest one, tinted and sized (`STAND_INS`) until theirs exist
 const HEIGHTS := {"fallen": 1.2, "shaman": 1.95, "zombie": 1.9, "skeleton": 1.85, "bat": 0.7, "drowned": 1.9,
@@ -32,6 +33,12 @@ const MAX_STRIDE := 2.4             # beyond this the legs blur; the feet slide 
 const LANE := 6.0                    # the rules' lane (about ±0.28 tiles) spread to metres across the street
 const FLY := 2.4                     # a flyer's height over the ground
 const EMERGE := 1.2                  # seconds a newcomer takes to come out of its portal
+const HOOK_FLIGHT := 0.12            # seconds a hook's chain flies before it bites
+const DRAG := 0.3                    # seconds the chain drags a hooked monster back
+const STRIDE_TO_GATE := 3.0          # tiles a second a leaking monster walks the steps to the shrine's gate
+const GATE_STAND := 0.9              # tiles short of the door it stands to strike
+const BLOW := 0.35                   # seconds into its strike that the blow lands, and the light answers
+const CAST_BACK := 0.35              # seconds a boss stands in the shrine's light before it is gone to its portal
 
 var world: World
 var id := 0
@@ -44,6 +51,9 @@ var leader := false
 var wave := -1
 var gone := false                    # dead and faded, or inside the sanctuary: the world frees it
 var progress := 0.0                  # 0..1 along its route, for the camera
+var boss := false                    # strikes the shrine and is cast back to its portal
+var strikes := 0                     # a boss's strikes on the shrine so far
+var moved := 0                       # the movers that have moved it back, a bit each (the Hook's is 1)
 
 var _route := "main"
 var _lateral := 0.0
@@ -52,7 +62,7 @@ var _s1 := 0.0
 var _flags := 0
 var _frozen := false
 var _chilled := false
-var _state := "walk"                 # walk, ponder, chant, door, dead
+var _state := "walk"                 # walk, ponder, chant, door (striking the shrine), dead
 var _state_t := 0.0
 var _age := 0.0
 var _chant_spot := Vector2i(-1, -1)
@@ -72,6 +82,15 @@ var _zap := 0.0                      # lightning still crawling over a corpse, s
 var _dying: Array[ORMMaterial3D] = []   # a corpse's own materials, its eyes going out
 var _frozen_dead := false            # killed by cold: its rime keeps its colour
 var _curse_glow: Array[ORMMaterial3D] = []   # a chanting Shaman's skull, flaring
+var _drag_from := 0.0                # where a hook caught it
+var _drag_t := -1.0                  # seconds since the hook was thrown; -1: not hooked
+var _snap := false                   # cast back: the next step's place is taken as it is, not glided to
+var _cast_back := 0.0                # seconds left of a boss standing in the shrine's light, where it struck
+var _cast_from := 0.0
+var _strike_s := 0.0                 # where it walks the steps from, to strike the shrine
+var _striking := false               # at the gate, its blow coming
+var _struck := false                 # the shrine's light has answered its blow
+var _strike_label: Label3D
 
 # how each element marks a blow, and a death
 const ELEMENT_FLASH := {"fire": Color(1.0, 0.45, 0.1), "cold": Color(0.45, 0.75, 1.0),
@@ -91,6 +110,7 @@ func setup(w: World, ident: int, facts: Dictionary, table: Dictionary) -> void:
 	hp = max_hp
 	wave = int(facts["wave"])
 	leader = table["leader"] != null
+	boss = bool(table["boss"])
 	_base = kind if HEIGHTS.has(kind) else String(STAND_INS.get(kind, ["fallen"])[0])
 	height = HEIGHTS[kind] * BODY if HEIGHTS.has(kind) else float(table["size"]) * 2.3 * BODY
 	_s0 = 0.0
@@ -140,7 +160,7 @@ func _ready() -> void:
 	_bar = Vfx.health_bar(0.9 if height < 1.9 else 1.2)
 	_bar.position = Vector3(0, height + 0.35, 0)
 	add_child(_bar)
-	_bar.visible = leader   # a leader's life always shows; the others' once they are hurt
+	_bar.visible = leader or boss   # a leader's or a boss's life always shows; the others' once they are hurt
 	if leader:
 		var ring := MeshInstance3D.new()
 		var pm := PlaneMesh.new()
@@ -158,11 +178,15 @@ func _ready() -> void:
 	global_position = _where(0.0)
 
 
-## The server's word on it this step: [id, s, hp, flags, chill, frozen, poison stacks, door].
+## The server's word on it this step: [id, s, hp, flags, chill, frozen, poison stacks, door, moved].
 func sync(entry: Array, stepped: bool) -> void:
 	if stepped:
 		_s0 = _s1
 	_s1 = float(entry[1])
+	if _snap:   # cast back to its portal: it comes out of it rather than gliding the whole route back
+		_s0 = _s1
+		_snap = false
+	moved = int(entry[8])
 	if hp != float(entry[2]):
 		hp = float(entry[2])
 		_bar.visible = true
@@ -226,10 +250,7 @@ func _process(delta: float) -> void:
 				for m in _curse_glow:
 					m.emission_energy_multiplier = Mats.GLOW * (2.2 + 1.2 * sin(_state_t * 9.0))
 		"door":
-			_state_t = min(_state_t, 1.4)
-			global_position = _where(world.level.route_length(_route) + _state_t * 3.0)
-			if _state_t >= 1.4:
-				gone = true
+			_strike_shrine()
 		"dead":
 			Mats.eyes_out(_dying, _state_t, not _frozen_dead)
 			if _state_t > 3.0:
@@ -240,16 +261,31 @@ func _process(delta: float) -> void:
 
 func _walk(delta: float) -> void:
 	var s := lerpf(_s0, _s1, world.alpha)
-	if _age < EMERGE:   # out of the portal: it comes from the portal's mouth to its place on the route
+	if _cast_back > 0.0:   # struck back: it stands in the light where it struck, then is gone to its portal
+		_cast_back -= delta
+		s = _cast_from
+		_flash = 1.0
+		if _cast_back <= 0.0:
+			_age = 0.0
+	elif _age < EMERGE:   # out of the portal: it comes from the portal's mouth to its place on the route
 		s -= Level.APPROACH / Level.TILE * pow(1.0 - _age / EMERGE, 2.0)
+	var dragged := _drag_t >= 0.0
+	if dragged:   # the hook's chain flies to it, then hauls it back from where it was caught to where it is
+		_drag_t += delta
+		var k: float = clamp((_drag_t - HOOK_FLIGHT) / DRAG, 0.0, 1.0)
+		s = lerpf(_drag_from, s, k * k * (3.0 - 2.0 * k))
+		if _drag_t >= HOOK_FLIGHT + DRAG:
+			_drag_t = -1.0
 	var p := _where(s)
 	var step := p - global_position
 	var pace: float = Vector2(step.x, step.z).length() / max(delta, 0.0001)
-	if _state == "walk" and not bool(stats["flying"]):
+	if dragged:
+		_anim.speed_scale = 0.0   # hauled, not walking
+	elif _state == "walk" and not bool(stats["flying"]):
 		_anim.speed_scale = 0.0 if _frozen else min(pace / (WALK.get(_base, 0.7) * BODY), MAX_STRIDE)
 	else:
 		_anim.speed_scale = 0.0 if _frozen else 1.0
-	if Vector2(step.x, step.z).length() > 0.001 and _state == "walk":
+	if Vector2(step.x, step.z).length() > 0.001 and _state == "walk" and not dragged:
 		rotation.y = lerp_angle(rotation.y, atan2(-step.x, -step.z), min(1.0, delta * 8.0))
 	global_position = p
 	progress = s / max(world.level.route_length(_route), 0.01)
@@ -335,17 +371,93 @@ func vanish() -> void:
 	_state_t = 3.0
 
 
+## It reached the end of its route: it walks the steps to the shrine's gate and strikes it, and the shrine's light
+## answers the blow and obliterates it.
 func leak() -> void:
 	if not alive():
 		return
 	_state = "door"
 	_state_t = 0.0
-	_anim.speed_scale = 1.0
-	_play("attack")
+	_strike_s = maxf(lerpf(_s0, _s1, world.alpha), world.level.route_length(_route))
+	_drag_t = -1.0
+	_anim.speed_scale = MAX_STRIDE   # it hurries up the steps
+	_play("walk")
 	_drop_beam()
+	if _ring:
+		_ring.queue_free()
+
+
+func _strike_shrine() -> void:
+	var gate := world.level.route_length(_route) + Level.APPROACH / Level.TILE - GATE_STAND
+	var walk := maxf(gate - _strike_s, 0.0) / STRIDE_TO_GATE
+	if _state_t < walk:
+		global_position = _where(_strike_s + _state_t * STRIDE_TO_GATE)
+		return
+	if not _striking:
+		_striking = true
+		global_position = _where(gate)
+		_anim.speed_scale = 1.0
+		_play("attack")
+		var to := world.level.door_pos - global_position
+		rotation.y = atan2(-to.x, -to.z)
+	if _state_t >= walk + BLOW and not _struck:
+		_struck = true
+		_obliterate()
+	if _state_t >= walk + BLOW + 0.6:
+		gone = true
+
+
+## The shrine's light falls on it: a holy pillar, a white flash through the body, and nothing left of it.
+func _obliterate() -> void:
+	Vfx.impact(world, world.level.door_pos + Vector3(0, 1.4, 0), Color(1.0, 0.85, 0.55), 30)
+	Vfx.holy(world, global_position)
+	_flash = 1.0
+	_overlay.set_shader_parameter("flash_color", Color(1.6, 1.4, 1.0))
+	_bar.visible = false
 	var tw := create_tween()
-	tw.tween_interval(0.6)
-	tw.tween_property(self, "scale", Vector3(0.01, 0.01, 0.01), 0.8)
+	tw.tween_interval(0.12)
+	tw.tween_property(_model, "scale", _model.scale * Vector3(1.25, 0.02, 1.25), 0.18).set_trans(Tween.TRANS_QUAD) \
+		.set_ease(Tween.EASE_IN)
+	tw.tween_callback(func(): _model.visible = false)
+
+
+## A boss struck the shrine: the light casts it back in a flash, and it comes out of its portal again with the life
+## it had. Its strikes so far show over its bar.
+func returned(count: int) -> void:
+	strikes = count
+	Vfx.holy(world, global_position)
+	Vfx.burst(world, chest(), Color(1.0, 0.85, 0.5), 60)
+	_flash = 1.0
+	_overlay.set_shader_parameter("flash_color", Color(1.6, 1.4, 1.0))
+	_drag_t = -1.0
+	_cast_from = lerpf(_s0, _s1, world.alpha)
+	_cast_back = CAST_BACK
+	_snap = true
+	_resume()
+	if _strike_label == null:
+		_strike_label = Label3D.new()
+		_strike_label.font = Style.title_font()
+		_strike_label.font_size = 72
+		_strike_label.pixel_size = 0.006
+		_strike_label.modulate = Color(1.0, 0.82, 0.4)
+		_strike_label.outline_modulate = Color(0.08, 0.03, 0.0)
+		_strike_label.outline_size = 14
+		_strike_label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_strike_label.no_depth_test = true
+		_strike_label.position = Vector3(0, height + 0.75, 0)
+		add_child(_strike_label)
+	_strike_label.text = "%d %s" % [count, "strike" if count == 1 else "strikes"]
+
+
+## A hook caught it at `from_s` (the server has already hauled it back): it is drawn there while the chain flies,
+## then dragged back to where it walks on.
+func drag(from_s: float) -> void:
+	if not alive():
+		return
+	_drag_from = from_s
+	_drag_t = 0.0
+	if _flinch:
+		_flinch.kick(10.0, 0.0)
 
 
 # -- A leader's curse: it ponders (asks its planner), then chants or marks a spot; the curse lands, breaks or fizzles
@@ -382,11 +494,6 @@ func chant(curse: String, spot: Vector2i, marking: bool) -> void:
 		_beam = Vfx.curse_beam(world, tip if tip else self, _curse_target)
 	_circle = Vfx.rune_circle_at(world, at, radius, _chant_time)
 	Sfx.play("chant", chest())
-
-
-func broken() -> void:
-	Vfx.burst(world, chest(), Color(1.0, 0.9, 0.6), 40)
-	_resume()
 
 
 func stop_chant() -> void:

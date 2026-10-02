@@ -17,7 +17,9 @@ func _ready() -> void:
 	var only := OS.get_environment("HELLWARD_TEST")
 	for t in [test_battle_starts_with_the_locations_purse, test_intro_hands_over_the_camera, test_mouse_builds_a_tower,
 			test_the_server_refuses_a_tower_on_the_lane, test_a_wave_brings_monsters_that_walk,
-			test_a_curse_lands_and_cleanse_lifts_it, test_defeat_ends_the_battle_and_its_music,
+			test_a_curse_lands_on_a_tower, test_r_sings_battle_hymn_over_a_tower,
+			test_a_monster_at_the_shrine_strikes_it_and_is_gone, test_the_plate_of_a_monster_under_the_mouse,
+			test_defeat_ends_the_battle_and_its_music,
 			test_the_watched_defence_holds_and_ends_with_victory, test_a_campaign_walk_through_every_screen,
 			test_every_location_lays_out_and_plays]:
 		if only != "" and only not in t.get_method():
@@ -105,6 +107,34 @@ func click(m: Node, tile: Vector2i) -> void:
 	vp.push_input(ev)
 
 
+## The mouse moved to `at` (the 3D point under it) on the battle's screen.
+func move_mouse(m: Node, at: Vector3) -> void:
+	var vp: Viewport = m.get_viewport()
+	var ev := InputEventMouseMotion.new()
+	ev.position = vp.get_final_transform() * m.rig.cam.unproject_position(at)
+	vp.push_input(ev)
+
+
+## Win `location` for the profile in play, its defence played by the campaign's scripted `player` (the tests' honest
+## way on to a later location); whether it was won.
+func win(location: String, player: String) -> bool:
+	var reply: Dictionary = await Net.ask("defend", {"location": location, "player": player}).done
+	if not bool(reply["ok"]):
+		return false
+	var last := [{}]
+	var keep := func(f: Dictionary): last[0] = f
+	Net.frame.connect(keep)
+	var step := 0
+	while not last[0].has("result"):
+		step += 400
+		Net.advance(400)
+		var started := Time.get_ticks_msec()
+		while not last[0].has("result") and int(last[0].get("step", 0)) < step and Time.get_ticks_msec() - started < 60000:
+			await frames(1)
+	Net.frame.disconnect(keep)
+	return bool(last[0]["result"]["won"])
+
+
 ## Bare floor tiles beside the main route, nearest its middle first: where an arrow tower reaches the path.
 func lane_side(lv: Level, count: int) -> Array:
 	var out: Array = []
@@ -189,8 +219,8 @@ func test_a_wave_brings_monsters_that_walk() -> void:
 	check(first.global_position.distance_to(was) > 1.0, "a monster walks its route")
 
 
-## Towers by the lanes draw a Fallen Shaman's curse; R on the cursed tower cleanses it for mana.
-func test_a_curse_lands_and_cleanse_lifts_it() -> void:
+## Towers by the lanes draw a Fallen Shaman's curse: the tower shows it, and its card says which and how long.
+func test_a_curse_lands_on_a_tower() -> void:
 	var m := await start()
 	m.rig.user_control = false
 	var w: World = m.world
@@ -215,16 +245,118 @@ func test_a_curse_lands_and_cleanse_lifts_it() -> void:
 		return
 	Engine.time_scale = 1.0
 	m.builder.choose(cursed)
-	await check_cleanse(m, cursed)
+	await frames(2)
+	check(m.hud._curse_box.visible and String(w.start["curses"][cursed.curses.keys()[0]]["name"]).to_upper()
+		in m.hud._curse_text.text.to_upper(), "the chosen tower's card names its curse (%s)" % m.hud._curse_text.text)
+	check(not w.offers("cleanse") and not m.hud._spell_slots.has("cleanse"), "no Cleanse lifts it")
 
 
-func check_cleanse(m: Node, cursed: Tower) -> void:
+## At the Graveyard, where Battle Hymn is learned: R with a tower chosen sings it over that tower for mana, and its
+## gold aura shows while the server's seconds last; with none chosen, R takes Hymn in hand and a click on a tower
+## casts it there.
+func test_r_sings_battle_hymn_over_a_tower() -> void:
+	await Net.ask("create_profile", {"name": "singer"}).done
+	check(await win("tristram", "adaptive"), "the campaign's scripted player holds Tristram, opening the Graveyard")
+	var m := await start({"location": "graveyard"})
+	m.rig.user_control = false
 	var w: World = m.world
-	await until(func(): return w.mana >= w.spell_cost("cleanse"), 60.0)
+	check(w.offers("hymn") and m.hud._spell_slots.has("hymn"), "Hymn is on the spell bar")
+	var tiles := lane_side(m.level, 2)
+	for tile in tiles:
+		await w.order("build", {"kind": "arrow", "tile": [tile.x, tile.y]})
+	check(w.towers.size() == 2, "two towers stand (%d)" % w.towers.size())
+	if w.towers.size() < 2:
+		await Net.ask("switch_profile", {"name": "main"}).done
+		return
+	var first: Tower = w.tower_at(tiles[0])
+	var second: Tower = w.tower_at(tiles[1])
+	Engine.time_scale = 4.0
+	check(await until(func(): return w.mana >= w.spell_cost("hymn"), 120.0), "the mana for a hymn wells up")
+	Engine.time_scale = 1.0
+	m.builder.choose(first)
 	var mana := w.mana
 	press(m.get_viewport(), KEY_R)
-	check(await until(func(): return not cursed.cursed(), 3.0), "R cleanses the chosen tower")
-	check(w.mana < mana, "Cleanse costs mana (%.0f -> %.0f)" % [mana, w.mana])
+	check(await until(func(): return first.hymn > 0.0, 3.0), "R sings Hymn over the chosen tower")
+	check(w.mana < mana, "Hymn costs mana (%.0f -> %.0f)" % [mana, w.mana])
+	check(is_instance_valid(first._aura) and m.hud._hymn_box.visible, "its gold aura shows, and its card the hymn's time")
+	check(await until(func(): return first.hymn <= 0.0, 30.0), "the hymn ends when the server says")
+	await frames(2)
+	check(not is_instance_valid(first._aura), "and its aura goes with it")
+	m.builder.choose(null)
+	Engine.time_scale = 4.0
+	check(await until(func(): return w.mana >= w.spell_cost("hymn") and w.recharge("hymn") <= 0.0, 120.0),
+		"Hymn gathers itself again")
+	Engine.time_scale = 1.0
+	press(m.get_viewport(), KEY_R)
+	await frames(2)
+	check(m.builder.held == "spell:hymn", "with no tower chosen, R takes Hymn in hand (%s)" % m.builder.held)
+	click(m, second.tile)
+	check(await until(func(): return second.hymn > 0.0, 3.0), "a click on a tower casts it there")
+	check(m.builder.held == "", "the hand is empty after the cast")
+	await Net.ask("switch_profile", {"name": "main"}).done
+
+
+## An undefended Tristram: the first monster to reach the end of its road walks up to the shrine's gate, strikes it,
+## and the shrine's light obliterates it; a life is lost.
+func test_a_monster_at_the_shrine_strikes_it_and_is_gone() -> void:
+	var m := await start()
+	var w: World = m.world
+	Engine.time_scale = 4.0
+	var leaks := []
+	w.happened.connect(func(e: Array): if e[0] == "leak": leaks.append(int(e[1])))
+	await w.order("call_wave")
+	check(await until(func(): return not leaks.is_empty(), 300.0), "a monster reaches the shrine")
+	if leaks.is_empty():
+		return
+	Engine.time_scale = 1.0
+	var striker: Monster = w.monsters.get(leaks[0])
+	check(striker != null and not striker.alive(), "it stops being a living foe at once")
+	if striker == null:
+		return
+	check(w.lives < w.start_lives, "a life is lost (%d)" % w.lives)
+	check(await until(func(): return striker._struck, 5.0), "it strikes the gate and the light answers")
+	check(await until(func(): return not w.monsters.has(leaks[0]), 3.0), "then it is gone")
+
+
+## The mouse on a monster shows its plate: its name and life, its armor, its tags, and the hit each tower of the
+## arsenal deals it at each rank, as the server's table says. The Catacombs bring armored Overlords.
+func test_the_plate_of_a_monster_under_the_mouse() -> void:
+	var m := await start({"demo": "", "player": "ordinary", "location": "catacombs"})
+	m.rig.user_control = false   # the virtual cursor would pan the camera at the screen's edge
+	var w: World = m.world
+	Engine.time_scale = 8.0
+	var visible := func() -> Monster:
+		for mon in w.living():
+			if mon._age > Monster.EMERGE and m.rig.cam.is_position_in_frustum(mon.chest()):
+				return mon
+		return null
+	var ok := await until(func(): return visible.call() != null, 300.0)
+	check(ok, "a monster walks in sight")
+	Engine.time_scale = 1.0
+	w.set_paused(true)
+	await frames(2)
+	var mon: Monster = visible.call()
+	if mon == null:
+		return
+	move_mouse(m, mon.chest())
+	await frames(2)
+	check(m.hud.hovered() == mon, "the plate is the monster's under the mouse")
+	var text: String = m.hud.hover_text()
+	var table: Dictionary = mon.stats
+	check(mon.title() in text, "it names the monster (%s)" % text)
+	var armor := int(table["armor"])
+	check(text.contains("Armor %d" % armor) if armor > 0 else not text.contains("Armor"), "it says its armor (%d)" % armor)
+	for e in table["protected"]:
+		check(String(e).capitalize() in text, "it names its protection from %s" % e)
+	var hits: Dictionary = table["hits"]
+	check(not hits.is_empty(), "the server tells the hits it takes")
+	for kind in hits:
+		var row := "%s %d %d %d" % [w.tower_table(kind)["name"], int(hits[kind][0]), int(hits[kind][1]), int(hits[kind][2])]
+		check(row in text, "its row for the %s: %s" % [kind, row])
+	move_mouse(m, mon.chest() + Vector3(0, 30, 0))
+	await frames(2)
+	check(m.hud.hovered() == null, "the plate goes when the mouse leaves it")
+
 
 
 ## With no towers, the waves walk in: the defence falls, the battle stops and its music with it.
@@ -254,6 +386,8 @@ func test_the_watched_defence_holds_and_ends_with_victory() -> void:
 	var m := await start({"demo": "", "player": "adaptive"})
 	var w: World = m.world
 	Engine.time_scale = 8.0
+	var built := [0]   # towers raised: the bot sells those the last monsters have passed
+	w.happened.connect(func(e: Array): if e[0] == "built": built[0] += 1)
 	var largest := [""]
 	var keep := func(f: Dictionary):
 		var text := JSON.stringify(f)
@@ -269,7 +403,7 @@ func test_the_watched_defence_holds_and_ends_with_victory() -> void:
 	print("   largest frame %d bytes, parsed in %.0f us" % [largest[0].length(), parse])
 	check(parse < 500.0, "the client parses the largest frame in under half a millisecond (%.0f us)" % parse)
 	check(w.outcome == "victory", "the scripted defence wins (outcome '%s', wave %d, lives %d)" % [w.outcome, w.wave + 1, w.lives])
-	check(w.towers.size() >= 4, "it built a defence (%d towers)" % w.towers.size())
+	check(built[0] >= 4, "it built a defence (%d towers)" % built[0])
 	check(Sfx.music_name() == "title", "the title's music plays after the victory (%s)" % Sfx.music_name())
 
 
@@ -400,7 +534,8 @@ func check_bodies(w: World, seen: Dictionary) -> void:
 		seen["t:" + kind] = true
 		for rank in 3:
 			var model := Tower.model_name(kind, rank)
-			check(ResourceLoader.exists("res://assets/models/%s.glb" % model), "%s rank %d: %s is built" % [kind, rank + 1, model])
+			check(model == "tower_%s_%d" % [kind, rank + 1] and ResourceLoader.exists("res://assets/models/%s.glb" % model),
+				"%s rank %d: its own model is built (%s)" % [kind, rank + 1, model])
 			var body := Models.make(model)
 			add_child(body)
 			check(Models.node(body, "fx_muzzle") != null or Models.node(body, "fx_fire") != null,

@@ -14,6 +14,8 @@ tools/shot.sh VIEW OUT.png [FRAMES] [args] # one 1080p battle frame of a named v
 tools/gallery.sh OUT.png V1,V2,.. FRAMES demo   # several views from one run, as a contact sheet
 tools/record.sh OUT.mp4 FRAMES 1 demo film      # a video with its mixed soundtrack; OUT a dir: every Nth JPEG
 tools/showcase.sh [OUT]                    # tests, beauty stills and the filmed demo into the evidence folder
+tools/stage.sh NAME OUT_DIR                # a staged moment, framed close (../tools/stages.py --list: a hook's drag,
+                                           # a knife at a gate, Hymn, the shrine's strike, a boss's return, the plate)
 tools/preview.sh MODEL OUT.png [anim=walk]      # contact sheet of one model under game lighting
 tools/model.sh NAME...                     # build models: tools/blender/NAME.py in Blender -> game/assets/models/NAME.glb
 uv run python tools/paint.py [NAME...]     # paint images with Codex (art/painted/)
@@ -67,11 +69,12 @@ forecourt braziers and burning props in the field cast shadows), and clutter cas
   server plays it: the clock in whole steps, events into the scene, orders), `monster.gd`, `tower.gd` (pictures of
   the server's monsters and towers; stand-ins for kinds without a model yet), `atmosphere.gd` (the night),
   `level.gd` (the server's grid in metres, routes, where a monster stands, the floor), `dressing.gd` (each
-  location's scenery, gates), `scatter.gd`, `bolt.gd` (missiles), `vfx.gd`, `fx.gd`, `hud.gd`, `builder.gd`
+  location's scenery, gates), `scatter.gd`, `bolt.gd` (missiles), `chain.gd` (the Hook's chain), `vfx.gd`, `fx.gd`,
+  `hud.gd` (the bar, the tower card, the monster plate), `builder.gd`
   (input into orders), `camera_rig.gd`, `intro.gd`, `demo.gd` (the film director for a watched defence),
   `sfx.gd` (cues, music, the recording's sound log), `mats.gd` (the material library), `models.gd`.
-- `game/shaders/` — ground, grass, overlay (hit/chill/curse/kind rim/x-ray), bar, orb, ring, vortex, beam
-  (Cleanse), curse_beam, vignette, hud_panel/hud_bar/hud_banner.
+- `game/shaders/` — ground, grass, overlay (hit/chill/curse/hymn/kind rim/x-ray), bar, orb, ring, vortex, beam
+  (holy light: Smite, the shrine), curse_beam, vignette, hud_panel/hud_bar/hud_banner.
 - `tools/blender/` — one script per model; `lib.py` holds the contract, `monsters.py`, `towers.py`,
   `village.py`, `drystone.py` the shared kits.
 - `game/assets/` — `models/` (built), `textures/` (PBR sets), `fx/` and `ui/` (keyed sprites), `audio/`.

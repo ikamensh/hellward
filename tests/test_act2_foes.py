@@ -32,46 +32,39 @@ class TestAct2Monsters:
     def test_flayer_exists(self) -> None:
         m = MONSTERS["flayer"]
         assert m.speed == 1.45
-        assert m.resist == {Element.FIRE: 0.25}
         assert m.size == 0.5
 
     def test_zealot_exists(self) -> None:
         m = MONSTERS["zealot"]
         assert m.speed == 1.0
-        assert m.resist == {Element.LIGHTNING: 0.4, Element.FIRE: 0.25}
         assert m.size == 0.85
 
     def test_spider_exists(self) -> None:
         m = MONSTERS["spider"]
         assert m.speed == 1.35
-        assert m.resist == {Element.POISON: 1.0, Element.COLD: -0.25}
         assert m.size == 0.7
 
     def test_bat_exists(self) -> None:
         m = MONSTERS["bat"]
         assert m.speed == 1.9
         assert m.flying is True
-        assert m.resist == {Element.COLD: 0.5, Element.POISON: 0.25}
         assert m.size == 0.5
 
     def test_hulk_exists(self) -> None:
         m = MONSTERS["hulk"]
         assert m.speed == 0.55
         assert m.lives == 2
-        assert m.resist == {Element.POISON: 1.0, Element.COLD: 0.25, Element.FIRE: -0.25}
         assert m.size == 1.1
 
     def test_drowned_exists(self) -> None:
         m = MONSTERS["drowned"]
         assert m.speed == 0.7
-        assert m.resist == {Element.COLD: 0.5, Element.POISON: 0.5, Element.LIGHTNING: -0.25}
         assert m.size == 0.85
 
     def test_fetish_exists(self) -> None:
         m = MONSTERS["fetish"]
         assert m.speed == 1.1
         assert m.lives == 2
-        assert m.resist == {Element.FIRE: 0.25}
         assert m.size == 0.6
         assert m.leader is not None
         assert m.leader.curses == (Curse.WEAKEN,)
@@ -83,7 +76,6 @@ class TestAct2Monsters:
         m = MONSTERS["inquisitor"]
         assert m.speed == 0.95
         assert m.lives == 2
-        assert m.resist == {Element.LIGHTNING: 0.4, Element.FIRE: 0.25}
         assert m.size == 0.9
         assert m.leader is not None
         assert m.leader.curses == (Curse.WEAKEN, Curse.DIM_VISION)
@@ -93,8 +85,7 @@ class TestAct2Monsters:
     def test_bone_priest_exists(self) -> None:
         m = MONSTERS["bone_priest"]
         assert m.speed == 0.45
-        assert m.lives == 20
-        assert m.resist == {Element.POISON: 1.0, Element.COLD: 0.25, Element.FIRE: 0.25, Element.LIGHTNING: 0.25}
+        assert m.boss
         assert m.size == 1.6
         assert m.leader is not None
         assert m.leader.curses == (Curse.BONE_PRISON, Curse.WEAKEN, Curse.DECREPIFY, Curse.DIM_VISION)

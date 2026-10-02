@@ -3,7 +3,7 @@
 A gothic tower defence in 3D in which the demons have **leaders**, and a leader curses your towers. It picks
 the tower and the curse by playing the fight ahead in its head, again and again, before it casts. Defend
 twelve locations in two acts, from burning Tristram through Hell's Gate and across Kurast to the Temple of Light.
-The first defence gives you a single-target Arrow Tower and Cleanse; gates, elemental towers, spells and larger
+The first defence gives you a single-target Arrow Tower and Smite; gates, elemental towers, spells and larger
 attacks arrive gradually. Monsters enter from different sides and may wander along longer trails, while runners
 head straight for the sanctuary.
 
@@ -33,10 +33,11 @@ the `main` profile keeps your existing save. Saves live in `~/.hellward/saves`, 
 | **2–5**, then click buildable ground | Pyre, Storm, Frost and Plague towers as later locations unlock them |
 | **6**, then click an arch | a warded gate, available from the Graveyard: walkers stop and batter it, flyers pass over |
 | **7–8**, then click buildable ground | Bone Altar and Druid Grove support towers in Act II |
-| click a tower | select it: **U** upgrade, **Delete** sell, **R** cleanse (mana) |
-| **Z** (from the Graveyard) | Smite: with a leader pondering or chanting, it strikes the one closest to cursing; otherwise click a monster |
+| click a tower | select it: **U** upgrade, **Delete** sell, **R** Battle Hymn (from the Graveyard, mana) |
+| **Z** (from the start), then click a monster | Smite: holy damage that strikes anywhere |
+| **R** (from the Graveyard), then click a tower | Battle Hymn: the tower attacks twice as fast for 6 s |
 | **X** (from Travincal), then click the floor | Meteor: it lands a moment later and leaves the floor burning |
-| **C** (from the Jungle), then click the floor | Frozen Orb: nearby monsters freeze; an interruptible leader's chant breaks |
+| **C** (from the Jungle), then click the floor | Frozen Orb: nearby monsters freeze |
 | **V** during a wave break | sell one held salvage for battle gold instead of banking it for the forge |
 | **Space** | call the next wave; ending a break early can grant a small gold bonus |
 | **F** | double the pace |
@@ -48,10 +49,9 @@ the `main` profile keeps your existing save. Saves live in `~/.hellward/saves`, 
 
 Leaders wear a violet ring and their life shows over the field. When
 one ponders, dots rise over its head; when it chants, a violet beam reaches for a tower and a rune
-circle closes round that tower's foot. Later, Smite or Frozen Orb can break an interruptible chant
-before it lands. Marked and resolute curses cannot be interrupted; **Cleanse** removes curses from
-a tower afterward, even in the opening defence. Spells spend mana (the blue orb) and are not cast
-while paused. The red orb is the sanctuary's life.
+circle closes round that tower's foot. No spell lifts a curse that has landed or breaks a chant: the answers
+are spacing your towers, killing the leader first, and Battle Hymn on a tower the leaders cannot reach.
+Spells spend mana (the blue orb) and are not cast while paused. The red orb is the sanctuary's life.
 
 **The campaign.** Each location's intro names who comes, what they resist, the curses their
 leaders cast and how to answer them. A victory earns one to three **sigils** by the life you keep;

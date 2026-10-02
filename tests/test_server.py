@@ -13,13 +13,17 @@ import json
 import pytest
 
 from hellward.server.client import Client, Refused
+from hellward.server.progress import Progress
 from hellward.server.protocol import event
+from hellward.server.saves import Saves
 from hellward.sim import planner
-from hellward.sim.campaign import LOCATIONS, ORDER
+from hellward.sim.campaign import ACTS, LOCATIONS, ORDER
+from hellward.sim.content import MONSTERS, TOWERS, felt_hit
 from hellward.sim.model import World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.ghost import Ghost
 from hellward.sim.players.hands import defend
+from hellward.sim.skills import perks
 
 
 def direct(location: str, player, seed: int) -> tuple[World, list]:
@@ -61,37 +65,67 @@ def test_a_scripted_defence_through_the_server_is_the_same_defence(client):
     assert sent == expected
 
 
-def test_a_persons_orders_log_a_defence_whose_ghost_fights_the_same_battle(client, tmp_path):
-    """Orders through the protocol, a curse cleansed when one lands: the replay the server writes, played by its
-    ghost directly and through the server's demo, gives the same events."""
-    grid = client.request("defend", location="tristram")["grid"]
-    tiles = [[x, y] for y, row in enumerate(grid) for x, c in enumerate(row) if c == "."]
-    sent: list = []
-    with pytest.raises(Refused, match="bare floor"):
-        client.order("build", kind="arrow", tile=[0, 8])
-    for tile in (tiles[40], tiles[120], tiles[200]):
-        for frame in client.order("build", kind="arrow", tile=tile):
-            sent.extend(frame["events"])
-    outcome = None
-    while outcome is None:
-        for frame in client.advance(1):
-            sent.extend(frame["events"])
-            outcome = frame["state"]["outcome"]
-            if frame["state"]["can_call"] and (frame["state"]["break_left"] or 0) < 25:
-                for f in client.order("call_wave"):
-                    sent.extend(f["events"])
-            cursed = [t for t in frame["towers"] if t[3]]
-            if cursed and frame["state"]["mana"] >= frame["state"]["spell_cost"]["cleanse"]:
-                for f in client.order("cleanse", tower=cursed[0][0]):
-                    sent.extend(f["events"])
-    replays = sorted((tmp_path / "data" / "replays").glob("*-tristram.json"))
-    assert len(replays) == 1
-    log = json.loads(replays[0].read_text())
-    assert log["outcome"] == outcome
-    assert any(c[1] == "cleanse" for c in log["commands"]), "a curse landed and was cleansed"
-    world, replayed = direct("tristram", Ghost(log), seed=log["seed"])
-    assert (world.outcome, world.lives, world.time) == (log["outcome"], log["lives"], log["time"])
-    assert replayed == sent
-    client.request("demo", replay=log)
-    _, ghosted = through(client)
-    assert ghosted == sent
+def test_a_persons_orders_log_a_defence_whose_ghost_fights_the_same_battle(tmp_path):
+    """Orders through the protocol, Battle Hymn cast on a tower whenever it is ready: the replay the server writes,
+    played by its ghost directly and through the server's demo, gives the same events."""
+    data = tmp_path / "data"
+    Progress(saves=Saves(data / "saves"), won={"tristram": 1}).save()   # the Graveyard, where Hymn is learned, is open
+    with Client(data, seed=3) as client:
+        grid = client.request("defend", location="graveyard")["grid"]
+        tiles = [[x, y] for y, row in enumerate(grid) for x, c in enumerate(row) if c == "."]
+        sent: list = []
+        with pytest.raises(Refused, match="bare floor"):
+            client.order("build", kind="arrow", tile=[0, 8])
+        for tile in (tiles[40], tiles[120], tiles[200]):
+            for frame in client.order("build", kind="arrow", tile=tile):
+                sent.extend(frame["events"])
+        outcome = None
+        while outcome is None:
+            for frame in client.advance(1):
+                sent.extend(frame["events"])
+                outcome = frame["state"]["outcome"]
+                state = frame["state"]
+                if state["can_call"] and (state["break_left"] or 0) < 25:
+                    for f in client.order("call_wave"):
+                        sent.extend(f["events"])
+                if (outcome is None and state["mana"] >= state["spell_cost"]["hymn"]
+                        and state["recharge"].get("hymn", 0) <= 0):
+                    for f in client.order("hymn", tower=frame["towers"][0][0]):
+                        sent.extend(f["events"])
+        replays = sorted((data / "replays").glob("*-graveyard.json"))
+        assert len(replays) == 1
+        log = json.loads(replays[0].read_text())
+        assert log["outcome"] == outcome
+        assert any(c[1] == "hymn" for c in log["commands"]) and any(e[0] == "hymn" for e in sent)
+        world, replayed = direct("graveyard", Ghost(log), seed=log["seed"])
+        assert (world.outcome, world.lives, world.time) == (log["outcome"], log["lives"], log["time"])
+        assert replayed == sent
+        client.request("demo", replay=log)
+        _, ghosted = through(client)
+        assert ghosted == sent
+
+
+def test_the_battle_start_tells_each_kind_its_armor_its_tags_and_the_hits_it_takes(tmp_path):
+    """The hover's table comes from the simulation's own felt hit: one entry per rank of every tower here that strikes
+    blows, whole and at least 1. The frames carry each monster's movers' bits last."""
+    data = tmp_path / "data"
+    Progress(saves=Saves(data / "saves"), won={key: 1 for key in ACTS[1]}).save()
+    with Client(data, seed=3) as client:
+        start = client.request("defend", location="docks")
+        world = World(LOCATIONS["docks"], perks=perks(frozenset(), ORDER.index("docks")), seed=3, planner=None)
+        striking = [k for k in start["arsenal"]["towers"] if TOWERS[k].attack not in ("amplify", "aura")]
+        assert {"hook", "knife"} <= set(striking)
+        for key, table in start["monsters"].items():
+            kind = MONSTERS[key]
+            assert (table["armor"], table["boss"]) == (kind.armor, kind.boss)
+            assert (table["protected"], table["vulnerable"]) == ([e.value for e in kind.protected],
+                                                                 [e.value for e in kind.vulnerable])
+            assert list(table["hits"]) == striking
+            for tower, ranks in table["hits"].items():
+                assert ranks == [felt_hit(lv.damage, TOWERS[tower].element, kind) for lv in world.tower_levels[tower]]
+                assert all(isinstance(hit, int) and hit >= 1 for hit in ranks)
+        assert start["spells"]["hymn"]["aim"] == "tower"
+        client.order("call_wave")
+        frames = client.advance(200)
+        monsters = [m for f in frames for m in f["monsters"]]
+        assert monsters and all(len(m) == 9 and isinstance(m[8], int) for m in monsters)

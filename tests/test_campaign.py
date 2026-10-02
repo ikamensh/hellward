@@ -2,6 +2,8 @@
 
 import pytest
 
+from hellward.sim import tuning
+
 from hellward.sim.campaign import ACT_ENDS, LOCATIONS, ORDER, SIGIL_LIVES, sigils
 from hellward.sim.balance import BALANCE
 from hellward.sim.content import MONSTERS, SPELLS, START_LIVES, TOWERS
@@ -53,7 +55,7 @@ def test_the_campaign_uses_one_location_and_wave_growth_curve():
     for stage, key in enumerate(ORDER):
         location = LOCATIONS[key]
         assert location.start_gold == BALANCE.starting_gold(stage)
-        assert location.life == pytest.approx(BALANCE.location_growth ** stage)
+        assert location.life == pytest.approx(BALANCE.location_growth ** stage * tuning.number(f"campaign.life.{key}"))
         for wave_index, wave in enumerate(location.waves):
             assert wave.hp == pytest.approx(BALANCE.wave_growth ** wave_index)
 

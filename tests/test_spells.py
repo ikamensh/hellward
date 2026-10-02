@@ -1,4 +1,5 @@
-"""The four spells, through the World's commands: what each does to monsters, gates and the leaders' curses."""
+"""The four spells, through the World's commands: what each does to monsters, gates and towers, and that none of them
+touches the leaders' curses (S1)."""
 
 from dataclasses import replace
 
@@ -8,7 +9,7 @@ from hellward.sim import campaign, planner
 from hellward.sim.campaign import g
 from hellward.sim.content import MONSTERS, SPELLS, TOWERS, Curse, Group, Wave
 from hellward.sim.level import Level
-from hellward.sim.model import SIM_DT, ForcedCurse, Refused, World
+from hellward.sim.model import SIM_DT, Refused, World
 from hellward.sim.skills import perks
 
 
@@ -47,50 +48,56 @@ def chanting_leader(**kwargs) -> tuple[World, int]:
     return world, world.monsters[0].id
 
 
-def test_smite_breaks_a_chant_and_the_leader_waits_its_whole_cooldown():
-    world, leader = chanting_leader()
-    world.mana = 100
-    world.smite(leader)
+def cast_everything(world: World, leader: int) -> None:
+    """Every spell there is, each aimed at the leader or where it stands, or at the tower under its sign."""
     priest = world.monster(leader)
-    assert not priest.chanting and events(world, "broken")
-    assert priest.hp < priest.max_hp
-    run(world, 2)
-    assert not any(t.curses for t in world.towers.values())
-    assert not events(world, "cursed")
-    assert priest.cooldown > 5
+    tower = next(iter(world.towers.values()))
+    x, y = world.position(priest)
+    for key, spec in SPELLS.items():
+        world.mana = 1000
+        world.recharge.clear()
+        if spec.aim == "monster":
+            world.smite(leader)
+        elif spec.aim == "floor":
+            {"meteor": world.meteor, "orb": world.orb}[key](x, y)
+        else:
+            world.hymn(tower.id)
 
 
-def test_a_broken_leader_grows_resolute_and_its_next_curse_lands_whatever_strikes_it():
-    """Smite and Frozen Orb stop at most every other curse of a leader: once broken, its next curse is voiced as a
-    mark, pondering and all, and lands through every spell; after it, the leader can be broken again."""
-    world, leader = chanting_leader(hardness=20.0)   # a priest the spells cannot kill
-    for tile in ((9, 9), (12, 5)):
-        world.build("pyre", tile)   # a target for the next curse as the priest advances
-    world.mana = 100
-    world.smite(leader)
-    priest = world.monster(leader)
-    assert priest.resolute
-    world.events.clear()
-    while not events(world, "mark"):
-        if priest.asking is not None:
-            priest.asking = planner.Inline(planner.Decision(
-                leader, planner.Option(Curse.WEAKEN, (9, 9))))
-            if world.recharge.get("smite", 0.0) <= 0:
-                world.mana = 100
-                world.smite(leader)   # a resolute pondering does not break
+def test_no_spell_breaks_a_pondering_or_a_chant_and_the_curse_lands():
+    """S1: whatever strikes a leader that does not die of it, its pondering goes on to a chant and the chant lands."""
+    world = world_of(g("priest", 1), planner=planner.smart, hardness=20.0)   # a priest the spells cannot kill
+    world.gold = 1000
+    world.build("pyre", (5, 5))
+    world.call_wave()
+    while not events(world, "ponder"):
         world.step()
-        assert world.outcome is None and world.time < 60
-    assert priest.marking and not priest.resolute
-    world.recharge.clear()
-    world.mana = 100
-    world.orb(*world.level.point(priest.s))
-    assert priest.chanting
+        assert world.time < 30
+    leader = world.monsters[0].id
+    cast_everything(world, leader)   # while it ponders
+    while not events(world, "chant"):
+        world.step()
+        assert world.time < 30
+    cast_everything(world, leader)   # while it chants
+    assert world.monster(leader).chanting
     run(world, 2)
     assert events(world, "cursed")
-    assert world.chants_broken == 1
+    assert not {"broken", "cleansed", "ward_holds"} & {e[0] for e in world.events}
 
 
-def test_a_frozen_monster_neither_walks_nor_batters_and_a_frozen_leader_loses_its_chant():
+def test_no_spell_lifts_a_curse():
+    """S1: a cursed tower carries its curse to the end, whatever is cast."""
+    world, leader = chanting_leader(hardness=20.0)
+    run(world, 2)
+    tower = next(iter(world.towers.values()))
+    assert tower.curses
+    left = dict(tower.curses)
+    cast_everything(world, leader)
+    assert tower.curses == left
+    assert not hasattr(world, "cleanse") and "cleanse" not in SPELLS
+
+
+def test_a_frozen_monster_neither_walks_nor_batters_and_a_frozen_leader_keeps_its_chant():
     world = world_of(g("zombie", 3, 0.3))
     world.gold = 1000
     world.build_door(0)
@@ -107,10 +114,10 @@ def test_a_frozen_monster_neither_walks_nor_batters_and_a_frozen_leader_loses_it
     run(world, 1.0)
     assert world.doors[0].hp < gate
 
-    world, leader = chanting_leader()
+    world, leader = chanting_leader(hardness=20.0)
     world.mana = 100
     world.orb(*world.level.point(world.monster(leader).s))
-    assert not world.monster(leader).chanting and events(world, "broken")
+    assert world.monster(leader).frozen > 0 and world.monster(leader).chanting
 
 
 def test_a_meteor_lands_after_its_delay_and_leaves_the_floor_burning():
@@ -137,8 +144,11 @@ def test_spells_need_mana_and_a_place_in_the_locations_arsenal():
     world.call_wave()
     run(world, 2)
     world.mana = 100
-    with pytest.raises(Refused, match="Smite"):
-        world.smite(world.monsters[0].id)   # Tristram teaches only Cleanse
+    world.gold = 1000
+    tower = world.build("arrow", next((x, y) for y in range(world.level.height) for x in range(world.level.width)
+                                      if world.level.buildable(x, y)))
+    with pytest.raises(Refused, match="Battle Hymn"):
+        world.hymn(tower.id)   # Tristram teaches only Smite
     world = world_of(g("fallen", 3))
     world.call_wave()
     run(world, 2)
@@ -150,18 +160,32 @@ def test_spells_need_mana_and_a_place_in_the_locations_arsenal():
     assert world.mana == pytest.approx(100 - SPELLS["smite"].mana)
 
 
-def test_under_salvation_a_cleansed_tower_is_warded_and_no_leader_can_curse_it():
-    world, leader = chanting_leader(perks=perks({"holy_shield", "salvation"}))
-    pyre = next(iter(world.towers.values()))
-    pyre.curses[Curse.WEAKEN] = 5.0
+def bolts_loosed(world: World, seconds: float) -> int:
+    world.record = True
+    world.events.clear()
+    run(world, seconds)
+    return len(events(world, "bolt"))
+
+
+def test_battle_hymn_doubles_a_towers_attacks_for_its_while():
+    """S3's boost: the hymned arrow looses twice as many arrows while the hymn lasts, and as many as before after."""
+    world = world_of(g("zombie", 1), hardness=20.0)   # it lives through both
+    world.gold = 1000
+    arrow = world.build("arrow", (3, 5))
+    world.call_wave()
+    run(world, 3.0)   # the zombie walks into reach
+    plain = bolts_loosed(world.clone(), SPELLS["hymn"].lasting)
     world.mana = 100
-    world.cleanse(pyre.id)
-    assert world.mana == pytest.approx(75)
-    assert pyre.ward > 0
-    assert pyre.id not in {t.id for t in planner.reachable(world, world.monster(leader))}
-    world.forced.append(ForcedCurse(world.time, leader, Curse.BONE_PRISON, pyre.tile))
-    run(world, 2)
-    assert not pyre.curses and events(world, "ward_holds")
+    world.hymn(arrow.id)
+    assert world.mana == pytest.approx(100 - SPELLS["hymn"].mana) and events(world, "hymn") == [("hymn", arrow.id)]
+    assert arrow.rate_mult() == SPELLS["hymn"].rate == 2.0
+    hymned = bolts_loosed(world, SPELLS["hymn"].lasting)
+    assert abs(hymned - 2 * plain) <= 1 and plain >= 3
+    assert arrow.hymn == 0 and arrow.rate_mult() == 1.0
+    with pytest.raises(Refused, match="gathers itself"):
+        world.hymn(arrow.id)   # 15 s to gather itself again
+    with pytest.raises(Refused):
+        world.hymn(9999)
 
 
 def test_a_clone_with_spells_in_the_air_plays_on_like_its_original():

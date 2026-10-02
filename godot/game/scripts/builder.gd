@@ -1,16 +1,18 @@
 class_name Builder
 extends Node3D
 ## The player's hands: hold a tower (1-8 or a slot) and click bare ground to raise it; click a tower to choose it,
-## then U upgrades, Delete (or Backspace) sells, R cleanses. Z, X and C pick Smite, Meteor and Frozen Orb, aimed
-## with a click; Z with a leader pondering or chanting smites the one closest to cursing at once. Hold the gate and
-## click an arch to ward it. Space summons a wave, F doubles the pace, V sells a salvage drop, H hides the HUD, Esc
-## lets go. WASD, Q and E are the camera's (CameraRig). Keys are read by their place on the keyboard, as the camera
-## reads its own (the labels name a QWERTY keyboard's letters): any layout, Cyrillic too, gives the same keys.
+## then U upgrades, Delete (or Backspace) sells. Z, X and C pick Smite, Meteor and Frozen Orb, aimed with a
+## click; R sings Battle Hymn over the chosen tower, or with none chosen picks it to aim at one. Hold the gate
+## and click an arch to ward it. Space summons a wave, F doubles the pace, V sells a salvage drop, H hides the
+## HUD, Esc lets go. WASD, Q and E are the camera's (CameraRig). Keys are read by their place on the keyboard, as
+## the camera reads its own (the labels name a QWERTY keyboard's letters): any layout, Cyrillic too, gives the
+## same keys. The monster under the mouse shows its plate (Hud.hover).
 ## Everything is an order to the server; the ghost and the marks are only this side's guesses.
 
 signal menu                          # Esc with nothing to let go of
 
-const SPELL_KEYS := {KEY_Z: "smite", KEY_X: "meteor", KEY_C: "orb"}
+const SPELL_KEYS := {KEY_Z: "smite", KEY_X: "meteor", KEY_C: "orb", KEY_R: "hymn"}
+const HOVER := 46.0                  # pixels from a monster's body within which the mouse is on it
 
 var world: World
 var hud: Hud
@@ -22,6 +24,7 @@ var _ghost: Node3D
 var _ghost_mat: StandardMaterial3D
 var _tile_mark: MeshInstance3D
 var _reach_mark: MeshInstance3D
+var _mouse := Vector2(-1, -1)        # the mouse in the viewport's pixels, as its last motion put it
 
 
 func setup(w: World, h: Hud, r: CameraRig) -> void:
@@ -126,8 +129,9 @@ func _ground_at(screen: Vector2) -> Vector3:
 
 
 func _process(_delta: float) -> void:
-	var p := _ground_at(get_viewport().get_mouse_position())
+	var p := _ground_at(_mouse)
 	var tile := world.level.tile_at(p)
+	hud.hover(null if held != "" and not held.begins_with("spell:") else monster_at(_mouse), _mouse)
 	if held == "" or held == "gate":
 		_tile_mark.visible = held == "gate" and _arch_at(tile) >= 0
 		if _tile_mark.visible:
@@ -136,6 +140,14 @@ func _process(_delta: float) -> void:
 		return
 	if held.begins_with("spell:"):
 		var spell: Dictionary = world.start["spells"][held.substr(6)]
+		if String(spell["aim"]) == "tower":   # the tower under the mouse lights up, its tile marked
+			var t := world.tower_at(tile)
+			_tile_mark.visible = t != null
+			_reach_mark.visible = false
+			if t:
+				_tile_mark.global_position = world.level.tile_pos(tile) + Vector3(0, 0.06, 0)
+				(_tile_mark.material_override as ShaderMaterial).set_shader_parameter("color", Color(Hud.SPELL_TONES[held.substr(6)], 0.95))
+			return
 		var radius: float = max(float(spell["radius"]), 0.6) * Level.TILE
 		_show_reach(Vector3(p.x, 0, p.z), radius, Color(0.6, 0.8, 1.0, 0.9))
 		return
@@ -159,6 +171,27 @@ func _hover(tile: Vector2i) -> void:
 	_reach_mark.visible = t != null
 	if t:
 		_show_reach(t.global_position, t.reach * Level.TILE, Color(1.0, 0.8, 0.45, 0.5))
+
+
+## The living monster whose body is nearest `screen` (viewport pixels), within HOVER of it; or null.
+func monster_at(screen: Vector2) -> Monster:
+	var best: Monster = null
+	var nearest := HOVER
+	for m in world.monsters.values():
+		if not m.alive() or not rig.cam.is_position_in_frustum(m.chest()):
+			continue
+		var feet := rig.cam.unproject_position(m.global_position)
+		var head := rig.cam.unproject_position(m.head())
+		var d := Geometry2D.get_closest_point_to_segment(screen, feet, head).distance_to(screen)
+		if d < nearest:
+			best = m
+			nearest = d
+	return best
+
+
+func _input(event: InputEvent) -> void:
+	if event is InputEventMouse:
+		_mouse = (event as InputEventMouse).position
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -185,7 +218,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		match k:
 			KEY_U: _order("upgrade")
 			KEY_DELETE, KEY_BACKSPACE: _order("sell")
-			KEY_R: _order("cleanse")
 			KEY_V: _order("salvage")
 			KEY_SPACE: _order("wave")
 			KEY_F: _order("pace")
@@ -228,14 +260,14 @@ func _arch_at(tile: Vector2i) -> int:
 	return -1
 
 
-## Z, X, C: pick a spell to aim. Z with a leader about to curse smites it at once.
+## Z, X, C, R: pick a spell to aim. A spell aimed at a tower (Battle Hymn) falls on the chosen tower at once.
 func _spell(key: String) -> void:
 	if not world.offers(key):
 		Sfx.play("refuse")
 		world.refused.emit("%s is not yet yours." % key.capitalize())
 		return
-	if key == "smite" and _threatened():
-		world.order("smite_threat")
+	if String(world.start["spells"][key]["aim"]) == "tower" and chosen and is_instance_valid(chosen) and not chosen.removed:
+		await world.order(key, {"tower": chosen.id})
 		return
 	choose(null)
 	let_go()
@@ -243,16 +275,17 @@ func _spell(key: String) -> void:
 	Sfx.play("click")
 
 
-func _threatened() -> bool:
-	for m in world.monsters.values():
-		if m.alive() and m.leader and m.casting() >= 0.0:
-			return true
-	return false
-
-
 func _cast(key: String, p: Vector3, shift: bool) -> void:
 	var ok := false
-	if key == "smite":
+	var spell: Dictionary = world.start["spells"][key]
+	if String(spell["aim"]) == "tower":
+		var t := world.tower_at(world.level.tile_at(p))
+		if t == null:
+			Sfx.play("refuse")
+			world.refused.emit("%s falls on a tower: click on one." % spell["name"])
+			return
+		ok = await world.order(key, {"tower": t.id})
+	elif key == "smite":
 		var best: Monster = null
 		for m in world.monsters.values():
 			if m.alive() and Vector2(m.global_position.x - p.x, m.global_position.z - p.z).length() < Level.TILE * 1.2 \
@@ -285,10 +318,6 @@ func _order(name: String) -> void:
 				var t := chosen
 				if await world.order("sell", {"tower": t.id}):
 					choose(null)
-		"cleanse":
-			if chosen:
-				await world.order("cleanse", {"tower": chosen.id})
-				hud.select(chosen)
 		_:
 			if name.begins_with("breach:"):
 				world.order("breach", {"mode": name.substr(7)})

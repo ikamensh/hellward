@@ -251,12 +251,11 @@ func _event(e: Array) -> void:
 		"door_broken":
 			Vfx.dust(self, level.tile_pos(_arch(int(e[1]))), 2.5)
 			Sfx.play("door_break", level.tile_pos(_arch(int(e[1]))))
-		"cleansed":
+		"hymn":
 			var t: Tower = towers.get(int(e[1]))
 			if t:
-				t.lift_curse()
-				Vfx.holy(self, t.global_position)
-				Sfx.play("cleanse", t.global_position)
+				t.hymned()
+				Sfx.play("hymn", t.global_position)
 		"smite":
 			var at := ground(e[2])
 			Vfx.lightning(self, [at + Vector3(0, 22, 0), at + Vector3(0, 1.0, 0)])
@@ -296,25 +295,11 @@ func _event(e: Array) -> void:
 			var m: Monster = monsters.get(int(e[1]))
 			if m:
 				m.chant(String(e[2]), Vector2i(int(e[3][0]), int(e[3][1])), kind == "mark")
-		"broken":
-			var m: Monster = monsters.get(int(e[1]))
-			if m:
-				m.broken()
-				Sfx.play("broken", m.chest())
-				announce.emit("", "The %s's curse is broken." % m.title())
 		"fizzle":
 			var m: Monster = monsters.get(int(e[1]))
 			if m:
 				m.stop_chant()
 			Sfx.play("fizzle", level.tile_pos(Vector2i(int(e[2][0]), int(e[2][1]))))
-		"ward_holds":
-			var t: Tower = towers.get(int(e[2]))
-			if t:
-				Vfx.holy(self, t.global_position)
-				Sfx.play("ward", t.global_position)
-			var m: Monster = monsters.get(int(e[1]))
-			if m:
-				m.stop_chant()
 		"cursed":
 			_cursed(int(e[1]), Vector2i(int(e[2][0]), int(e[2][1])), String(e[3]), e[4])
 		"curse_ended":
@@ -328,6 +313,17 @@ func _event(e: Array) -> void:
 			if m:
 				m.leak()
 			Sfx.play("leak")
+		"returned":
+			var m: Monster = monsters.get(int(e[1]))
+			if m:
+				m.returned(int(e[4]))
+				Sfx.play("returned", level.door_pos)
+				announce.emit("", "%s strikes the shrine for %d lives and is cast back to its portal." % [m.title(), int(e[3])])
+		"hook":
+			var t: Tower = towers.get(int(e[1]))
+			var m: Monster = monsters.get(int(e[2]))
+			if t and m:
+				t.hook(m, float(e[3]))
 		"bolt":
 			var b: Dictionary = e[1]
 			var t: Tower = towers.get(int(b["tower"]))
@@ -457,6 +453,6 @@ func _arch(index: int) -> Vector2i:
 
 func _has_boss(w: Dictionary) -> bool:
 	for g in w["groups"]:
-		if String(g["kind"]) in ["azazel", "bone_priest"]:
+		if bool(monster_table(String(g["kind"]))["boss"]):
 			return true
 	return false

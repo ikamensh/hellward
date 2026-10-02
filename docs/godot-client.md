@@ -55,7 +55,7 @@ commit on both sides and one test run covers both. Delete `hellward3d` afterward
   curse pondered, chanted, landed, broken, marked; spells; gates; wave called and cleared; gold, lives, mana;
   outcome) and a snapshot of every monster (id, kind, route, distance along it, lane offset, life, chill, frozen,
   poison, chanting) and tower (id, kind, rank, curses and their time left, cooldown readiness).
-- The client sends orders: build, upgrade, sell, cleanse, spells with their target (Smite, Meteor, Frozen Orb), gate
+- The client sends orders: build, upgrade, sell, spells with their target (Smite, Battle Hymn, Meteor, Frozen Orb), gate
   build and repair, call the wave, sell salvage, breach choices, pace, pause. The server answers each with accepted or
   refused and why, and the client plays the refusal.
 - Real time: the server steps at 20 Hz times the pace; the client draws at its frame rate, smoothing between steps.
@@ -96,7 +96,7 @@ them with the demo's pipeline: Blender scripts, Codex-painted textures, the mate
 - A protocol test plays a logged defence through the server and checks its event digest against `hands.defend`
   run directly: the server adds transport, never a different battle.
 - A client test (headless Godot, as `hellward3d/tools/test.sh`) plays a battle against the real server: build by
-  mouse, call waves, a curse lands and Cleanse lifts it, victory and defeat end the battle and its music.
+  mouse, call waves, a curse lands, victory and defeat end the battle and its music.
 - A campaign test walks title, profile, map, briefing, skill tree, battle and back, against the real server.
 - A protocol benchmark keeps the measured budget honest (message size, encode and parse time, round trip).
 - Visual changes are checked in rendered frames. Rendering never disturbs the person at the Mac: only through
@@ -131,8 +131,9 @@ GDScript or C#, a Windows build (the transport choice must not rule it out).
   how far between two steps it is drawing. Online play would hand the clock back to the server.
 - **Messages.** `hellward/server/protocol.py` and `service.py` list them: the battle's start (map, routes, gates,
   waves, arsenal, tables), a frame per step (events with the newcomers' facts, purse and clocks, monsters
-  `[id, s, hp, flags, chill, frozen, poison, door]`, towers `[id, level, reach, curses, ward, upgrade cost, needs,
-  refund]`, gates, burning ground), orders answered by a frame and a reply or by a refusal with its reason, and
+  `[id, s, hp, flags, chill, frozen, poison, door, moved]`, towers `[id, level, reach, curses, hymn, upgrade cost,
+  needs, refund]`, gates, burning ground; the start's monster table carries each kind's armor, element tags and the
+  `hits` each tower here deals it, by the simulation's own `felt_hit`), orders answered by a frame and a reply or by a refusal with its reason, and
   the campaign's requests answered with finished words (a briefing's lines, a skill's tooltip, the reckoning).
 - **Measured** (`tools/protocol_bench.py`, 2026-10-01, M4, veteran player): a frame is 0.9-1.0 KB on average and
   2.2 KB at most (17-19 KB/s); the server builds and encodes one in 19-21 us; a request's round trip is 50 us
@@ -141,8 +142,9 @@ GDScript or C#, a Windows build (the transport choice must not rule it out).
 - **Verification.** `tests/test_server.py` (a scripted defence through the server is `hands.defend` event for
   event; a person's orders log a defence whose ghost fights the identical battle), `tests/test_campaign_server.py`
   (the campaign's rules through the real server, including a defence won by the real rules), `godot/tools/test.sh`
-  (the client against the real server: building by mouse, refusals, waves, a curse and Cleanse, defeat and
-  victory with their music, the frame parse, and a walk through the campaign's screens).
+  (the client against the real server: building by mouse, refusals, waves, a curse, Battle Hymn by key and by
+  click, a monster striking the shrine, a monster's plate under the mouse, defeat and victory with their music, the
+  frame parse, and a walk through the campaign's screens).
 - **Content (step 4, under way).** All twelve locations play with their own scenery. Every tower family has a
   model per rank (`tools/blender/tower_<kind>.py` builds `tower_<kind>_1..3`). Monsters: the Fallen, Shaman, Zombie
   and Skeleton are hand-made (godot/docs/monsters.md); the other fifteen kinds, the two bosses among them, have

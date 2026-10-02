@@ -14,9 +14,15 @@ const LEADER_RIM := Color(0.6, 0.32, 0.85)
 const UNIQUE := Color(0.84, 0.72, 0.46)     # the sealed side entrance, in Diablo's colour for uniques
 const HOLY := Color(0.98, 0.9, 0.62)
 const WASTE := Color(0.92, 0.24, 0.15)      # blood, lifted to read on the dark
-const GLYPH_TONES := {"smite": Color(1.0, 0.92, 0.6), "meteor": Color(1.0, 0.45, 0.12), "gate": Color(0.85, 0.62, 0.3)}
-const NOTE_HEADS := ["Resists", "Immune", "Weak", "Flies", "Curses", "Raises", "Marks", "Each", "No resistances"]
-const RESISTS := {"Resists": Color(0.74, 0.69, 0.6), "Immune to": Color(0.96, 0.86, 0.68), "Weak to": Color(0.72, 0.9, 0.5)}
+const SPELL_KEYS := {"smite": "Z", "meteor": "X", "orb": "C", "hymn": "R"}
+const GLYPH_TONES := {"smite": Color(1.0, 0.92, 0.6), "meteor": Color(1.0, 0.45, 0.12), "gate": Color(0.85, 0.62, 0.3),
+	"hymn": Color(1.0, 0.78, 0.3)}
+const TOWER_HUES := {"arrow": Color(0.55, 0.32, 0.14), "ballista": Color(0.5, 0.36, 0.2), "hook": Color(0.36, 0.38, 0.42),
+	"knife": Color(0.42, 0.44, 0.5), "pyre": Color(0.7, 0.26, 0.08), "frost": Color(0.16, 0.32, 0.6),
+	"storm": Color(0.32, 0.22, 0.62)}
+const NOTE_HEADS := ["Armor", "Protected", "Vulnerable", "Flies", "Strikes", "Curses", "Raises", "Marks", "Each",
+	"Unarmored"]
+const TAGS := {"Protected from": Color(0.74, 0.69, 0.6), "Vulnerable to": Color(0.72, 0.9, 0.5)}
 const SLOT := 68.0                          # an arsenal item's well
 const PORTRAIT_BG := Color(0.026, 0.02, 0.024)
 
@@ -364,7 +370,7 @@ func _curses() -> Control:
 	answer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	col.add_child(answer)
 	var cross := TextureRect.new()
-	cross.texture = load("res://assets/ui/cleanse.png")
+	cross.texture = load("res://assets/ui/holy.png")
 	cross.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	cross.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	cross.custom_minimum_size = Vector2(38, 38)
@@ -964,7 +970,8 @@ static func _italic() -> Font:
 	return _italic_font
 
 
-## The server's notes on a kind ("Resists Fire, Curses: Weaken, Decrepify") one per line, a curse list kept whole.
+## The server's notes on a kind ("Armor 2, Protected from Fire, Curses: Weaken, Decrepify") one per line, a curse
+## list kept whole.
 static func _notes(text: String) -> Array:
 	var out: Array = []
 	for part in text.split(", "):
@@ -976,15 +983,15 @@ static func _notes(text: String) -> Array:
 	return out
 
 
-## The notes as the card shows them, in Diablo's manner: one line per kind of note, the resisted elements gathered on
+## The notes as the card shows them, in Diablo's manner: one line per kind of note, the tagged elements gathered on
 ## one line, each element in its colour, what a leader does in violet.
 static func _described(notes: Array) -> String:
-	var elements := {}                  # "Resists", "Immune to", "Weak to" -> the elements' names
+	var elements := {}                  # "Protected from", "Vulnerable to" -> the elements' names
 	var lines: Array = []
 	for n in notes:
 		var note := String(n)
 		var head := ""
-		for h in RESISTS:
+		for h in TAGS:
 			if note.begins_with(h + " "):
 				head = h
 		if head == "":
@@ -994,22 +1001,24 @@ static func _described(notes: Array) -> String:
 			elements[head] = []
 			lines.append(head)
 		var element := note.substr(head.length() + 1)
-		var tone: Color = Hud.ELEMENT_TONES.get(element.to_lower(), Style.BONE)
-		if head != "Immune to":
-			tone = tone.lerp(Style.BONE, 0.2)
+		var tone: Color = Hud.ELEMENT_TONES.get(element.to_lower(), Style.BONE).lerp(Style.BONE, 0.2)
 		elements[head].append("[color=#%s]%s[/color]" % [tone.to_html(false), element])
 	for i in lines.size():
 		var head := String(lines[i])
 		if elements.has(head):
-			lines[i] = "[color=#%s]%s[/color] %s" % [RESISTS[head].to_html(false), head, ", ".join(elements[head])]
+			lines[i] = "[color=#%s]%s[/color] %s" % [TAGS[head].to_html(false), head, ", ".join(elements[head])]
 	return "[center]%s[/center]" % "\n".join(lines)
 
 
 static func _note_tone(note: String) -> Color:
 	if note.begins_with("Flies"):
 		return Color(0.7, 0.82, 1.0)
-	if note.begins_with("No resistances"):
+	if note.begins_with("Unarmored"):
 		return Style.DIM_GOLD
+	if note.begins_with("Armor"):
+		return Color(0.8, 0.82, 0.88)
+	if note.begins_with("Strikes"):
+		return Color(1.0, 0.8, 0.45)    # a boss's strike on the shrine
 	return Color(0.84, 0.64, 1.0)       # what a leader does: its curses, raising, marking, burning
 
 

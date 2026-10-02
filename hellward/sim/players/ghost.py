@@ -3,7 +3,7 @@
 A log is what the server (:class:`~hellward.server.battle.Battle`) writes for a defence a person plays: the location, the
 seed, the skills learned and every command with the time it took effect. The ghost learns the log's skills and
 issues each command through the hands when the world's time reaches the logged time: builds, upgrades, sells,
-gates and wave calls as they were given, a cleanse on the tower standing on the logged tile, a smite on the
+gates and wave calls as they were given, a Battle Hymn on the tower standing on the logged tile, a smite on the
 monster nearest the logged point, a meteor or an orb at the logged point. Whatever the world refuses (a tower
 the ghost cannot yet afford, since the monsters were made tougher) is tried again every step for ten seconds of
 game time, then let go, so a harder location still plays out to its end.
@@ -102,11 +102,11 @@ class Ghost:
                 world.choose_breach(str(args[0]))
             elif name == "sell_salvage":
                 world.sell_salvage(int(args[0]))
-            elif name == "cleanse":
+            elif name == "hymn":
                 tower = world.tower_at(_tile(args[0]))
                 if tower is None:
                     raise Refused("No tower stands there yet.")
-                hands.cleanse(tower.id)
+                hands.hymn(tower.id)
             elif name == "smite":
                 target = self._nearest(world, float(args[0]), float(args[1]))
                 if target is None:

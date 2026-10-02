@@ -1,5 +1,5 @@
 shader_type spatial;
-// Cleanse: a column of holy light on an open cylinder. Soft at its silhouette, bright down its middle, bands of
+// Holy light (Smite, the shrine): a column of holy light on an open cylinder. Soft at its silhouette, bright down its middle, bands of
 // light streaming up it, faded into the ground and away into the sky. `fade` takes it out.
 render_mode unshaded, blend_add, cull_disabled, depth_draw_never, shadows_disabled, fog_disabled;
 

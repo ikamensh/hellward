@@ -3,14 +3,15 @@ extends CanvasLayer
 ## The screen over the battle, in Diablo's manner: a narrow iron bar at the bottom capped by the life and mana
 ## orbs in their sculpted holders, the tower slots, the wave and the gold on it, the chosen tower's card above it.
 ## Banners, a leader's bar and the chronicle of curses live on a layer of their own (`_over`), so H (toggle) puts
-## the HUD away and film mode (cinematic) fades it while they stay.
+## the HUD away and film mode (cinematic) fades it while they stay. A monster under the mouse shows its life, armor,
+## element tags and the hit each of the player's towers deals it (`hover`).
 
 signal slot_pressed(kind: String)     # a tower kind, "gate", or "spell:<key>"
-signal order(name: String)            # "wave", "upgrade", "sell", "cleanse", "pace", "salvage", "breach:<mode>", "menu"
+signal order(name: String)            # "wave", "upgrade", "sell", "pace", "salvage", "breach:<mode>", "menu"
 
-const SPELLS := {"cleanse": "R", "smite": "Z", "meteor": "X", "orb": "C"}
-const SPELL_TONES := {"cleanse": Color(1.0, 0.85, 0.45), "smite": Color(1.0, 0.95, 0.7), "meteor": Color(1.0, 0.45, 0.12),
-	"orb": Color(0.45, 0.7, 1.0)}
+const SPELLS := {"smite": "Z", "meteor": "X", "orb": "C", "hymn": "R"}
+const SPELL_TONES := {"smite": Color(1.0, 0.95, 0.7), "meteor": Color(1.0, 0.45, 0.12), "orb": Color(0.45, 0.7, 1.0),
+	"hymn": Color(1.0, 0.78, 0.3)}
 const BAR := Vector2(1240, 112)       # the bottom bar, centred, LIFT px above the screen's edge
 const LIFT := 10.0
 const ORB := 176.0                    # an orb's glass, across
@@ -28,7 +29,8 @@ const ELEMENT_TONES := {"physical": Color(0.82, 0.76, 0.66), "fire": Color(1.0, 
 	"bone": Color(0.9, 0.86, 0.72), "nature": Color(0.45, 0.85, 0.4)}
 const TOWER_HUES := {"arrow": Color(0.55, 0.32, 0.14), "pyre": Color(0.7, 0.26, 0.08),   # a portrait's halo, per kind
 	"frost": Color(0.16, 0.32, 0.6), "storm": Color(0.32, 0.22, 0.62), "plague": Color(0.24, 0.5, 0.14),
-	"altar": Color(0.55, 0.5, 0.38), "grove": Color(0.2, 0.48, 0.18)}
+	"altar": Color(0.55, 0.5, 0.38), "grove": Color(0.2, 0.48, 0.18),
+	"ballista": Color(0.5, 0.36, 0.2), "hook": Color(0.36, 0.38, 0.42), "knife": Color(0.42, 0.44, 0.5)}
 const TONES := {"wave": Color(0.95, 0.76, 0.4), "curse": Color(0.76, 0.42, 1.0),
 	"won": Color(0.86, 0.9, 0.55), "lost": Color(0.88, 0.12, 0.07)}
 
@@ -95,10 +97,21 @@ var _curse_bar: ShaderMaterial
 var _curse_text: Label
 var _upgrade: Button
 var _sell: Button
-var _cleanse: Button
+var _hymn_box: Control
+var _hymn_bar: ShaderMaterial
+var _hymn_text: Label
 var _selected: Tower
 var _portraits := {}                  # "kind:rank" -> [SubViewport, the turning pivot]
 var _turning: Node3D
+
+var _leader_kind: Label
+var _hover: PanelContainer
+var _hover_title: Label
+var _hover_life: Label
+var _hover_notes: VBoxContainer
+var _hover_grid: GridContainer
+var _hovered: Monster
+var _hover_shown: Array = []          # the monster, strikes and movers the plate was filled for
 
 
 ## Film mode: the bar and orbs sink away, leaving the battle and the banners.
@@ -172,6 +185,7 @@ func _build() -> void:
 	_build_card()
 	_build_banner(top)
 	_build_leader(top)
+	_build_hover()
 	_chronicle = VBoxContainer.new()
 	_pin(_chronicle, 1.0, 0.0, Rect2(-620, 22, 596, 0))
 	_chronicle.add_theme_constant_override("separation", 4)
@@ -215,7 +229,7 @@ func _build_orbs() -> void:
 	_mana_orb = mana[0]
 	_mana_text = mana[1]
 	_mana_text.add_theme_font_size_override("font_size", 38)
-	mana[2].tooltip_text = "Mana: it wells back slowly. Cleanse spends %d to lift a curse." % int(world.spell_cost("cleanse"))
+	mana[2].tooltip_text = "Mana: it wells back slowly, and your spells spend it."
 
 
 ## An orb at one end of the bar (`side` -1 left, 1 right): the glass, its sculpted frame over it, its number.
@@ -273,7 +287,7 @@ func _build_slots() -> void:
 		row.add_child(b)
 
 
-## The spells offered here, in a row over the bar's right end: Cleanse, then the aimed ones.
+## The spells offered here, in a row over the bar's right end, in the order of their keys (Q W E R).
 func _build_spells() -> void:
 	var keys := []
 	for key in SPELLS:
@@ -293,10 +307,7 @@ func _build_spells() -> void:
 			tip += " Then %d s to gather itself. Not while paused." % int(spell["recharge"])
 		var b := _slot(SPELLS[key], _icon(key), tip)
 		b.custom_minimum_size = Vector2(size, size)
-		if key == "cleanse":
-			b.pressed.connect(func(): order.emit("cleanse"))
-		else:
-			b.pressed.connect(func(): slot_pressed.emit("spell:" + key))
+		b.pressed.connect(func(): slot_pressed.emit("spell:" + key))
 		var drop := ColorRect.new()
 		var dm := ShaderMaterial.new()
 		dm.shader = preload("res://shaders/orb.gdshader")
@@ -605,9 +616,18 @@ func _build_card() -> void:
 	_curse_bar = _gauge(cb, Color(0.55, 0.2, 0.9), Vector2(0, 8))
 	_curse_box.add_child(cb)
 
-	var orders := HFlowContainer.new()   # Upgrade on a row; Sell and Cleanse under it when they do not fit
-	orders.add_theme_constant_override("h_separation", 6)
-	orders.add_theme_constant_override("v_separation", 6)
+
+	_hymn_box = VBoxContainer.new()
+	_hymn_box.add_theme_constant_override("separation", 3)
+	body.add_child(_hymn_box)
+	_hymn_text = _caps(12, SPELL_TONES["hymn"])
+	_hymn_box.add_child(_hymn_text)
+	var hb := ColorRect.new()
+	_hymn_bar = _gauge(hb, SPELL_TONES["hymn"] * 0.8, Vector2(0, 8))
+	_hymn_box.add_child(hb)
+
+	var orders := HBoxContainer.new()
+	orders.add_theme_constant_override("separation", 6)
 	body.add_child(orders)
 	_upgrade = _button("")
 	_upgrade.icon_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -617,9 +637,7 @@ func _build_card() -> void:
 	_sell = _button("")
 	_sell.pressed.connect(func(): order.emit("sell"))
 	orders.add_child(_sell)
-	_cleanse = _button("Cleanse · R")
-	_cleanse.pressed.connect(func(): order.emit("cleanse"))
-	orders.add_child(_cleanse)
+
 	_card.visible = false
 
 
@@ -739,10 +757,10 @@ func _build_leader(top: Control) -> void:
 	var life := ColorRect.new()
 	_leader_life = _gauge(life, Color(0.78, 0.07, 0.04), Vector2(480, 16))
 	col.add_child(life)
-	var kind := _caps(13, Color(0.82, 0.74, 0.9))
-	kind.text = "Leader · curses the towers that hurt its pack"
-	kind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(kind)
+
+	_leader_kind = _caps(11, Color(0.82, 0.74, 0.9))
+	_leader_kind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(_leader_kind)
 	_leader_cast_box = VBoxContainer.new()
 	_leader_cast_box.add_theme_constant_override("separation", 3)
 	col.add_child(_leader_cast_box)
@@ -756,6 +774,152 @@ func _build_leader(top: Control) -> void:
 	_leader_cast_text.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
 	_leader_cast_box.add_child(_leader_cast_text)
 	_leader.modulate.a = 0.0
+
+
+# a monster under the mouse: a dark plate by the cursor with its name, life, armor and tags, and the hits table
+func _build_hover() -> void:
+	_hover = PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.035, 0.03, 0.034, 0.94)
+	sb.border_color = Style.BRONZE
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(2)
+	sb.content_margin_left = 14
+	sb.content_margin_right = 14
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 10
+	sb.shadow_color = Color(0, 0, 0, 0.6)
+	sb.shadow_size = 10
+	_hover.add_theme_stylebox_override("panel", sb)
+	_hover.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hover.visible = false
+	_root.add_child(_hover)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 3)
+	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hover.add_child(col)
+	_hover_title = _label(Style.title_font(), 24, Style.GOLD)
+	col.add_child(_hover_title)
+	_hover_life = _label(Style.text_font(), 18, Style.BONE)
+	col.add_child(_hover_life)
+	_hover_notes = VBoxContainer.new()
+	_hover_notes.add_theme_constant_override("separation", 1)
+	col.add_child(_hover_notes)
+	var rule := TextureRect.new()
+	rule.texture = _gradient([[0.0, Color(Style.BRONZE, 0.0)], [0.5, Color(Style.BRONZE, 0.9)], [1.0, Color(Style.BRONZE, 0.0)]], false)
+	rule.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	rule.stretch_mode = TextureRect.STRETCH_SCALE
+	rule.custom_minimum_size = Vector2(0, 1)
+	col.add_child(rule)
+	_hover_grid = GridContainer.new()
+	_hover_grid.columns = 4
+	_hover_grid.add_theme_constant_override("h_separation", 14)
+	_hover_grid.add_theme_constant_override("v_separation", 0)
+	col.add_child(_hover_grid)
+
+
+## The monster under the mouse at `at` (viewport pixels), or null: its plate shows by the cursor, its life kept
+## current. The hits are the server's (the battle's `hits` table): what each rank of each tower here deals it.
+func hover(m: Monster, at := Vector2.ZERO) -> void:
+	if m == null or not is_instance_valid(m) or not m.alive():
+		_hovered = null
+		_hover_shown = []
+		_hover.visible = false
+		return
+	var shown := [m, m.strikes, m.moved]   # a return or a hook changes what the plate says of it
+	if shown != _hover_shown:
+		_hover_shown = shown
+		_fill_hover(m)
+	_hovered = m
+	_hover.visible = true
+	_hover_life.text = "Life %d / %d" % [ceili(m.hp), ceili(m.max_hp)]
+	var armor := int(m.stats["armor"])
+	if armor > 0:
+		_hover_life.text += "   ·   Armor %d" % armor
+	_hover.reset_size()
+	var view := get_viewport().get_visible_rect().size
+	var size := _hover.get_combined_minimum_size()
+	var pos := at + Vector2(26, 22)
+	if pos.x + size.x > view.x - 8:
+		pos.x = at.x - 26 - size.x
+	pos.y = clampf(pos.y, 8, view.y - size.y - LIFT - BAR.y - 8)
+	_hover.position = pos
+
+
+## The monster the plate shows, or null.
+func hovered() -> Monster:
+	return _hovered if _hover.visible else null
+
+
+## The plate's words, line by line (the tests read them).
+func hover_text() -> String:
+	var out := [_hover_title.text, _hover_life.text]
+	for l in _hover_notes.get_children():
+		out.append((l as Label).text)
+	var row := []
+	for l in _hover_grid.get_children():
+		row.append((l as Label).text)
+		if row.size() == _hover_grid.columns:
+			out.append(" ".join(row).strip_edges())
+			row = []
+	return "\n".join(out)
+
+
+func _fill_hover(m: Monster) -> void:
+	var table: Dictionary = m.stats
+	_hover_title.text = m.title()
+	_hover_title.add_theme_color_override("font_color", Color(0.9, 0.72, 1.0) if m.leader else Style.GOLD)
+	for c in _hover_notes.get_children():
+		c.free()
+	var tags := [["Protected", table["protected"], Color(0.62, 0.62, 0.66)],
+		["Vulnerable", table["vulnerable"], Color(0.95, 0.55, 0.4)]]
+	for tag in tags:
+		if (tag[1] as Array).is_empty():
+			continue
+		var names := []
+		for e in tag[1]:
+			names.append(String(e).capitalize())
+		var l := _caps(12, tag[2])
+		l.text = "%s: %s" % [tag[0], ", ".join(names)]
+		_hover_notes.add_child(l)
+	var traits := []
+	if bool(table["flying"]):
+		traits.append("Flies")
+	if m.boss:
+		traits.append("Boss · %d %s" % [m.strikes, "strike" if m.strikes == 1 else "strikes"])
+	if m.moved & 1:
+		traits.append("Hooked once")
+	if not traits.is_empty():
+		var l := _caps(12, Style.DIM_GOLD)
+		l.text = " · ".join(traits)
+		_hover_notes.add_child(l)
+	for c in _hover_grid.get_children():
+		c.free()
+	var hits: Dictionary = table["hits"]
+	if hits.is_empty():
+		return
+	var head := _caps(11, Style.DIM_GOLD)
+	head.text = "Your hits"
+	_hover_grid.add_child(head)
+	for r in 3:
+		var n := _caps(11, Style.DIM_GOLD)
+		n.text = NUMERALS[r]
+		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_hover_grid.add_child(n)
+	for kind in hits:
+		var tower: Dictionary = world.tower_table(kind)
+		var name := _label(Style.text_font(), 17, ELEMENT_TONES.get(String(tower["element"]), Style.BONE))
+		name.text = String(tower["name"])
+		_hover_grid.add_child(name)
+		for r in 3:
+			var felt := int(hits[kind][r])
+			var dealt := int(round(float(tower["levels"][r]["damage"])))
+			var v := _label(Style.text_font(), 17, Style.BONE if felt == dealt else
+				(Color(0.95, 0.5, 0.38) if felt < dealt else Color(0.7, 0.92, 0.5)))
+			v.text = str(felt)
+			v.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			v.custom_minimum_size = Vector2(30, 0)
+			_hover_grid.add_child(v)
 
 
 ## A tower's portrait: its model with its fire and glow, a cool key light and a warm rim, framed from three
@@ -960,6 +1124,10 @@ func _refresh_card() -> void:
 		for c in t.curses:
 			longest = max(longest, float(world.start["curses"][c]["duration"]))
 		_curse_bar.set_shader_parameter("fill", t.curse_left() / longest)
+	_hymn_box.visible = t.hymn > 0.0
+	if t.hymn > 0.0:
+		_hymn_text.text = "%s · %d s" % [world.start["spells"]["hymn"]["name"], ceili(t.hymn)]
+		_hymn_bar.set_shader_parameter("fill", t.hymn / maxf(float(world.start["spells"]["hymn"]["lasting"]), t.hymn))
 	_card_iron.set_shader_parameter("curse", 1.0 if cursed else 0.0)
 	_card_style.shadow_color = Color(0.5, 0.12, 0.9, 0.5) if cursed else Color(0, 0, 0, 0.6)
 	if t.upgrade_cost != null:
@@ -979,7 +1147,6 @@ func _refresh_card() -> void:
 		_upgrade.disabled = true
 	_sell.text = "SELL · DEL  +%d" % t.refund
 	_sell.disabled = cursed or world.demo
-	_cleanse.disabled = not cursed or world.mana < world.spell_cost("cleanse") or world.demo
 	if not was:
 		_card.modulate.a = 0.0
 		_card.create_tween().tween_property(_card, "modulate:a", 1.0, 0.18)
@@ -1001,7 +1168,7 @@ func _refresh_leader(delta: float) -> void:
 	var best: Monster = null
 	var score := -1.0
 	for m in world.monsters.values():
-		if m.leader and m.alive() and cam and cam.is_position_in_frustum(m.chest()):
+		if (m.leader or m.boss) and m.alive() and cam and cam.is_position_in_frustum(m.chest()):
 			var s: float = m.progress + (2.0 if m.casting() >= 0.0 else 0.0)   # a cursing one first, then the foremost
 			if s > score:
 				best = m
@@ -1011,6 +1178,13 @@ func _refresh_leader(delta: float) -> void:
 		return
 	_leader_name.text = best.title()
 	_leader_life.set_shader_parameter("fill", best.hp / best.max_hp)
+	var what := []
+	if best.boss:
+		what.append("Boss · %d %s on the shrine" % [best.strikes, "strike" if best.strikes == 1 else "strikes"]
+			if best.strikes > 0 else "Boss · cast back from the shrine, it comes again")
+	if best.leader:
+		what.append("Leader · curses the towers that hurt its pack")
+	_leader_kind.text = " · ".join(what)
 	var cast := best.casting()
 	var target := best.curse_target()
 	_leader_cast_box.modulate.a = 1.0 if cast >= 0.0 else 0.0

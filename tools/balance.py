@@ -4,8 +4,10 @@
     uv run python tools/balance.py --policies none,smart --defenders 4 --location hells_gate
 
 Each defender is the ordinary player with a different element rotation and tower count. For every leader
-policy it prints the victories, the lives the defenders lost (mean and range) and the curses cast. The
-leaders are worth something when ``smart`` costs the defenders clearly more lives than ``random``.
+policy it prints the victories, the lives the defenders lost (mean and range), the curses cast, and S3's measure:
+the share of the towers the curses caught that were hymned when caught, against the share of tower-time that was
+hymned. The leaders are worth something when ``smart`` costs the defenders clearly more lives than ``random``, and
+see the hymn when they curse hymned towers more often than the hymn's share of the time.
 
 It runs the compiled simulation (:mod:`hellward.fastsim`, built on first use), which plays as the source does;
 ``HELLWARD_INTERPRETED=1`` runs the source.
@@ -53,10 +55,15 @@ def match(policy: str, index: int, count: int, location: str) -> dict:
         defender.act(hands)
         world.step(SIM_DT)
         hands.observe(world.events)
+        stats["tower_steps"] += len(world.towers)
+        stats["hymned_steps"] += sum(1 for t in world.towers.values() if t.hymn > 0)
         for e in world.events:
-            if e[0] in ("cursed", "fizzle", "cleansed", "door_broken"):
+            if e[0] in ("cursed", "fizzle", "hymn", "door_broken"):
                 stats[e[0]] += 1
-            elif e[0] == "leak":
+            if e[0] == "cursed":
+                stats["caught"] += len(e[4])
+                stats["caught_hymned"] += sum(1 for tid in e[4] if world.towers[tid].hymn > 0)
+            elif e[0] in ("leak", "returned"):
                 leaks[world.wave] += e[3]
         world.events.clear()
     lost = 10_000 - world.lives
@@ -82,8 +89,11 @@ def main() -> None:
         stats: Counter = sum((r["stats"] for r in rows), Counter())
         leaks: Counter = sum((r["leaks"] for r in rows), Counter())
         n = len(rows)
+        hymned = stats["caught_hymned"] / stats["caught"] if stats["caught"] else 0.0
+        hymn_time = stats["hymned_steps"] / stats["tower_steps"] if stats["tower_steps"] else 0.0
         print(f"{policy:8s} wins {wins}/{n}  lives lost mean {statistics.mean(lost):5.1f} range {min(lost)}-{max(lost)}  "
-              f"curses {stats['cursed'] / n:4.1f} cleansed {stats['cleansed'] / n:4.1f} doors broken {stats['door_broken'] / n:3.1f}  "
+              f"curses {stats['cursed'] / n:4.1f} hymns {stats['hymn'] / n:4.1f} doors broken {stats['door_broken'] / n:3.1f}  "
+              f"hymned caught {hymned:.0%} of tower-time {hymn_time:.0%}  "
               f"lives lost by wave {' '.join(f'{w + 1}:{leaks[w] / n:.1f}' for w in sorted(leaks))}")
 
 

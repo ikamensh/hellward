@@ -2,20 +2,22 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d2xuagtbipfn3"
-path="res://.godot/imported/cleanse.png-beba5a3bb6ec3ff1dbd2ee9a8a302107.ctex"
+uid="uid://cv1v6du6aaaah"
+path.s3tc="res://.godot/imported/hymn.png-82a221131db3b118c9b597328aea2da2.s3tc.ctex"
+path.etc2="res://.godot/imported/hymn.png-82a221131db3b118c9b597328aea2da2.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 
 [deps]
 
-source_file="res://assets/ui/cleanse.png"
-dest_files=["res://.godot/imported/cleanse.png-beba5a3bb6ec3ff1dbd2ee9a8a302107.ctex"]
+source_file="res://assets/ui/hymn.png"
+dest_files=["res://.godot/imported/hymn.png-82a221131db3b118c9b597328aea2da2.s3tc.ctex", "res://.godot/imported/hymn.png-82a221131db3b118c9b597328aea2da2.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
