@@ -38,6 +38,7 @@ ARRIVING = 3.0        # tiles of path before a tower's reach whose monsters coun
 METEOR_BITE = 3.0     # a Meteor must take this many of its blows' worth of life
 GATE_CROWD = 600.0    # life a queue must hold for an orb to keep its breaking gate standing
 LEAK_SMITE = 2.5      # seconds from the sanctuary a monster one Smite kills is smitten
+HYMN_LOAD = 3.0       # monsters in or coming into a tower's reach that make it worth a Battle Hymn
 FULL = 8.0            # mana short of the orb's top at which it is spent on lesser targets rather than wasted
 FULL_BITE = 1.5       # the Meteor's bar then
 QUEUE_FALLOFF = 0.5   # each arch further along the path counts this much less: the first queue fights most
@@ -439,9 +440,9 @@ class Warden:
         self.last_aim = world.time
 
     def _hymn(self, hands: Hands) -> None:
-        """The tower with the most work in hand or coming, while a Smite stays in hand for a leader."""
+        """The tower with the most work in hand or coming, when a crowd is on it, while a Smite stays in hand."""
         world = hands.world
-        keep = world.spell_cost("smite") if "smite" in world.location.arsenal.spells and world.leaders() else 0.0
+        keep = world.spell_cost("smite") if "smite" in world.location.arsenal.spells else 0.0
         if not ready(world, "hymn", spare=keep):
             return
         best, best_value = None, 0.0
@@ -451,7 +452,7 @@ class Warden:
             value = _tower_value(world, t)
             if value > best_value:
                 best, best_value = t, value
-        if best is not None:
+        if best is not None and _load(world, best) >= HYMN_LOAD:
             hands.hymn(best.id)
 
     def _kill_chanter(self, hands: Hands) -> bool:
@@ -546,8 +547,8 @@ class Warden:
         return True
 
 
-def _tower_value(world: World, tower: Tower) -> float:
-    """How much a tower is about to do: its strength times the monsters in or coming into its reach."""
+def _load(world: World, tower: Tower) -> float:
+    """The monsters in or coming into a tower's reach, each by the share of its hit it feels."""
     stats = tower.stats
     element = tower.kind.element
     load = 0.0
@@ -555,6 +556,13 @@ def _tower_value(world: World, tower: Tower) -> float:
         spans = world.level.route(m.route).coverage(tower.tile, stats.range)
         if _inside(m.s, tuple((a - ARRIVING, b) for a, b in spans)):
             load += felt_hit(stats.damage, element, m.kind) / stats.damage if stats.damage > 0 else 1.0
+    return load
+
+
+def _tower_value(world: World, tower: Tower) -> float:
+    """How much a tower is about to do: its strength times the monsters in or coming into its reach."""
+    stats = tower.stats
+    load = _load(world, tower)
     attack = tower.kind.attack
     if attack == "nova":
         cap = 8.0

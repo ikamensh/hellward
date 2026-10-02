@@ -37,6 +37,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from hellward import fastsim  # noqa: E402
+
+if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of its worker processes, not as a library
+    fastsim.activate()   # the compiled simulation, unless HELLWARD_INTERPRETED is set
+
 from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import MONSTERS, TOWERS, felt_hit  # noqa: E402
