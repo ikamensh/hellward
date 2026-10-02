@@ -119,6 +119,14 @@ hand-made AAA work: surfaces from one generated atlas per body, walks from captu
    Parts the generator gets wrong are modelled instead (`tools/blender/feathers.py`: the Shaman's crest, the
    Zombie's arrows) or generated alone and fitted (the Shaman's staff skull, `art/gen/skull`); a part to replace is
    cut off with `sculpted.trim`.
+   The fifteen later kinds are short specs for `tools/blender/biped.py` and `beast.py`, which read the joints off
+   the body's slices (`tools/fit_skeleton.py`). Where the fitter misreads a body, the spec gives what it missed:
+   it assumes human proportions (shoulders at least 0.72 of the height), so the masked Fetish and Flayer, whose
+   mask and crest are the top two fifths of them, give their upper body's joints (`Spec.joints`, read off
+   `views.py --focus`) and their eyes (`Spec.eyes_at`: the eye search takes the brightest saturated spot on the
+   head, here the red feathers); winged Azazel's hands are searched under its wings (`hands_below`). A sole span
+   over 0.2 of the height is a robe's hem (the foot goes under the hip), and a robe's skirt below the knee follows
+   the shins (with no legs inside, it all went to the thighs and knelt 84 cm into the ground).
 4. Godot: `Mats.monster` builds the ORM material for any `mon_*` name. Review with `tools/review.sh` (clips),
    `tools/lineup.sh` (side by side at battle distance, or as silhouettes), `tools/preview.sh`, and
    `tools/review_set.sh DIR` for the whole L3 picture set the critics read.
