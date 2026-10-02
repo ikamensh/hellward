@@ -76,7 +76,7 @@ func _ready() -> void:
 				overlay.shader = preload("res://shaders/overlay.gdshader")
 				overlay.set_shader_parameter("kind_rim", Monster.RIM[kind])
 				overlay.set_shader_parameter("xray", 0.0 if _args.has("noxray") else 1.0)
-				overlay.set_shader_parameter("moonrim", 0.3)
+				overlay.set_shader_parameter("moonrim", 0.6)
 				(mi as MeshInstance3D).material_overlay = overlay
 		var player := Models.player(body)
 		var anim := Models.anim_name(player, _args.get("anim", "walk"))

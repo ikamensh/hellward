@@ -9,8 +9,18 @@ import sculpted
 K = 1.06
 HEIGHT = 1.15   # hoof to horn tip, standing in the A-pose it was generated in
 start()
-body = sculpted.prepare("fallen", HEIGHT, yaw=180, colour=sculpted.imp_colour, faces=7000, rough=sculpted.imp_hide,
-                        glow={"eyes": [(0.062, 0.2, 0.955), (-0.048, 0.2, 0.955)], "radius": 0.014})   # (found before the reshape)   # the yellow eyes glow
+# material families, by the colours the generator painted them (tools/blender/clusters.py fallen 1.15 6)
+FAMILIES = {"skin": [(19.3, 25.9, 19.6), (26.6, 33.3, 25.4)], "leather": [(28.6, 9.0, 15.4)],
+            "strap": [(18.8, 8.1, 11.3)], "hoof": [(9.8, 9.7, 8.7)], "horn": [(58.6, 10.2, 24.6)]}
+LOOKS = {
+    "skin": {"colour": sculpted.grade(sat=0.62, value=0.8, mottle=0.12), "rough": lambda ao: 0.6 + 0.2 * (1 - ao)},
+    "leather": {"colour": sculpted.grade(sat=0.5, value=0.85, toward=(0.27, 0.25, 0.18), mix=0.75), "rough": 0.88},
+    "strap": {"colour": sculpted.grade(sat=0.45, value=0.7, toward=(0.17, 0.14, 0.11), mix=0.7), "rough": 0.8},
+    "hoof": {"colour": sculpted.grade(sat=0.4, value=0.7), "rough": 0.4},
+    "horn": {"colour": sculpted.grade(sat=0.55, value=0.75, mottle=0.1, scale=0.03), "rough": 0.65},
+}
+body = sculpted.prepare("fallen", HEIGHT, yaw=180, families=FAMILIES, looks=LOOKS, faces=7000,
+                        glow={"eyes": [(0.062, 0.2, 0.955), (-0.048, 0.2, 0.955)], "radius": 0.014})   # the yellow eyes glow (found before the reshape)
 
 
 # the 2D Fallen's proportions: a head a third bigger than the generator made it, and ears half as long again
@@ -88,7 +98,10 @@ rig.springs = {"ear.R": (90.0, 0.3), "ear.L": (90.0, 0.3)}   # the ears flop aft
 rig.springs.update({"skirt.F": (45.0, 0.3, 0.7), "skirt.B": (45.0, 0.3, 0.7)})   # cloth hangs and swings
 
 # the knife in the right fist, blade forward and its curved edge down
-knife, kf = sculpted.prop("kukri", 0.42)
+knife, kf = sculpted.prop("kukri", 0.42, families={"blade": lambda x, y, z, lab: 1.0 * (z > 0.15), "hilt": "rest"},
+                          looks={"blade": sculpted.STEEL,
+                                 "hilt": {"colour": sculpted.grade(sat=0.45, value=0.8, toward=(0.2, 0.15, 0.1), mix=0.5),
+                                          "rough": 0.8}})
 grip = sculpted.snap(knife, kf["centre"] - kf["axis"] * 0.13, 0.04)
 fist = rig.head["hand.R"].lerp(rig.tail["hand.R"], 0.45)
 BLADE, FACE = Vector((0, 1, -0.3)).normalized(), Vector((1, 0, 0))   # in the right hand's rest frame
@@ -112,6 +125,16 @@ def attack(t):
     follow.rot("hand.R", p=-10)
     p = keyed(t, [(0.0, base, smooth), (0.36, wind, smooth), (0.5, strike, ease_in), (0.62, follow, ease_out),
                   (1.0, base, smooth)])
+    # the blade leads: up and back over the shoulder, then driven forward and down at the target's chest
+    aims = [(0.0, None), (0.36, Vector((0.1, -0.5, 1))), (0.5, Vector((0.05, 0.9, -0.35))),
+            (0.62, Vector((-0.3, 0.7, -0.6))), (1.0, None)]
+    rest_dir = rig.turn(base, "hand.R") @ BLADE
+    for (t0, a0), (t1, a1) in zip(aims, aims[1:]):
+        if t0 <= t <= t1:
+            d0, d1 = (a0 or rest_dir).normalized(), (a1 or rest_dir).normalized()
+            d = d0.slerp(d1, smooth((t - t0) / (t1 - t0))) if d0.dot(d1) > -0.99 else d1
+            rig.orient(p, "hand.R", frame_turn(BLADE, FACE, d, Vector((1, 0, 0))))
+            break
     feet = imp_feet(rig, K)
     lunge = smooth((t - 0.36) / 0.14) * (1 - smooth((t - 0.62) / 0.38))
     a, pitch, yaw = feet["L"]
@@ -121,13 +144,13 @@ def attack(t):
 
 
 rig.action("idle", 2.0, lambda t: imp_idle(rig, K, t), loop=True)
-rig.action("walk", 0.87, lambda t: imp_walk(rig, K, t, stride=0.16), loop=True)
+rig.action("walk", 0.6, lambda t: imp_walk(rig, K, t, stride=0.11, crouch=1.0), loop=True)   # short quick steps
 rig.action("attack", 0.7, attack)
 rig.action("hit", 0.35, lambda t: imp_hit(rig, K, t))
 rig.action("die", 1.2, lambda t: imp_die(rig, K, t, foot_pitch=(55.0, 85.0), hand_r=LIE_KNIFE, wrist_z=0.07), ground_from=0.2, body=body)
 rig.action("die2", 1.3, lambda t: imp_die_forward(rig, K, t, hand_r=LIE_KNIFE), ground_from=0.2, body=body)
 rig.report(body)
 rig.extremes(body, "die")
-print(f"walk ground speed {walk_speed(0.16 * K, IMP_DUTY, 0.87):.2f} m/s")
+print(f"walk ground speed {walk_speed(0.11 * K, IMP_DUTY, 0.6):.2f} m/s")
 fx("fx_head", (0, 0.1, HEIGHT + 0.15), rig)
 export("mon_fallen")

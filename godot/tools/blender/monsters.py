@@ -1055,9 +1055,12 @@ def walk_speed(stride: float, duty: float, seconds: float) -> float:
     return 2 * stride / (duty * seconds)
 
 
-def imp_walk(rig: Rig, k: float, t: float, stride: float = 0.16, hold=None) -> Pose:
-    """The scurry: two footfalls a cycle, the hips bobbing low after each, arms swinging against the legs."""
+def imp_walk(rig: Rig, k: float, t: float, stride: float = 0.16, hold=None, crouch: float = 0.0) -> Pose:
+    """The scurry: two footfalls a cycle, the hips bobbing low after each, arms swinging against the legs. `crouch`
+    (0..1) sinks it lower and hunches it further, the head kept level, looking ahead."""
     p = imp_stance(k)
+    p.move("hips", z=-0.06 * k * crouch).rot("hips", p=-10 * crouch).rot("chest", p=-8 * crouch)
+    p.rot("neck", p=10 * crouch).rot("head", p=10 * crouch)
     c = math.cos(TAU * t)
     p.move("hips", x=-0.02 * k * wave(t), z=-0.034 * k * math.cos(2 * TAU * (t - 0.08)))
     p.rot("hips", r=6 * wave(t), y=-11 * c, p=-3 * math.cos(2 * TAU * (t - 0.1)))

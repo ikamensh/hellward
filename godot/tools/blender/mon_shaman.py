@@ -12,23 +12,41 @@ GROW = 1.18    # the leader stands a size above its pack (the generator made it 
 K = 1.15 * GROW
 HEIGHT = 1.6   # hoof to the tallest feather, standing in the A-pose it was generated in (before GROW)
 start()
-def crest_colour(rgb, hue, sat, val, pos):
-    """The imp standard, and the crest as the 2D shaman wears it: feathers alternating crimson and gold round the
-    fan, each darker at its root and paler at its tip."""
-    base = sculpted.imp_colour(rgb, hue, sat, val, pos)
-    x, y, z = pos[..., 0], pos[..., 1], pos[..., 2]
-    crest = (z > 1.2)[..., None]
+def feathers(rgb, pos):
+    """The crest as the 2D shaman wears it: feathers alternating crimson and gold round the fan, each darker at its
+    root and paler at its tip, a dark quill line down each."""
+    x, z = pos[..., 0], pos[..., 2]
     angle = np.degrees(np.arctan2(x, z - 1.1))
-    gold = ((np.floor(angle / 11.0) % 2) == 1)[..., None]
+    band = angle / 11.0
+    gold = ((np.floor(band) % 2) == 1)[..., None]
+    quill = (np.abs(band - np.floor(band) - 0.5) < 0.06)[..., None]
     along = np.clip((z - 1.2) / 0.38, 0, 1)[..., None]
     shade = 0.55 + 0.6 * along
     red = np.array([0.42, 0.05, 0.03]) * shade
     yellow = np.array([0.62, 0.42, 0.06]) * shade
-    feather = np.where(gold, yellow, red) * (0.75 + 0.5 * val[..., None])
-    return np.where(crest & ((sat > 0.3)[..., None]), feather, base)
+    val = rgb.max(-1, keepdims=True)
+    out = np.where(gold, yellow, red) * (0.75 + 0.5 * val)
+    return np.where(quill, out * 0.45, out)
 
 
-body = sculpted.prepare("shaman", HEIGHT, yaw=180, colour=crest_colour, faces=10000, rough=sculpted.imp_hide,
+# material families: the crest by place (above the horns); the rest by the colours the generator painted
+# (tools/blender/clusters.py shaman 1.6 8): red skin, tan and brown hide and fur, light bone fetishes, dark hooves
+FAMILIES = {
+    "crest": lambda x, y, z, lab: np.clip((z - 1.2) / 0.03, 0, 1) * (lab[..., 1] > 15),
+    "skin": [(21.4, 23.7, 16.0), (27.6, 30.7, 22.1), (33.8, 49.3, 42.4)],
+    "hide": [(26.3, 11.5, 13.2), (35.1, 11.2, 13.6)],
+    "bone": [(47.8, 7.6, 13.0), (60.9, 10.3, 28.2)],
+    "hoof": [(17.8, 10.7, 11.0)],
+}
+LOOKS = {
+    "crest": {"colour": feathers, "rough": 0.8},
+    "skin": {"colour": sculpted.grade(sat=0.62, value=0.8, mottle=0.12), "rough": lambda ao: 0.6 + 0.2 * (1 - ao)},
+    "hide": {"colour": sculpted.grade(sat=0.5, value=0.85, toward=(0.27, 0.23, 0.17), mix=0.6, mottle=0.1),
+             "rough": 0.9},
+    "bone": {"colour": sculpted.grade(sat=0.45, value=0.95, toward=(0.6, 0.55, 0.45), mix=0.4), "rough": 0.7},
+    "hoof": {"colour": sculpted.grade(sat=0.4, value=0.7), "rough": 0.4},
+}
+body = sculpted.prepare("shaman", HEIGHT, yaw=180, faces=10000, families=FAMILIES, looks=LOOKS,
                         glow={"eyes": [(-0.04, 0.16, 1.083), (-0.113, 0.09, 1.083)], "radius": 0.014})   # the yellow eyes glow
 
 
@@ -121,7 +139,10 @@ def staff_colour(rgb, hue, sat, val, pos):
     return np.where(skull & ((sat < 0.6)[..., None]), white, g + (rgb - g) * 0.7)
 
 
-staff, sf = sculpted.prop("skull_staff", STAFF, metal=None, colour=staff_colour, faces=2500)
+# the leader's sign on the model itself: the staff skull's sockets burn with the curse's violet
+staff, sf = sculpted.prop("skull_staff", STAFF, metal=None, colour=staff_colour, faces=2500,
+                          glow={"eyes": [(0.018, 0.12, 1.633), (-0.032, 0.125, 1.633)], "radius": 0.016,
+                                "colour": (0.75, 0.25, 1.0), "find": "fixed"})
 # the skull twice the size the generator gave it: the top fifth of the staff grown about its own middle
 top = [v.co.copy() for v in staff.data.vertices if v.co.z > STAFF * 0.8]
 skull_mid = sum(top, Vector()) / len(top)
@@ -141,8 +162,13 @@ def hold(p, t=0.0, swing=0.0, tilt=(0.0, 0.0)):
 
 
 def walk_hold(p, t):
-    c = math.cos(TAU * t)
-    hold(p, t, swing=10 * c, tilt=(-7 * c, 2 * wave(t, 2)))
+    """The staff as a walking stick: planted with the left foot, it tilts back as the body passes it (its foot
+    stays put on the ground), then is lifted and swung ahead for the next plant."""
+    dy, z, _ = foot_track(t, 0.17 * K, 0.1, duty=IMP_DUTY, ankle_z=0.0, heel=(-0.01, 0.0), toe=(0.01, 0.0),
+                          strike=0.0, push=0.0)
+    reach = (GRIP * STAFF)   # grip to the staff's foot
+    tilt = math.degrees(math.asin(max(-0.9, min(0.9, dy / reach))))
+    hold(p, t, swing=6 + 60 * z, tilt=(tilt, 2 * wave(t, 2)))
 
 
 def idle_hold(p, t):
@@ -154,22 +180,30 @@ def v(x, y, z):
 
 
 def cast(t):
-    """The chant: the staff thrust up and pumped to a beat (three a loop), the body rocking under it, the free claw
-    clawing at the air, the head thrown back on each beat, the jaw working."""
-    p = imp_stance(K)
-    sway = wave(t)
-    beat = abs(wave(t, 1.5)) ** 2   # three sharp beats a loop
-    p.move("hips", z=0.03 * K + 0.025 * beat, x=0.035 * K * sway).rot("hips", p=8, r=-8 * sway)
-    p.rot("spine", p=6 + 6 * beat, r=5 * sway).rot("chest", p=14 + 8 * beat, r=6 * sway, y=10 * wave(t, 1, 0.25))
-    p.rot("neck", p=-4).rot("head", p=8 + 16 * beat, r=-9 * sway).rot("jaw", p=-12 - 18 * beat)
-    p.rot("crest", r=-12 * wave(t, 1, -0.12), p=-8 * beat)
-    chest = rig.delta(p, "chest")
-    top = rig.head["neck"].z
-    rig.reach(p, "upper_arm.R", "forearm.R", chest @ Vector((0.2, 0.22, top + 0.3 + 0.12 * beat)), (1, -0.4, -0.6))
-    rig.orient(p, "hand.R", Q(p=-12 - 10 * beat, r=-10 * sway))
-    rig.reach(p, "upper_arm.L", "forearm.L", chest @ Vector((-0.45, 0.15 + 0.08 * wave(t, 3), top + 0.25 + 0.1 * beat)),
-              (-1, -0.3, -0.6))
-    p.rot("hand.L", p=-40 - 20 * wave(t, 3, 0.2), r=-20)
+    """The chant, a ritual in four beats a loop: crouched over the staff, gathering; rising with it thrust up; two
+    pumps to the sky, head thrown back; the release, the staff driven out at the cursed tower, the body following;
+    and down to gather again."""
+    def chant(lift, lean, head, jaw, arm_h, arm_fwd, staff_p, claw):
+        p = imp_stance(K)
+        p.move("hips", z=lift * K, y=0.04 * lean * K).rot("hips", p=8 - 10 * lean)
+        p.rot("spine", p=6 - 8 * lean).rot("chest", p=12 - 14 * lean).rot("neck", p=-4)
+        p.rot("head", p=head).rot("jaw", p=jaw).rot("crest", p=-8 * (lift > 0.04))
+        chest = rig.delta(p, "chest")
+        top = rig.head["neck"].z
+        rig.reach(p, "upper_arm.R", "forearm.R", chest @ Vector((0.2, 0.15 + arm_fwd, top + arm_h)), (1, -0.4, -0.6))
+        rig.orient(p, "hand.R", Q(p=staff_p))
+        rig.reach(p, "upper_arm.L", "forearm.L", chest @ Vector((-0.42, 0.15 + claw * 0.15, top + 0.05 + claw * 0.3)),
+                  (-1, -0.3, -0.6))
+        p.rot("hand.L", p=-40 - 30 * claw)
+        return p
+    gather = chant(-0.04, 0.4, -18, -6, -0.25, 0.15, 10, 0.0)
+    rise = chant(0.04, -0.2, 18, -28, 0.32, 0.0, -10, 0.7)
+    pump = chant(0.07, -0.3, 26, -36, 0.42, 0.0, -14, 1.0)
+    dip = chant(0.03, -0.1, 12, -14, 0.25, 0.0, -6, 0.6)
+    release = chant(0.0, 0.7, 4, -40, 0.15, 0.35, 70, 0.3)
+    p = keyed(t, [(0.0, gather, smooth), (0.22, rise, ease_out), (0.34, dip, smooth), (0.44, pump, ease_out),
+                  (0.54, dip, smooth), (0.64, pump, ease_out), (0.8, release, ease_in), (0.9, release, smooth),
+                  (1.0, gather, smooth)])
     for s, side in SIDES:
         p.rot(f"ear.{side}", r=-s * 10 * wave(t, 2, 0.1))
     plant_legs(rig, p, imp_feet(rig, K))
@@ -220,7 +254,7 @@ def die(t):
 rig.action("idle", 2.0, lambda t: imp_idle(rig, K, t, hold=idle_hold), loop=True)
 rig.action("walk", 0.93, lambda t: imp_walk(rig, K, t, stride=0.17, hold=walk_hold), loop=True)
 rig.action("attack", 0.75, attack)
-rig.action("cast", 1.5, cast, loop=True)
+rig.action("cast", 2.2, cast, loop=True)
 rig.action("hit", 0.35, lambda t: imp_hit(rig, K, t, hold=lambda p, t: hold(p, t, tilt=(14 * bump(t, 0, 1), 0))))
 rig.action("die", 1.2, die, ground_from=0.34, body=body)
 rig.action("die2", 1.3, lambda t: imp_die_forward(rig, K, t, lie_z=0.16, hand_r=lie_staff_q,

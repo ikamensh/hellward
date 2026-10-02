@@ -111,7 +111,7 @@ func _ready() -> void:
 	_overlay.shader = preload("res://shaders/overlay.gdshader")
 	_overlay.set_shader_parameter("kind_rim", RIM.get(kind, STAND_INS.get(kind, [null, Color(0.9, 0.4, 0.3)])[1]))
 	_overlay.set_shader_parameter("xray", 1.0)
-	_overlay.set_shader_parameter("moonrim", 0.3)
+	_overlay.set_shader_parameter("moonrim", 0.6)
 	if STAND_INS.has(kind):
 		_overlay.set_shader_parameter("tint", STAND_INS[kind][1])
 	for mi in _model.find_children("*", "MeshInstance3D", true, false):

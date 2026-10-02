@@ -109,10 +109,25 @@ const FLESH := {"mon_fallen": Color(0.55, 0.06, 0.02), "mon_shaman": Color(0.55,
 	"mon_zombie": Color(0.16, 0.18, 0.1)}
 
 
+# fine surface for a close look, laid over a generated body's own maps as a world-scaled triplanar detail normal:
+# [library texture set, metres per repeat]
+const GRAIN := {"mon_fallen": ["demon_skin", 0.18], "mon_shaman": ["demon_skin", 0.2],
+	"mon_zombie": ["corpse_skin", 0.25], "mon_skeleton": ["bone", 0.15]}
+
+
 static func monster(kind: String) -> ORMMaterial3D:
 	var dir := TEX + kind + "/"
 	var m := ORMMaterial3D.new()
 	m.resource_name = kind
+	if GRAIN.has(kind) and OS.get_environment("HW_NOGRAIN") == "":
+		m.detail_enabled = true
+		m.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
+		m.uv2_triplanar = true
+		m.uv2_scale = Vector3.ONE / float(GRAIN[kind][1])
+		m.detail_normal = load(TEX + String(GRAIN[kind][0]) + "_normal.png")
+		m.detail_albedo = _flat_texture(Color.WHITE)   # the colour left as it is (multiplied by white)
+		m.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
+		m.detail_mask = _flat_texture(Color(0.45, 0.45, 0.45))   # the grain under the body's own forms, not instead
 	if FLESH.has(kind):
 		m.backlight_enabled = true
 		m.backlight = FLESH[kind]
@@ -124,7 +139,7 @@ static func monster(kind: String) -> ORMMaterial3D:
 	if ResourceLoader.exists(dir + "emission.webp"):   # eyes, embers
 		m.emission_enabled = true
 		m.emission_texture = load(dir + "emission.webp")
-		m.emission_energy_multiplier = 3.0
+		m.emission_energy_multiplier = 7.0   # bright enough to bloom: eyes are what reads from the battle camera
 	return m
 
 
@@ -172,6 +187,12 @@ static func restyle(root: Node, tag: String, change: Callable) -> void:
 				change.call(copy)
 				_cache[key] = copy
 			mi.set_surface_override_material(i, _cache[key])
+
+
+static func _flat_texture(c: Color) -> ImageTexture:
+	var img := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+	img.fill(c)
+	return ImageTexture.create_from_image(img)
 
 
 static func _ice() -> StandardMaterial3D:

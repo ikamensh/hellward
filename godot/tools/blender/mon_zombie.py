@@ -12,11 +12,31 @@ import sculpted
 HEIGHT = 1.95   # sole to crown, standing in the A-pose it was generated in
 H = 1.13        # the old human frame's scale: distances in the poses below
 start()
-WRIST_R = (0.5, -0.03, 1.05)
+WRIST_R = (0.505, 0.1, 1.035)
+
+
+def _band(v, lo, hi, soft=0.03):
+    return np.clip((v - lo) / soft, 0, 1) * np.clip((hi - v) / soft, 0, 1)
+
+
+# Skin and linen were painted alike, so the families part by place: the linen wraps the hips down to the shins and
+# hangs in a strip from the left shoulder; the manacle on the right wrist is iron.
+FAMILIES = {
+    "iron": lambda x, y, z, lab: 1.0 * (np.sqrt((x - WRIST_R[0]) ** 2 + (y - WRIST_R[1]) ** 2
+                                               + (z - WRIST_R[2]) ** 2) < 0.1) * (lab[..., 1] < 8),
+    "linen": lambda x, y, z, lab: np.maximum(_band(z, 0.42, 1.08) * _band(np.abs(x), -1, 0.34),
+                                             _band(z, 1.08, 1.62) * _band(x - (-0.08 + (1.6 - z) * 0.35), -0.12, 0.08)),
+    "skin": "rest",
+}
+LOOKS = {
+    "skin": {"colour": sculpted.corpse_colour_pos, "rough": lambda ao: 0.62 + 0.15 * (1 - ao)},
+    "linen": {"colour": sculpted.grade(sat=0.25, value=1.15, toward=(0.42, 0.4, 0.34), mix=0.5, mottle=0.12,
+                                       scale=0.12), "rough": 0.95},
+    "iron": {"colour": sculpted.grade(sat=0.35, value=0.6), "rough": 0.55, "metal": 0.75},
+}
 body = sculpted.prepare(
-    "zombie", HEIGHT, yaw=180, colour=sculpted.corpse_colour, faces=9000, rough=sculpted.corpse,
-    # the manacle and its chain are iron
-    metal=lambda hue, sat, val, pos: (np.linalg.norm(pos - np.array(WRIST_R), axis=-1) < 0.12) * (sat < 0.35) * 0.8)
+    "zombie", HEIGHT, yaw=180, faces=9000, families=FAMILIES, looks=LOOKS,
+    glow={"eyes": [(0.04, 0.287, 1.825), (0.11, 0.273, 1.825)], "radius": 0.013, "colour": (0.55, 0.7, 0.35)})
 
 
 def BELLY(p):
@@ -230,9 +250,10 @@ def die_back(t):
     """Struck full in the chest: it rears up, staggers back two steps and topples on its back with a thud."""
     base = stance()
     rear = stance().move("hips", y=-0.08 * H, z=0.02 * H).rot("hips", p=14).rot("chest", p=20).rot("head", p=30)
-    rear.rot("jaw", p=-34).rot("upper_arm.R", p=-40, r=-20).rot("upper_arm.L", p=-40, r=20)
+    rear.rot("jaw", p=-34).rot("upper_arm.R", p=45, r=-25).rot("upper_arm.L", p=40, r=25)
+    rear.rot("forearm.R", p=30).rot("forearm.L", p=35)
     stagger = stance().move("hips", y=-0.3 * H, z=-0.08 * H).rot("hips", p=22).rot("chest", p=14).rot("head", p=24)
-    stagger.rot("upper_arm.R", p=-60, r=-40).rot("upper_arm.L", p=-50, r=40)
+    stagger.rot("upper_arm.R", p=-95, r=-45).rot("upper_arm.L", p=-85, r=50).rot("forearm.R", p=20)
     fall = Pose().move("hips", y=-0.4 * H, z=-0.45 * H).rot("hips", p=60).rot("chest", p=10).rot("head", p=-10)
     for s, side in SIDES:
         fall.rot(f"upper_arm.{side}", p=-70, r=-s * 60)
@@ -242,9 +263,9 @@ def die_back(t):
     for q, back in ((rear, 0.0), (stagger, 0.22)):
         f = {sd: (a + Vector((0, -back * H, 0)), pt, yw) for sd, (a, pt, yw) in FEET.items()}
         plant_legs(rig, q, f, pole_out=0.2)
-    p = keyed(t, [(0.0, base, smooth), (0.14, rear, ease_out), (0.38, stagger, smooth), (0.6, fall, ease_in),
-                  (0.74, lie, ease_in), (0.82, bounce, ease_out), (1.0, lie, smooth)])
-    if t < 0.14:
+    p = keyed(t, [(0.0, base, smooth), (0.12, rear, ease_out), (0.3, stagger, smooth), (0.52, fall, ease_in),
+                  (0.68, lie, ease_in), (0.78, bounce, ease_out), (1.0, lie, smooth)])
+    if t < 0.12:
         plant_legs(rig, p, FEET, pole_out=0.2)
     else:
         lift_feet(rig, p, 0.07 * H)

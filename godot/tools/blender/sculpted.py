@@ -255,13 +255,14 @@ def smooth_normals(obj: bpy.types.Object, radius: float = 0.035) -> None:
 
 
 def prepare(kind: str, height: float, yaw: float = 0.0, glow=None, metal=None, rough=None, colour=None,
-            faces: int | None = None) -> bpy.types.Object:
+            faces: int | None = None, families=None, looks=None) -> bpy.types.Object:
     """The body stood in the model contract, its maps baked and written, its material named mon_<kind>. With
     HW_FAST=1 in the environment the maps already written are kept (fitting a rig needs no bake)."""
     import os
     obj, m = body(kind, height, yaw, faces)
     if not os.environ.get("HW_FAST"):
-        write_maps(kind, obj, bake_detail(obj, kind, m), glow=glow, metal=metal, rough=rough, colour=colour)
+        write_maps(kind, obj, bake_detail(obj, kind, m), glow=glow, metal=metal, rough=rough, colour=colour,
+                   families=families, looks=looks)
     COLOURS[obj.name] = vertex_colours(obj)   # before the generator's material gives way to the library's
     name_material(obj, f"mon_{kind}")
     return obj
@@ -419,8 +420,38 @@ def _hsv(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return h * 60.0, d / (mx + 1e-9), mx
 
 
+def family_weights(rgb: np.ndarray, pos: np.ndarray, families: dict, sigma: float = 7.0) -> dict[str, np.ndarray]:
+    """Each texel's share in each material family. A family is given by
+    - the Lab colours it was painted in (tools/blender/clusters.py): texels take the family of their nearest painted
+      colour, softly across a border `sigma` Lab units wide;
+    - a test f(x, y, z, lab) -> 0..1 on the texel's place and colour (cloth painted like skin parts by place): it
+      claims that share first;
+    - "rest": whatever no other family claims."""
+    lab = to_lab(rgb)
+    x, y, z = pos[..., 0], pos[..., 1], pos[..., 2]
+    out: dict[str, np.ndarray] = {}
+    claimed = np.zeros(rgb.shape[:-1], np.float32)
+    for name, spec in families.items():
+        if callable(spec):
+            w = np.clip(spec(x, y, z, lab), 0, 1).astype(np.float32) * (1 - claimed)
+            out[name] = w
+            claimed = claimed + w
+    painted = [n for n, spec in families.items() if isinstance(spec, (list, tuple))]
+    if painted:
+        best = np.stack([np.min(np.stack([((lab - np.array(c)) ** 2).sum(-1) for c in families[n]]), axis=0)
+                         for n in painted])
+        w = np.exp(-(best - best.min(0)) / (2 * sigma ** 2))
+        w /= w.sum(0)
+        for i, n in enumerate(painted):
+            out[n] = w[i] * (1 - claimed)
+    rest = [n for n, spec in families.items() if isinstance(spec, str)]
+    if rest:
+        out[rest[0]] = np.clip(1 - claimed, 0, 1) if not painted else np.zeros_like(claimed)
+    return {n: out[n] for n in families}
+
+
 def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Image], glow=None, metal=None,
-               rough=None, colour=None, cavity: float = 0.45) -> Path:
+               rough=None, colour=None, cavity: float = 0.45, families=None, looks=None) -> Path:
     """game/assets/textures/mon_<kind>/: albedo.webp, normal.webp, orm.webp (occlusion, roughness, metal) and,
     given `glow`, emission.webp. Each has an .import that compresses it for the GPU with mipmaps.
 
@@ -459,6 +490,21 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
     else:
         rough = maps.get("rough", np.full((h, h), 0.8, np.float32))
     albedo = albedo.copy()
+    if families:   # material families: each graded, roughened and metalled its own way, blended at the borders
+        share = family_weights(albedo[..., :3], pos, families)
+        out_rgb = np.zeros_like(albedo[..., :3])
+        out_rough = np.zeros(albedo.shape[:2], np.float32)
+        out_metal = np.zeros(albedo.shape[:2], np.float32)
+        for name, w in share.items():
+            look = looks[name]
+            out_rgb += w[..., None] * np.clip(look["colour"](albedo[..., :3], pos), 0.0, 1.0)
+            r = look["rough"]
+            out_rough += w * (r(ao) if callable(r) else r)
+            out_metal += w * look.get("metal", 0.0)
+            print(f"family {name}: {w.mean() * 100:.0f}% of the texels")
+        albedo[..., :3] = out_rgb
+        rough = out_rough
+        metal = out_metal
     if colour is not None:
         albedo[..., :3] = np.clip(colour(albedo[..., :3], hue, sat, val, pos), 0.0, 1.0)
     albedo[..., :3] *= (1.0 - cavity + cavity * ao)[..., None]
@@ -478,9 +524,11 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
             d = np.linalg.norm(pos - np.array(hint), axis=-1)
             near = d < 0.03
             best = near & (score >= np.percentile(score[near], 97)) & (score > 0.25) if near.any() else near
+            if glow.get("find") == "dark":
+                best = best & False
             if best.sum() < 6 and near.any():   # no painted glow: the eye is the socket, the darkest spot near
                 best = near & (val <= np.percentile(val[near], 5))
-            centre = np.median(pos[best], axis=0) if best.sum() >= 6 else np.array(hint)
+            centre = np.median(pos[best], axis=0) if best.sum() >= 6 and glow.get("find") != "fixed" else np.array(hint)
             lit = np.maximum(lit, np.clip(1.5 - np.linalg.norm(pos - centre, axis=-1) / r, 0, 1))
             print(f"glow at {tuple(np.round(centre, 3))} ({int(best.sum())} texels found) for hint {hint}")
         save(np.array(glow.get("colour", (1.0, 0.72, 0.15)))[None, None, :] * lit[..., None], folder / "emission.webp",
@@ -624,15 +672,22 @@ def iron(hue, sat, val, pos):
     return (sat < 0.25) * 0.85
 
 
+# worn steel: grey, a little rust in its pits, bright where it is smooth
+STEEL = {"colour": lambda rgb, pos: grade(sat=0.3, value=1.1, toward=(0.34, 0.33, 0.32), mix=0.6, mottle=0.2,
+                                          scale=0.02)(rgb, pos),
+         "rough": lambda ao: 0.3 + 0.45 * (1 - ao), "metal": 0.85}
+
+
 def prop(kind: str, length: float, yaw: float = 180.0, metal=iron, faces: int = 1500, colour=None,
-         rough=None) -> tuple[bpy.types.Object, dict]:
+         rough=None, glow=None, families=None, looks=None) -> tuple[bpy.types.Object, dict]:
     """A generated prop (art/gen/<kind>/: a weapon, a staff, a shield) stood upright `length` metres long, its maps
     baked like a body's (material mon_<kind>). Returns it with its frame from the shape's spread (PCA): "axis",
     the long direction pointing up; "flat", across its thinnest; "centre", its middle."""
     import os
     obj, m = body(kind, length, yaw, faces)
     if not os.environ.get("HW_FAST"):
-        write_maps(kind, obj, bake_detail(obj, kind, m), metal=metal, colour=colour, rough=rough)
+        write_maps(kind, obj, bake_detail(obj, kind, m), metal=metal, colour=colour, rough=rough, glow=glow,
+                   families=families, looks=looks)
     name_material(obj, f"mon_{kind}")
     co = np.array([v.co for v in obj.data.vertices])
     c = co.mean(0)
@@ -698,7 +753,7 @@ def corpse_colour(rgb, hue, sat, val, pos):
     """A cold grey-violet corpse (the concept), its wounds left dark and red, its linen a dirty grey."""
     wound = ((((hue < 20) | (hue > 300)) & (sat > 0.45) & (val < 0.4)))[..., None]
     g = _grey(rgb)
-    cold = (g + (rgb - g) * 0.3) * np.array([0.93, 0.97, 1.06]) * _mottle(pos, 0.09, 0.14)
+    cold = (g + (rgb - g) * 0.3) * np.array([0.9, 1.02, 0.95]) * _mottle(pos, 0.09, 0.14)
     return np.where(wound, rgb * 0.9, cold)
 
 
@@ -767,3 +822,48 @@ def grow(pivot, scale: float, low: float, high: float, axis: int = 2, below: boo
 def smooth(x: float) -> float:
     x = max(0.0, min(1.0, x))
     return x * x * (3 - 2 * x)
+
+
+def to_lab(rgb: np.ndarray) -> np.ndarray:
+    """CIE Lab of linear-ish 0..1 RGB rows (treated as sRGB-encoded, D65)."""
+    c = np.where(rgb > 0.04045, ((rgb + 0.055) / 1.055) ** 2.4, rgb / 12.92)
+    m = np.array([[0.4124, 0.3576, 0.1805], [0.2126, 0.7152, 0.0722], [0.0193, 0.1192, 0.9505]])
+    xyz = c @ m.T / np.array([0.9505, 1.0, 1.089])
+    f = np.where(xyz > 0.008856, np.cbrt(xyz), 7.787 * xyz + 16 / 116)
+    return np.stack([116 * f[..., 1] - 16, 500 * (f[..., 0] - f[..., 1]), 200 * (f[..., 1] - f[..., 2])], -1)
+
+
+def kmeans(x: np.ndarray, k: int, seed: int = 1, rounds: int = 40) -> np.ndarray:
+    """k centres of the rows of x (k-means++ start)."""
+    rng = np.random.default_rng(seed)
+    centres = [x[rng.integers(len(x))]]
+    for _ in range(1, k):
+        d = np.min(((x[:, None, :] - np.array(centres)[None]) ** 2).sum(-1), axis=1)
+        centres.append(x[rng.choice(len(x), p=d / d.sum())])
+    c = np.array(centres)
+    for _ in range(rounds):
+        label = np.argmin(((x[:, None, :] - c[None]) ** 2).sum(-1), axis=1)
+        c = np.array([x[label == i].mean(0) if (label == i).any() else c[i] for i in range(k)])
+    return c[np.argsort(c[:, 0])]   # darkest first
+
+
+def grade(sat: float = 1.0, value: float = 1.0, toward=None, mix: float = 0.0, mottle: float = 0.0, scale: float = 0.07):
+    """A family's colour: saturation and value scaled, pulled `mix` of the way toward the colour `toward` (keeping
+    the painting's light and dark), blotched by `mottle`."""
+    def fn(rgb, pos):
+        g = _grey(rgb)
+        out = (g + (rgb - g) * sat) * value
+        if toward is not None:
+            t = np.array(toward)
+            out = out * (1 - mix) + (t * (g / max(float(np.mean(t)), 1e-3))) * mix
+        if mottle:
+            out = out * _mottle(pos, scale, mottle)
+        return out
+    return fn
+
+
+def corpse_colour_pos(rgb, pos):
+    """The corpse standard for a family (no hue mask needed): cold grey-green-violet, blotched; wounds (dark, red)
+    keep their red."""
+    hue, sat, val = _hsv(rgb)
+    return corpse_colour(rgb, hue, sat, val, pos)

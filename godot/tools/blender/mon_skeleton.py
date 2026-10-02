@@ -16,16 +16,26 @@ EMBER = (1.0, 0.36, 0.08)
 start()
 
 
-def mail(hue, sat, val, pos):
-    """Iron: the helmet, the pauldron and the mail skirt, wherever their colour is a dark near-grey."""
-    z = pos[..., 2]
-    helm = z > 1.66
-    pauldron = (pos[..., 0] < -0.1) & (z > 1.3) & (z < 1.62)
-    skirt = (z > 0.68) & (z < 1.15)
-    return (helm | pauldron | skirt) * (sat < 0.3) * (val < 0.5) * 0.8
+def _near(x, y, z, c, r):
+    return np.sqrt((x - c[0]) ** 2 + (y - c[1]) ** 2 + (z - c[2]) ** 2) < r
 
 
-body = sculpted.prepare("skeleton", HEIGHT, yaw=180, colour=sculpted.bone_colour, faces=9000, rough=sculpted.bones, metal=mail,
+# material families: the crimson tabard by its colour; the iron (helmet, pauldron, mail skirt) by place and darkness;
+# bone is the rest
+FAMILIES = {
+    "cloth": lambda x, y, z, lab: 1.0 * (lab[..., 1] > 7.0) * (lab[..., 0] < 32),
+    "iron": lambda x, y, z, lab: 1.0 * ((z > 1.72) | ((x < -0.1) & (z > 1.3) & (z < 1.62) & (lab[..., 0] < 26))
+                                        | ((z > 0.68) & (z < 1.1) & (np.abs(x) < 0.3) & (lab[..., 0] < 18))),
+    "bone": "rest",
+}
+LOOKS = {
+    "cloth": {"colour": sculpted.grade(sat=1.15, value=1.1, toward=(0.36, 0.05, 0.04), mix=0.5), "rough": 0.92},
+    "iron": {"colour": sculpted.grade(sat=0.6, value=0.8, toward=(0.2, 0.15, 0.12), mix=0.4, mottle=0.25, scale=0.03),
+             "rough": lambda ao: 0.45 + 0.4 * (1 - ao), "metal": 0.7},
+    "bone": {"colour": lambda rgb, pos: sculpted.bone_colour(rgb, *sculpted.hue_sat_val(rgb).transpose(2, 0, 1), pos),
+             "rough": lambda ao: 0.7 + 0.15 * (1 - ao)},
+}
+body = sculpted.prepare("skeleton", HEIGHT, yaw=180, faces=9000, families=FAMILIES, looks=LOOKS,
                         glow={"eyes": [(0.045, 0.09, 1.692), (-0.025, 0.09, 1.692)], "radius": 0.016,
                               "colour": EMBER})
 
@@ -128,7 +138,9 @@ S0 = stance()
 # -- the sword in the right fist, blade forward and down in the stance; the shield on the left forearm, facing
 # forward and a little out. Each is set where it sits in the stance, in the hand's (forearm's) own rest frame.
 SWORD = 0.92
-sword, wf = sculpted.prop("sword", SWORD)   # made standing point down: its axis runs from the point to the pommel
+HILT = {"colour": sculpted.grade(sat=0.4, value=0.7, toward=(0.16, 0.12, 0.09), mix=0.5), "rough": 0.75}
+sword, wf = sculpted.prop("sword", SWORD, families={"blade": lambda x, y, z, lab: 1.0 * (z < SWORD * 0.72), "hilt": "rest"},
+                          looks={"blade": sculpted.STEEL, "hilt": HILT})   # made standing point down: its axis runs from the point to the pommel
 grip = sculpted.snap(sword, Vector((wf["centre"].x, wf["centre"].y, SWORD - 0.12)), 0.05)
 q_hand = rig.turn(S0, "hand.R")
 blade = Vector((0.0, 0.85, 0.3)).normalized()   # forward and a little up: at the ready
@@ -241,6 +253,8 @@ def corpse(settle=0.0, lift=0.0):
         wrist.z = 0.05 if s > 0 else 0.09   # the left wears the pauldron
         rig.reach(p, f"upper_arm.{side}", f"forearm.{side}", wrist, (s * 0.5, 0, 1))
         rig.orient(p, f"hand.{side}", Q(r=s * 80, y=-s * 40))
+        if s > 0:
+            lay_blade(p)
         h = rig.where(p, "hips", HD[f"thigh.{side}"])
         ankle = h + (Vector((0.1, 0.62, 0)) if s > 0 else Vector((-0.18, 0.5, 0)))
         ankle.z = 0.07 if s > 0 else 0.1
@@ -314,7 +328,13 @@ def heap(seed: int = 3) -> Pose:
         to = centre + out + Vector((rng.uniform(-0.06, 0.06), rng.uniform(-0.06, 0.06), lie))
         rig.orient(p, bone, q)
         rig.place(p, bone, to - (q @ Vector((0, 0, 0))) - q @ ((head - head)))
+    lay_blade(p)
     return p
+
+
+def lay_blade(p: Pose, direction=Vector((0.75, 0.6, 0.0))) -> None:
+    """The sword dropped: its blade flat on the ground beside the hand, not standing up out of the bones."""
+    rig.orient(p, "hand.R", frame_turn(BLADE_REST, FLAT_REST, direction.normalized(), Vector((0, 0, 1))))
 
 
 HEAP = heap()
