@@ -13,7 +13,7 @@ const RIM := {"fallen": Color(1.3, 0.4, 0.12), "shaman": Color(1.25, 0.26, 0.22)
 	"skeleton": Color(0.72, 0.68, 0.56)}   # dimmer: a bright rim on every thin bone shimmers at range
 const KINDGLOW := 0.25              # how strongly that rim lights a living body at any distance
 # how fast each walk cycle carries the body at speed_scale 1 (m/s): the walk plays faster as the body speeds up
-const WALK := {"fallen": 0.86, "shaman": 0.94, "zombie": 0.44, "skeleton": 0.89}
+const WALK := {"fallen": 0.89, "shaman": 0.94, "zombie": 0.44, "skeleton": 0.89}
 # a kind without a model: [the model it borrows, its tint]; its height follows its size in the rules
 const STAND_INS := {
 	"goatman": ["zombie", Color(0.55, 0.38, 0.22)], "overlord": ["zombie", Color(0.75, 0.2, 0.12)],
@@ -23,7 +23,7 @@ const STAND_INS := {
 	"bat": ["fallen", Color(0.5, 0.1, 0.12)], "gargoyle": ["skeleton", Color(0.45, 0.45, 0.5)],
 	"hulk": ["zombie", Color(0.35, 0.55, 0.2)], "drowned": ["zombie", Color(0.3, 0.5, 0.55)],
 	"fetish": ["shaman", Color(0.45, 0.65, 0.25)], "inquisitor": ["shaman", Color(0.95, 0.8, 0.45)],
-	"bone_priest": ["skeleton", Color(0.7, 0.55, 0.95)],
+	"bone_priest": ["shaman", Color(0.7, 0.55, 0.95)],
 }
 const MAX_STRIDE := 2.4             # beyond this the legs blur; the feet slide a little instead
 const LANE := 6.0                    # the rules' lane (about ±0.28 tiles) spread to metres across the street
@@ -279,6 +279,10 @@ func die(element: String, bounty: int) -> void:
 	# two deaths a kind where it has them, one or the other by its id
 	_play("die2" if id % 2 == 1 and Models.anim_name(_anim, "die2") != "" else "die")
 	_bar.visible = false
+	if bool(stats["flying"]):   # a flyer's body drops out of the air as it dies
+		var fall := create_tween()
+		fall.tween_property(self, "position:y", position.y - FLY, 0.55).set_ease(Tween.EASE_IN) \
+			.set_trans(Tween.TRANS_QUAD)
 	_overlay.set_shader_parameter("kind_rim", Color.BLACK)   # the dead stop catching the eye
 	_overlay.set_shader_parameter("xray", 0.0)
 	if _ring:

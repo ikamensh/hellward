@@ -1,4 +1,4 @@
-"""The arrow tower in three ranks: a wooden ballista on a gothic stone plinth. Built by tower_arrow_1..3.py.
+"""The arrow tower in three ranks (tower_arrow_1..3.glb, one run): a wooden ballista on a gothic stone plinth.
 
 Rank 1 carries the ballista on a flared timber post; rank 2 raises it on a braced trestle with a planked
 platform skirted in red cloth; rank 3 is heavier still: iron-banded legs, a hoarding parapet, banners on
@@ -294,3 +294,8 @@ def build(rank: int) -> None:
     tris = sum(len(p.vertices) - 2 for o in (tower, turret) for p in o.data.polygons)
     print(f"tower_arrow_{rank}: {tris} triangles, pivot {pivot:.2f}")
     export(f"tower_arrow_{rank}")
+
+
+if __name__ == "__main__":
+    for r in (1, 2, 3):
+        build(r)

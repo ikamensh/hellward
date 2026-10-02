@@ -97,6 +97,10 @@ static func _make(key: String) -> Material:
 		"glow_window": return glow(Color(1.0, 0.55, 0.2), 2.0)
 		"glow_holy": return glow(Color(1.0, 0.7, 0.4), 1.6)
 		"glow_portal": return glow(Color(1.0, 0.15, 0.04), 8.0)
+		"glow_venom": return glow(Color(0.35, 1.0, 0.2), 4.0)
+		"venom_pool": return glow(Color(0.25, 0.8, 0.12), 0.9, Color(0.05, 0.12, 0.03))
+		"leaves": return flat(Color(0.1, 0.17, 0.06), 0.85)
+		"mossy": return textured("stone", Color(0.62, 0.78, 0.55), 1.2)
 	if key.begins_with("mon_"):
 		return monster(key)
 	return null

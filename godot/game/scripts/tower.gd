@@ -7,8 +7,7 @@ extends Node3D
 const NAMES := {"arrow": "Arrow Tower", "pyre": "Pyre", "frost": "Frost Shrine", "storm": "Storm Obelisk",
 	"plague": "Plague Totem", "altar": "Bone Altar", "grove": "Druid Grove"}
 # a family without a model of its own wears another's, tinted, until it has one
-const STAND_INS := {"plague": ["frost", Color(0.45, 0.85, 0.3)], "altar": ["storm", Color(0.9, 0.85, 0.7)],
-	"grove": ["pyre", Color(0.4, 0.8, 0.35)]}
+const STAND_INS := {}   # kind -> [the model it borrows, its tint], while its own is not built
 const LOOKS := {"arrow": "arrow", "pyre": "fire", "frost": "frost", "plague": "frost", "altar": "fire", "grove": "fire"}
 const CASTS := {"arrow": "arrow_cast", "pyre": "fire_cast", "plague": "venom_cast", "altar": "fire_cast"}
 
@@ -57,10 +56,16 @@ func _ready() -> void:
 	Vfx.dust(world, global_position, 1.6)
 
 
-## The model a tower of `kind` and `rank` (0..2) wears: Arrow Towers have one per rank, the others grow.
+## The model a tower of `kind` and `rank` (0..2) wears: its rank's own (tower_<kind>_<rank>) where one is built,
+## else its one model, grown a size a rank (`ranked` says which).
 static func model_name(kind: String, rank: int) -> String:
 	var base: String = STAND_INS[kind][0] if STAND_INS.has(kind) else kind
-	return "tower_arrow_%d" % (rank + 1) if base == "arrow" else "tower_" + base
+	var own := "tower_%s_%d" % [base, rank + 1]
+	return own if ranked(own) else "tower_" + base
+
+
+static func ranked(model: String) -> bool:
+	return ResourceLoader.exists("res://assets/models/%s.glb" % model)
 
 
 func title() -> String:
@@ -92,7 +97,7 @@ func _dress() -> void:
 		_model.queue_free()
 	_model = Models.make(model_name(kind, rank))
 	add_child(_model)
-	if model_name(kind, rank).begins_with("tower_arrow") == false:
+	if not model_name(kind, rank).ends_with("_%d" % (rank + 1)):   # one model for every rank: it grows
 		_model.scale = Vector3.ONE * (1.0 + 0.14 * rank)
 	_turret = Models.node(_model, "turret")
 	_muzzle = Models.node(_model, "fx_muzzle")
@@ -134,6 +139,18 @@ static func dress_fx(model: Node3D, kind: String, rank: int) -> void:
 			light.light_energy = 2.0 + 0.5 * rank
 			light.omni_range = 7.0
 			Models.node(model, "fx_glow").add_child(light)
+		"plague", "grove":   # a venom-green glow from the pool, the grove's runes
+			light = OmniLight3D.new()
+			light.light_color = Color(0.4, 1.0, 0.3) * tint
+			light.light_energy = 1.6 + 0.4 * rank
+			light.omni_range = 6.0
+			Models.node(model, "fx_glow").add_child(light)
+		"altar":   # the cauldron's sickly fire
+			var f := Models.node(model, "fx_fire")
+			f.add_child(Fx.fire(0.7 + 0.15 * rank, 1.0, Color(0.45, 1.0, 0.4)))
+			light = Fx.fire_light(2.5 + rank, 8.0)
+			light.light_color = Color(0.55, 1.0, 0.4)
+			f.add_child(light)
 		"storm":
 			light = OmniLight3D.new()
 			light.light_color = Color(0.45, 0.6, 1.0) * tint

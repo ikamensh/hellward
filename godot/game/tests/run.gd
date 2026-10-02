@@ -331,6 +331,7 @@ func test_a_campaign_walk_through_every_screen() -> void:
 ## a scripted player defending: a script error anywhere fails the suite (tools/test.sh).
 func test_every_location_lays_out_and_plays() -> void:
 	var view: Dictionary = (await Net.ask("campaign").done)["data"]
+	var seen := {}   # the kinds whose bodies are checked (check_bodies), over every location's battle
 	for act in view["acts"]:
 		for place in act["places"]:
 			var key := String(place["key"])
@@ -344,6 +345,7 @@ func test_every_location_lays_out_and_plays() -> void:
 			check(m.hud.slots().size() == bar, "%s: the bar holds its arsenal (%d of %d)" % [key, m.hud.slots().size(), bar])
 			check(w.time > 5.0 and w.outcome == "", "%s: its battle runs (%.0f s)" % [key, w.time])
 			check(w.level.portals.size() >= 1 and m.has_node("Dressing"), "%s: its scenery stands" % key)
+			await check_bodies(w, seen)
 			_main.queue_free()
 			await frames(2)
 
@@ -351,3 +353,55 @@ func test_every_location_lays_out_and_plays() -> void:
 func _showing(seen: Array, screen: String) -> bool:
 	return not seen.is_empty() and seen.back() == screen
 
+
+## Every monster and tower kind of a battle not `seen` before, dressed as the battle dresses it: its model
+## instantiates with the library's materials (none left untextured), a monster plays every clip monster.gd asks of
+## it (and a leader its cast) without its bones going wild, and a tower of every rank stands with the anchors its
+## effects hang on.
+func check_bodies(w: World, seen: Dictionary) -> void:
+	for kind in w.start["monsters"]:
+		if seen.has("m:" + kind):
+			continue
+		seen["m:" + kind] = true
+		var own := ResourceLoader.exists("res://assets/models/mon_%s.glb" % kind)
+		var base := String(kind) if own else String(Monster.STAND_INS.get(kind, ["?"])[0])
+		check(own or Monster.STAND_INS.has(kind), "%s: a model or a stand-in" % kind)
+		if not ResourceLoader.exists("res://assets/models/mon_%s.glb" % base):
+			continue
+		var body := Models.make("mon_" + base)
+		add_child(body)
+		var player := Models.player(body)
+		var clips := ["idle", "walk", "attack", "die", "die2"]
+		if w.start["monsters"][kind]["leader"] != null:
+			clips.append("cast")
+		for clip in clips:
+			var name := Models.anim_name(player, clip)
+			check(name != "", "%s: has its %s clip" % [kind, clip])
+			if name == "":
+				continue
+			player.play(name)
+			player.seek(player.get_animation(name).length * 0.5, true)
+			await frames(1)
+			var box := AABB()
+			for mi in body.find_children("*", "MeshInstance3D", true, false):
+				box = box.merge((mi as MeshInstance3D).get_aabb())
+			check(box.size.length() < 12.0, "%s %s: its bones stay together (bounds %.1f m)" % [kind, clip, box.size.length()])
+		for mi in body.find_children("*", "MeshInstance3D", true, false):
+			for i in (mi as MeshInstance3D).mesh.get_surface_count():
+				var mat := (mi as MeshInstance3D).get_active_material(i)
+				check(mat is BaseMaterial3D and ((mat as BaseMaterial3D).albedo_texture != null
+					or (mat as BaseMaterial3D).emission_enabled or (mat as BaseMaterial3D).albedo_color != Color.WHITE),
+					"%s: surface %d of %s is dressed by the library" % [kind, i, mi.name])
+		body.queue_free()
+	for kind in w.start["towers"]:
+		if seen.has("t:" + kind):
+			continue
+		seen["t:" + kind] = true
+		for rank in 3:
+			var model := Tower.model_name(kind, rank)
+			check(ResourceLoader.exists("res://assets/models/%s.glb" % model), "%s rank %d: %s is built" % [kind, rank + 1, model])
+			var body := Models.make(model)
+			add_child(body)
+			check(Models.node(body, "fx_muzzle") != null or Models.node(body, "fx_fire") != null,
+				"%s rank %d: has an anchor its shots leave from" % [kind, rank + 1])
+			body.queue_free()

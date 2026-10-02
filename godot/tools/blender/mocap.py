@@ -76,6 +76,7 @@ class Clip:
                 if pb.name + "_end" in ends:
                     ends[pb.name + "_end"].append(tuple(arm.matrix_world @ pb.tail))
         bpy.data.objects.remove(arm)
+        bpy.data.actions.remove(act)   # sampled: left in the file it would export as a junk clip
         joints = {k: np.array(v) for k, v in {**heads, **ends}.items()}
         stretch = max(float(np.percentile(np.linalg.norm(joints[f"{c}Hip"] - joints[f"{c}Ankle"], axis=1), 99))
                       for c in CAP.values())
