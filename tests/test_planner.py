@@ -78,7 +78,7 @@ def test_smart_curses_are_close_to_the_best_and_beat_the_naive_ones():
             found.append((world.clone(), leader_id))
         return planner.smart(world, leader_id)
 
-    world = World(seed=2, planner=recorder)
+    world = World(replace(campaign.CATHEDRAL, life=1.0), seed=2, planner=recorder)   # a hard fight, whatever the tuning
     world.lives = 10_000
     defender, hands = Ordinary(), Hands(world, react=0.6)
     while len(found) < 6 and world.time < 1500:
