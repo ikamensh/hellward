@@ -143,5 +143,11 @@ GDScript or C#, a Windows build (the transport choice must not rule it out).
   (the campaign's rules through the real server, including a defence won by the real rules), `godot/tools/test.sh`
   (the client against the real server: building by mouse, refusals, waves, a curse and Cleanse, defeat and
   victory with their music, the frame parse, and a walk through the campaign's screens).
-- **Content.** All twelve locations play with their own scenery; monster and tower kinds without a model of
-  their own yet (step 4) wear a tinted stand-in (`monster.gd` and `tower.gd` `STAND_INS`).
+- **Content (step 4, under way).** All twelve locations play with their own scenery. Every tower family has a
+  model per rank (`tools/blender/tower_<kind>.py` builds `tower_<kind>_1..3`). Monsters: the Fallen, Shaman, Zombie
+  and Skeleton are hand-made (godot/docs/monsters.md); the other fifteen kinds, the two bosses among them, have
+  concepts painted from the 2D game's sheets and short specs (`biped.py`, `beast.py`) waiting on their generated
+  meshes, and wear a tinted stand-in (`monster.gd STAND_INS`) until then. What is built and what is a stand-in:
+  `tools/assets.py`, `godot/tools/survey.sh`; checked by `tests/test_client_assets.py`, the client tests (every
+  kind's body over every location), `godot/tools/blender/audit.py` (clips) and `tools/visual_check.py` (every screen
+  and battle rendered and checked).
