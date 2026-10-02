@@ -185,6 +185,18 @@ The screen after a story page ignores keys pressed before it opened, so a held E
 
 The earlier six-location and twelve-location tuning tables were measured before this low-number, branching-hall economy. Their life factors, bot margins, planner gains and timing figures no longer describe the current rules. The common profile supplies the starting curve; authored roles, wave compositions, entrances and optional packs were checked with an eight-seed earned-sigil campaign after the corridor revision. The [redesign notes](redesign.md#earned-sigil-campaign-on-the-corridor-maps) summarize that result, including the tight Temple finale and the current planner-latency limit.
 
+Each location's life is its growth times a factor in `hellward/sim/data/campaign.toml`, tuned with `tools/margin.py`
+after stage 1's rules (2026-10-02, evaluation seeds 1000-1007, smart leaders): the strongest bot wins every location
+and the veteran every location of Act I, each with its worst seed at a margin of at least 1.0. The factors are 1.0
+but for the Graveyard 0.76, the Cathedral 0.61 and Hell's Gate 0.80 (where the veteran, drafting from the intro,
+lost before them; it already lost the Cathedral at 0.49 before stage 1, while the planned player holds it at 2.6),
+the Catacombs 1.5 and Kurast Docks 1.07 (where an Arrow-only build now loses and one with Ballistas for the same gold
+wins, `tools/armor_ab.py`, M9), and Travincal 0.86 (the planned player's worst seed). Margins at those factors,
+median (veteran in Act I; the better of the planned and adaptive players everywhere): Tristram 1.28 / 1.39,
+Graveyard 1.19 / 2.07, Cathedral 1.11 / 2.58, Catacombs 1.12 / 2.31, Caves 1.61 / 1.80, Hell's Gate 1.23 / 1.57;
+Docks 1.63, Spider Forest 2.26, Jungle 1.73, Drowned City 1.91, Travincal 1.17, Temple 1.43. Ballistas fill the
+searched builds from the Catacombs on: the armor answer is also the strongest general tower at these numbers.
+
 `tools/balance.py` compares leader policies and defenders, `tools/curse_quality.py` measures the curse planner, `tools/campaign_balance.py` follows progression, and `tools/margin.py` estimates spare difficulty. The source simulation and mypyc build should agree on events, rewards and outcomes for the same seed, including a breach and a forged loadout. Tests cover route geometry, clone determinism, rewards and replayed commands. Record each balance result with its profile and command so later curve changes remain comparable.
 
 The original tuning still taught useful rules: a broken gate remains rubble until a break; a spell recharges after casting; and spells grow with location and wave, rather than an arbitrary hardship multiplier. These mechanics remain in the game. Stage 1 ([its spec](stages/1-armor-and-pirates.md)) took Cleanse, wards, Salvation and chant interrupts out: no spell lifts, prevents or breaks a curse.

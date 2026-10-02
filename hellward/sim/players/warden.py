@@ -25,7 +25,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from hellward.sim.campaign import ORDER, Location
+from hellward.sim.campaign import ORDER, Location, idle
 from hellward.sim.content import MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Element, felt_hit
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
@@ -142,7 +142,8 @@ def small(location: Location) -> float:
 
 
 def draft_skills(location: Location, sigils: int) -> frozenset[str]:
-    """Skills bought in a veteran's order from the columns the location has use for, then the rest of the tree."""
+    """Skills bought in a veteran's order from the columns the location has use for, then the rest of the tree; never
+    one that does nothing here."""
     arsenal = location.arsenal
     wanted: list[str] = []
     if "pyre" in arsenal.towers:
@@ -154,7 +155,7 @@ def draft_skills(location: Location, sigils: int) -> frozenset[str]:
     if "storm" in arsenal.towers and flyers(location) > 0.1:
         wanted += ["adept_lightning", "chain_lightning"]
     if "ballista" in arsenal.towers and armored(location) > 0.1:
-        wanted += ["adept_arrow"]
+        wanted += ["adept_arrow"]   # Steel: the Ballistas' second rank
     if "frost" in arsenal.towers:
         wanted += ["adept_cold"]
     if "pyre" in arsenal.towers:
@@ -178,7 +179,7 @@ def draft_skills(location: Location, sigils: int) -> frozenset[str]:
     learned: frozenset[str] = frozenset()
     stage = ORDER.index(location.key)
     for key in [*wanted, *SKILLS]:
-        if can_learn(learned, key, sigils, stage):
+        if not idle(location, SKILLS[key].needs) and can_learn(learned, key, sigils, stage):
             learned |= {key}
     return learned
 

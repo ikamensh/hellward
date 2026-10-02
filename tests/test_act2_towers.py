@@ -147,7 +147,7 @@ def test_corpse_explosion_bursts_once_and_does_not_chain():
     a, b, c = world.monsters
     a.s = b.s = c.s = 4.0
     a.amplified, a.amplify = 5.0, 0.3
-    b.amplified, b.amplify, b.hp = 5.0, 0.3, 1.0   # the burst kills it, amplified or not
+    b.amplified, b.amplify, b.hp = 5.0, 0.3, a.max_hp * 0.1   # the burst kills it, amplified or not
     full = c.hp
     world.events.clear()
     world._hurt(a, 10000.0, None)
