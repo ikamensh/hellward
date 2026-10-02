@@ -532,7 +532,8 @@ func check_bodies(w: World, seen: Dictionary) -> void:
 		seen["t:" + kind] = true
 		for rank in 3:
 			var model := Tower.model_name(kind, rank)
-			check(ResourceLoader.exists("res://assets/models/%s.glb" % model), "%s rank %d: %s is built" % [kind, rank + 1, model])
+			check(model == "tower_%s_%d" % [kind, rank + 1] and ResourceLoader.exists("res://assets/models/%s.glb" % model),
+				"%s rank %d: its own model is built (%s)" % [kind, rank + 1, model])
 			var body := Models.make(model)
 			add_child(body)
 			check(Models.node(body, "fx_muzzle") != null or Models.node(body, "fx_fire") != null,
