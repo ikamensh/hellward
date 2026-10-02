@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://cw3ju0k3jtqwc"
-path="res://.godot/imported/tower_pyre.glb-9c59d6f0a8fea1418bc7e146fb8b2e40.scn"
+uid="uid://d35oguuag7e1c"
+path="res://.godot/imported/tower_grove_1.glb-6c7e5b88fa44aacafb54f35f5fdc1ec4.scn"
 
 [deps]
 
-source_file="res://assets/models/tower_pyre.glb"
-dest_files=["res://.godot/imported/tower_pyre.glb-9c59d6f0a8fea1418bc7e146fb8b2e40.scn"]
+source_file="res://assets/models/tower_grove_1.glb"
+dest_files=["res://.godot/imported/tower_grove_1.glb-6c7e5b88fa44aacafb54f35f5fdc1ec4.scn"]
 
 [params]
 

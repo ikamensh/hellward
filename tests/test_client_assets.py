@@ -66,3 +66,15 @@ def test_every_model_has_the_clips_anchors_and_maps_the_client_uses():
         assert not assets.monster(kind)["problems"], (kind, assets.monster(kind)["problems"])
     for kind in TOWERS:
         assert not assets.tower(kind)["problems"], (kind, assets.tower(kind)["problems"])
+
+
+def test_every_client_asset_has_its_import_record_and_no_record_is_orphaned():
+    """Godot's .import records are committed with their assets: a model or texture without one imports with a new
+    uid on every machine, and a record left behind by a deleted asset is noise."""
+    tracked = set(__import__("subprocess").run(["git", "ls-files", "godot/game/assets"], capture_output=True, text=True,
+                                               cwd=GAME.parent.parent, check=True).stdout.split())
+    for path in tracked:
+        if path.endswith(".import"):
+            assert path[: -len(".import")] in tracked, f"{path}: its asset is gone"
+        elif path.endswith((".glb", ".png", ".jpg", ".webp", ".wav", ".mp3", ".ogg")):
+            assert path + ".import" in tracked, f"{path}: commit its .import record"

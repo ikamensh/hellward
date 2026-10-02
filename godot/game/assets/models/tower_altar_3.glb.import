@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://ddf70qy88f5ph"
-path="res://.godot/imported/tower_frost.glb-a527f2c1669f861cc59f1074fa5683e5.scn"
+uid="uid://h3dw5a0sg2ye"
+path="res://.godot/imported/tower_altar_3.glb-db94a4cf63bf99a715f986bc7d90c40f.scn"
 
 [deps]
 
-source_file="res://assets/models/tower_frost.glb"
-dest_files=["res://.godot/imported/tower_frost.glb-a527f2c1669f861cc59f1074fa5683e5.scn"]
+source_file="res://assets/models/tower_altar_3.glb"
+dest_files=["res://.godot/imported/tower_altar_3.glb-db94a4cf63bf99a715f986bc7d90c40f.scn"]
 
 [params]
 

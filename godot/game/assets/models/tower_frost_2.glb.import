@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://bxohnxr5cfiwa"
-path="res://.godot/imported/tower_storm.glb-6e1887f093ed7b31912a3f152baa78f7.scn"
+uid="uid://6elp1ejflwhw"
+path="res://.godot/imported/tower_frost_2.glb-30fc8c00ad15aba1f5328dc6a1739cf6.scn"
 
 [deps]
 
-source_file="res://assets/models/tower_storm.glb"
-dest_files=["res://.godot/imported/tower_storm.glb-6e1887f093ed7b31912a3f152baa78f7.scn"]
+source_file="res://assets/models/tower_frost_2.glb"
+dest_files=["res://.godot/imported/tower_frost_2.glb-30fc8c00ad15aba1f5328dc6a1739cf6.scn"]
 
 [params]
 
