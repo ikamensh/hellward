@@ -43,14 +43,6 @@ body = sculpted.prepare(
     "zombie", HEIGHT, yaw=180, faces=14000, families=FAMILIES, looks=LOOKS, fill=0.14)   # its eyes are the head's
 
 
-def BELLY(p):
-    """The concept's slumped gut: the front of the belly pushed forward and down (a pear in profile)."""
-    if p.y < 0.0 or abs(p.x) > 0.32:
-        return p
-    w = sculpted.smooth(1.0 - abs(p.z - 1.1) / 0.32) * sculpted.smooth(p.y / 0.18) * sculpted.smooth(1 - abs(p.x) / 0.32)
-    return Vector((p.x * (1 + 0.3 * w), p.y + 0.22 * w, p.z - 0.08 * w))   # wider than the hips from the front
-
-
 def BULK(p):
     """The concept's slab of a body: the trunk and shoulders broad and deep (the generator made a gaunt old man)."""
     w = sculpted.smooth((p.z - 0.95) / 0.12) * (1 - sculpted.smooth((p.z - 1.66) / 0.06))
@@ -65,8 +57,10 @@ def NECK(p):
     return Vector((p.x, p.y + 0.06 * w, p.z + 0.05 * w))
 
 
+# the generated gut stays as it was made: amplifying it, by any push or scaling, grew a ball on the front of the
+# body (a hernia more than a gut)
 def SHAPE(p):
-    return NECK(BULK(BELLY(p)))
+    return NECK(BULK(p))
 
 
 sculpted.reshape(body, SHAPE)
