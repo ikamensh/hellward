@@ -8,12 +8,16 @@ the rules have wears a model or a stand-in.
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 from hellward.audio.cues import CUES, files
 from hellward.audio.music import PIECES
 from hellward.sim.campaign import LOCATIONS
 from hellward.sim.content import MONSTERS, TOWERS
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
+import assets  # noqa: E402
 
 GAME = Path(__file__).resolve().parent.parent / "godot" / "game"
 SCRIPTS = "\n".join(p.read_text() for p in sorted((GAME / "scripts").rglob("*.gd")))
@@ -53,3 +57,12 @@ def test_every_monster_and_tower_kind_wears_a_model_or_a_stand_in():
     for kind in TOWERS:
         own = f"tower_{kind}" in models or f"tower_{kind}_1" in models
         assert own or re.search(rf'"{kind}": \["(arrow|pyre|frost|storm)"', tower), kind
+
+
+def test_every_model_has_the_clips_anchors_and_maps_the_client_uses():
+    """tools/assets.py's checks: a monster model has every clip monster.gd plays (and a leader its cast), the
+    effect anchors, its maps, and no stand-in left over; a tower kind a model or a stand-in, not both."""
+    for kind in MONSTERS:
+        assert not assets.monster(kind)["problems"], (kind, assets.monster(kind)["problems"])
+    for kind in TOWERS:
+        assert not assets.tower(kind)["problems"], (kind, assets.tower(kind)["problems"])

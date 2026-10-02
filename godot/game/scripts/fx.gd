@@ -60,7 +60,7 @@ static func curve(points: Array) -> CurveTexture:
 
 
 ## Flames `size` metres across, rooted where they burn and licking upward; additive, so glow turns them into light.
-static func fire(size: float, intensity := 1.0) -> GPUParticles3D:
+static func fire(size: float, intensity := 1.0, tint := Color.WHITE) -> GPUParticles3D:
 	var p := GPUParticles3D.new()
 	p.amount = int(clamp(13 * size, 10, 40))   # more overlapping additive flames sum to white
 	p.lifetime = 0.9
@@ -92,9 +92,10 @@ static func fire(size: float, intensity := 1.0) -> GPUParticles3D:
 	pm.turbulence_influence_max = 0.07
 	# overlapping additive flames sum: each stays faint, so the heart of a big fire is orange, not white
 	var k := intensity
-	pm.color_ramp = ramp([[0.0, Color(k, k * 0.8, k * 0.55, 0.0)], [0.1, Color(k, k * 0.75, k * 0.45, 0.5)],
-		[0.45, Color(k * 0.95, k * 0.5, k * 0.25, 0.4)], [0.8, Color(0.7, 0.22, 0.07, 0.2)],
-		[1.0, Color(0.35, 0.1, 0.04, 0.0)]])
+	# `tint` multiplies it (the Bone Altar's cauldron burns green)
+	pm.color_ramp = ramp([[0.0, Color(k, k * 0.8, k * 0.55, 0.0) * tint], [0.1, Color(k, k * 0.75, k * 0.45, 0.5) * tint],
+		[0.45, Color(k * 0.95, k * 0.5, k * 0.25, 0.4) * tint], [0.8, Color(0.7, 0.22, 0.07, 0.2) * tint],
+		[1.0, Color(0.35, 0.1, 0.04, 0.0) * tint]])
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(size * 0.85, size * 1.2)

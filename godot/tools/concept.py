@@ -35,6 +35,12 @@ FIGURE = ("A single full-body character, seen from the front and slightly to its
 
 PROP = ("A single game prop alone, seen in a three-quarter view, filling most of the frame, nobody holding it. ")
 
+WINGED = ("A single full-body flying creature seen from the front and slightly above, hovering with its wings spread "
+          "wide and flat to both sides, legs hanging below, nothing in its hands or claws. ")
+
+SHEET = ("exactly the creature in the attached reference, a sheet of small frames from a 2D game showing it from "
+         "several directions and in several poses (use it only for its design: shapes, colours, costume)")
+
 CONCEPTS: dict[str, tuple[str, str | None]] = {
     "fallen": (FIGURE + "A Fallen, a small demon imp about 1.1 m tall, exactly the creature in the attached reference "
                "(front, side and back views from a 2D game): crimson-red wrinkled leathery hide with darker veins, a "
@@ -65,6 +71,93 @@ CONCEPTS: dict[str, tuple[str, str | None]] = {
                "wrapped round its hips, a rusty iron manacle with a short broken chain on its right wrist, bare "
                "blackened feet. Two broken arrows stick out of its back and shoulder. Long heavy arms with "
                "blackened claw-like nails. Nothing glows.", None),
+    "goatman": (FIGURE + "A Goatman, a demon warrior with the head of a ram and a muscular man's body, about 1.9 m "
+                "tall, " + SHEET + ": shaggy brown fur on the legs, which are a goat's with dark cloven hooves, bare "
+                "brown-skinned torso and arms, long curling ram's horns, a goat's snout and beard, small burning orange "
+                "eyes, worn leather straps and a hide loincloth, iron bracers. Only the eyes glow.", "goatman_ref.png"),
+    "overlord": (FIGURE + "An Overlord, a huge fat demon brute about 2.2 m tall, " + SHEET + ": rust-red wrinkled "
+                 "hide, a massive gut, short thick legs, enormous shoulders and arms studded with bone spikes, a small "
+                 "horned head sunk into its shoulders with tusks, iron bands on its wrists, a spiked iron collar, a "
+                 "ragged loincloth. Small yellow eyes glow; nothing else glows.", "overlord_ref.png"),
+    "azazel": (FIGURE.replace("arms held away from the body at about 35 degrees", "great bat-like wings spread wide "
+               "behind it, arms held away from the body at about 35 degrees") + "Azazel the Flayer, a demon lord "
+               "about 2.6 m tall, " + SHEET + ": dark crimson muscular body armoured in black chitin and bone plates, "
+               "huge leathery red bat wings, a horned crown of curving black horns, a fanged skull-like face with "
+               "burning orange eyes, clawed hands and clawed digitigrade feet, glowing lava-orange cracks in its "
+               "armour. Only the eyes and the cracks glow.", "azazel_ref.png"),
+    "priest": (FIGURE + "A Bone Acolyte, a gaunt undead priest about 1.85 m tall, " + SHEET + ": a hooded floor-length "
+               "robe of dark brown wool with a dull red sash and tabard, a grey dead face with sunken cheeks under the "
+               "hood, bony grey hands, a string of small bones and skulls round its neck. Small green eyes glow in the "
+               "hood; nothing else glows.", "priest_ref.png"),
+    "witch": (FIGURE + "A Blood Witch, a pale sorceress about 1.8 m tall, " + SHEET + ": a long tattered crimson gown "
+              "with a black corset and a high collar, long straight black hair, ghost-pale skin, dark lips, long red "
+              "nails, a necklace of blood-red stones. Her eyes glow faint red; nothing else glows.", "witch_ref.png"),
+    "flayer": (FIGURE + "A Flayer, a tiny jungle demon-imp about 0.9 m tall, " + SHEET + ": lean wiry body with dark "
+               "red-brown skin daubed with white and ochre paint, a big carved wooden tribal mask with a toothy grin "
+               "over its face, a crest of red feathers sprouting from the mask, bone bracelets and anklets, a grass "
+               "and hide loincloth, long thin arms and clawed feet. Small yellow eyes glow through the mask; nothing "
+               "else glows.", "flayer_ref.png"),
+    "zealot": (FIGURE + "A Zealot of Zakarum, a fanatical human cultist about 1.85 m tall, " + SHEET + ": a cream "
+               "and dirty white robe belted with rope, a tall pointed cream hood-hat of the Zakarum order with a gold "
+               "trim, a red cross-shaped sigil on the chest, bare scarred forearms, sandals, a crazed grey face. His "
+               "eyes glow faint yellow; nothing else glows.", "zealot_ref.png"),
+    "spider": ("A single giant spider about 1.6 m across its legs, seen from the front and slightly above, standing "
+               "with all eight long legs spread wide and clearly apart from each other and from the body, " + SHEET +
+               ": a glossy black-brown armoured body with a bulbous abdomen marked by a blood-red hourglass and red "
+               "stripes, bristly jointed legs, a cluster of small red eyes, curved fangs. Only the eyes glow faintly. ",
+               "spider_ref.png"),
+    "bat": (WINGED + "A Blood Bat, a giant demonic bat with a wingspan of about 1.4 m, " + SHEET + ": dark crimson "
+            "membrane wings with black finger bones, a furry blood-red body, a pig-snouted fanged face with big ears, "
+            "small hooked feet. Its small eyes glow red; nothing else glows.", "bat_ref.png"),
+    "gargoyle": (WINGED + "A Gargoyle, a stone demon about 1.7 m tall with a wingspan of about 2.4 m, " + SHEET + ": "
+                 "weathered grey-green stone skin cracked and mossy, leathery stone bat wings, curling horns, a "
+                 "snarling ape-like face, long arms with stone claws, crouched digitigrade legs. Its eyes glow pale "
+                 "green; nothing else glows.", "gargoyle_ref.png"),
+    "hulk": (FIGURE + "A Thorned Hulk, a hulking jungle brute about 2.2 m tall, " + SHEET + ": a massive hunched body "
+             "of dark olive-brown bark-like hide, long thorns and spikes growing out of its back, shoulders and "
+             "forearms, very long heavy arms, short thick legs, a small brutish head with a jutting jaw and small "
+             "orange eyes. Only the eyes glow.", "hulk_ref.png"),
+    "drowned": (FIGURE + "The Drowned, a bloated corpse risen from the harbour, about 1.9 m tall, " + SHEET + ": "
+                "swollen blue-grey and sickly green waterlogged skin, barnacles and seaweed hanging from its arms and "
+                "shoulders, the rotten remains of a sailor's coat and trousers, a slack jaw, pale bulging milky eyes, "
+                "long webbed clawed hands. Nothing glows.", "drowned_ref.png"),
+    "fetish": (FIGURE + "A Fetish Shaman, a tiny jungle demon about 1.0 m tall, " + SHEET + ": crimson-red skin, a huge "
+               "carved bone-and-wood mask covering its head with a spray of red feathers fanning out above it, a "
+               "necklace of shrunken heads and teeth, bone bracelets, a ragged grass skirt, thin arms and clawed feet. "
+               "Small yellow eyes glow through the mask; nothing else glows.", "fetish_ref.png"),
+    "inquisitor": (FIGURE + "A Zakarum Inquisitor, a tall stern priest about 2.0 m tall, " + SHEET + ": long white and "
+                   "ivory vestments trimmed with gold embroidery, a crimson stole hanging down the front, a tall "
+                   "pointed gold-trimmed mitre, a gold sun-and-cross pectoral, a gaunt cruel face, white gloves. His "
+                   "eyes glow faint gold; nothing else glows.", "inquisitor_ref.png"),
+    "bone_priest": (FIGURE + "The Bone Priest, an undead high priest about 2.5 m tall, " + SHEET + ": a towering dark "
+                    "brown and black robe with heavy gold trim and a crimson underrobe, a tall spiked mitre of bone "
+                    "and gold, a skull face with green fire in its sockets, skeletal hands, a mantle of small skulls "
+                    "over its shoulders, chains and bone charms hanging from its belt. Only its eye sockets glow "
+                    "green.", "bone_priest_ref.png"),
+    "goat_axe": (PROP + "The Goatman's weapon: a crude long-hafted battle axe, a crescent iron blade nicked and "
+                 "rusted on a dark wooden haft wrapped with leather, about as long as a man is tall. Standing "
+                 "upright, blade at the top, the whole axe in frame.", None),
+    "club": (PROP + "The Overlord's weapon: a huge spiked club of a gnarled tree root studded with iron spikes and "
+             "bound with iron bands. Standing upright, the heavy end at the top, the whole club in frame.", None),
+    "flame_sword": (PROP + "Azazel's weapon: a huge curved demonic greatsword of black iron with jagged teeth along its "
+                    "edge and molten orange-glowing cracks running down the blade, a horned black crossguard, a grip "
+                    "wrapped in red leather. Standing upright, point up, the whole sword in frame.", None),
+    "green_staff": (PROP + "The Bone Acolyte's staff: a tall twisted dark wooden staff topped with a cage of bone "
+                    "claws holding a glowing green orb, small bones and feathers tied below it. Standing upright, the "
+                    "whole staff in frame.", None),
+    "blood_staff": (PROP + "The Blood Witch's staff: a slender black wooden staff topped with a twisted iron crescent "
+                    "holding a glowing blood-red crystal, red ribbons hanging below. Standing upright, the whole staff "
+                    "in frame.", None),
+    "spear": (PROP + "The Flayer's spear: a short crude spear, a leaf-shaped bone head lashed to a bamboo shaft with "
+              "red cord, two red feathers hanging from it. Standing upright, point up, the whole spear in frame.", None),
+    "mace": (PROP + "The Zealot's weapon: a heavy flanged iron mace with a worn leather-wrapped wooden handle and a "
+             "small gold Zakarum cross set into its head. Standing upright, the head at the top, the whole mace in "
+             "frame.", None),
+    "crozier": (PROP + "The Inquisitor's crozier: a tall gold-plated staff topped with a sun-and-cross emblem of the "
+                "Zakarum faith, a red banner tassel hanging from it. Standing upright, the whole crozier in frame.", None),
+    "bone_staff": (PROP + "The Bone Priest's great staff: a very tall staff of fused human bones and spine vertebrae, "
+                   "topped with a horned skull whose sockets burn with green fire, gold rings bound round it. Standing "
+                   "upright, the whole staff in frame.", None),
     "kukri": (PROP + "The Fallen's knife: a heavy curved kukri-like blade of dark pitted iron with a notched edge and "
               "a bright worn cutting edge, a short iron guard, a grip wrapped in old brown leather, an iron pommel. "
               "Laid out straight, blade pointing up and slightly to the right.", None),
