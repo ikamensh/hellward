@@ -159,10 +159,12 @@ class Biped:
         ankle = {side: j[f"ankle.{side}"].z for side in ("R", "L")}
         masks = {f"shin.{side}": (lambda co, hsv, thick, z=ankle[side]: co.z > 0.85 * z) for side in ("R", "L")}
         # and a robe's skirt below the knee to the shins: a generated robe has no legs inside it, and its hem, all
-        # the thighs' by nearness, went the thighs' length under the ground as they knelt
-        knee = {side: j[f"knee.{side}"].z for side in ("R", "L")}
-        masks |= {f"thigh.{side}": (lambda co, hsv, thick, z=knee[side]: co.z > z - 0.04 * self.h)
-                  for side in ("R", "L")}
+        # the thighs' by nearness, went the thighs' length under the ground as they knelt (rags over legs keep it:
+        # on the shins they swung under the ground in the walk)
+        if self.robe:
+            knee = {side: j[f"knee.{side}"].z for side in ("R", "L")}
+            masks |= {f"thigh.{side}": (lambda co, hsv, thick, z=knee[side]: co.z > z - 0.04 * self.h)
+                      for side in ("R", "L")}
         if spec.wings:   # a wing's bones move only the wing on their side, above the arms
             low = spec.wings_above * self.h
             for s, side in SIDES:
