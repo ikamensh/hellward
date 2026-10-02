@@ -123,6 +123,19 @@ Monsters:
 - Every ward and resolute branch is gone.
 - `tools/curse_quality.py` confirms the estimate still shortlists well (share of best ≥ 0.85).
 
+## Names both sides build against
+
+| Thing | Name |
+|---|---|
+| a hit's felt damage | `hellward.sim.content.felt_hit(hit: float, element: Element \| None, kind: MonsterKind, factor: float = 1.0) -> int` (element None: physical-free holy, no factor, no armor) |
+| monster kind fields | `MonsterKind.armor: int`, `.protected: tuple[Element, ...]`, `.vulnerable: tuple[Element, ...]`, `.boss: bool` |
+| monster fields | `Monster.moved: int` (bitmask, Hook = 1), `Monster.strikes: int` |
+| tower field | `Tower.hymn: float` (seconds left) |
+| the spell | `World.hymn(tower_id: int) -> None`, spell key `"hymn"` |
+| tower kinds | `"ballista"`, `"hook"` (attack `"hook"`), `"knife"` |
+| events | `("hook", tower_id, monster_id, from_s, to_s)`, `("returned", monster_id, kind_key, lives, strikes)`, `("hymn", tower_id)` |
+| tuning | `battle.boss_strike_lives`, `battle.factor_cap`, `battle.hook_pull`, `battle.knife_standing`, `battle.splash_share` |
+
 ## The wire (server protocol; `PROTOCOL` +1, with `Net.PROTOCOL`)
 
 **Events** (plain lists):
