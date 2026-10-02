@@ -23,7 +23,7 @@ boss = false
 
 [skeleton]
 name = "Skeleton"
-life = 1.4
+life = 1.3
 speed = 1.0
 bounty = 1
 lives = 1
@@ -38,7 +38,7 @@ boss = false
 
 [zombie]
 name = "Zombie"
-life = 1.6
+life = 1.5
 speed = 0.6
 bounty = 2
 lives = 1
@@ -53,7 +53,7 @@ boss = false
 
 [goatman]
 name = "Goatman"
-life = 1.7
+life = 1.6
 speed = 1.1
 bounty = 2
 lives = 1
@@ -83,7 +83,7 @@ boss = false
 
 [overlord]
 name = "Overlord"
-life = 4.0
+life = 2.4
 speed = 0.65
 bounty = 4
 lives = 2
@@ -98,7 +98,7 @@ boss = false
 
 [azazel]
 name = "Azazel the Flayer"
-life = 15.0
+life = 16.0
 speed = 0.5
 bounty = 8
 door_dps = 12.0
@@ -112,7 +112,7 @@ boss = true
 
 [shaman]
 name = "Fallen Shaman"
-life = 2.0
+life = 1.8
 speed = 1.0
 bounty = 3
 lives = 2
@@ -128,7 +128,7 @@ leader = { curses = ["weaken"] }
 
 [priest]
 name = "Bone Acolyte"
-life = 2.5
+life = 2.1
 speed = 0.9
 bounty = 3
 lives = 2
@@ -144,7 +144,7 @@ leader = { curses = ["bone_prison", "dim_vision"], cooldown = 10.0 }
 
 [witch]
 name = "Blood Witch"
-life = 2.7
+life = 2.0
 speed = 0.95
 bounty = 3
 lives = 2
@@ -160,7 +160,7 @@ leader = { curses = ["decrepify", "weaken"], cooldown = 8.5 }
 
 [flayer]
 name = "Flayer"
-life = 0.85
+life = 0.9
 speed = 1.45
 bounty = 1
 lives = 1
@@ -190,7 +190,7 @@ boss = false
 
 [spider]
 name = "Spider"
-life = 1.4
+life = 1.3
 speed = 1.35
 bounty = 1
 lives = 1
@@ -220,7 +220,7 @@ boss = false
 
 [hulk]
 name = "Thorned Hulk"
-life = 5.0
+life = 2.6
 speed = 0.55
 bounty = 5
 lives = 2
@@ -235,7 +235,7 @@ boss = false
 
 [drowned]
 name = "The Drowned"
-life = 2.2
+life = 2.0
 speed = 0.7
 bounty = 2
 lives = 1
@@ -250,7 +250,7 @@ boss = false
 
 [fetish]
 name = "Fetish Shaman"
-life = 2.0
+life = 1.9
 speed = 1.1
 bounty = 3
 lives = 2
@@ -266,7 +266,7 @@ leader = { curses = ["weaken"], cooldown = 9.0, raises = "flayer" }
 
 [inquisitor]
 name = "Zakarum Inquisitor"
-life = 2.7
+life = 2.2
 speed = 0.95
 bounty = 3
 lives = 2
@@ -282,7 +282,7 @@ leader = { curses = ["weaken", "dim_vision"], cooldown = 12.0, mark = 1.5 }
 
 [bone_priest]
 name = "The Bone Priest"
-life = 24.0
+life = 12.0
 speed = 0.45
 bounty = 0
 door_dps = 14.0

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 1.5   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 CATACOMBS = Location(
     key="catacombs",
@@ -45,5 +48,5 @@ CATACOMBS = Location(
           "still here?",
     lesson="An Overlord's armor takes half an arrow's hit and little of a Ballista's bolt; frost weakens its blows.",
     requires=("cathedral",),
-    life=BALANCE.location_growth ** 3 * tuning.number("campaign.life.catacombs"),
+    life=BALANCE.life_growth ** 3 * LIFE_FACTOR,
 )

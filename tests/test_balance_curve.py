@@ -12,29 +12,27 @@ def test_opening_fights_use_small_hits_and_no_large_enemy_life():
     """The first defence stays within the requested 1–20 scale and needs several arrows."""
     assert 1 <= BALANCE.effective_hp(1.0, 0, 0) <= 20
     assert 2 <= -(-BALANCE.effective_hp(1.0, 0, 0) // BALANCE.arrow_damage(0)) <= 5
-    assert BALANCE.effective_hp(2.0, 0, 4) <= 20
+    assert BALANCE.effective_hp(2.0, 0, 4) == 24
     assert [BALANCE.arrow_damage(rank) for rank in range(3)] == [2, 3, 4]
 
 
 def test_a_location_starts_with_three_arrow_prices_and_an_ordinary_wave_pays_one():
-    """Gold budgets grow from the same unit as the opening Arrow price."""
+    """Prices stay flat with depth; the stipend grows with the monsters' life, income a little slower."""
     assert BALANCE.gold_unit(0) == 12
     assert BALANCE.starting_gold(0) == 36
     assert BALANCE.wave_income(0, 0) == 12
     assert BALANCE.wave_income(0, 4) == 36
-    assert BALANCE.gold_unit(11) == 22
-    assert BALANCE.starting_gold(11) == 187
-    assert BALANCE.wave_income(11, 0) == 22
-    assert BALANCE.wave_density(0) == BALANCE.wave_density(1) == 1.0
-    assert BALANCE.wave_density(11) == BALANCE.minimum_wave_density
+    assert BALANCE.gold_unit(11) == 12
+    assert BALANCE.income_unit(11) == 42
+    assert BALANCE.starting_gold(11) == 184
+    assert BALANCE.wave_income(11, 0) == 42
 
 
 @pytest.mark.parametrize("change", (
-    {"base_hp": 0}, {"location_growth": 0.9}, {"wave_growth": float("nan")},
+    {"base_hp": 0}, {"life_growth": 0.9}, {"wave_growth": float("nan")},
+    {"income_growth": 0.9}, {"stipend_growth": float("nan")},
     {"arrow_hit": 0}, {"base_gold_unit": 0}, {"starting_units": 0},
     {"wave_income_units": 0}, {"wave_income_growth_units": -0.1},
-    {"starting_units_growth": -0.1}, {"wave_density_decay": -0.1},
-    {"minimum_wave_density": 0}, {"minimum_wave_density": 1.1},
 ))
 def test_an_invalid_profile_fails_when_created(change):
     """A malformed curve must be found before a defence begins."""
@@ -58,7 +56,7 @@ def test_invalid_stage_or_role_cannot_produce_a_plausible_battle_number():
 
 def test_a_few_profile_changes_reach_late_encounters_and_the_gold_economy():
     """Tuning knobs propagate while a role's Arrow damage stays earned, not automatic."""
-    changed = replace(BALANCE, base_hp=8, location_growth=1.12, base_gold_unit=16)
+    changed = replace(BALANCE, base_hp=8, life_growth=1.2, base_gold_unit=16)
     assert changed.effective_hp(1, 0, 0) == 8
     assert changed.effective_hp(1, 11, 7) > BALANCE.effective_hp(1, 11, 7)
     assert changed.gold_unit(11) > BALANCE.gold_unit(11)

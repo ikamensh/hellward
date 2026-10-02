@@ -486,7 +486,7 @@ class World:
 
     @property
     def gate_life(self) -> float:
-        return self.perks.gate_life * BALANCE.location_growth ** self.stage
+        return self.perks.gate_life * BALANCE.life_growth ** self.stage
 
     def _price(self, opening_cost: int) -> int:
         return round(opening_cost * BALANCE.gold_unit(self.stage) / BALANCE.base_gold_unit)

@@ -25,7 +25,7 @@ def _in_child(override: str | None, code: str) -> str:
 
 def test_an_override_file_changes_the_numbers_a_new_process_reads(tmp_path):
     override = tmp_path / "harder.toml"
-    override.write_text('[economy]\nbase_hp = 12.0\n[monsters.fallen]\nspeed = 2.0\n')
+    override.write_text('[economy]\nbase_hp = 20.0\n[monsters.fallen]\nspeed = 2.0\n')
     code = ("import json; from hellward.sim.content import MONSTERS; "
             "print(json.dumps([MONSTERS['fallen'].hp, MONSTERS['fallen'].speed, MONSTERS['skeleton'].speed]))")
     base = json.loads(_in_child(None, code))

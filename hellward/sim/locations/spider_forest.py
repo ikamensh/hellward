@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import EVERY_TOWER, Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 1.0   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 SPIDER_FOREST = Location(
     key="spider_forest",
@@ -43,5 +46,5 @@ SPIDER_FOREST = Location(
     taunt="The old trees have taken your side. Stand close to them, then. One curse will find you all.",
     lesson="Venom barely bites the spiders here. A grove makes a bunch worth its risk.",
     requires=("docks",),
-    life=BALANCE.location_growth ** 7 * tuning.number("campaign.life.spider_forest"),
+    life=BALANCE.life_growth ** 7 * LIFE_FACTOR,
 )

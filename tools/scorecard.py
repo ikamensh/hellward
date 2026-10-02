@@ -19,10 +19,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from hellward.sim.balance import BALANCE  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import MAX_POISON_STACKS, MONSTERS, SPELLS, TOWERS, TowerKind, felt_hit  # noqa: E402
 from hellward.sim.model import World  # noqa: E402
-from tools.maps import LEAST_CLUSTERED, LEAST_OCCUPIED, MOST_PRIME, survey  # noqa: E402
+from tools.maps import LEAST_CLUSTERED, LEAST_OCCUPIED, MOST_PRIME, survey, traffic, worth_map  # noqa: E402
 
 ATTACKS = ("bolt", "chain", "nova", "venom", "hook")   # tower attacks that deal damage; the others are mechanics towers
 
@@ -151,12 +152,120 @@ def real_estate() -> list[Result]:
     ]
 
 
+def power_table() -> list[Result]:
+    """G3.4: at every location, on the untuned curve, the reference board's damage per second covers the last
+    wave's life per second. The reference board is the best board the location's gold buys on its eight best
+    cells (greedy by marginal felt damage per gold, at most seven at rank III); Hooks buy pulls, not damage.
+    Each route's demand is its monsters' life over their seconds inside the covered stretch; each tower's
+    supply is its felt damage per second against the last wave's mix, weighed by life. Chains, splashes and
+    venom beyond one stack are left out, so the board is weaker here than in a fight. The row says whether
+    gold or cells bind."""
+    out = []
+    for stage, key in enumerate(ORDER):
+        location = LOCATIONS[key]
+        mix = _last_mix(location, stage)
+        total = sum(mix.values())
+        shares = {kind: life / total for kind, life in mix.items()}
+        gold = BALANCE.starting_gold(stage) + sum(BALANCE.wave_income(stage, i) for i in range(len(location.waves)))
+        worth = worth_map(location.level, traffic(location))
+        cells = sorted(worth, key=lambda c: worth[c], reverse=True)[:8]
+        kinds = [k for k in location.arsenal.towers if TOWERS[k].attack in ATTACKS and TOWERS[k].attack != "hook"]
+        board: dict = {}
+        left = gold
+        while True:
+            offer = _best_buy(board, cells, kinds, shares, left)
+            if offer is None:
+                break
+            (cell, rank), price, _ = offer
+            board[cell] = rank
+            left -= price
+        binds = "gold" if left < min(TOWERS[k].levels[0].cost for k in kinds) else "cells"
+        route, worst = min(_route_cover(location, board, shares, stage).items(), key=lambda kv: kv[1])
+        out.append(Result("G3.4", f"{key}: worst route's supply over demand ({route}; {binds} binds)",
+                          f"{worst:.2f}", worst >= 1.0))
+    return out
+
+
+def _last_mix(location: Location, stage: int) -> dict[str, float]:
+    """The last wave's kinds with their life on the untuned curve (factor 1)."""
+    wave = location.waves[-1]
+    mix: dict[str, float] = {}
+    for group in wave.groups:
+        life = MONSTERS[group.kind].hp * wave.hp * BALANCE.life_growth ** stage * group.count
+        mix[group.kind] = mix.get(group.kind, 0.0) + life
+    return mix
+
+
+def _felt_dps(kind: str, rank: int, shares: dict[str, float]) -> float:
+    """A rank's damage per second against a kind mix: each hit as felt, weighed by the kind's life share."""
+    tower, level = TOWERS[kind], TOWERS[kind].levels[rank]
+    return sum(share * level.rate * felt_hit(level.damage, tower.element, MONSTERS[monster])
+               for monster, share in shares.items())
+
+
+def _best_buy(board: dict, cells: list, kinds: list[str], shares: dict[str, float], gold: int):
+    """The best marginal felt damage per gold still affordable: a new rank-I tower or a rank up (at most
+    seven towers at rank III), or None when nothing affordable improves the board."""
+    best = None
+    tops = sum(1 for placed in board.values() if placed[1] == 2)
+    for cell in cells:
+        if cell in board:
+            kind, rank = board[cell][0], board[cell][1]
+            if rank == 2 or (rank == 1 and tops >= 7):
+                continue
+            gain = _felt_dps(kind, rank + 1, shares) - _felt_dps(kind, rank, shares)
+            price = TOWERS[kind].levels[rank + 1].cost
+            if gain > 0 and price <= gold and (best is None or gain / price > best[2]):
+                best = ((cell, (kind, rank + 1)), price, gain / price)
+            continue
+        for kind in kinds:
+            price = TOWERS[kind].levels[0].cost
+            gain = _felt_dps(kind, 0, shares)
+            if gain > 0 and price <= gold and (best is None or gain / price > best[2]):
+                best = ((cell, (kind, 0)), price, gain / price)
+    return best
+
+
+def _route_cover(location: Location, board: dict, shares: dict[str, float], stage: int) -> dict[str, float]:
+    """Each walked route's supply over demand: the towers covering it deal their felt damage per second;
+    its monsters' life arrives over their seconds inside the covered stretch."""
+    wave = location.waves[-1]
+    cover: dict[str, list] = {}
+    for cell, (kind, rank) in board.items():
+        reach = TOWERS[kind].levels[rank].range
+        for route in location.level.routes:
+            spans = route.coverage(cell, reach)
+            if spans:
+                cover.setdefault(route.key, []).append((kind, rank, spans))
+    ratios = {}
+    for route in location.level.routes:
+        groups = [g for g in wave.groups if g.route == route.key]
+        if not groups:
+            continue
+        covered = _union_length([s for _, _, spans in cover.get(route.key, []) for s in spans])
+        demand = sum(MONSTERS[g.kind].hp * wave.hp * BALANCE.life_growth ** stage * g.count
+                      * MONSTERS[g.kind].speed / covered for g in groups) if covered else float("inf")
+        supply = sum(_felt_dps(kind, rank, shares) for kind, rank, _ in cover.get(route.key, []))
+        ratios[route.key] = supply / demand if demand else 1.0
+    return ratios or {"main": 0.0}
+
+
+def _union_length(spans: list[tuple[float, float]]) -> float:
+    total, end = 0.0, -1.0
+    for a, b in sorted(spans):
+        if b > end:
+            total += b - max(a, end)
+            end = b
+    return total
+
+
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
     bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, tower_kinds, real_estate,
+    power_table,
 )
 
 NOT_YET = (
-    "G1.1", "G1.2", "G1.3", "G1.4", "G1.5", "G1.6", "G2.2", "G2.5", "G2.6", "G3.1", "G3.2", "G3.3", "G3.4",
+    "G1.1", "G1.2", "G1.3", "G1.4", "G1.5", "G1.6", "G2.2", "G2.5", "G2.6", "G3.1", "G3.2", "G3.3",
     "M1", "M2", "M3", "M5", "M7", "M9", "M10", "S2", "S3", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
     "R2", "R4", "R6", "R7", "T2", "T4",
 )

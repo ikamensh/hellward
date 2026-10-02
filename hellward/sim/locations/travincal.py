@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import ALL_SPELLS, EVERY_TOWER, Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 0.86   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 TRAVINCAL = Location(
     key="travincal",
@@ -47,5 +50,5 @@ TRAVINCAL = Location(
     taunt="Turn back, and I will leave Tristram's lamp alone. It is a small lamp. No one would miss it.",
     lesson="Curses from every side: spread wide, and kill the elders first.",
     requires=("drowned_city",),
-    life=BALANCE.location_growth ** 10 * tuning.number("campaign.life.travincal"),
+    life=BALANCE.life_growth ** 10 * LIFE_FACTOR,
 )

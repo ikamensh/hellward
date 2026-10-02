@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 0.76   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 GRAVEYARD = Location(
     key="graveyard",
@@ -43,5 +46,5 @@ GRAVEYARD = Location(
           "your arrows behind it.",
     lesson="A gate holds the dead in a queue. A hymned tower fires twice as fast, and the acolytes curse it first.",
     requires=("tristram",),
-    life=BALANCE.location_growth ** 1 * tuning.number("campaign.life.graveyard"),
+    life=BALANCE.life_growth ** 1 * LIFE_FACTOR,
 )

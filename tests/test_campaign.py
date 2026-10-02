@@ -1,8 +1,8 @@
 """The campaign's locations and its order: every map is sound and every location can be reached."""
 
-import pytest
+import importlib
 
-from hellward.sim import tuning
+import pytest
 
 from hellward.sim.campaign import ACT_ENDS, LOCATIONS, ORDER, SIGIL_LIVES, sigils
 from hellward.sim.balance import BALANCE
@@ -54,8 +54,9 @@ def test_sigils_grow_with_the_life_kept_and_a_fall_earns_none():
 def test_the_campaign_uses_one_location_and_wave_growth_curve():
     for stage, key in enumerate(ORDER):
         location = LOCATIONS[key]
+        factor = importlib.import_module(f"hellward.sim.locations.{key}").LIFE_FACTOR
         assert location.start_gold == BALANCE.starting_gold(stage)
-        assert location.life == pytest.approx(BALANCE.location_growth ** stage * tuning.number(f"campaign.life.{key}"))
+        assert location.life == pytest.approx(BALANCE.life_growth ** stage * factor)
         for wave_index, wave in enumerate(location.waves):
             assert wave.hp == pytest.approx(BALANCE.wave_growth ** wave_index)
 

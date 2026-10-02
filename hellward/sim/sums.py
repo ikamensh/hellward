@@ -45,3 +45,8 @@ def int_sum(values: Iterable[int]) -> int:
     for value in values:
         total += value
     return total
+
+
+def half_up(value: float) -> int:
+    """*value* rounded half up, the same in the source and the compiled simulation: 2.5 is 3, and -2.5 is -2."""
+    return math.floor(value + 0.5)

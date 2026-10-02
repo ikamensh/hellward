@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import EVERY_TOWER, Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 1.0   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 JUNGLE = Location(
     key="jungle",
@@ -42,5 +45,5 @@ JUNGLE = Location(
     taunt="My inquisitors do not chant. You will know their curse when the ground burns under your towers, and not before.",
     lesson="The inquisitors mark their spot long before the curse falls: kill them first.",
     requires=("spider_forest",),
-    life=BALANCE.location_growth ** 8 * tuning.number("campaign.life.jungle"),
+    life=BALANCE.life_growth ** 8 * LIFE_FACTOR,
 )

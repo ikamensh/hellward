@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import EVERY_TOWER, Arsenal, Location, corridor_level, g, water, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 1.0   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 DROWNED_CITY = Location(
     key="drowned_city",
@@ -44,5 +47,5 @@ DROWNED_CITY = Location(
     taunt="The Hulks were drowned men once. They do not tire, and your gates are cloth to them.",
     lesson="Frost barely slows the drowned; fire and lightning must. The gate falls fast.",
     requires=("jungle",),
-    life=BALANCE.location_growth ** 9 * tuning.number("campaign.life.drowned_city"),
+    life=BALANCE.life_growth ** 9 * LIFE_FACTOR,
 )

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import ALL_TOWERS_II, Arsenal, Location, corridor_level, g, water, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 1.07   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 DOCKS = Location(
     key="docks",
@@ -39,5 +42,5 @@ DOCKS = Location(
     taunt="You crossed a sea for a lamp that is not yours. My shaman will raise every Flayer you leave whole.",
     lesson="Hooks drag Flayers back under your towers, knives make the gate a kill zone; kill the shaman before it raises the dead.",
     requires=("hells_gate",),
-    life=BALANCE.location_growth ** 6 * tuning.number("campaign.life.docks"),
+    life=BALANCE.life_growth ** 6 * LIFE_FACTOR,
 )

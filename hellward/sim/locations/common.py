@@ -66,14 +66,12 @@ ALL_SPELLS = ("smite", "hymn", "meteor", "orb")
 
 
 def waves(stage: int, *rows: tuple[Group, ...]) -> tuple[Wave, ...]:
-    waves: list[Wave] = []
-    density = BALANCE.wave_density(stage)
+    """Waves from their authored groups: the authored counts are the counts."""
+    found: list[Wave] = []
     for index, groups in enumerate(rows):
-        scaled = tuple(Group(group.kind, max(1, round(group.count * density)), group.interval, group.start, group.route)
-                       for group in groups)
-        bodies = int_sum(group.count for group in scaled)
-        waves.append(Wave(scaled, BALANCE.wave_clear_bonus(stage, index, bodies), BALANCE.wave_growth ** index))
-    return tuple(waves)
+        bodies = int_sum(group.count for group in groups)
+        found.append(Wave(groups, BALANCE.wave_clear_bonus(stage, index, bodies), BALANCE.wave_growth ** index))
+    return tuple(found)
 
 
 def g(kind: str, count: int, interval: float = 1.0, start: float = 0.0, *, route: str = "main") -> Group:

@@ -226,8 +226,10 @@ def _tower(key: str, row: dict[str, Any]) -> TowerKind:
     rate, reach, splash = _ranks(row, "rate"), _ranks(row, "range"), _ranks(row, "splash")
     chill, chill_time, poison_time, lasting = (_ranks(row, "chill"), _ranks(row, "chill_time"),
                                                _ranks(row, "poison_time"), _ranks(row, "lasting"))
-    levels = tuple(TowerLevel(BALANCE.tower_cost(rank, price), damage[rank], rate[rank], reach[rank], splash=splash[rank],
-                              chill=chill[rank], chill_time=chill_time[rank], poison=poison[rank],
+    rank_units = row.get("rank_cost_units")
+    units = None if rank_units is None else (float(rank_units[0]), float(rank_units[1]), float(rank_units[2]))
+    levels = tuple(TowerLevel(BALANCE.tower_cost(rank, price, 0, units), damage[rank], rate[rank], reach[rank],
+                              splash=splash[rank], chill=chill[rank], chill_time=chill_time[rank], poison=poison[rank],
                               poison_time=poison_time[rank], lasting=lasting[rank])
                    for rank in range(3))
     return TowerKind(key, row["name"], Element(row["element"]), row["attack"], levels, row["blurb"],

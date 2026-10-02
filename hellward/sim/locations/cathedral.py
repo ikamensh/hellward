@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 0.61   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 CATHEDRAL = Location(
     key="cathedral",
@@ -41,5 +44,5 @@ CATHEDRAL = Location(
           "goatmen will take both aisles.",
     lesson="Two aisles split the host: place arrows where they cover both before spending on fire.",
     requires=("graveyard",),
-    life=BALANCE.location_growth ** 2 * tuning.number("campaign.life.cathedral"),
+    life=BALANCE.life_growth ** 2 * LIFE_FACTOR,
 )

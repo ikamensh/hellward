@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 1.0   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 CAVES = Location(
     key="caves",
@@ -42,5 +45,5 @@ CAVES = Location(
     taunt="Walls mean nothing to wings. Look up. And tell me, keeper: why do my bones never show your face?",
     lesson="Wings ignore the gate, and the lava leaves fewer places to build.",
     requires=("catacombs",),
-    life=BALANCE.location_growth ** 4 * tuning.number("campaign.life.caves"),
+    life=BALANCE.life_growth ** 4 * LIFE_FACTOR,
 )

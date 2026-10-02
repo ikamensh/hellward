@@ -12,21 +12,21 @@ from dataclasses import dataclass
 from typing import Final
 
 from hellward.sim import tuning
+from hellward.sim.sums import half_up
 
 
 @dataclass(frozen=True)
 class BalanceProfile:
     base_hp: float
-    location_growth: float
+    life_growth: float
     wave_growth: float
+    income_growth: float
+    stipend_growth: float
     arrow_hit: int
     base_gold_unit: int
     starting_units: float
-    starting_units_growth: float
     wave_income_units: float
     wave_income_growth_units: float
-    wave_density_decay: float
-    minimum_wave_density: float
     rank_cost_units: tuple[float, float, float]
     salvage_budget: int
     salvage_sale_fraction: float
@@ -38,17 +38,12 @@ class BalanceProfile:
                             ("wave_income_units", self.wave_income_units)):
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
-        for name, value in (("location_growth", self.location_growth), ("wave_growth", self.wave_growth)):
+        for name, value in (("life_growth", self.life_growth), ("wave_growth", self.wave_growth),
+                            ("income_growth", self.income_growth), ("stipend_growth", self.stipend_growth)):
             if not math.isfinite(value) or value < 1:
                 raise ValueError(f"{name} must be finite and at least one")
         if not math.isfinite(self.wave_income_growth_units) or self.wave_income_growth_units < 0:
             raise ValueError("wave_income_growth_units must be finite and nonnegative")
-        if not math.isfinite(self.starting_units_growth) or self.starting_units_growth < 0:
-            raise ValueError("starting_units_growth must be finite and nonnegative")
-        if not math.isfinite(self.wave_density_decay) or self.wave_density_decay < 0:
-            raise ValueError("wave_density_decay must be finite and nonnegative")
-        if not math.isfinite(self.minimum_wave_density) or not 0 < self.minimum_wave_density <= 1:
-            raise ValueError("minimum_wave_density must be between zero and one")
         for name, value in (("arrow_hit", self.arrow_hit), ("base_gold_unit", self.base_gold_unit)):
             if type(value) is not int or value <= 0:
                 raise ValueError(f"{name} must be a positive integer")
@@ -71,8 +66,8 @@ class BalanceProfile:
         for name, value in (("role_hp", role_hp), ("encounter_factor", encounter_factor)):
             if not math.isfinite(value) or value <= 0:
                 raise ValueError(f"{name} must be finite and positive")
-        hp = round(self.base_hp * role_hp * self.location_growth ** location_index
-                   * self.wave_growth ** wave_index * encounter_factor)
+        hp = half_up(self.base_hp * role_hp * self.life_growth ** location_index
+                     * self.wave_growth ** wave_index * encounter_factor)
         if hp < 1:
             raise ValueError("effective HP must be at least one")
         return hp
@@ -87,40 +82,41 @@ class BalanceProfile:
         """A direct hit for a tower role, using Arrow's rank progression as the unit."""
         if not math.isfinite(role_damage) or role_damage <= 0:
             raise ValueError("role_damage must be finite and positive")
-        damage = round(self.arrow_damage(rank) * role_damage)
+        damage = half_up(self.arrow_damage(rank) * role_damage)
         if damage < 1:
             raise ValueError("tower damage must be at least one")
         return damage
 
-    def tower_cost(self, rank: int, role_price: float = 1.0, location_index: int = 0) -> int:
-        """The price of a tower rank, in the local gold unit.
+    def tower_cost(self, rank: int, role_price: float = 1.0, location_index: int = 0,
+                   rank_cost_units: tuple[float, float, float] | None = None) -> int:
+        """The price of a tower rank, in the gold unit, which does not grow with depth.
 
-        Catalog ranks use location zero; the battle applies its location index when
-        charging for a build or upgrade.
+        Catalog ranks use location zero; a tower kind may price its ranks apart from
+        the common ``rank_cost_units``.
         """
         if not math.isfinite(role_price) or role_price <= 0:
             raise ValueError("role_price must be finite and positive")
         self.arrow_damage(rank)  # validates the rank shared by damage and prices
-        cost = round(self.gold_unit(location_index) * self.rank_cost_units[rank] * role_price)
+        units = self.rank_cost_units if rank_cost_units is None else rank_cost_units
+        cost = round(self.gold_unit(location_index) * units[rank] * role_price)
         if cost < 1:
             raise ValueError("tower cost must be at least one")
         return cost
 
     def gold_unit(self, location_index: int) -> int:
-        """Price of a rank-I Arrow at this location, and the budget's unit."""
+        """Price of a rank-I Arrow: the gold unit, the same at every location."""
         self._index("location_index", location_index)
-        return round(self.base_gold_unit * self.location_growth ** location_index)
+        return self.base_gold_unit
+
+    def income_unit(self, location_index: int) -> int:
+        """What a wave's gold is counted in here: it grows while prices do not."""
+        self._index("location_index", location_index)
+        return round(self.base_gold_unit * self.income_growth ** location_index)
 
     def starting_gold(self, location_index: int) -> int:
-        """Battle gold in hand before the first wave."""
-        return round(self.gold_unit(location_index)
-                     * (self.starting_units + location_index * self.starting_units_growth))
-
-    def wave_density(self, location_index: int) -> float:
-        """Retire the old area-attack swarm counts while keeping late packs substantial."""
+        """Battle gold in hand before the first wave: it grows with the monsters' life."""
         self._index("location_index", location_index)
-        return max(self.minimum_wave_density,
-                   1.0 / (1.0 + self.wave_density_decay * max(0, location_index - 1)))
+        return round(self.base_gold_unit * self.starting_units * self.stipend_growth ** location_index)
 
     def wave_income(self, location_index: int, wave_index: int) -> int:
         """Total ordinary-wave gold budget, shared by kills and its clear reward.
@@ -129,7 +125,7 @@ class BalanceProfile:
         authored swarms therefore cannot multiply income by accident.
         """
         self._index("wave_index", wave_index)
-        return round(self.gold_unit(location_index)
+        return round(self.income_unit(location_index)
                      * (self.wave_income_units + self.wave_income_growth_units * wave_index))
 
     def wave_kill_budget(self, location_index: int, wave_index: int, bodies: int) -> int:
@@ -150,12 +146,12 @@ class BalanceProfile:
 
     def breach_payouts(self, location_index: int, weights: tuple[int, ...]) -> tuple[int, ...]:
         """Extra kill gold earned by the optional side pack."""
-        budget = round(self.gold_unit(location_index) * self.breach_pack_income_units)
+        budget = round(self.income_unit(location_index) * self.breach_pack_income_units)
         return self._allocate_gold(budget, weights)
 
     def breach_cache(self, location_index: int) -> int:
         """Cash cache for clearing the optional pack instead of keeping its trophy."""
-        return round(self.gold_unit(location_index) * self.breach_cache_units)
+        return round(self.income_unit(location_index) * self.breach_cache_units)
 
     @staticmethod
     def _allocate_gold(budget: int, weights: tuple[int, ...]) -> tuple[int, ...]:
@@ -181,7 +177,7 @@ class BalanceProfile:
 
     def salvage_sale_gold(self, location_index: int) -> int:
         """Battle gold from selling one piece instead of banking it for a pattern."""
-        return max(1, round(self.gold_unit(location_index) * self.salvage_sale_fraction))
+        return max(1, round(self.income_unit(location_index) * self.salvage_sale_fraction))
 
     @staticmethod
     def _index(name: str, value: int) -> None:

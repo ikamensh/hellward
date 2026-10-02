@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 1.0   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 TRISTRAM = Location(
     key="tristram",
@@ -35,5 +38,5 @@ TRISTRAM = Location(
           "them, and a shaman sings them on.",
     taunt="Huddle your towers together, if it comforts you. When my shaman's curse falls, it falls on all of them.",
     lesson="His curses fall on a tower and the towers beside it: spread your arrows.",
-    life=BALANCE.location_growth ** 0 * tuning.number("campaign.life.tristram"),
+    life=BALANCE.life_growth ** 0 * LIFE_FACTOR,
 )

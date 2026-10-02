@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import ALL_SPELLS, EVERY_TOWER, Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 1.0   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 TEMPLE = Location(
     key="temple",
@@ -45,5 +48,5 @@ TEMPLE = Location(
     taunt="I cannot see you in the bones. So I have come to see you myself.",
     lesson="Each curse of his that lands burns your mana for every tower it catches: spread out, and spend it first.",
     requires=("travincal",),
-    life=BALANCE.location_growth ** 11 * tuning.number("campaign.life.temple"),
+    life=BALANCE.life_growth ** 11 * LIFE_FACTOR,
 )

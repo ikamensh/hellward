@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import ALL_TOWERS, Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
+
+LIFE_FACTOR = 0.8   # this location's tuning, by simulation: every monster's life here,
+                            # and the spells' strength, is multiplied by it (0.85-1.2)
+
 
 HELLS_GATE = Location(
     key="hells_gate",
@@ -46,5 +49,5 @@ HELLS_GATE = Location(
     taunt="In every night I have seen, the lamp goes out. I have begun to wonder what I have not seen.",
     lesson="Every curse at once, and Azazel: no element bites him, and the shrine only sends him back to walk again.",
     requires=("caves",),
-    life=BALANCE.location_growth ** 5 * tuning.number("campaign.life.hells_gate"),
+    life=BALANCE.life_growth ** 5 * LIFE_FACTOR,
 )
