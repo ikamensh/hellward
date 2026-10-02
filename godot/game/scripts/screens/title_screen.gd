@@ -22,6 +22,16 @@ void fragment() {
 }
 """
 
+const DRIFT := """
+shader_type canvas_item;
+// The painting drawn `zoom` times closer about its middle, by fractions of a pixel: a Control's own scale snaps its
+// position to whole pixels, and so slow a drift moved in visible steps.
+uniform float zoom = 1.0;
+varying vec4 tint;
+void vertex() { tint = COLOR; }
+void fragment() { COLOR = texture(TEXTURE, (UV - 0.5) / zoom + 0.5) * tint; }
+"""
+
 var _clock := 0.0
 var _name: Label
 var _vault: TextureRect
@@ -120,13 +130,16 @@ func _status(text: String) -> void:
 	_line.add_theme_color_override("font_color", Style.DIM_GOLD)
 
 
-## The painting drifts closer, slowly, and back.
+## The painting drifts closer, slowly, and back (the kit's backdrop crops it evenly, so its middle is UV 0.5).
 func _drift(pic: Control) -> void:
-	pic.pivot_offset = Vector2(Ui.W, Ui.H) / 2
-	pic.resized.connect(func(): pic.pivot_offset = pic.size / 2)
+	var mat := ShaderMaterial.new()
+	mat.shader = Shader.new()
+	mat.shader.code = DRIFT
+	pic.material = mat
+	var zoom := func(z: float): mat.set_shader_parameter("zoom", z)
 	var tw := pic.create_tween().set_loops()
-	tw.tween_property(pic, "scale", Vector2(1.06, 1.06), 28.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tw.tween_property(pic, "scale", Vector2.ONE, 28.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_method(zoom, 1.0, 1.06, 28.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_method(zoom, 1.06, 1.0, 28.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 
 ## A band of dark across the window, from `stops` running down; anchored at the top (0) or the bottom (1).

@@ -358,7 +358,7 @@ func _place(p: Dictionary) -> void:
 	col.add_theme_constant_override("separation", 3)
 	col.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	plaque.add_child(col)
-	var called := Ui.caps(String(p["name"]), 17, Style.GOLD if opened else Color(0.5, 0.45, 0.4))
+	var called := Ui.caps(String(p["name"]), 20, Style.GOLD if opened else Color(0.5, 0.45, 0.4))
 	called.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(called)
 	if opened:
@@ -502,8 +502,7 @@ func _bar() -> void:
 
 ## A gold count on the Skills plaque's corner: sigils waiting to be spent.
 func _badge(n: int) -> Label:
-	var b := Ui.label(str(n), 15, Color(0.12, 0.06, 0.02), Style.small_font())
-	b.add_theme_constant_override("outline_size", 0)
+	var b := Ui.ink(Ui.label(str(n), 18, Color(0.12, 0.06, 0.02), Style.small_font()))
 	var sb := StyleBoxFlat.new()
 	sb.bg_color = Style.GOLD
 	sb.border_color = Style.PALE_GOLD

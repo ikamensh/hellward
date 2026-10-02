@@ -2,7 +2,8 @@ extends Node
 ## Captures render here (scenes/capture.tscn, run by tools/godot-capture.sh): the scene named by `scene=` runs
 ## inside an offscreen SubViewport and the window itself draws nothing. macOS stops handing a hidden window
 ## (or any window, once the screen is locked) its drawables, which slowed windowed renders to a frame a second;
-## a SubViewport never asks for one. `res=WxH` sets the size (1920x1080).
+## a SubViewport never asks for one. `res=WxH` sets the size (1920x1080); `scale=S` renders that layout S times
+## larger, as a window of res x S pixels shows it (a Retina window at 2880 wide: res=1920x1673 scale=1.5).
 
 func _ready() -> void:
 	var args := {}
@@ -11,7 +12,12 @@ func _ready() -> void:
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	var res: PackedStringArray = args.get("res", "1920x1080").split("x")
 	var view := SubViewport.new()
-	view.size = Vector2i(int(res[0]), int(res[1]))
+	var layout := Vector2i(int(res[0]), int(res[1]))
+	var scale := float(args.get("scale", "1"))
+	view.size = Vector2i(roundi(layout.x * scale), roundi(layout.y * scale))
+	if scale != 1.0:
+		view.size_2d_override = layout   # the 2D is laid out at res and drawn scaled; text is rasterised at the scale
+		view.size_2d_override_stretch = true
 	view.msaa_3d = Viewport.MSAA_2X
 	view.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA
 	view.positional_shadow_atlas_size = 8192

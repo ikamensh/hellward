@@ -8,13 +8,15 @@ extends CanvasLayer
 signal slot_pressed(kind: String)     # a tower kind, "gate", or "spell:<key>"
 signal order(name: String)            # "wave", "upgrade", "sell", "cleanse", "pace", "salvage", "breach:<mode>", "menu"
 
-const SPELLS := {"cleanse": "C", "smite": "Q", "meteor": "W", "orb": "E"}
+const SPELLS := {"cleanse": "R", "smite": "Z", "meteor": "X", "orb": "C"}
 const SPELL_TONES := {"cleanse": Color(1.0, 0.85, 0.45), "smite": Color(1.0, 0.95, 0.7), "meteor": Color(1.0, 0.45, 0.12),
 	"orb": Color(0.45, 0.7, 1.0)}
 const BAR := Vector2(1240, 112)       # the bottom bar, centred, LIFT px above the screen's edge
 const LIFT := 10.0
 const ORB := 176.0                    # an orb's glass, across
 const ORB_RISE := 128.0               # an orb's centre above the screen's edge
+const ORB_REACH := 780.0
+const COIN := preload("res://assets/ui/coin.png")              # the orbs' frames reach this far either side of the middle: the HUD's width
 const FRAME_HOLE := 0.40              # a painted frame's opening, as a fraction of its half-size (tools/fxsprites.py)
 const SLOT := 82.0
 const GAP := 8.0                      # between slots
@@ -24,12 +26,21 @@ const NUMERALS := ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
 const ELEMENT_TONES := {"physical": Color(0.82, 0.76, 0.66), "fire": Color(1.0, 0.55, 0.25),
 	"cold": Color(0.55, 0.8, 1.0), "lightning": Color(0.72, 0.72, 1.0), "poison": Color(0.55, 0.9, 0.3),
 	"bone": Color(0.9, 0.86, 0.72), "nature": Color(0.45, 0.85, 0.4)}
+const TOWER_HUES := {"arrow": Color(0.55, 0.32, 0.14), "pyre": Color(0.7, 0.26, 0.08),   # a portrait's halo, per kind
+	"frost": Color(0.16, 0.32, 0.6), "storm": Color(0.32, 0.22, 0.62), "plague": Color(0.24, 0.5, 0.14),
+	"altar": Color(0.55, 0.5, 0.38), "grove": Color(0.2, 0.48, 0.18)}
 const TONES := {"wave": Color(0.95, 0.76, 0.4), "curse": Color(0.76, 0.42, 1.0),
 	"won": Color(0.86, 0.9, 0.55), "lost": Color(0.88, 0.12, 0.07)}
 
 var world: World
+var prefs: Prefs                      # its `interface` is the HUD's size (main sets it; the settings change it live)
 var _root: Control
 var _over: CanvasLayer
+var _top: Control                     # `_over`'s root
+var _asked := 0.0                     # the interface size the HUD was last fitted for
+var _scale := 1.0                     # the size it is drawn at: as asked, as far as the window's width allows
+var _fonts := {}                      # Style's fonts -> the HUD's copies (`_sharp` rasterises them at its size)
+var _sharp: Array[SystemFont] = []
 var _shown := true
 var _show_tween: Tween
 var _life_orb: ShaderMaterial
@@ -141,7 +152,6 @@ func _reveal(on: bool, seconds: float) -> void:
 
 func _build() -> void:
 	_root = Control.new()
-	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.theme = _tooltips()
 	add_child(_root)
@@ -149,9 +159,9 @@ func _build() -> void:
 	_over.layer = layer + 1
 	add_child(_over)
 	var top := Control.new()
-	top.set_anchors_preset(Control.PRESET_FULL_RECT)
 	top.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_over.add_child(top)
+	_top = top
 
 	_build_bar()
 	_build_orbs()
@@ -166,6 +176,8 @@ func _build() -> void:
 	_pin(_chronicle, 1.0, 0.0, Rect2(-620, 22, 596, 0))
 	_chronicle.add_theme_constant_override("separation", 4)
 	top.add_child(_chronicle)
+	_fit()
+	get_viewport().size_changed.connect(_fit)
 
 
 # the bar: a dark rising from the bottom edge, then the iron bar centred on it
@@ -333,11 +345,12 @@ func _build_choices(top: Control) -> void:
 	_choice_title = _label(Style.title_font(), 26, Style.GOLD)
 	_choice_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_choices.add_child(_choice_title)
-	_choice_line = _label(Style.text_font(), 19, Style.BONE)
+	_choice_line = _label(Style.text_font(), 21, Style.BONE)
 	_choice_line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_choice_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_choices.add_child(_choice_line)
 	_choice_row = HBoxContainer.new()
+	_choice_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_choice_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	_choice_row.add_theme_constant_override("separation", 10)
 	_choices.add_child(_choice_row)
@@ -356,10 +369,11 @@ func _build_choices(top: Control) -> void:
 		keep.pressed.connect(func(): order.emit("breach:decline"))
 		_choice_row.add_child(keep)
 	var salvage := HBoxContainer.new()
+	salvage.mouse_filter = Control.MOUSE_FILTER_IGNORE   # only its button takes clicks, not the row's whole width
 	salvage.alignment = BoxContainer.ALIGNMENT_CENTER
 	salvage.add_theme_constant_override("separation", 10)
 	_choices.add_child(salvage)
-	_salvage_line = _caps(14, Style.GOLD)
+	_salvage_line = _caps(16, Style.GOLD)
 	salvage.add_child(_salvage_line)
 	_salvage_sell = _button("Sell 1 for %d gold · V" % int(world.start["salvage_sale_gold"]))
 	_salvage_sell.pressed.connect(func(): order.emit("salvage"))
@@ -412,7 +426,7 @@ func _slot(key: String, picture: Texture2D, tip: String) -> Button:
 	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	b.add_child(pic)
 	_slot_pics[b] = pic
-	var k := _caps(14, Style.PALE_GOLD)
+	var k := _caps(16, Style.PALE_GOLD)
 	k.text = key
 	k.position = Vector2(8, 5)
 	k.add_theme_constant_override("outline_size", 5)
@@ -442,7 +456,7 @@ func _cost(slot: Button, icon: Control) -> Label:
 	icon.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	row.add_child(icon)
-	var l := _label(Style.small_font(), 16, Style.GOLD)
+	var l := _label(Style.small_font(), 18, Style.GOLD)
 	l.add_theme_constant_override("outline_size", 6)
 	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.95))
 	row.add_child(l)
@@ -463,18 +477,17 @@ func _build_info() -> void:
 	_root.add_child(rule)
 	var info := VBoxContainer.new()
 	info.add_theme_constant_override("separation", 5)
-	_pin(info, 0.5, 1.0, Rect2(left, -LIFT - BAR.y + 17, right - left, BAR.y - 32))
+	info.add_theme_constant_override("separation", 2)
+	_pin(info, 0.5, 1.0, Rect2(left, -LIFT - BAR.y + 12, right - left, BAR.y - 24))
 	_root.add_child(info)
 
 	var head := HBoxContainer.new()
 	head.add_theme_constant_override("separation", 10)
 	info.add_child(head)
-	_wave_kicker = _caps(13, Style.DIM_GOLD)
-	_wave_kicker.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	head.add_child(_wave_kicker)
 	_wave_name = _label(Style.text_font(), 22, Style.GOLD)
 	_wave_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_wave_name.clip_text = true
+	_wave_name.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS   # a long line beside many slots
 	head.add_child(_wave_name)
 	var coin := _coin_icon(26)
 	coin.size_flags_vertical = Control.SIZE_SHRINK_CENTER
@@ -485,12 +498,15 @@ func _build_info() -> void:
 	var prog := HBoxContainer.new()
 	prog.add_theme_constant_override("separation", 10)
 	info.add_child(prog)
+	_wave_kicker = _caps(15, Style.DIM_GOLD)   # beside the gauge: the name above gets the row's width
+	_wave_kicker.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	prog.add_child(_wave_kicker)
 	var bar := ColorRect.new()
 	_progress = _gauge(bar, Color(0.75, 0.16, 0.08), Vector2(0, 10))
 	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	prog.add_child(bar)
-	_progress_text = _caps(12, Style.BONE)
+	_progress_text = _caps(14, Style.BONE)
 	_progress_text.custom_minimum_size = Vector2(96, 0)
 	_progress_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	prog.add_child(_progress_text)
@@ -498,7 +514,7 @@ func _build_info() -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
 	info.add_child(row)
-	_call = _button("Summon the wave · Space")
+	_call = _button("Summon · Space")
 	_call.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_call.pressed.connect(func(): order.emit("wave"))
 	row.add_child(_call)
@@ -516,7 +532,7 @@ func _build_card() -> void:
 	_card_style.bg_color = Color(0, 0, 0, 0)
 	_card_style.shadow_size = 18
 	_card.add_theme_stylebox_override("panel", _card_style)
-	_pin(_card, 0.5, 1.0, Rect2(-BAR.x / 2 + INSET + 10, -LIFT - BAR.y - 10, 450, 0))
+	_pin(_card, 0.5, 1.0, Rect2(-BAR.x / 2 + INSET + 10, -LIFT - BAR.y - 10, 490, 0))
 	_card.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_root.add_child(_card)
 	var iron := ColorRect.new()
@@ -560,7 +576,7 @@ func _build_card() -> void:
 	head.add_child(pips)
 	for i in 3:
 		pips.add_child(_pip())
-	_card_kind = _caps(11, Style.DIM_GOLD)
+	_card_kind = _caps(13, Style.DIM_GOLD)
 	body.add_child(_card_kind)
 
 	var grid := GridContainer.new()
@@ -569,7 +585,7 @@ func _build_card() -> void:
 	grid.add_theme_constant_override("v_separation", 1)
 	body.add_child(grid)
 	for row in ["damage", "rate", "reach", "chill"]:
-		var name := _caps(12, Style.DIM_GOLD)
+		var name := _caps(14, Style.DIM_GOLD)
 		name.text = {"damage": "Damage", "rate": "Shots", "reach": "Reach", "chill": "Chill"}[row]
 		name.custom_minimum_size = Vector2(70, 0)
 		var now := _label(Style.text_font(), 19, Style.BONE)
@@ -583,14 +599,15 @@ func _build_card() -> void:
 	_curse_box = VBoxContainer.new()
 	_curse_box.add_theme_constant_override("separation", 3)
 	body.add_child(_curse_box)
-	_curse_text = _caps(12, Style.CURSE)
+	_curse_text = _caps(14, Style.CURSE)
 	_curse_box.add_child(_curse_text)
 	var cb := ColorRect.new()
 	_curse_bar = _gauge(cb, Color(0.55, 0.2, 0.9), Vector2(0, 8))
 	_curse_box.add_child(cb)
 
-	var orders := HBoxContainer.new()
-	orders.add_theme_constant_override("separation", 6)
+	var orders := HFlowContainer.new()   # Upgrade on a row; Sell and Cleanse under it when they do not fit
+	orders.add_theme_constant_override("h_separation", 6)
+	orders.add_theme_constant_override("v_separation", 6)
 	body.add_child(orders)
 	_upgrade = _button("")
 	_upgrade.icon_alignment = HORIZONTAL_ALIGNMENT_RIGHT
@@ -600,7 +617,7 @@ func _build_card() -> void:
 	_sell = _button("")
 	_sell.pressed.connect(func(): order.emit("sell"))
 	orders.add_child(_sell)
-	_cleanse = _button("Cleanse · C")
+	_cleanse = _button("Cleanse · R")
 	_cleanse.pressed.connect(func(): order.emit("cleanse"))
 	orders.add_child(_cleanse)
 	_card.visible = false
@@ -649,6 +666,7 @@ func _build_banner(top: Control) -> void:
 	_banner_title = _label(Style.display_font(), 72, Style.GOLD)
 	_banner_title.uppercase = true
 	_banner_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_banner_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # a long title wraps rather than runs off
 	_banner_title.add_theme_constant_override("outline_size", 12)
 	_banner_title.add_theme_color_override("font_outline_color", Color(0.04, 0.02, 0.0, 0.85))
 	words.add_child(_banner_title)
@@ -721,7 +739,7 @@ func _build_leader(top: Control) -> void:
 	var life := ColorRect.new()
 	_leader_life = _gauge(life, Color(0.78, 0.07, 0.04), Vector2(480, 16))
 	col.add_child(life)
-	var kind := _caps(11, Color(0.82, 0.74, 0.9))
+	var kind := _caps(13, Color(0.82, 0.74, 0.9))
 	kind.text = "Leader · curses the towers that hurt its pack"
 	kind.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(kind)
@@ -732,7 +750,7 @@ func _build_leader(top: Control) -> void:
 	_leader_cast = _gauge(cast, Color(0.62, 0.25, 1.0), Vector2(320, 9))
 	cast.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_leader_cast_box.add_child(cast)
-	_leader_cast_text = _caps(15, Color(0.86, 0.68, 1.0))
+	_leader_cast_text = _caps(16, Color(0.86, 0.68, 1.0))
 	_leader_cast_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_leader_cast_text.add_theme_constant_override("outline_size", 6)
 	_leader_cast_text.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.9))
@@ -779,9 +797,7 @@ func _portrait(kind: String, rank: int, px: int, live: bool) -> Array:
 	back.mesh = quad
 	var bm := StandardMaterial3D.new()
 	bm.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	var hue: Color = {"arrow": Color(0.55, 0.32, 0.14), "pyre": Color(0.7, 0.26, 0.08),
-		"frost": Color(0.16, 0.32, 0.6), "storm": Color(0.32, 0.22, 0.62), "plague": Color(0.24, 0.5, 0.14),
-		"altar": Color(0.55, 0.5, 0.38), "grove": Color(0.2, 0.48, 0.18)}[kind]
+	var hue: Color = TOWER_HUES[kind]
 	var glow := GradientTexture2D.new()
 	glow.gradient = Gradient.new()
 	glow.gradient.colors = PackedColorArray([hue, Color(0.02, 0.018, 0.022)])
@@ -860,7 +876,7 @@ func refresh() -> void:
 		_progress_text.text = "%d / %d slain" % [min(done, count), count]
 	_call.disabled = not world.can_call() or world.demo
 	var bonus := int(world.state["early_bonus"])
-	_call.text = "Summon the wave · Space" + ("  +%d" % bonus if bonus > 0 else "")
+	_call.text = "Summon · Space" + ("  +%d" % bonus if bonus > 0 else "")
 	for kind in _slot_keys:
 		var cost := int(world.state["door_cost"]) if kind == "gate" else world.tower_cost(kind)
 		_costs[kind].text = str(cost)
@@ -872,6 +888,14 @@ func refresh() -> void:
 
 
 func _process(delta: float) -> void:
+	if prefs.interface != _asked:
+		_fit()
+	# the side entrance's offer and the salvage stand above the chosen tower's card, never over its orders
+	var lift := _card.get_combined_minimum_size().y + 8.0 if _card.visible else 0.0
+	if _spell_slots.size() > 2:   # three or four spells reach in from the right as far as the middle's lines
+		lift = maxf(lift, 76.0)
+	_choices.offset_bottom = -LIFT - BAR.y - 14.0 - lift
+	_choices.offset_top = _choices.offset_bottom - 236.0
 	_mana_orb.set_shader_parameter("level", world.mana / max(world.mana_max, 1.0))
 	_mana_text.text = str(int(world.mana))
 	for key in _spell_slots:
@@ -916,7 +940,6 @@ func _refresh_card() -> void:
 		var element: String = world.tower_table(t.kind)["element"]
 		_card_kind.text = "%s damage · rank %s" % [element, NUMERALS[t.rank]]
 		_card_kind.add_theme_color_override("font_color", ELEMENT_TONES[element])
-		_upgrade.icon = load("res://assets/ui/coin.png") if t.upgrade_cost != null else null
 	var levels: Array = world.tower_table(t.kind)["levels"]
 	var lv: Dictionary = levels[t.rank]
 	var up: Dictionary = levels[t.rank + 1] if t.rank + 1 < levels.size() else {}
@@ -941,6 +964,7 @@ func _refresh_card() -> void:
 	_card_style.shadow_color = Color(0.5, 0.12, 0.9, 0.5) if cursed else Color(0, 0, 0, 0.6)
 	if t.upgrade_cost != null:
 		var cost := int(t.upgrade_cost)
+		_upgrade.icon = null if t.needs != null else COIN   # a coin only beside a price
 		if t.needs != null:
 			_upgrade.text = "NEEDS A SKILL · K"
 			_upgrade.tooltip_text = "Learn the next rank in the skill tree."
@@ -950,9 +974,10 @@ func _refresh_card() -> void:
 			_upgrade.tooltip_text = ""
 			_upgrade.disabled = world.gold < cost or world.demo
 	else:
+		_upgrade.icon = null
 		_upgrade.text = "HIGHEST RANK"
 		_upgrade.disabled = true
-	_sell.text = "SELL · S  +%d" % t.refund
+	_sell.text = "SELL · DEL  +%d" % t.refund
 	_sell.disabled = cursed or world.demo
 	_cleanse.disabled = not cursed or world.mana < world.spell_cost("cleanse") or world.demo
 	if not was:
@@ -1044,6 +1069,7 @@ func _chronicle_line(text: String, color := Color(0.82, 0.6, 1.0)) -> void:
 	var l := _label(Style.text_font(), 22, color)
 	l.text = text
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # a long line wraps in the column, never past the edge
 	back.add_child(l)
 	_chronicle.add_child(back)
 	while _chronicle.get_child_count() > 5:
@@ -1072,7 +1098,7 @@ func _tooltips() -> Theme:
 	sb.content_margin_bottom = 7
 	t.set_stylebox("panel", "TooltipPanel", sb)
 	t.set_font("font", "TooltipLabel", Style.text_font())
-	t.set_font_size("font_size", "TooltipLabel", 19)
+	t.set_font_size("font_size", "TooltipLabel", 21)
 	t.set_color("font_color", "TooltipLabel", Style.BONE)
 	return t
 
@@ -1089,9 +1115,43 @@ func _pin(c: Control, ax: float, ay: float, rect: Rect2) -> Control:
 	return c
 
 
+## The HUD at the interface size the settings ask for, as far as the window's width keeps the orbs' frames on it:
+## both layers scale, their roots span the window in the layers' own units (the bar keeps to the bottom edge, the
+## banners to the middle), and the HUD's fonts rasterise at the size they are drawn - a layer's scale alone would
+## magnify glyphs rasterised small. Tooltips are windows of their own, outside the layers: their text grows apart.
+func _fit() -> void:
+	_asked = prefs.interface
+	var window := get_viewport().get_visible_rect().size
+	_scale = minf(_asked, window.x / (2.0 * ORB_REACH))
+	var span := window / _scale
+	for l: CanvasLayer in [self, _over]:
+		l.scale = Vector2(_scale, _scale)
+	for c: Control in [_root, _top]:
+		c.position = Vector2.ZERO
+		c.size = span
+	for f in _sharp:
+		f.oversampling = get_viewport().get_oversampling() * _scale
+	_root.theme.set_font_size("font_size", "TooltipLabel", roundi(21 * _scale))
+	# the chronicle keeps right of the leader's column (centred, 250 either side)
+	_chronicle.offset_left = -minf(620.0, span.x / 2 - 262.0)
+
+
+## The HUD's copy of one of Style's fonts: its own system font, so `_fit` can rasterise it at the HUD's size.
+func _own(font: Font) -> Font:
+	if not _fonts.has(font):
+		var copy := font.duplicate() as Font
+		var base := (copy as FontVariation).base_font.duplicate() as SystemFont if copy is FontVariation else copy as SystemFont
+		if copy is FontVariation:
+			(copy as FontVariation).base_font = base
+		base.oversampling = get_viewport().get_oversampling() * _scale
+		_sharp.append(base)
+		_fonts[font] = copy
+	return _fonts[font]
+
+
 func _label(font: Font, size: int, color: Color) -> Label:
 	var l := Label.new()
-	l.add_theme_font_override("font", font)
+	l.add_theme_font_override("font", _own(font))
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
 	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
@@ -1115,8 +1175,8 @@ func _button(text: String) -> Button:
 	var b := Button.new()
 	b.text = text.to_upper()
 	b.focus_mode = Control.FOCUS_NONE
-	b.add_theme_font_override("font", Style.small_font())
-	b.add_theme_font_size_override("font_size", 13)
+	b.add_theme_font_override("font", _own(Style.small_font()))
+	b.add_theme_font_size_override("font_size", 15)
 	b.add_theme_color_override("font_color", Style.PALE_GOLD)
 	b.add_theme_color_override("font_hover_color", Color(1, 0.97, 0.86))
 	b.add_theme_color_override("font_pressed_color", Style.GOLD)

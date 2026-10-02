@@ -59,6 +59,14 @@ def test_every_monster_and_tower_kind_wears_a_model_or_a_stand_in():
         assert own or re.search(rf'"{kind}": \["(arrow|pyre|frost|storm)"', tower), kind
 
 
+def test_every_tower_kind_has_its_portrait_hue():
+    """The HUD's slots and the briefing's arsenal frame a tower's portrait in its kind's hue (Hud.TOWER_HUES): a kind
+    without one broke every Act II briefing once plague, altar and grove wore their own models."""
+    table = re.search(r"const TOWER_HUES := \{(.*?)\}", (GAME / "scripts" / "hud.gd").read_text(), re.S)
+    for kind in TOWERS:
+        assert f'"{kind}":' in table.group(1), f"{kind}: give it a hue in Hud.TOWER_HUES"
+
+
 def test_every_model_has_the_clips_anchors_and_maps_the_client_uses():
     """tools/assets.py's checks: a monster model has every clip monster.gd plays (and a leader its cast), the
     effect anchors, its maps, and no stand-in left over; a tower kind a model or a stand-in, not both."""

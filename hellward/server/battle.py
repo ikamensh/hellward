@@ -175,7 +175,7 @@ class Battle:
         return [x, y]
 
     def _smite_threat(self) -> list:
-        """The panel's Q: smite the leader closest to cursing, as the 2D game's Q did."""
+        """The panel's Z (the 2D game's Q): smite the leader closest to cursing."""
         self._ready("smite")
         leader = self.threat()
         if leader is None:

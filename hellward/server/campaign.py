@@ -179,10 +179,10 @@ class Campaign:
                 curses += [c for c in spec.curses if c not in curses]
         answers = []
         if offers(loc, "smite"):
-            answers.append("Smite (Q) the leader while it ponders or chants")
+            answers.append("Smite (Z) the leader while it ponders or chants")
         if offers(loc, "orb"):
             answers.append("freeze it with the Frozen Orb")
-        answers.append("Cleanse (C) lifts a curse that has landed")
+        answers.append("Cleanse (R) lifts a curse that has landed")
         previous = LOCATIONS[ORDER[index - 1]] if index > 0 else None
         learned = perks(p.learned, index)
         arsenal = []

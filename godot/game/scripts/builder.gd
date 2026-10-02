@@ -1,14 +1,16 @@
 class_name Builder
 extends Node3D
 ## The player's hands: hold a tower (1-8 or a slot) and click bare ground to raise it; click a tower to choose it,
-## then U upgrades, S sells, C cleanses. Q, W and E pick Smite, Meteor and Frozen Orb, aimed with a click; Q with a
-## leader pondering or chanting smites the one closest to cursing at once. Hold the gate and click an arch to ward it.
-## Space summons a wave, F doubles the pace, V sells a salvage drop, H hides the HUD, Esc lets go.
+## then U upgrades, Delete (or Backspace) sells, R cleanses. Z, X and C pick Smite, Meteor and Frozen Orb, aimed
+## with a click; Z with a leader pondering or chanting smites the one closest to cursing at once. Hold the gate and
+## click an arch to ward it. Space summons a wave, F doubles the pace, V sells a salvage drop, H hides the HUD, Esc
+## lets go. WASD, Q and E are the camera's (CameraRig). Keys are read by their place on the keyboard, as the camera
+## reads its own (the labels name a QWERTY keyboard's letters): any layout, Cyrillic too, gives the same keys.
 ## Everything is an order to the server; the ghost and the marks are only this side's guesses.
 
 signal menu                          # Esc with nothing to let go of
 
-const SPELL_KEYS := {KEY_Q: "smite", KEY_W: "meteor", KEY_E: "orb"}
+const SPELL_KEYS := {KEY_Z: "smite", KEY_X: "meteor", KEY_C: "orb"}
 
 var world: World
 var hud: Hud
@@ -168,7 +170,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			let_go()
 			choose(null)
 	elif event is InputEventKey and event.pressed and not event.echo:
-		var k := (event as InputEventKey).keycode
+		var key := event as InputEventKey
+		if key.meta_pressed or key.ctrl_pressed:
+			return   # the system's shortcuts (Cmd-Q, Cmd-W), not orders
+		var k := key.physical_keycode
 		if k >= KEY_1 and k <= KEY_8:
 			var slots: Array = hud.slots()
 			if k - KEY_1 < slots.size():
@@ -179,8 +184,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		match k:
 			KEY_U: _order("upgrade")
-			KEY_S: _order("sell")
-			KEY_C: _order("cleanse")
+			KEY_DELETE, KEY_BACKSPACE: _order("sell")
+			KEY_R: _order("cleanse")
 			KEY_V: _order("salvage")
 			KEY_SPACE: _order("wave")
 			KEY_F: _order("pace")
@@ -223,7 +228,7 @@ func _arch_at(tile: Vector2i) -> int:
 	return -1
 
 
-## Q, W, E: pick a spell to aim. Q with a leader about to curse smites it at once.
+## Z, X, C: pick a spell to aim. Z with a leader about to curse smites it at once.
 func _spell(key: String) -> void:
 	if not world.offers(key):
 		Sfx.play("refuse")

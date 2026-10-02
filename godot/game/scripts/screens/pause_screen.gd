@@ -1,7 +1,7 @@
 class_name PauseScreen
 extends Screen
 ## The pause menu over the defence: the battle stays behind a dark, blurred veil, the ways out on an iron card.
-## No key leaves the game (Q is Smite in the fight).
+## No key the fight uses throws the defence away: starting again (R is Cleanse there) and leaving take a click.
 ##
 ## It also holds the overlays' frame, which the settings, the profiles and the reckoning share: the veil, the iron
 ## card in its gold trim (the HUD's tower card), a heading in tracked capitals and the gilt rule under it.
@@ -42,7 +42,7 @@ func build() -> void:
 	settings.pressed.connect(game.settings)
 	_add(col, settings)
 	col.add_child(PauseScreen.gap(4))
-	for way in [["Start this defence again", "R", game.restart], ["To the map", "M", game.to_map],
+	for way in [["Start this defence again", "", game.restart], ["To the map", "M", game.to_map],
 			["Back to the title", "T", game.to_title], ["Leave the game", "", game.leave]]:
 		var b := Ui.button(String(way[0]), String(way[1]), 420)
 		var go: Callable = way[2]

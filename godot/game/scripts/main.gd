@@ -17,6 +17,7 @@ var builder: Builder
 var rig: CameraRig
 var env: Environment
 var args = null   # the user args as a Dictionary; a test sets them before adding the scene
+var prefs: Prefs  # the shell's (the settings change it live); alone, the scene reads the saved ones
 var battle := {}  # the server's battle message; the shell sets it, or the scene asks for one
 
 
@@ -44,6 +45,8 @@ func _ready() -> void:
 
 
 func _build() -> void:
+	if prefs == null:
+		prefs = Prefs.load_saved()
 	level = Level.new()
 	level.name = "Level"
 	add_child(level)
@@ -73,6 +76,7 @@ func _build() -> void:
 	world.setup(level, battle)
 	world.dressing = dressing
 	hud = Hud.new()
+	hud.prefs = prefs
 	add_child(hud)
 	hud.setup(world)
 	builder = Builder.new()
@@ -111,6 +115,15 @@ func _build() -> void:
 	if args.has("gallery"):
 		_gallery(int(args.get("frames", "40")), args["gallery"].split(","), args["out"])
 	started.emit()
+
+
+## A live defence keeps the cursor in the window, so the window's edges pan; paused, decided or watched, it lets go.
+## Paused or decided, the camera stays where it is: the pause menu's and the reckoning's keys are theirs.
+func _process(_delta: float) -> void:
+	if rig and world:
+		var live := not world.paused and world.outcome == ""
+		rig.hold_mouse = prefs.hold_mouse and not world.demo and live
+		rig.frozen = not live
 
 
 ## The location's battle music.

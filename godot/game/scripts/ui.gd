@@ -13,9 +13,19 @@ static func label(text: String, size: int, color: Color, font: Font = null) -> L
 	l.add_theme_font_override("font", font if font else Style.text_font())
 	l.add_theme_font_size_override("font_size", size)
 	l.add_theme_color_override("font_color", color)
-	l.add_theme_constant_override("outline_size", 6)
-	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
+	# a soft drop shadow, as the 2D game's text had: a dark outline round thin serifs blurs them at small sizes
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
+	l.add_theme_constant_override("shadow_offset_x", 1)
+	l.add_theme_constant_override("shadow_offset_y", 2)
+	l.add_theme_constant_override("shadow_outline_size", 3)
 	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return l
+
+
+## Dark ink on a light fill (a gilt tag, parchment): no outline and no shadow, either would smear its strokes.
+static func ink(l: Label) -> Label:
+	l.add_theme_constant_override("outline_size", 0)
+	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0))
 	return l
 
 
@@ -28,7 +38,7 @@ static func title(text: String, size := 64, color := Style.GOLD) -> Label:
 
 
 ## Tracked capitals for headings and kickers.
-static func caps(text: String, size := 18, color := Style.DIM_GOLD) -> Label:
+static func caps(text: String, size := 20, color := Style.DIM_GOLD) -> Label:
 	return label(text.to_upper(), size, color, Style.small_font())
 
 
@@ -47,7 +57,7 @@ static func button(text: String, key := "", width := 0.0) -> Button:
 	b.text = text + ("  ·  " + key if key != "" else "")
 	b.focus_mode = Control.FOCUS_NONE
 	b.add_theme_font_override("font", Style.small_font())
-	b.add_theme_font_size_override("font_size", 20)
+	b.add_theme_font_size_override("font_size", 24)
 	b.add_theme_color_override("font_color", Style.PALE_GOLD)
 	b.add_theme_color_override("font_hover_color", Color(1.0, 0.95, 0.8))
 	b.add_theme_color_override("font_disabled_color", Color(0.45, 0.4, 0.34))
@@ -139,7 +149,7 @@ static func theme() -> Theme:
 	sb.set_content_margin_all(12)
 	t.set_stylebox("panel", "TooltipPanel", sb)
 	t.set_font("font", "TooltipLabel", Style.text_font())
-	t.set_font_size("font_size", "TooltipLabel", 20)
+	t.set_font_size("font_size", "TooltipLabel", 22)
 	t.set_color("font_color", "TooltipLabel", Style.BONE)
 	return t
 

@@ -14,10 +14,7 @@ const LEADER_RIM := Color(0.6, 0.32, 0.85)
 const UNIQUE := Color(0.84, 0.72, 0.46)     # the sealed side entrance, in Diablo's colour for uniques
 const HOLY := Color(0.98, 0.9, 0.62)
 const WASTE := Color(0.92, 0.24, 0.15)      # blood, lifted to read on the dark
-const SPELL_KEYS := {"cleanse": "C", "smite": "Q", "meteor": "W", "orb": "E"}
 const GLYPH_TONES := {"smite": Color(1.0, 0.92, 0.6), "meteor": Color(1.0, 0.45, 0.12), "gate": Color(0.85, 0.62, 0.3)}
-const TOWER_HUES := {"arrow": Color(0.55, 0.32, 0.14), "pyre": Color(0.7, 0.26, 0.08), "frost": Color(0.16, 0.32, 0.6),
-	"storm": Color(0.32, 0.22, 0.62)}
 const NOTE_HEADS := ["Resists", "Immune", "Weak", "Flies", "Curses", "Raises", "Marks", "Each", "No resistances"]
 const RESISTS := {"Resists": Color(0.74, 0.69, 0.6), "Immune to": Color(0.96, 0.86, 0.68), "Weak to": Color(0.72, 0.9, 0.5)}
 const SLOT := 68.0                          # an arsenal item's well
@@ -175,7 +172,7 @@ func _header(body: VBoxContainer) -> void:
 	name.add_theme_color_override("font_outline_color", Color(0.05, 0.02, 0.0, 0.9))
 	body.add_child(name)
 	body.add_child(_rule(640))
-	var heading := Ui.caps(String(data["heading"]), 18, Style.DIM_GOLD)
+	var heading := Ui.caps(String(data["heading"]), 21, Style.DIM_GOLD)
 	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	body.add_child(heading)
 	_space(body, 4)
@@ -230,7 +227,7 @@ func _taunt_row() -> Control:
 	_taunt.add_theme_font_override("font", _italic())
 	_taunt.add_theme_constant_override("outline_size", 10)
 	words.add_child(_taunt)
-	var who := Ui.caps("— the Bone Priest", 15, Color(0.66, 0.55, 0.72))
+	var who := Ui.caps("— the Bone Priest", 18, Color(0.66, 0.55, 0.72))
 	who.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	words.add_child(who)
 	return centre
@@ -277,12 +274,12 @@ func _monster_card(h: Dictionary, width: float, tall: float) -> Control:
 		tag.grow_horizontal = Control.GROW_DIRECTION_BOTH
 		pic.add_child(tag)
 	_space(col, 2)
-	var name := Ui.label(String(h["name"]).to_upper(), 17 if width > 200 else 15, LEADER_NAME if leader else Style.GOLD,
+	var name := Ui.label(String(h["name"]).to_upper(), 20 if width > 200 else 18, LEADER_NAME if leader else Style.GOLD,
 		Style.small_font())
 	name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(name)
-	var line := Ui.label(String(h["line"]), 16, Style.BONE)
+	var line := Ui.label(String(h["line"]), 19, Style.BONE)
 	line.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(line)
@@ -293,7 +290,7 @@ func _monster_card(h: Dictionary, width: float, tall: float) -> Control:
 	said.scroll_active = false
 	said.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	said.add_theme_font_override("normal_font", Style.text_font())
-	said.add_theme_font_size_override("normal_font_size", 15)
+	said.add_theme_font_size_override("normal_font_size", 18)
 	said.add_theme_constant_override("outline_size", 5)
 	said.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.8))
 	said.add_theme_constant_override("line_separation", -2)
@@ -357,8 +354,8 @@ func _curses() -> Control:
 		words.alignment = BoxContainer.ALIGNMENT_CENTER
 		words.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		row.add_child(words)
-		words.add_child(Ui.label(title, 19, Style.CURSE.lerp(Color.WHITE, 0.15), Style.title_font()))
-		var what := Ui.label(String(c["line"]), 16, Style.BONE)
+		words.add_child(Ui.label(title, 22, Style.CURSE.lerp(Color.WHITE, 0.15), Style.title_font()))
+		var what := Ui.label(String(c["line"]), 19, Style.BONE)
 		what.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		words.add_child(what)
 	var answer := HBoxContainer.new()
@@ -375,10 +372,11 @@ func _curses() -> Control:
 	cross.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	answer.add_child(cross)
 	var said := String(data["answer"])
-	var words := Ui.label(said, 18, HOLY)
+	var size := 21
+	var words := Ui.label(said, size, HOLY)
 	words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	words.custom_minimum_size = Vector2(minf(Style.text_font().get_string_size(said, HORIZONTAL_ALIGNMENT_LEFT, -1, 18).x + 8,
-		640), 0)
+	words.custom_minimum_size = Vector2(minf(Style.text_font().get_string_size(said, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x + 8,
+		720), 0)
 	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	answer.add_child(words)
 	return box
@@ -401,7 +399,7 @@ func _arsenal() -> Control:
 	middle.add_child(grid)
 	var new: Array = things.filter(func(t): return bool(t["new"])).map(func(t): return String(t["name"]))
 	if not new.is_empty():
-		var said := Ui.label("New here: " + ", ".join(new), 17, Style.GOLD)
+		var said := Ui.label("New here: " + ", ".join(new), 20, Style.GOLD)
 		said.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		middle.add_child(said)
 	for t in things:
@@ -447,8 +445,8 @@ func _arsenal_item(t: Dictionary) -> Control:
 		pic = g
 	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	well.add_child(pic)
-	if SPELL_KEYS.has(key):
-		var k := Ui.caps(SPELL_KEYS[key], 14, Style.PALE_GOLD)
+	if Hud.SPELLS.has(key):
+		var k := Ui.caps(Hud.SPELLS[key], 17, Style.PALE_GOLD)
 		k.position = Vector2(8, 8)
 		item.add_child(k)
 	if ranks > 0:
@@ -480,10 +478,10 @@ func _sigils() -> Control:
 	col.add_child(pips)
 	_space(col, 4)
 	var next = data["next_sigil"]
-	col.add_child(Ui.paragraph(String(next) if next != null else "All three are won.", 18,
+	col.add_child(Ui.paragraph(String(next) if next != null else "All three are won.", 21,
 		Style.BONE if next != null else Style.GOLD, 300, HORIZONTAL_ALIGNMENT_CENTER))
 	if data["waste"] != null:
-		col.add_child(Ui.paragraph(String(data["waste"]), 18, WASTE, 300, HORIZONTAL_ALIGNMENT_CENTER))
+		col.add_child(Ui.paragraph(String(data["waste"]), 21, WASTE, 300, HORIZONTAL_ALIGNMENT_CENTER))
 	return box
 
 
@@ -507,10 +505,10 @@ func _breach(breach: Dictionary) -> Control:
 	var claim := String(breach["claimed"]) if breach["claimed"] != null else ""
 	var said: String = {"trophy": "Its trophy is yours.", "cash": "Its cache was taken: no trophy here."}.get(claim,
 		"Clear its side pack and win to keep its trophy.")
-	for part in [Ui.caps("Sealed side entrance", 15, Style.DIM_GOLD), _gem(7, UNIQUE, UNIQUE),
-			Ui.caps(String(breach["name"]), 19, UNIQUE), Ui.label(String(breach["blurb"]), 19, Style.BONE),
+	for part in [Ui.caps("Sealed side entrance", 18, Style.DIM_GOLD), _gem(7, UNIQUE, UNIQUE),
+			Ui.caps(String(breach["name"]), 22, UNIQUE), Ui.label(String(breach["blurb"]), 22, Style.BONE),
 			_gem(7, UNIQUE, UNIQUE),
-			Ui.label(said, 19, HOLY if claim == "trophy" else Style.PALE_GOLD if claim == "" else Style.DIM_GOLD)]:
+			Ui.label(said, 22, HOLY if claim == "trophy" else Style.PALE_GOLD if claim == "" else Style.DIM_GOLD)]:
 		(part as Control).size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(part)
 	return strip
@@ -667,7 +665,7 @@ func _tower_portrait(kind: String, rank: int, px: int) -> TextureRect:
 	var half := tan(deg_to_rad(cam.fov) / 2)
 	var dist := maxf(span * 1.08, width) * 0.6 / half
 	cam.look_at_from_position(centre + toward * dist, centre)
-	_halo(vp, centre, toward, dist, width, TOWER_HUES[base] * tint, half)
+	_halo(vp, centre, toward, dist, width, Hud.TOWER_HUES[base] * tint, half)
 	var key_light := DirectionalLight3D.new()
 	key_light.light_color = Color(0.75, 0.84, 1.0)
 	key_light.light_energy = 3.2
@@ -898,9 +896,7 @@ func _tag(text: String, fill: Color, edge: Color, ink: Color) -> PanelContainer:
 	sb.shadow_size = 4
 	tag.add_theme_stylebox_override("panel", sb)
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var l := Ui.caps(text, 12, ink)
-	l.add_theme_constant_override("outline_size", 0)
-	tag.add_child(l)
+	tag.add_child(Ui.ink(Ui.caps(text, 15, ink)))
 	return tag
 
 

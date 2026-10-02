@@ -114,7 +114,7 @@ func build() -> void:
 	add_child(StoryScreen.film(0.62, 0.055))
 	_build_title()
 	_build_caption()
-	_hint = Ui.caps("Esc: skip", 15, Style.DIM_GOLD)
+	_hint = Ui.caps("Esc: skip", 18, Style.DIM_GOLD)
 	_hint.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	_hint.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_hint.offset_left = -40
@@ -435,8 +435,7 @@ func _build_caption() -> void:
 	_caption.anchor_bottom = 1.0
 	_caption.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_caption.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_caption_text = Ui.label("", 42, Color8(40, 18, 12))
-	_caption_text.add_theme_constant_override("outline_size", 0)
+	_caption_text = Ui.ink(Ui.label("", 42, Color8(40, 18, 12)))
 	_caption_text.add_theme_constant_override("line_spacing", 2)
 	_caption_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_caption.add_child(_caption_text)

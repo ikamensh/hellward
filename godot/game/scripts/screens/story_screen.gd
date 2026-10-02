@@ -45,7 +45,7 @@ func build() -> void:
 	band.offset_top = -BAND
 	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(band)
-	_footer = Ui.caps("Enter: continue  ·  Esc: skip", 16, Style.DIM_GOLD)
+	_footer = Ui.caps("Enter: continue  ·  Esc: skip", 19, Style.DIM_GOLD)
 	_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_footer.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	_footer.grow_horizontal = Control.GROW_DIRECTION_BOTH

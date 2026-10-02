@@ -46,7 +46,7 @@ func _key(event: InputEvent) -> void:
 	for b in find_children("*", "Button", true, false):
 		var button := b as Button
 		if button.has_meta("key") and button.is_visible_in_tree() and not button.disabled \
-				and Ui.keycode(String(button.get_meta("key"))) == k.keycode:
+				and Ui.keycode(String(button.get_meta("key"))) == k.physical_keycode:   # by place, as in battle
 			get_viewport().set_input_as_handled()
 			button.pressed.emit()
 			return

@@ -155,9 +155,9 @@ func _card(card: Dictionary, box: Rect2, rank: int) -> Control:
 	kin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	kin.draw.connect(func(): SkillsScreen.medallion(kin, column, Vector2.ZERO, 12.0, tone, lit))
 	slot.add_child(kin)
-	var kind := SkillsScreen.words(String(card["family_name"]), Style.small_font(), 15, tone if lit else tone.darkened(0.35))
+	var kind := SkillsScreen.words(String(card["family_name"]), Style.small_font(), 18, tone if lit else tone.darkened(0.35))
 	kind.uppercase = true
-	kind.position = Vector2(x + 32, 73)
+	kind.position = Vector2(x + 32, 71)
 	slot.add_child(kind)
 	var rule := Control.new()
 	rule.position = Vector2(x, 110)
@@ -174,17 +174,22 @@ func _card(card: Dictionary, box: Rect2, rank: int) -> Control:
 	blurb.position = Vector2(x, 122)
 	blurb.size = Vector2(width, 104)
 	slot.add_child(blurb)
-	var price_kicker := SkillsScreen.words("Price", Style.small_font(), 13, Style.DIM_GOLD if lit else Color(0.45, 0.4, 0.34))
+	var price_kicker := SkillsScreen.words("Price", Style.small_font(), 16, Style.DIM_GOLD if lit else Color(0.45, 0.4, 0.34))
 	price_kicker.uppercase = true
 	price_kicker.position = Vector2(x, 232)
 	slot.add_child(price_kicker)
 	var price := SkillsScreen.words(String(card["price"]), Style.text_font(), 21,
 		(Style.GOLD if not owned else Style.DIM_GOLD) if lit else Color(0.5, 0.46, 0.4))
-	price.position = Vector2(x + 54, 226)
+	price.position = Vector2(x + price_kicker.get_minimum_size().x + 10, 226)
 	slot.add_child(price)
 
 	var act := Ui.button(String(card["label"]), "", width)
-	act.add_theme_font_size_override("font_size", 17)
+	var fs := 20   # smaller, to 16, until the label fits the button's face (the server's "Opens at the ..." run long)
+	while fs > 16 and Style.small_font().get_string_size(act.text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs).x > width - 44:
+		fs -= 1
+	act.add_theme_font_size_override("font_size", fs)
+	act.clip_text = true
+	act.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	act.position = Vector2(x, box.size.y - 66)
 	act.size = Vector2(width, 46)
 	act.disabled = not enabled
@@ -211,8 +216,9 @@ func _tag(text: String, bright: bool, at: Vector2) -> Control:
 	sb.shadow_size = 10 if bright else 4
 	tag.add_theme_stylebox_override("panel", sb)
 	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var l := Ui.label(text.to_upper(), 15, Color(0.16, 0.08, 0.03) if bright else Style.GOLD, Style.small_font())
-	l.add_theme_constant_override("outline_size", 0)
+	var l := Ui.label(text.to_upper(), 18, Color(0.16, 0.08, 0.03) if bright else Style.GOLD, Style.small_font())
+	if bright:
+		Ui.ink(l)
 	tag.add_child(l)
 	tag.resized.connect(func(): tag.position = at - tag.size / 2)
 	return tag

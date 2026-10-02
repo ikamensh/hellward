@@ -11,9 +11,9 @@ extends Screen
 const TONES := {"arrow": Color(0.86, 0.72, 0.48), "fire": Color(1.0, 0.5, 0.18), "lightning": Color(0.68, 0.7, 1.0),
 	"cold": Color(0.5, 0.85, 1.0), "poison": Color(0.66, 0.93, 0.25), "bone": Color(0.9, 0.86, 0.74),
 	"nature": Color(0.38, 0.82, 0.42), "warding": Color(1.0, 0.84, 0.48), "sorcery": Color(0.45, 0.55, 1.0)}
-const NODE := Vector2(178, 160)
+const NODE := Vector2(186, 186)
 const PITCH := 196.0                  # from one column's centre to the next
-const TIER_Y := [244.0, 440.0, 636.0, 832.0]
+const TIER_Y := [244.0, 448.0, 652.0, 856.0]   # the last row ends above the frame's inner line (1057)
 const HEAD_Y := 160.0                 # the columns' sigils
 const MARGIN := 26.0                  # a plate's glow reaches this far past it
 const PLATE_SHADER := """
@@ -142,6 +142,12 @@ static func greyed(c: Color, amount := 1.0) -> Color:
 	return c.lerp(Color(l, l, l, c.a) * Color(0.62, 0.62, 0.62, 1.0), amount)
 
 
+## `c` drained of colour but not of light: the words of a skill that does nothing here.
+static func drained(c: Color) -> Color:
+	var l := c.get_luminance()
+	return Color(l, l, l, c.a)
+
+
 # -- Laying out --------------------------------------------------------------------------------------
 
 func _lay_out(flash: String) -> void:
@@ -216,10 +222,10 @@ static func stage(screen: Control) -> Control:
 ## Words in `font` with a soft shadow under them rather than an outline.
 static func words(text: String, font: Font, size: int, color: Color) -> Label:
 	var l := Ui.label(text, size, color, font)
-	l.add_theme_constant_override("outline_size", 0)
 	l.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.85))
 	l.add_theme_constant_override("shadow_offset_x", 1)
 	l.add_theme_constant_override("shadow_offset_y", 2)
+	l.add_theme_constant_override("shadow_outline_size", 1)
 	return l
 
 
@@ -250,7 +256,7 @@ func _header() -> void:
 	# the purse: the sigils free to spend, in a gilt ring
 	var free: int = int(data["free"])
 	var purse := Control.new()
-	purse.position = Vector2(_column_x(8) - 20, 62)
+	purse.position = Vector2(_column_x(8) - 44, 62)   # its larger captions clear of the frame on the right
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	purse.draw.connect(func(): _draw_purse(purse, free))
 	_stage.add_child(purse)
@@ -262,11 +268,11 @@ func _header() -> void:
 	count.position = Vector2(-40, -36)
 	count.size = Vector2(80, 70)
 	purse.add_child(count)
-	var caption := words("sigils free", Style.small_font(), 14, Style.DIM_GOLD)
+	var caption := words("sigils free", Style.small_font(), 17, Style.DIM_GOLD)
 	caption.uppercase = true
 	caption.position = Vector2(48, -24)
 	purse.add_child(caption)
-	var won := words("of %d won" % int(data["sigils"]), Style.small_font(), 14, Style.BONE)
+	var won := words("of %d won" % int(data["sigils"]), Style.small_font(), 17, Style.BONE)
 	won.uppercase = true
 	won.position = Vector2(48, 0)
 	purse.add_child(won)
@@ -321,7 +327,7 @@ func _column_head(i: int, key: String, title: String, nodes: Dictionary) -> void
 	medal.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	medal.draw.connect(func(): medallion(medal, key, Vector2.ZERO, 31.0, tone, lit))
 	_stage.add_child(medal)
-	var l := words(title, Style.small_font(), 17, tone if lit else tone.darkened(0.15))
+	var l := words(title, Style.small_font(), 19, tone if lit else tone.darkened(0.15))
 	l.uppercase = true
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	l.position = Vector2(x - PITCH / 2, HEAD_Y + 38)
@@ -514,9 +520,9 @@ func _node(node: Dictionary, box: Rect2) -> Control:
 		glow = Color(0, 0, 0, 0)
 		name_color = Color(0.64, 0.58, 0.5)
 		text_color = Color(0.6, 0.57, 0.52)
-	if dormant:
-		name_color = greyed(name_color, 0.85).darkened(0.1)
-		text_color = greyed(text_color, 0.85).darkened(0.15)
+	if dormant:   # drained of colour, not of light: the grey plate says "nothing here", the words stay readable
+		name_color = drained(name_color).darkened(0.12)
+		text_color = drained(text_color).darkened(0.1)
 	var slot := Control.new()
 	slot.position = box.position
 	slot.size = box.size
@@ -536,8 +542,8 @@ func _node(node: Dictionary, box: Rect2) -> Control:
 
 	var font := Style.text_font()
 	var width := box.size.x - 18
-	var size := 21
-	while size > 15 and font.get_string_size(String(node["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
+	var size := 22
+	while size > 17 and font.get_string_size(String(node["name"]), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x > width:
 		size -= 1
 	var title := words(String(node["name"]), font, size, name_color)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -546,10 +552,10 @@ func _node(node: Dictionary, box: Rect2) -> Control:
 	title.size = Vector2(width, 28)
 	slot.add_child(title)
 
-	var blurb_size := 15
+	var blurb_size := 18
 	var room := box.size.y - 52 - 30
-	while blurb_size > 12 and font.get_multiline_string_size(String(node["blurb"]), HORIZONTAL_ALIGNMENT_CENTER,
-			box.size.x - 22, blurb_size).y > room:
+	while blurb_size > 15 and font.get_multiline_string_size(String(node["blurb"]), HORIZONTAL_ALIGNMENT_CENTER,
+			box.size.x - 22, blurb_size).y > room - 8:   # the label's line spacing adds a little to the font's own
 		blurb_size -= 1
 	var blurb := words(String(node["blurb"]), font, blurb_size, text_color)
 	blurb.add_theme_constant_override("shadow_offset_y", 1)
@@ -634,17 +640,18 @@ func _legend() -> void:
 		swatch.position = Vector2(at.x, y)
 		swatch.size = Vector2(40, 26)
 		swatch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# a skill that does nothing here is mostly a locked one: the swatch shows it so, drained of colour
 		var rim: Color = {"learned": Style.GOLD, "learnable": Style.PALE_GOLD, "locked": Color(0.36, 0.29, 0.22),
-			"dormant": greyed(Style.GOLD)}[kind]
+			"dormant": Color(0.36, 0.29, 0.22)}[kind]
 		var glow: Color = {"learned": Color(1.0, 0.7, 0.3, 0.8), "learnable": Color(1.0, 0.8, 0.45, 0.42),
-			"locked": Color(0, 0, 0, 0), "dormant": Color(0.6, 0.6, 0.6, 0.3)}[kind]
+			"locked": Color(0, 0, 0, 0), "dormant": Color(0, 0, 0, 0)}[kind]
 		var p := plate(swatch.size, rim, glow, 1.5 if kind == "learned" else 0.0, 1.0 if kind == "learnable" else 0.0,
 			0.85 if kind == "dormant" else 0.0, 6.0)
 		if kind == "learned":
 			(p.material as ShaderMaterial).set_shader_parameter("face", Color(0.075, 0.064, 0.064).lerp(Color(0.3, 0.2, 0.1), 0.45))
 		swatch.add_child(p)
 		_stage.add_child(swatch)
-		var l := words(String(keys[i][0]), Style.text_font(), 19, Style.BONE if kind != "dormant" else greyed(Style.BONE))
+		var l := words(String(keys[i][0]), Style.text_font(), 19, Style.BONE if kind != "dormant" else drained(Style.BONE).darkened(0.1))
 		l.position = Vector2(at.x + 54, y)
 		_stage.add_child(l)
 

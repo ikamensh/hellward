@@ -1,12 +1,15 @@
 class_name SettingsScreen
 extends Screen
-## The settings, over the title or the pause menu: the music's and the sounds' volume, fullscreen, and whether the
-## leaders' minds show in the battle's chronicle. ↑↓ pick a row, ←→ change it (Enter or Space flips a switch), the mouse does
-## the same on the row's buttons. Every change is saved and applied at once (game.prefs, on this machine).
+## The settings, over the title or the pause menu: the music's and the sounds' volume, fullscreen, the battle
+## interface's size, whether the leaders' minds show in the battle's chronicle and whether a defence keeps the mouse in
+## the window. ↑↓ pick a row, ←→ change it (Enter or Space flips a switch), the mouse does the same on the row's
+## buttons. Every change is saved and applied at once (game.prefs, on this machine; the HUD follows it live).
 
 const ROWS := [["Music", "music"], ["Sound effects", "sfx"], ["Fullscreen", "fullscreen"],
-	["Leaders' minds in the chronicle", "minds"]]
-const STEPS := 10                     # a volume moves by a tenth
+	["Battle interface size", "interface"], ["Leaders' minds in the chronicle", "minds"],
+	["Keep the mouse in the window in battle", "hold_mouse"]]
+const RANGES := {"music": [0.0, 1.0], "sfx": [0.0, 1.0], "interface": [1.0, 1.2]}   # a gauge's ends
+const STEPS := 10                     # a gauge moves by a tenth of its range
 
 var _row := 0
 var _rows: Array = []                 # per row: {key, back (its highlight), marker, and its controls}
@@ -22,7 +25,7 @@ func build() -> void:
 	for i in ROWS.size():
 		col.add_child(_make_row(i, String(ROWS[i][0]), String(ROWS[i][1])))
 	col.add_child(PauseScreen.gap(10))
-	var hint := Ui.caps("↑↓ choose    ←→ change    Esc closes", 14, Style.DIM_GOLD)
+	var hint := Ui.caps("↑↓ choose    ←→ change    Esc closes", 17, Style.DIM_GOLD)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	col.add_child(hint)
 	var close := PauseScreen.primary(Ui.button("Close", "Esc", 300))
@@ -56,7 +59,7 @@ func _key(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()   # an overlay takes every key: none reaches what is under it
 
 
-## A row: its name, then − / a gauge of tenths / the percent / + for a volume, or Off / On for a switch.
+## A row: its name, then − / a gauge of tenths / the percent / + for a gauge, or Off / On for a switch.
 func _make_row(i: int, name: String, key: String) -> Control:
 	var back := PanelContainer.new()
 	var sb := StyleBoxFlat.new()
@@ -109,7 +112,7 @@ func _make_row(i: int, name: String, key: String) -> Control:
 			tick.custom_minimum_size = Vector2(12, 22)
 			tick.mouse_filter = Control.MOUSE_FILTER_STOP
 			var level := float(t + 1) / STEPS
-			tick.gui_input.connect(func(e: InputEvent): _tick_clicked(e, key, level))
+			tick.gui_input.connect(func(e: InputEvent): _tick_clicked(e, key, _value(key, level)))
 			gauge.add_child(tick)
 			ticks.append(tsb)
 		row.add_child(gauge)
@@ -137,7 +140,18 @@ func _small(text: String, width: float) -> Button:
 
 
 func _is_switch(key: String) -> bool:
-	return key == "fullscreen" or key == "minds"
+	return not RANGES.has(key)
+
+
+## A gauge's value at `level` (0..1 of its range), and back.
+func _value(key: String, level: float) -> float:
+	var r: Array = RANGES[key]
+	return lerpf(r[0], r[1], level)
+
+
+func _level(key: String) -> float:
+	var r: Array = RANGES[key]
+	return inverse_lerp(r[0], r[1], float(game.prefs.get(key)))
 
 
 func _tick_clicked(e: InputEvent, key: String, level: float) -> void:
@@ -147,15 +161,14 @@ func _tick_clicked(e: InputEvent, key: String, level: float) -> void:
 		_store(key, level)
 
 
-## A step of a volume (`step` -1 or +1), or a switch: ← off, → on, 0 flips it.
+## A step of a gauge (`step` -1 or +1), or a switch: ← off, → on, 0 flips it.
 func _change(key: String, step: int) -> void:
 	var p: Prefs = game.prefs
 	if _is_switch(key):
 		var now: bool = p.get(key)
 		_set_switch(key, not now if step == 0 else step > 0)
 		return
-	var level: float = p.get(key)
-	_store(key, clampf(roundf(level * STEPS + step) / STEPS, 0.0, 1.0))
+	_store(key, _value(key, clampf(roundf(_level(key) * STEPS + step) / STEPS, 0.0, 1.0)))
 	Sfx.play("click")
 
 
@@ -196,8 +209,8 @@ func _show() -> void:
 			_lit(entry["on"], on)
 			_lit(entry["off"], not on)
 		else:
-			var level: float = p.get(key)
-			(entry["value"] as Label).text = "%d%%" % roundi(level * 100)
+			var level := _level(key)
+			(entry["value"] as Label).text = "%d%%" % roundi(float(p.get(key)) * 100)
 			var ticks: Array = entry["ticks"]
 			for t in ticks.size():
 				var tsb: StyleBoxFlat = ticks[t]

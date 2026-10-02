@@ -33,17 +33,18 @@ the `main` profile keeps your existing save. Saves live in `~/.hellward/saves`, 
 | **2–5**, then click buildable ground | Pyre, Storm, Frost and Plague towers as later locations unlock them |
 | **6**, then click an arch | a warded gate, available from the Graveyard: walkers stop and batter it, flyers pass over |
 | **7–8**, then click buildable ground | Bone Altar and Druid Grove support towers in Act II |
-| click a tower | select it: **U** upgrade, **S** sell, **C** cleanse (mana) |
-| **Q** (from the Graveyard) | Smite: with a leader pondering or chanting, it strikes the one closest to cursing; otherwise click a monster |
-| **W** (from Travincal), then click the floor | Meteor: it lands a moment later and leaves the floor burning |
-| **E** (from the Jungle), then click the floor | Frozen Orb: nearby monsters freeze; an interruptible leader's chant breaks |
+| click a tower | select it: **U** upgrade, **Delete** sell, **R** cleanse (mana) |
+| **Z** (from the Graveyard) | Smite: with a leader pondering or chanting, it strikes the one closest to cursing; otherwise click a monster |
+| **X** (from Travincal), then click the floor | Meteor: it lands a moment later and leaves the floor burning |
+| **C** (from the Jungle), then click the floor | Frozen Orb: nearby monsters freeze; an interruptible leader's chant breaks |
 | **V** during a wave break | sell one held salvage for battle gold instead of banking it for the forge |
 | **Space** | call the next wave; ending a break early can grant a small gold bonus |
 | **F** | double the pace |
 | **H** | hide the HUD |
-| arrow keys / screen edges, wheel, middle drag | pan, zoom and turn the camera |
+| **WASD** / arrow keys / the window's edges | pan the camera; during a defence the mouse stays in the window (Settings can let it go) |
+| **Q** / **E** or the wheel, middle drag | zoom in / out, turn the camera |
 | right click / **Esc** | let go of what you hold |
-| **Esc** with nothing held | pause: settings (music and effects volume, fullscreen), start again, the map, the title, leave |
+| **Esc** with nothing held | pause: settings (music and effects volume, fullscreen, the battle interface's size, the mouse kept in the window), start again, the map, the title, leave |
 
 Leaders wear a violet ring and their life shows over the field. When
 one ponders, dots rise over its head; when it chants, a violet beam reaches for a tower and a rune

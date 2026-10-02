@@ -50,20 +50,22 @@ func _ready() -> void:
 	Net.failed.connect(_failed)
 	Net.start()
 	if args.has("snap"):
-		_snap_after(int(args.get("frames", "60")), String(args["snap"]))
+		_snap_after(int(args.get("frames", "60")), String(args["snap"]), int(args.get("run", "1")))
 	if args.has("screen"):
 		await _open_named(String(args["screen"]))
 	else:
 		title()
 
 
-## Save the frame drawn `frames` frames after the first screen shows to `path`, then quit (captures of a screen).
-func _snap_after(frames: int, path: String) -> void:
+## Save the frame drawn `frames` frames after the first screen shows to `path`, and with `run` > 1 the frames after
+## it beside it (NAME-1.png, NAME-2.png...: motion), then quit (captures of a screen).
+func _snap_after(frames: int, path: String, run: int) -> void:
 	await shown
 	for i in frames:
 		await get_tree().process_frame
-	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(path)
+	for k in run:
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png(path if k == 0 else "%s-%d.png" % [path.get_basename(), k])
 	Net.stop()
 	get_tree().quit()
 
@@ -291,6 +293,7 @@ func _battle(start: Dictionary) -> void:
 	battle = load(MAIN).instantiate()
 	battle.battle = start
 	battle.args = {"film": ""} if bool(start["scripted"]) else {}
+	battle.prefs = prefs
 	add_child(battle)
 	battle.menu.connect(pause)
 	battle.ended.connect(_ended)

@@ -98,7 +98,7 @@ func _stat(what: String, value: String) -> VBoxContainer:
 	var v := Ui.label(value, 46, Style.PALE_GOLD, Style.title_font())
 	v.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(v)
-	var w := Ui.caps(what, 15, Style.DIM_GOLD)
+	var w := Ui.caps(what, 18, Style.DIM_GOLD)
 	w.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(w)
 	return box

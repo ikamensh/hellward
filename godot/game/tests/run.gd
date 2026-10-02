@@ -90,6 +90,7 @@ func play_out(w: World, limit: float) -> bool:
 func press(vp: Viewport, keycode: Key) -> void:
 	var key := InputEventKey.new()
 	key.keycode = keycode
+	key.physical_keycode = keycode   # the game reads keys by their place (a QWERTY keyboard here)
 	key.pressed = true
 	vp.push_input(key)
 
@@ -188,7 +189,7 @@ func test_a_wave_brings_monsters_that_walk() -> void:
 	check(first.global_position.distance_to(was) > 1.0, "a monster walks its route")
 
 
-## Towers by the lanes draw a Fallen Shaman's curse; C on the cursed tower cleanses it for mana.
+## Towers by the lanes draw a Fallen Shaman's curse; R on the cursed tower cleanses it for mana.
 func test_a_curse_lands_and_cleanse_lifts_it() -> void:
 	var m := await start()
 	m.rig.user_control = false
@@ -221,8 +222,8 @@ func check_cleanse(m: Node, cursed: Tower) -> void:
 	var w: World = m.world
 	await until(func(): return w.mana >= w.spell_cost("cleanse"), 60.0)
 	var mana := w.mana
-	press(m.get_viewport(), KEY_C)
-	check(await until(func(): return not cursed.cursed(), 3.0), "C cleanses the chosen tower")
+	press(m.get_viewport(), KEY_R)
+	check(await until(func(): return not cursed.cursed(), 3.0), "R cleanses the chosen tower")
 	check(w.mana < mana, "Cleanse costs mana (%.0f -> %.0f)" % [mana, w.mana])
 
 
