@@ -255,3 +255,21 @@ neighbour). Cells are (x, y); "y6 x9–15" is a run along row 6.
 6. **Order of work.** Stage 2 also rewrites the waves (four to six a location), which moves every route's share and
    so every cell's worth. Re-author the waves first, re-run `tools/maps.py`, then the maps. Re-measure the gate
    bonus after stage 1's Knife Post.
+
+## Decisions for stage 2 (2026-10-02)
+
+1. **Prime stays at 60%** of the map's best worth.
+2. **Maps are re-designed, not walled.** The proposal above is a measurement, not a layout: a straight wall of
+   rocks along a corridor reads as a bug. Stage 2 re-authors each map by hand, and geometry may change:
+   - a shorter shared stretch into the sanctuary;
+   - islands that a loop wraps around;
+   - halls narrower than the route ±1 where that makes a choke.
+
+   Rock comes in clusters (boulders, ruins, a collapsed wall), and water in ponds.
+3. **R1's 40% is weighted by worth.** Dead flanks do not count toward scarcity; ground a tower could use does.
+4. **Rock and water as rules:**
+   - Up to three rocks per map are rubble that can be cleared for gold during a break, at 1, 2, then 3 gold units.
+   - Water lies next to the kept clusters, where a Moon Well (stage 5) will matter; until then it is simply occupied.
+5. **Unwalked routes** get wanderers from their entrance, or are deleted if no wave wants them.
+6. **Order:** stage 2's wave rewrite comes first (it changes every route's share), then `tools/maps.py` again, then
+   the maps.

@@ -115,7 +115,7 @@ V7's targets:
 
 | ID | Criterion | Judge | Target |
 |---|---|---|---|
-| R1 | Good cells are scarce by map design; many cells start occupied (rock, water). | scorecard (maps) | occupied ≥ 40% of the ground beside the halls; ≤ 12 prime cells a map |
+| R1 | Good cells are scarce by map design; many cells start occupied (rock, water). | scorecard (maps: `tools/maps.py`) | occupied ≥ 40% of the ground beside the halls, weighted by worth; ≤ 12 prime cells (worth ≥ 60% of the map's best) a map |
 | R2 | A cell is worth what it reaches of the routes, and the player sees that worth. | test; protocol | per-cell coverage in the level facts |
 | R3 | Upgrading buys less per gold than another tower, but more per cell, against the location's real armor mix. | scorecard (tower tables) | for every attacking kind, rank II and III: marginal damage per gold below rank I's; damage per cell above |
 | R4 | Scarcity keeps the tower count low without a cap. | scorecard (bot runs) | see G2.2; no build limit in the rules |
