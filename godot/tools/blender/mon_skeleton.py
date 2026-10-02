@@ -35,7 +35,9 @@ def _chroma(lab):
 # material families: the crimson tabard by its colour; the iron by place: the helmet, the pauldron (grey, colourless,
 # where bone is warm), the mail skirt (dark); bone is the rest
 FAMILIES = {
-    "cloth": lambda x, y, z, lab: 1.0 * (lab[..., 1] > 7.0) * (lab[..., 0] < 32),
+    # the tabard by its colour and its place: red-brown stains the generator smeared on the pelvis and thighs are bone
+    "cloth": lambda x, y, z, lab: 1.0 * (lab[..., 1] > 7.0) * (lab[..., 0] < 32) * (np.abs(x) < 0.15) * (y > -0.05)
+                                  * (z > 0.55) * (z < 1.45),
     "mail": lambda x, y, z, lab: 1.0 * (z > 0.68) * (z < 1.1) * (np.abs(x) < 0.3) * (lab[..., 0] < 20),
     "iron": lambda x, y, z, lab: 1.0 * ((z > 1.72) | ((x < -0.11) & (z > 1.34) & (z < 1.62) & (_chroma(lab) < 9))),
     "bone": "rest",
@@ -44,9 +46,9 @@ LOOKS = {
     "cloth": {"colour": sculpted.grade(sat=0.6, value=0.7, toward=(0.26, 0.07, 0.05), mix=0.55, mottle=0.18,
                                        grime=0.4, knee=1.1),
               "rough": 0.92},
-    "mail": {"colour": mail, "rough": lambda ao: 0.5 + 0.3 * (1 - ao), "metal": 0.8},
+    "mail": {"colour": mail, "rough": lambda ao: 0.5 + 0.3 * (1 - ao), "metal": 0.55},
     "iron": {"colour": sculpted.grade(sat=0.7, value=1.15, toward=(0.3, 0.2, 0.14), mix=0.45, mottle=0.3, scale=0.03),
-             "rough": lambda ao: 0.42 + 0.4 * (1 - ao), "metal": 0.8},
+             "rough": lambda ao: 0.42 + 0.4 * (1 - ao), "metal": 0.55},
     "bone": {"colour": lambda rgb, pos: sculpted.grade(grime=0.25, knee=0.45)(
                  sculpted.bone_colour(rgb, *sculpted.hue_sat_val(rgb).transpose(2, 0, 1), pos), pos),
              "rough": lambda ao: 0.72 + 0.15 * (1 - ao)},
@@ -206,18 +208,18 @@ def shield_colour(rgb, hue, sat, val, pos):
     plank = np.floor(x)
     seam = np.exp(-((x - np.round(x)) / 0.05) ** 2)[..., None]
     grain = 0.85 + 0.15 * np.sin(x * 60 + np.sin(pos[..., 2] * 40 + plank * 3) * 2)[..., None]
-    oak = np.array([0.36, 0.26, 0.17]) * (0.85 + 0.12 * np.sin(plank * 2.3))[..., None] * grain * (1 - 0.6 * seam)
+    oak = np.array([0.44, 0.33, 0.22]) * (0.85 + 0.12 * np.sin(plank * 2.3))[..., None] * grain * (1 - 0.6 * seam)
     g = rgb.mean(-1, keepdims=True)
     oak = oak * (0.6 + 0.8 * g / max(float(g.mean()), 1e-3) * 0.5)
     hue_, sat_, val_ = sculpted.hue_sat_val(rgb).transpose(2, 0, 1)
     paint = (((hue_ < 20) | (hue_ > 330)) & (sat_ > 0.3))[..., None]
-    wood = np.where(paint, oak * 0.45 + np.array([0.42, 0.08, 0.05]) * 0.55, oak)   # the sigil, faded but red
-    iron = np.array([0.22, 0.19, 0.17]) * (0.6 + 0.8 * g)
+    wood = np.where(paint, oak * 0.6 + np.array([0.36, 0.12, 0.08]) * 0.4, oak)   # the sigil, faded into the wood
+    iron = np.array([0.4, 0.36, 0.32]) * (0.6 + 0.8 * g)   # a pale worn rim and boss
     return np.where((r > 0.9) | (r < 0.27), iron, wood)
 
 
 shield, hf = sculpted.prop("shield", SHIELD, colour=shield_colour,
-                           metal=lambda hue, sat, val, pos: 0.8 * ((_disc(pos) > 0.9) | (_disc(pos) < 0.27)))
+                           metal=lambda hue, sat, val, pos: 0.5 * ((_disc(pos) > 0.9) | (_disc(pos) < 0.27)))
 co = np.array([v.co for v in shield.data.vertices])
 d = (co - np.array(hf["centre"])) @ np.array(hf["flat"])
 front = hf["flat"] if d.max() > -d.min() else -hf["flat"]   # the boss stands out of the front
@@ -268,40 +270,43 @@ def aim_blade(p: Pose, direction: Vector) -> None:
 
 
 def guard(p: Pose) -> None:
-    """The sword at guard: point forward and up, turned with the hips."""
-    aim_blade(p, rig.turn(p, "hips") @ Vector((0.08, 0.85, 0.45)).normalized())
+    """The sword carried low, point forward and down, turned with the hips (held level it read as a lance)."""
+    aim_blade(p, rig.turn(p, "hips") @ Vector((0.12, 0.8, -0.55)).normalized())
 
 
 def attack(t):
-    """An overhead chop: the sword raised straight up behind the skull, the weight back, then a step in and the
-    blade brought down in front, the shield drawn back out of the way; recover."""
+    """Behind its shield: the shield punched out at the foe, the sword drawn back low at the hip, then a step in and
+    a straight thrust at the chest past the shield's edge, the right shoulder driven through; recover to guard."""
     base = stance()
     guard(base)
-    wind = stance().move("hips", y=-0.05, z=0.01).rot("hips", p=4).rot("chest", p=8, y=-10).rot("head", p=6)
-    wind.q["upper_arm.R"], wind.q["forearm.R"], wind.q["hand.R"] = Q(p=170, r=-4), Q(p=75), Q(p=-50)
-    wind.rot("upper_arm.L", p=14, r=6).rot("jaw", p=-18)
-    strike = stance().move("hips", y=0.14, z=-0.06).rot("hips", p=-12).rot("chest", p=-16, y=8).rot("head", p=-6)
-    strike.q["upper_arm.R"], strike.q["forearm.R"], strike.q["hand.R"] = Q(p=100, r=2), Q(p=4), Q(p=95)
-    strike.rot("upper_arm.L", p=-24, r=26).rot("forearm.L", p=-10).rot("jaw", p=-24)
-    follow = strike.copy()
-    follow.q["upper_arm.R"], follow.q["forearm.R"], follow.q["hand.R"] = Q(p=80, r=6), Q(p=10), Q(p=105)
-    keys = [(0.0, base, smooth), (0.36, wind, smooth), (0.5, strike, ease_in), (0.62, follow, ease_out),
-            (1.0, base, smooth)]
-    p = keyed(t, keys)
-    # the blade aimed in the world: up and back over the skull, then down to a man's waist in front of it
-    aims = [(0.0, None), (0.36, Vector((0, -0.45, 1))), (0.5, Vector((0, 1.0, -0.25))),
-            (0.62, Vector((0.15, 0.95, -0.45))), (1.0, None)]
+    bash = stance().move("hips", y=0.05, z=-0.02).rot("hips", p=-6).rot("chest", p=-6, y=-16).rot("head", p=-4)
+    bash.rot("upper_arm.L", p=40, r=-6).rot("forearm.L", p=-35).rot("jaw", p=-14)
+    thrust = stance().move("hips", y=0.18, z=-0.07).rot("hips", p=-12).rot("chest", p=-10, y=22).rot("head", p=-6)
+    thrust.rot("upper_arm.L", p=-10, r=24).rot("forearm.L", p=-10).rot("jaw", p=-26)
+    follow = thrust.copy().rot("chest", y=4)
+    p = keyed(t, [(0.0, base, smooth), (0.3, bash, ease_out), (0.5, thrust, ease_in), (0.62, follow, ease_out),
+                  (1.0, base, smooth)])
+    # the sword hand from the shoulder: as held, drawn back to the hip, driven out at chest height, back
+    def off(q):
+        return rig.where(q, "hand.R", HD["hand.R"]) - rig.where(q, "chest", HD["upper_arm.R"])
+    held = off(base)
+    hands = [(0.0, held), (0.3, Vector((0.1, -0.14, -0.42))), (0.5, Vector((-0.02, 0.62, -0.1))),
+             (0.62, Vector((-0.02, 0.58, -0.14))), (1.0, held)]
+    aims = [(0.0, None), (0.3, Vector((0.1, 1, 0.05))), (0.5, Vector((0.02, 1, 0.0))), (0.62, Vector((0.05, 1, -0.08))),
+            (1.0, None)]
     rest_dir = rig.turn(base, "hand.R") @ BLADE_REST
-    for (t0, a0), (t1, a1) in zip(aims, aims[1:]):
+    for ((t0, h0), (t1, h1)), ((_, a0), (_, a1)) in zip(zip(hands, hands[1:]), zip(aims, aims[1:])):
         if t0 <= t <= t1:
-            d0, d1 = (a0 or rest_dir).normalized(), (a1 or rest_dir).normalized()
             w = smooth((t - t0) / (t1 - t0))
-            aim_blade(p, d0.slerp(d1, w) if d0.dot(d1) > -0.99 else d1)
+            rig.reach(p, "upper_arm.R", "forearm.R", rig.where(p, "chest", HD["upper_arm.R"]) + h0.lerp(h1, w),
+                      (1, -0.5, -0.5))
+            d0, d1 = (a0 or rest_dir).normalized(), (a1 or rest_dir).normalized()
+            aim_blade(p, d0.slerp(d1, w))
             break
     feet = dict(FEET)
     a, pitch, yaw = feet["L"]
-    step = smooth((t - 0.36) / 0.14) * (1 - smooth((t - 0.68) / 0.32))
-    feet["L"] = (a + Vector((0, 0.22 * step, 0.08 * bump(t, 0.36, 0.5))), pitch, yaw)
+    step = smooth((t - 0.32) / 0.16) * (1 - smooth((t - 0.66) / 0.34))
+    feet["L"] = (a + Vector((0, 0.26 * step, 0.08 * bump(t, 0.32, 0.48))), pitch, yaw)
     plant_legs(rig, p, feet, pole_out=0.1)
     return p
 
@@ -424,6 +429,25 @@ def collapse(t, pile=HEAP, back=0.0):
     return out
 
 
+def popped(t, pile=None):
+    """The second death: the blow knocks the skull clean off, spinning back over its shoulders in an arc, while the
+    body under it falls apart backward."""
+    pile = pile or HEAP_BACK
+    p = collapse(t, pile, back=1.0)
+    w = clamp01((t - 0.05) / 0.42)
+    if w <= 0:
+        return p
+    start = jolt(1.0)
+    p0, q0 = rig.where(start, "head", HD["head"]), rig.turn(start, "head")
+    p1, q1 = rig.where(pile, "head", HD["head"]), rig.turn(pile, "head")
+    if q0.dot(q1) < 0:
+        q1 = -q1
+    spin = Quaternion((1, 0, 0), math.radians(-400 * ease_out(w)) * (1 - w))   # tumbling, settling as it lands
+    rig.orient(p, "head", spin @ q0.slerp(q1, w))
+    rig.place(p, "head", p0.lerp(p1, w) + Vector((0, 0, 0.45 * math.sin(math.pi * w) + 0.05 * bump(w, 0.9, 1.0))))
+    return p
+
+
 rig.action("idle", stand_still.seconds, idle, loop=True)
 rig.action("walk", march.seconds, walk, loop=True)
 rig.action("attack", 0.7, attack, ground_from=0.0, body=body)
@@ -431,7 +455,7 @@ rig.action("attack", 0.7, attack, ground_from=0.0, body=body)
 # lifted the whole pile with it
 cloth, rig.springs = rig.springs, {}
 rig.action("die", 1.4, collapse, ground_from=0.0, body=body)
-rig.action("die2", 1.4, lambda t: collapse(t, HEAP_BACK, back=1.0), ground_from=0.0, body=body)
+rig.action("die2", 1.4, popped, ground_from=0.0, body=body)
 rig.springs = cloth
 rig.report(body)
 rig.extremes(body, "die")

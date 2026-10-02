@@ -150,24 +150,34 @@ const GLOW := 5.0        # a monster's eyes: bright enough to bloom a little, as
 const GLOW_OUT := 0.45   # seconds a dead monster's eyes take to go out
 
 
-## A dead body's own copies of its monster materials, so its eyes go out alone (`eyes_out`).
-static func own(root: Node) -> Array[ORMMaterial3D]:
+## One monster's own copies of its glowing materials (all, or only the one named `only`), so their glow can
+## change on it alone: a dead body's eyes going out (`eyes_out`), a chanting Shaman's skull flaring.
+static func own(root: Node, only := "") -> Array[ORMMaterial3D]:
 	var mats: Array[ORMMaterial3D] = []
 	for node in root.find_children("*", "MeshInstance3D", true, false):
 		var mi := node as MeshInstance3D
 		for i in mi.mesh.get_surface_count():
 			var m := mi.get_surface_override_material(i) as ORMMaterial3D
-			if m != null and m.resource_name.begins_with("mon_") and m.emission_enabled:
+			if m != null and m.resource_name.begins_with("mon_") and m.emission_enabled \
+					and (only == "" or m.resource_name == only):
 				m = m.duplicate() as ORMMaterial3D
 				mi.set_surface_override_material(i, m)
 				mats.append(m)
 	return mats
 
 
-## The glow left in a body's eyes `t` seconds after it died: gone after GLOW_OUT, quickest at first.
-static func eyes_out(mats: Array[ORMMaterial3D], t: float) -> void:
+const DEAD := Color(0.55, 0.52, 0.5)   # what a corpse's colour sinks to (a bright red dead Fallen read as alive)
+
+
+## A body `t` seconds after it died: the glow in its eyes gone after GLOW_OUT, quickest at first, and with `pale`
+## its colour sinking to DEAD over a second (not for a frozen one, whose rime is its colour).
+static func eyes_out(mats: Array[ORMMaterial3D], t: float, pale := true) -> void:
 	for m in mats:
 		m.emission_energy_multiplier = GLOW * pow(clampf(1.0 - t / GLOW_OUT, 0.0, 1.0), 2.0)
+		if pale:
+			if not m.has_meta("alive"):
+				m.set_meta("alive", m.albedo_color)
+			m.albedo_color = (m.get_meta("alive") as Color) * Color.WHITE.lerp(DEAD, clampf(t, 0.0, 1.0))
 
 
 # a pack is not cloned: each monster wears one of these tints of its kind's maps (Mats.vary)

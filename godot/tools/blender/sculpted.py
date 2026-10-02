@@ -700,9 +700,18 @@ def iron(hue, sat, val, pos):
 
 
 # worn steel: grey, a little rust in its pits, bright where it is smooth
-STEEL = {"colour": lambda rgb, pos: grade(sat=0.3, value=1.3, toward=(0.42, 0.41, 0.4), mix=0.6, mottle=0.2,
+# pale, worn steel, only half metal: a full metal reflects the black night sky and a blade read as a dark stick
+STEEL = {"colour": lambda rgb, pos: grade(sat=0.25, value=1.6, toward=(0.55, 0.55, 0.54), mix=0.7, mottle=0.2,
                                           scale=0.02)(rgb, pos),
-         "rough": lambda ao: 0.3 + 0.45 * (1 - ao), "metal": 0.85}
+         "rough": lambda ao: 0.35 + 0.4 * (1 - ao), "metal": 0.5}
+
+
+def hide_rough(ao, rgb):
+    """A dry hide's roughness: matte all over, rougher in its creases and where the painting is darker (scabs,
+    wrinkles), so the light breaks up across it instead of one even sheen."""
+    lum = rgb.mean(-1)
+    dark = np.clip((np.median(lum) - lum) / max(float(np.median(lum)), 1e-3), 0, 1)
+    return 0.6 + 0.22 * (1 - ao) + 0.18 * dark
 
 
 def prop(kind: str, length: float, yaw: float = 180.0, metal=iron, faces: int = 1500, colour=None,
@@ -781,7 +790,7 @@ def corpse_colour(rgb, hue, sat, val, pos):
     the teal or slime green the moon pushes a greener skin to), livid violet bruises in blotches; its wounds and
     rot wet red-purple flesh, not black."""
     g = _grey(rgb)
-    pale = np.clip(g * 1.35, 0.0, 0.55) * np.array([0.98, 0.97, 0.86]) * _mottle(pos, 0.09, 0.14)
+    pale = np.clip(g * 1.35, 0.0, 0.55) * np.array([0.96, 1.0, 0.7]) * _mottle(pos, 0.09, 0.14)   # olive: the moon greys it
     bruise = np.clip(_mottle(pos, 0.06, 1.0) - 1.5, 0, 0.4)[..., :1] / 0.4
     sick = pale * (1 - 0.6 * bruise) + np.clip(g * 1.2, 0, 0.5) * np.array([0.72, 0.5, 0.78]) * 0.6 * bruise
     flesh = np.array([0.34, 0.09, 0.1]) * (0.6 + 0.8 * g / max(float(g.mean()), 1e-3) * 0.5)

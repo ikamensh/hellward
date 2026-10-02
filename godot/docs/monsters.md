@@ -84,6 +84,21 @@ Not yet seen by Ilya; concepts approved by the agent, not by him.
 - **Close-up finish:** wet eyes, teeth and gums, nails and claws modelled; cloth with thickness; no texture stretch
   or seams visible on a turntable.
 
+**Status 2026-10-02 (in progress):** rounds of the five-lens panel (`tools/review_set.sh DIR` renders the
+pictures; each critic sees only them), scores per lens across the four kinds:
+
+| round | anatomy | materials | animation | readability | style | what changed before it |
+|---|---|---|---|---|---|---|
+| 3 | 4-6 | 3-4 | 4-6 | 4-5 | 5-7 | material families, glowing eyes, the staff skull's violet |
+| 4 | 4-6 | 4-5 | 4-6 | 5-7 | 4-7 | modelled crest, generated staff skull, squat Fallen, deaths open on the blow |
+| 5 | 4-6 | 4-6 | 4-5 | 5-6 | 5-7 | Shaman a head taller, upright crown, overhead cast, pale Zombie |
+| 6 | 5-6 | 4-6 | 3-5 | 4-7 | 5-7 | generated Zombie head, crimson that holds under the moon |
+
+What the panel keeps asking for, beyond what is done: a wet/dry/metal surface language richer than one sheen
+per body; walks with more character than captured or keyed cycles give at six samples; each kind told apart by
+colour at the default camera, where monsters are 25-30 px tall. Blocking defects named in every round so far
+were fixed in the next; the 8/10 bar is not met.
+
 ## Pipeline (as built)
 
 1. `tools/concept.py`: concept renders (Codex image tool; the 2D paintings as references for Fallen and Shaman).

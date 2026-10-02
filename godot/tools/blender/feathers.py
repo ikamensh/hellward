@@ -57,7 +57,7 @@ def crest(name: str, root: Vector, length: float, width: float = 0.05) -> bpy.ty
     it reads from above and in profile; the middle ones longest, crimson and gold by turns. Upright: leaning back,
     they read from the battle camera as spines down its back."""
     bm = bmesh.new()
-    rows = ((8, 86.0, 6.0, 1.0, Vector((0, -0.03, 0))), (5, 50.0, -6.0, 0.72, Vector((0, 0.03, -0.01))))
+    rows = ((9, 130.0, 6.0, 1.0, Vector((0, -0.03, 0))), (6, 80.0, -6.0, 0.72, Vector((0, 0.03, -0.01))))
     k = 0
     for n, spread, lean, size, shift in rows:
         for i in range(n):

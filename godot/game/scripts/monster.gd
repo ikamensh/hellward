@@ -67,6 +67,8 @@ var _flash := 0.0
 var _flinch: Flinch
 var _zap := 0.0                      # lightning still crawling over a corpse, seconds
 var _dying: Array[ORMMaterial3D] = []   # a corpse's own materials, its eyes going out
+var _frozen_dead := false            # killed by cold: its rime keeps its colour
+var _curse_glow: Array[ORMMaterial3D] = []   # a chanting Shaman's skull, flaring
 
 # how each element marks a blow, and a death
 const ELEMENT_FLASH := {"fire": Color(1.0, 0.45, 0.1), "cold": Color(0.45, 0.75, 1.0),
@@ -217,13 +219,16 @@ func _process(delta: float) -> void:
 	match _state:
 		"walk", "ponder", "chant":
 			_walk(delta)
+			if _state == "chant":   # the skull's eyes flare and throb with the curse
+				for m in _curse_glow:
+					m.emission_energy_multiplier = Mats.GLOW * (2.2 + 1.2 * sin(_state_t * 9.0))
 		"door":
 			_state_t = min(_state_t, 1.4)
 			global_position = _where(world.level.route_length(_route) + _state_t * 3.0)
 			if _state_t >= 1.4:
 				gone = true
 		"dead":
-			Mats.eyes_out(_dying, _state_t)
+			Mats.eyes_out(_dying, _state_t, not _frozen_dead)
 			if _state_t > 3.0:
 				position.y -= delta * 0.5
 			if _state_t > 5.0:
@@ -289,6 +294,7 @@ func die(element: String, bounty: int) -> void:
 		Vfx.dust(world, global_position, 0.6, Color(0.6, 0.56, 0.48))
 	_mark_death(element)
 	if element != "fire":   # a charred body's embers smoulder on
+		_frozen_dead = element == "cold"
 		_dying = Mats.own(_model)
 	if leader:
 		Vfx.burst(world, chest(), Color(0.7, 0.2, 1.0), 40)
@@ -356,6 +362,8 @@ func chant(curse: String, spot: Vector2i, marking: bool) -> void:
 	var spec: Dictionary = stats["leader"]
 	_chant_time = float(spec["mark"]) if marking and float(spec["mark"]) > 0.0 else float(spec["channel"])
 	_play("cast")
+	if _curse_glow.is_empty():
+		_curse_glow = Mats.own(_model, "mon_skull")
 	var at := world.level.tile_pos(spot)
 	var to := at - global_position
 	rotation.y = atan2(-to.x, -to.z)
@@ -385,6 +393,8 @@ func _resume() -> void:
 	_state = "walk"
 	_state_t = 0.0
 	_curse_target = null
+	for m in _curse_glow:
+		m.emission_energy_multiplier = Mats.GLOW
 	_play("walk")
 
 

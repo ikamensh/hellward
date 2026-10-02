@@ -4,19 +4,22 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from monsters import *  # noqa: F401,F403
+import numpy as np
 import sculpted
 
 K = 1.06
 HEIGHT = 1.15   # hoof to horn tip, standing in the A-pose it was generated in
 start()
 # material families, by the colours the generator painted them (tools/blender/clusters.py fallen 1.15 6)
-FAMILIES = {"skin": [(19.3, 25.9, 19.6), (26.6, 33.3, 25.4)], "leather": [(28.6, 9.0, 15.4)],
+FAMILIES = {"sole": lambda x, y, z, lab: np.clip((0.075 - z) / 0.015, 0, 1),   # the hooves, painted red with the legs
+            "skin": [(19.3, 25.9, 19.6), (26.6, 33.3, 25.4)], "leather": [(28.6, 9.0, 15.4)],
             "strap": [(18.8, 8.1, 11.3)], "hoof": [(9.8, 9.7, 8.7)], "horn": [(58.6, 10.2, 24.6)]}
 LOOKS = {   # a dry, dusty hide, never plastic: rough all over, mud up the shins
-    # bright enough that the crimson survives the blue moon (it was sRGB 0.17 on average and read black)
-    "skin": {"colour": sculpted.grade(sat=0.85, value=1.35, toward=(0.55, 0.06, 0.05), mix=0.3, mottle=0.14,
-                                      grime=0.45, knee=0.4),   # crimson, not salmon
-             "rough": lambda ao: 0.76 + 0.16 * (1 - ao)},
+    # oxblood crimson, the 2D Fallen's: dark (sRGB 0.17 read black under the moon, 1.35x read fire-orange)
+    "skin": {"colour": sculpted.grade(sat=0.75, value=1.15, toward=(0.42, 0.04, 0.04), mix=0.45, mottle=0.16,
+                                      grime=0.45, knee=0.4),
+             "rough": sculpted.hide_rough},
+    "sole": {"colour": sculpted.grade(sat=0.3, value=0.6, toward=(0.08, 0.07, 0.06), mix=0.8), "rough": 0.5},
     "leather": {"colour": sculpted.grade(sat=0.5, value=0.85, toward=(0.27, 0.25, 0.18), mix=0.75), "rough": 0.88},
     "strap": {"colour": sculpted.grade(sat=0.45, value=0.7, toward=(0.17, 0.14, 0.11), mix=0.7), "rough": 0.8},
     "hoof": {"colour": sculpted.grade(sat=0.4, value=0.7, grime=0.4, knee=0.1), "rough": 0.55},
@@ -134,10 +137,10 @@ LIE_KNIFE = frame_turn(BLADE, FACE, Vector((0.85, 0.5, 0.02)), Vector((0, 0, 1))
 
 
 def ready(p, t, pump=0.0):
-    """The knife held ready at the hip, edge down, point forward and a little up; `pump` swings the arm with the
-    stride (the walk's own arm swing stays under it)."""
-    p.rot("upper_arm.R", p=22 + 26 * pump * math.cos(TAU * t), r=6).rot("forearm.R", p=52 + 12 * pump * math.cos(TAU * t))
-    rig.orient(p, "hand.R", frame_turn(BLADE, FACE, Vector((0.12, 1, 0.3 + 0.12 * pump * math.cos(TAU * t))),
+    """The knife carried low at the hip as the 2D Fallen carries it, point forward and down; `pump` swings the arm
+    with the stride (the walk's own arm swing stays under it)."""
+    p.rot("upper_arm.R", p=8 + 26 * pump * math.cos(TAU * t), r=6).rot("forearm.R", p=38 + 12 * pump * math.cos(TAU * t))
+    rig.orient(p, "hand.R", frame_turn(BLADE, FACE, Vector((0.15, 0.85, -0.45 + 0.15 * pump * math.cos(TAU * t))),
                                        Vector((1, 0, 0))))
 
 

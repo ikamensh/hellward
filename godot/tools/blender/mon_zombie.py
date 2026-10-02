@@ -36,8 +36,8 @@ LOOKS = {
     # grave linen, brown with earth: apart from the green skin at a glance
     "linen": {"colour": sculpted.grade(sat=0.3, value=1.0, toward=(0.44, 0.36, 0.25), mix=0.65, mottle=0.14,
                                        scale=0.12, grime=0.45, knee=0.9), "rough": 0.95},
-    "iron": {"colour": sculpted.grade(sat=0.5, value=0.85, toward=(0.42, 0.3, 0.22), mix=0.35), "rough": 0.42,
-             "metal": 0.9},
+    "iron": {"colour": sculpted.grade(sat=0.5, value=1.1, toward=(0.42, 0.3, 0.22), mix=0.35), "rough": 0.42,
+             "metal": 0.55},
 }
 body = sculpted.prepare(
     "zombie", HEIGHT, yaw=180, faces=9000, families=FAMILIES, looks=LOOKS, fill=0.14)   # its eyes are the head's
@@ -137,8 +137,8 @@ def linen(co, thick):
 thick = sculpted.thickness(body)
 print("trimmed", sculpted.trim(body, np.array([v.co.z < 0.6 and linen(v.co, thick[v.index]) for v in body.data.vertices])),
       "linen vertices")
-print("thickened", sculpted.thicken(body, rig, ["thigh.R", "thigh.L"], 1.2, reach=0.14)
-      + sculpted.thicken(body, rig, ["shin.R", "shin.L"], 1.1, reach=0.1), "vertices")   # the concept's tree-trunk legs
+print("thickened", sculpted.thicken(body, rig, ["thigh.R", "thigh.L"], 1.35, reach=0.15)
+      + sculpted.thicken(body, rig, ["shin.R", "shin.L"], 1.3, reach=0.11), "vertices")   # the concept's tree-trunk legs
 # the generated head was a featureless sack: it is cut off at the jaw, and a head generated alone from its own
 # concept (art/gen/zombie_head: a face, milky eyes, a slack jaw, hair) is set on the neck once the rig is posed
 NECK_TOP = 1.74
@@ -186,7 +186,8 @@ sway = mocap.Clip.load("Zombie_ID", mocap.leg(rig)).loop(3.0)
 def walk(t):
     """The captured shamble, the head held up and out, the arms dragging a beat behind the body's sway and the gut
     settling at every footfall."""
-    own = Pose().rot("jaw", p=-14 - 8 * bump(t, 0.1, 0.4)).rot("neck", p=8).rot("head", r=10, p=6)
+    own = Pose().rot("jaw", p=-14 - 8 * bump(t, 0.1, 0.4)).rot("neck", p=8)
+    own.rot("head", r=10 + 9 * math.sin(TAU * (t - 0.2)), p=6 + 5 * math.cos(2 * TAU * (t - 0.15)))   # lolling
     own.rot("hips", r=5 * math.sin(TAU * t))   # the gut swung from side to side, a step at a time
     own.rot("spine", p=-6 + 2.5 * math.cos(2 * TAU * (t - 0.1)), r=-3 * math.sin(TAU * (t - 0.1)))
     own.rot("chest", p=-6)   # the trunk leaning out over it
@@ -219,13 +220,14 @@ def attack(t):
     base = stance()
     wind = stance().move("hips", y=-0.04 * H).rot("hips", p=4).rot("chest", p=12, y=-16, r=4)
     wind.rot("head", p=8, y=8).rot("jaw", p=-24)
-    wind.rot("upper_arm.R", p=80, r=-30).rot("forearm.R", p=50).rot("hand.R", p=20)
-    wind.rot("upper_arm.L", p=10).rot("forearm.L", p=10)
+    wind.rot("upper_arm.R", p=130, r=-10).rot("forearm.R", p=50).rot("hand.R", p=20)   # both fists hauled high
+    wind.rot("upper_arm.L", p=130, r=10).rot("forearm.L", p=50).rot("hand.L", p=20)
     strike = stance().move("hips", y=0.16 * H, z=-0.12 * H).rot("hips", p=-10)   # the weight dropped into it
     strike.rot("chest", p=-6, y=22).rot("neck", p=-4).rot("head", p=6, y=-8).rot("jaw", p=-34)
-    strike.q["upper_arm.R"], strike.q["forearm.R"] = Q(p=62, y=34), Q(p=8)
-    strike.rot("hand.R", p=-20)
-    strike.q["upper_arm.L"], strike.q["forearm.L"] = Q(p=104, y=-14), Q(p=10)
+    strike.q["upper_arm.R"], strike.q["forearm.R"] = Q(p=62, y=12), Q(p=8)   # and brought down together
+    strike.rot("hand.R", p=-20).rot("chest", p=-16)
+    strike.q["upper_arm.L"], strike.q["forearm.L"] = Q(p=62, y=-12), Q(p=8)
+    strike.rot("hand.L", p=-20)
     bite = strike.copy().rot("jaw", p=30).rot("head", p=-4)
     p = keyed(t, [(0.0, base, smooth), (0.36, wind, smooth), (0.52, strike, ease_in), (0.64, bite, ease_out),
                   (1.0, base, smooth)])
@@ -331,9 +333,11 @@ def die_down(t):
     """The second death, the strings cut: no flourish, it drops to its knees where it stands, sags, and keels
     over backward onto the ground."""
     knees, sag = kneel(), kneel(slump=1.0)
-    lie, bounce = corpse_back(), corpse_back(lift=0.04)
-    p = keyed(t, [(0.0, jolt(), ease_out), (0.24, knees, ease_in), (0.32, knees, smooth), (0.5, sag, smooth),
-                  (0.74, lie, ease_in), (0.84, bounce, ease_out), (1.0, lie, smooth)])
+    thud = knees.copy().move("hips", z=-0.05 * H).rot("chest", p=-10).rot("head", p=-12)   # the knees hit, the gut sags
+    lie, bounce = corpse_back(), corpse_back(lift=0.05)
+    p = keyed(t, [(0.0, jolt(), ease_out), (0.15, thud, ease_in), (0.23, knees, ease_out), (0.32, knees, smooth),
+                  (0.48, sag, smooth), (0.64, lie, ease_in), (0.72, bounce, ease_out), (0.82, lie, ease_in),
+                  (1.0, lie, smooth)])
     if t < 0.12:
         plant_legs(rig, p, FEET, pole_out=0.2)
     else:

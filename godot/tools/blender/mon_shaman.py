@@ -32,7 +32,17 @@ def feather_colour(rgb, pos):
 
 # material families: the crest by place (above the horns); the rest by the colours the generator painted
 # (tools/blender/clusters.py shaman 1.6 8): red skin, tan and brown hide and fur, light bone fetishes, dark hooves
+def war_paint(x, y, z, lab):
+    """The 2D shaman's white paint: three chevrons down its chest and a stripe under each eye (a share 0..1)."""
+    chest = (y > 0.0) & (np.abs(x) < 0.13)
+    stripes = sum(np.abs(z - (c + 0.35 * np.abs(x))) < 0.007 for c in (0.79, 0.84, 0.89))
+    cheeks = sum((np.abs(x - ex) < 0.009) & (z > 1.035) & (z < 1.072) & (y > ey - 0.025)
+                 for ex, ey in ((-0.04, 0.16), (-0.113, 0.09)))
+    return 1.0 * ((chest & (stripes > 0)) | (cheeks > 0))
+
+
 FAMILIES = {
+    "paint": war_paint,
     "crest": lambda x, y, z, lab: np.clip((z - 1.2) / 0.03, 0, 1) * (lab[..., 1] > 15),
     "skin": [(21.4, 23.7, 16.0), (27.6, 30.7, 22.1), (33.8, 49.3, 42.4)],
     "hide": [(26.3, 11.5, 13.2), (35.1, 11.2, 13.6)],
@@ -40,11 +50,13 @@ FAMILIES = {
     "hoof": [(17.8, 10.7, 11.0)],
 }
 LOOKS = {
+    "paint": {"colour": lambda rgb, pos: np.broadcast_to(np.array([0.6, 0.57, 0.5]), rgb.shape) * sculpted._mottle(pos, 0.03, 0.15),
+              "rough": 0.92},   # chalky
     "crest": {"colour": feather_colour, "rough": 0.8},
     # the Fallen's crimson (the generator painted the shaman browner): one family of imps
-    "skin": {"colour": sculpted.grade(sat=0.85, value=1.3, toward=(0.55, 0.06, 0.05), mix=0.4, mottle=0.14,
+    "skin": {"colour": sculpted.grade(sat=0.75, value=1.15, toward=(0.42, 0.04, 0.04), mix=0.5, mottle=0.16,
                                       grime=0.5, knee=0.45),
-             "rough": lambda ao: 0.76 + 0.16 * (1 - ao)},
+             "rough": sculpted.hide_rough},
     "hide": {"colour": sculpted.grade(sat=0.5, value=0.85, toward=(0.27, 0.23, 0.17), mix=0.6, mottle=0.1),
              "rough": 0.9},
     # old bone and faded paint: ochre-grey and grimy, never chalk white
@@ -253,34 +265,39 @@ def held(base):
 
 
 def cast(t):
-    """The curse, a ritual the whole battle can read: crouched over the staff, gathering; it rises onto its toes
-    and hauls the skull high over its head, head thrown back, the free claw raised to the sky, and holds it there
-    shaking while it chants; then drives the skull out at the cursed tower, the claw pointing after it; and sinks
-    to gather again."""
+    """The curse, a ritual the whole battle can read and nothing like its blow: crouched over the staff, gathering;
+    it rises with the skull hauled over its head and its free claw flung at the sky, then thrusts the skull out at
+    the cursed tower at arm's length and jabs it there, again and again, chanting, the crest flared; and sinks to
+    gather again."""
     gather = imp_stance(K).move("hips", z=-0.05 * K).rot("hips", p=-6).rot("chest", p=-12).rot("head", p=-12)
     gather.rot("jaw", p=-10).rot("crest", p=6)
     gather.rot("upper_arm.L", p=30, r=20).rot("forearm.L", p=70)
     rise = imp_stance(K).move("hips", z=0.04 * K).rot("hips", p=10).rot("spine", p=8).rot("chest", p=14)
     rise.rot("neck", p=8).rot("head", p=24).rot("jaw", p=-36).rot("crest", p=-14)
     rise.rot("upper_arm.L", p=150, r=-10).rot("forearm.L", p=20).rot("hand.L", p=-40)
-    thrust = imp_stance(K).move("hips", y=0.07 * K, z=-0.02 * K).rot("hips", p=-10).rot("chest", p=-16, y=10)
-    thrust.rot("head", p=-4).rot("jaw", p=-40).rot("crest", p=10)
-    thrust.rot("upper_arm.L", p=95, r=10).rot("forearm.L", p=5).rot("hand.L", p=10)
-    pump = rise.copy().move("hips", z=-0.05 * K).rot("chest", p=-8).rot("head", p=-12).rot("jaw", p=10)
-    p = keyed(t, [(0.0, gather, smooth), (0.22, rise, ease_out), (0.31, pump, ease_in), (0.4, rise, ease_out),
-                  (0.49, pump, ease_in), (0.58, rise, ease_out), (0.7, thrust, ease_in), (0.84, thrust, smooth),
-                  (1.0, gather, smooth)])
-    shake = bump(t, 0.22, 0.6)   # high, it trembles with the effort of the curse between the beats
-    p.rot("chest", r=3 * shake * math.sin(TAU * t * 14)).rot("head", y=5 * shake * math.sin(TAU * t * 9))
-    p.rot("jaw", p=-12 * abs(math.sin(TAU * t * 7)))   # the chant
+    thrust = imp_stance(K).move("hips", y=0.06 * K, z=-0.01 * K).rot("hips", p=-8).rot("chest", p=-10, y=12)
+    thrust.rot("head", p=4).rot("jaw", p=-38).rot("crest", p=-18)
+    thrust.rot("upper_arm.L", p=140, r=-14).rot("forearm.L", p=25).rot("hand.L", p=-30)
+    jab = thrust.copy().move("hips", y=0.06 * K, z=0.02 * K).rot("chest", p=-10, y=6).rot("head", p=8).rot("jaw", p=16)
+    jab.rot("crest", p=-10)
+    keys = [(0.0, gather, smooth), (0.14, rise, ease_out), (0.26, thrust, ease_in)]
+    for n, tk in enumerate((0.36, 0.46, 0.56, 0.66, 0.76)):
+        keys.append((tk, jab if n % 2 == 0 else thrust, ease_out if n % 2 == 0 else smooth))
+    keys += [(0.88, thrust, smooth), (1.0, gather, smooth)]
+    p = keyed(t, keys)
+    p.rot("jaw", p=-10 * abs(math.sin(TAU * t * 7)))   # the chant
     for s_, side in SIDES:
-        p.rot(f"ear.{side}", r=-s_ * 14 * bump(t, 0.2, 0.6))
+        p.rot(f"ear.{side}", r=-s_ * 14 * bump(t, 0.12, 0.9))
     low = (Vector((0.12, 0.24, 0.8)) * K, Vector((0.08, 0.45, 1)))
     high = (Vector((0.1, 0.1, 1.42)) * K, Vector((0.0, 0.15, 1)))
-    out = (Vector((0.08, 0.34, 1.12)) * K, Vector((0.05, 1, 0.5)))
-    beat = (high[0] - Vector((0, -0.04, 0.2)) * K, Vector((0.0, 0.35, 1)))   # each beat drives the skull down
-    wield(p, t, [(0.0, *low), (0.22, *high), (0.31, *beat), (0.4, *high), (0.49, *beat), (0.58, *high),
-                 (0.7, *out), (0.84, *out), (1.0, *low)])
+    # brandished up at the tower's top, the skull high in front, each jab a hand further out and higher
+    out = (Vector((0.06, 0.36, 1.2)) * K, Vector((0.05, 0.8, 1)))
+    stab = (Vector((0.06, 0.54, 1.3)) * K, Vector((0.05, 1, 0.8)))
+    staff = [(0.0, *low), (0.14, *high), (0.26, *out)]
+    for n, tk in enumerate((0.36, 0.46, 0.56, 0.66, 0.76)):
+        staff.append((tk, *(stab if n % 2 == 0 else out)))
+    staff += [(0.88, *out), (1.0, *low)]
+    wield(p, t, staff)
     plant_legs(rig, p, imp_feet(rig, K))
     return p
 

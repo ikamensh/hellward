@@ -40,6 +40,9 @@ func _ready() -> void:
 		print("animations: ", _player.get_animation_list())
 	if String(_args.get("anim", "")).begins_with("die"):
 		_dying = Mats.own(_model)
+	if _args.get("anim", "") == "cast":   # the skull flares while the curse is chanted, as in a battle
+		for m in Mats.own(_model, "mon_skull"):
+			m.emission_energy_multiplier = Mats.GLOW * 3.0
 	var box := _bounds(_model)
 	_centre = box.get_center()
 	_radius = max(box.size.length() * 0.5, 0.3)
