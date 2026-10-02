@@ -72,6 +72,10 @@ CONCEPTS: dict[str, tuple[str, str | None]] = {
                     "small human skull lashed on with leather cords, red cloth ribbons and a few feathers hanging "
                     "below the skull, a bone fetish tied halfway down. Standing upright, the whole staff in frame.",
                     None),
+    "skull": (PROP + "The skull on the Fallen Shaman's staff, alone: a human skull of old bleached bone, ivory "
+              "white with grey-brown grime in its cracks and sutures, deep dark eye sockets, a broken nose "
+              "cavity, a full row of worn upper teeth and the lower jaw still attached, slightly open. Seen from the "
+              "front and a little to its left, so the sockets, cheekbones and the jaw's depth all show.", None),
     "sword": (PROP + "The Skeleton's sword: an old rusted arming sword, notched and pitted blade, a simple iron "
               "crossguard, grip of rotten leather, round iron pommel. Standing upright, point down, the whole sword "
               "in frame.", None),

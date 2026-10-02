@@ -255,14 +255,14 @@ def smooth_normals(obj: bpy.types.Object, radius: float = 0.035) -> None:
 
 
 def prepare(kind: str, height: float, yaw: float = 0.0, glow=None, metal=None, rough=None, colour=None,
-            faces: int | None = None, families=None, looks=None, fill: float = 0.1) -> bpy.types.Object:
+            faces: int | None = None, families=None, looks=None, fill: float = 0.09, cavity: float = 0.45) -> bpy.types.Object:
     """The body stood in the model contract, its maps baked and written, its material named mon_<kind>. With
     HW_FAST=1 in the environment the maps already written are kept (fitting a rig needs no bake)."""
     import os
     obj, m = body(kind, height, yaw, faces)
     if not os.environ.get("HW_FAST"):
         write_maps(kind, obj, bake_detail(obj, kind, m), glow=glow, metal=metal, rough=rough, colour=colour,
-                   families=families, looks=looks, fill=fill)
+                   families=families, looks=looks, fill=fill, cavity=cavity)
     COLOURS[obj.name] = vertex_colours(obj)   # before the generator's material gives way to the library's
     name_material(obj, f"mon_{kind}")
     return obj
@@ -499,8 +499,10 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
         for name, w in share.items():
             look = looks[name]
             out_rgb += w[..., None] * np.clip(look["colour"](albedo[..., :3], pos), 0.0, 1.0)
-            r = look["rough"]
-            out_rough += w * (r(ao) if callable(r) else r)
+            r = look["rough"]   # a number, f(occlusion) or f(occlusion, rgb) (wet where the colour says wound)
+            if callable(r):
+                r = r(ao, albedo[..., :3]) if r.__code__.co_argcount == 2 else r(ao)
+            out_rough += w * r
             out_metal += w * look.get("metal", 0.0)
             print(f"family {name}: {w.mean() * 100:.0f}% of the texels")
         albedo[..., :3] = out_rgb
@@ -510,7 +512,7 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
         albedo[..., :3] = np.clip(colour(albedo[..., :3], hue, sat, val, pos), 0.0, 1.0)
     albedo[..., :3] *= (1.0 - cavity + cavity * ao)[..., None]
     albedo[..., :3] = np.minimum(albedo[..., :3], 0.8)   # no painted white: albedo stays under 0.8
-    for old in folder.glob("*.png*"):
+    for old in [*folder.glob("*.png*"), *folder.glob("emission.webp*")]:   # an older glow map would still glow
         old.unlink()
     save(albedo, folder / "albedo.webp", data=False)
     save(normal, folder / "normal.webp", data=True, lossless=True)
@@ -556,6 +558,21 @@ def name_material(obj: bpy.types.Object, name: str) -> None:
     """One material named for the library (mats.gd builds the textured one); the export carries no images."""
     obj.data.materials.clear()
     obj.data.materials.append(lib.material(name))
+
+
+def trim(obj: bpy.types.Object, doomed: np.ndarray) -> int:
+    """Delete the vertices of `obj` flagged in `doomed` (one per vertex: a part to be replaced or shortened).
+    Returns how many."""
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.verts.ensure_lookup_table()
+    gone = [bm.verts[i] for i in np.flatnonzero(doomed)]
+    bmesh.ops.delete(bm, geom=gone, context="VERTS")
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+    return len(gone)
 
 
 def snap(obj: bpy.types.Object, guess, radius: float) -> Vector:
@@ -710,10 +727,20 @@ def hold(obj: bpy.types.Object, rig, bone: str, grip, axis, flat, at, toward, fa
     carried back to the bound rest and given wholly to `bone`."""
     from monsters import frame_turn
     q = frame_turn(axis, flat, toward, facing)
-    m = Matrix.Translation(Vector(at)) @ q.to_matrix().to_4x4() @ Matrix.Translation(-Vector(grip))
+    attach(obj, rig, bone, Matrix.Translation(Vector(at)) @ q.to_matrix().to_4x4() @ Matrix.Translation(-Vector(grip)))
+
+
+def attach(obj: bpy.types.Object, rig, bone: str, m: Matrix = Matrix.Identity(4)) -> None:
+    """Moved by `m` into the posing rest (Rig.repose), `obj` is carried back to the bound rest and given wholly to
+    `bone` (a prop in a hand, a crest on a head)."""
     unfix = rig.unfix[bone] if getattr(rig, "unfix", None) else Matrix.Identity(4)
     obj.data.transform(unfix @ m)
     obj.data.update()
+    give(obj, rig, bone)
+
+
+def give(obj: bpy.types.Object, rig, bone: str) -> None:
+    """`obj`, made where it sits on the bound body, given wholly to `bone`."""
     g = obj.vertex_groups.new(name=bone)
     g.add(list(range(len(obj.data.vertices))), 1.0, "REPLACE")
     obj.parent = rig.obj
@@ -739,49 +766,30 @@ def _skin_red(hue, sat):
     return (((hue < 18) | (hue > 340)) & (sat > 0.45))[..., None]
 
 
-def imp_colour(rgb, hue, sat, val, pos):
-    """The 2D game's brick red: the generator's crimson desaturated and darkened, blotched; bone (horns, claws,
-    teeth) a dull dirty ivory, not a bright cream."""
-    skin = _skin_red(hue, sat)
-    brick = (_grey(rgb) + (rgb - _grey(rgb)) * 0.62) * 0.82 * _mottle(pos)
-    bone = (((hue > 20) & (hue < 60)) & (val > 0.4))[..., None]
-    dull = (_grey(rgb) + (rgb - _grey(rgb)) * 0.6) * 0.72
-    return np.where(skin, brick, np.where(bone, dull, rgb * 0.92))
-
-
-def imp_hide(hue, sat, val, rough, ao):
-    """The imps' hide is leathery: matte, a little sheen on the swells only; leather, bone and feathers matte."""
-    skin = ((hue < 18) | (hue > 340)) & (sat > 0.45)
-    return np.where(skin, 0.58 + 0.17 * (1.0 - ao), np.maximum(rough, 0.7))
+def wounds(rgb) -> np.ndarray:
+    """Where the generator painted open wounds and sores: dark, saturated red."""
+    hue, sat, val = _hsv(rgb)
+    return ((hue < 20) | (hue > 300)) & (sat > 0.45) & (val < 0.4)
 
 
 def corpse_colour(rgb, hue, sat, val, pos):
-    """A cold grey-violet corpse (the concept), its wounds left dark and red, its linen a dirty grey."""
-    wound = ((((hue < 20) | (hue > 300)) & (sat > 0.45) & (val < 0.4)))[..., None]
+    """A sickly olive corpse, bruised violet in blotches: yellow enough that the blue moon leaves it green, not
+    grey-blue (docs/monsters.md L3); its wounds dark, wet red."""
     g = _grey(rgb)
-    cold = (g + (rgb - g) * 0.3) * np.array([0.9, 1.02, 0.95]) * _mottle(pos, 0.09, 0.14)
-    return np.where(wound, rgb * 0.9, cold)
-
-
-def corpse(hue, sat, val, rough, ao):
-    """Rotting flesh: wet in its wounds and sores, clammy and dull elsewhere, the linen matte."""
-    wet = (((hue < 20) | (hue > 300)) & (sat > 0.45) & (val < 0.4))
-    return np.where(wet, 0.25, np.where(sat < 0.3, 0.92, 0.66 + 0.15 * (1.0 - ao)))
+    sick = (g + (rgb - g) * 0.1) * np.array([0.95, 1.04, 0.66]) * _mottle(pos, 0.09, 0.16)   # no painted cyan
+    bruise = np.clip(_mottle(pos, 0.05, 1.0) - 1.6, 0, 0.4)[..., :1] / 0.4   # a few violet blotches
+    sick = sick * (1 - 0.5 * bruise) + g * np.array([0.75, 0.55, 0.85]) * 0.5 * bruise
+    return np.where(wounds(rgb)[..., None], rgb * np.array([0.8, 0.55, 0.55]), sick)
 
 
 def bone_colour(rgb, hue, sat, val, pos):
-    """Pale old ivory bone that holds its own against the dark ground; rusted iron and the cloth a grade duller."""
+    """Old yellowed bone stained with grave dirt (darker than chalk, so it holds against pale cobbles too); rusted
+    iron and the cloth a grade duller."""
     boneish = (((hue > 15) & (hue < 60)) & (sat < 0.65) & (val > 0.12))[..., None]
     g = _grey(rgb)
-    ivory = np.clip(g * 1.7, 0.0, 0.62) * np.array([1.0, 0.93, 0.8]) * _mottle(pos, 0.05, 0.08)
+    ivory = np.clip(g * 1.4, 0.0, 0.52) * np.array([1.0, 0.88, 0.68]) * _mottle(pos, 0.05, 0.14)
     red = _skin_red(hue, sat)
     return np.where(red, (g + (rgb - g) * 0.7) * 0.85, np.where(boneish, ivory, rgb))
-
-
-def bones(hue, sat, val, rough, ao):
-    """Old bone is dry and matte; the crimson cloth matte."""
-    red = ((hue < 15) | (hue > 340)) & (sat > 0.4)
-    return np.where(red, 0.92, 0.72 + 0.1 * (1.0 - ao))
 
 
 def weathered(rgb, hue, sat, val, pos):
@@ -853,9 +861,14 @@ def kmeans(x: np.ndarray, k: int, seed: int = 1, rounds: int = 40) -> np.ndarray
     return c[np.argsort(c[:, 0])]   # darkest first
 
 
-def grade(sat: float = 1.0, value: float = 1.0, toward=None, mix: float = 0.0, mottle: float = 0.0, scale: float = 0.07):
+DIRT = np.array((0.16, 0.11, 0.07))   # the dried mud a walker's legs gather
+
+
+def grade(sat: float = 1.0, value: float = 1.0, toward=None, mix: float = 0.0, mottle: float = 0.0, scale: float = 0.07,
+          grime: float = 0.0, knee: float = 0.5):
     """A family's colour: saturation and value scaled, pulled `mix` of the way toward the colour `toward` (keeping
-    the painting's light and dark), blotched by `mottle`."""
+    the painting's light and dark), blotched by `mottle`, and dirtied with mud up from the ground: `grime` of the
+    way at the soles, fading out by `knee` metres up."""
     def fn(rgb, pos):
         g = _grey(rgb)
         out = (g + (rgb - g) * sat) * value
@@ -864,6 +877,9 @@ def grade(sat: float = 1.0, value: float = 1.0, toward=None, mix: float = 0.0, m
             out = out * (1 - mix) + (t * (g / max(float(np.mean(t)), 1e-3))) * mix
         if mottle:
             out = out * _mottle(pos, scale, mottle)
+        if grime:
+            w = grime * np.clip(1.0 - pos[..., 2:3] / knee, 0.0, 1.0) ** 1.5 * _mottle(pos, 0.05, 0.5)
+            out = out * (1 - w) + DIRT * (0.6 + g) * w
         return out
     return fn
 

@@ -13,6 +13,7 @@ var _cam: Camera3D
 var _frame := 0
 var _centre := Vector3.ZERO
 var _radius := 1.0
+var _dying: Array[ORMMaterial3D] = []   # a death's eyes go out as they do in a battle (Mats.eyes_out)
 
 
 func _ready() -> void:
@@ -27,10 +28,18 @@ func _ready() -> void:
 	_model = doc.generate_scene(state)
 	add_child(_model)
 	Mats.apply(_model)
+	var kind := String(_args["model"]).get_file().get_basename().trim_prefix("mon_")
+	if Monster.RIM.has(kind):   # a monster wears its battle overlay (its kind's rim)
+		var dead := String(_args.get("anim", "")).begins_with("die")
+		var overlay := Monster.overlay(Color.BLACK if dead else Monster.RIM[kind])   # the dead lose their rim
+		for mi in _model.find_children("*", "MeshInstance3D", true, false):
+			(mi as MeshInstance3D).material_overlay = overlay
 	var players := _model.find_children("*", "AnimationPlayer", true, false)
 	if players.size() > 0:
 		_player = players[0]
 		print("animations: ", _player.get_animation_list())
+	if String(_args.get("anim", "")).begins_with("die"):
+		_dying = Mats.own(_model)
 	var box := _bounds(_model)
 	_centre = box.get_center()
 	_radius = max(box.size.length() * 0.5, 0.3)
@@ -66,8 +75,14 @@ func _place_camera(i: int) -> void:
 		_player.play(_args["anim"])
 		_player.seek(anim.length * float(i % views) / views, true)
 		_player.pause()
+		Mats.eyes_out(_dying, anim.length * float(i % views) / views)
 	else:
 		yaw += 360.0 * float(i % views) / views
+		var idle := Models.anim_name(_player, "idle") if _player != null else ""
+		if idle != "":   # a turntable shows the body as the game does, in its idle stance, never the bind pose
+			_player.play(idle)
+			_player.seek(0.0, true)
+			_player.pause()
 	var pitch := deg_to_rad(float(_args.get("pitch", "25")))
 	var dist := float(_args.get("dist", "0"))
 	if dist <= 0.0:

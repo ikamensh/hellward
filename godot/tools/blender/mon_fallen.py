@@ -12,32 +12,49 @@ start()
 # material families, by the colours the generator painted them (tools/blender/clusters.py fallen 1.15 6)
 FAMILIES = {"skin": [(19.3, 25.9, 19.6), (26.6, 33.3, 25.4)], "leather": [(28.6, 9.0, 15.4)],
             "strap": [(18.8, 8.1, 11.3)], "hoof": [(9.8, 9.7, 8.7)], "horn": [(58.6, 10.2, 24.6)]}
-LOOKS = {
-    "skin": {"colour": sculpted.grade(sat=0.62, value=0.8, mottle=0.12), "rough": lambda ao: 0.6 + 0.2 * (1 - ao)},
+LOOKS = {   # a dry, dusty hide, never plastic: rough all over, mud up the shins
+    "skin": {"colour": sculpted.grade(sat=0.62, value=0.8, mottle=0.14, grime=0.5, knee=0.4),
+             "rough": lambda ao: 0.76 + 0.16 * (1 - ao)},
     "leather": {"colour": sculpted.grade(sat=0.5, value=0.85, toward=(0.27, 0.25, 0.18), mix=0.75), "rough": 0.88},
     "strap": {"colour": sculpted.grade(sat=0.45, value=0.7, toward=(0.17, 0.14, 0.11), mix=0.7), "rough": 0.8},
-    "hoof": {"colour": sculpted.grade(sat=0.4, value=0.7), "rough": 0.4},
+    "hoof": {"colour": sculpted.grade(sat=0.4, value=0.7, grime=0.4, knee=0.1), "rough": 0.55},
     "horn": {"colour": sculpted.grade(sat=0.55, value=0.75, mottle=0.1, scale=0.03), "rough": 0.65},
 }
-body = sculpted.prepare("fallen", HEIGHT, yaw=180, families=FAMILIES, looks=LOOKS, faces=7000,
-                        glow={"eyes": [(0.062, 0.2, 0.955), (-0.048, 0.2, 0.955)], "radius": 0.014})   # the yellow eyes glow (found before the reshape)
+body = sculpted.prepare("fallen", HEIGHT, yaw=180, families=FAMILIES, looks=LOOKS, faces=7000, cavity=0.6,
+                        glow={"eyes": [(0.062, 0.2, 0.955), (-0.048, 0.2, 0.955)], "radius": 0.012})   # the yellow eyes glow (found before the reshape)
 
 
-# the 2D Fallen's proportions: a head a third bigger than the generator made it, and ears half as long again
-HEAD = sculpted.grow((0, 0.05, 0.86), 1.3, 0.83, 0.9)
+# the 2D Fallen's proportions: squat and heavy-headed. The head nearly half as big again as the generator made it,
+# the legs shorter, the shoulders broader, then the whole a little larger so it stands as tall as before
+HEAD = sculpted.grow((0, 0.05, 0.86), 1.45, 0.83, 0.9)
+SHINS = (0.08, 0.5, 0.92)   # the shins and thighs between these heights shortened to this share
+SCALE = 1.0
 
 
 def EARS(p):
-    """Stretch each ear out from its root along x, the further out the more."""
+    """Each ear a little longer than generated, swept back toward its tip and cupped (its top and bottom edges
+    turned forward): a flat sheet vanishes edge-on, a cupped one still shows its curve from the side."""
     if p.z < 0.9 or abs(p.x) < 0.1:
         return p
     root = 0.1 * math.copysign(1, p.x)
-    k = sculpted.smooth((abs(p.x) - 0.1) / 0.05)
-    return Vector((root + (p.x - root) * (1 + 0.5 * k), p.y, p.z + (p.z - 0.95) * 0.3 * k))
+    u = abs(p.x) - 0.1
+    k = sculpted.smooth(u / 0.05)
+    mid = 0.95 + 0.6 * u   # the ear's middle line rises toward the tip
+    dz = p.z - mid
+    return Vector((root + (p.x - root) * (1 + 0.15 * k), p.y - 0.3 * u * k + 9.0 * dz * dz * k,
+                   p.z + (p.z - 0.95) * 0.3 * k))
+
+
+def BUILD(p):
+    """Shorter legs (everything above them comes down), shoulders and chest broader."""
+    lo, hi, share = SHINS
+    z = p.z if p.z < lo else lo + (min(p.z, hi) - lo) * share + max(p.z - hi, 0.0)
+    w = sculpted.smooth((p.z - 0.55) / 0.12) * (1 - sculpted.smooth((p.z - 0.86) / 0.06))
+    return Vector((p.x * (1 + 0.12 * w), p.y, z)) * SCALE
 
 
 def SHAPE(p):
-    return HEAD(EARS(p))
+    return BUILD(HEAD(EARS(p)))
 
 
 sculpted.reshape(body, SHAPE)
@@ -82,6 +99,11 @@ rig.bone("skirt.F", (0, 0.06, 0.6), (0, 0.08, 0.38), "hips")
 rig.bone("skirt.B", (0, -0.14, 0.6), (0, -0.16, 0.36), "hips")
 rig.build()
 rig.obj.data.bones["eyes"].use_deform = False
+# the 2D Fallen's heavy forearms and thick legs, where the generator made them thin
+ARMS = [f"{b}.{side}" for b in ("upper_arm", "forearm") for _, side in SIDES]
+LEGS = [f"{b}.{side}" for b in ("thigh", "shin") for _, side in SIDES]
+print("thickened", sculpted.thicken(body, rig, ARMS, 1.4, reach=0.06) + sculpted.thicken(body, rig, LEGS, 1.25, reach=0.07),
+      "vertices")
 
 
 def leather(hsv):
@@ -98,36 +120,46 @@ rig.springs = {"ear.R": (90.0, 0.3), "ear.L": (90.0, 0.3)}   # the ears flop aft
 rig.springs.update({"skirt.F": (45.0, 0.3, 0.7), "skirt.B": (45.0, 0.3, 0.7)})   # cloth hangs and swings
 
 # the knife in the right fist, blade forward and its curved edge down
-knife, kf = sculpted.prop("kukri", 0.42, families={"blade": lambda x, y, z, lab: 1.0 * (z > 0.15), "hilt": "rest"},
+knife, kf = sculpted.prop("kukri", 0.56, families={"blade": lambda x, y, z, lab: 1.0 * (z > 0.15), "hilt": "rest"},
                           looks={"blade": sculpted.STEEL,
                                  "hilt": {"colour": sculpted.grade(sat=0.45, value=0.8, toward=(0.2, 0.15, 0.1), mix=0.5),
                                           "rough": 0.8}})
-grip = sculpted.snap(knife, kf["centre"] - kf["axis"] * 0.13, 0.04)
+grip = sculpted.snap(knife, kf["centre"] - kf["axis"] * 0.175, 0.04)
 fist = rig.head["hand.R"].lerp(rig.tail["hand.R"], 0.45)
 BLADE, FACE = Vector((0, 1, -0.3)).normalized(), Vector((1, 0, 0))   # in the right hand's rest frame
 sculpted.hold(knife, rig, "hand.R", grip, kf["axis"], kf["flat"], fist, BLADE, FACE)
 LIE_KNIFE = frame_turn(BLADE, FACE, Vector((0.85, 0.5, 0.02)), Vector((0, 0, 1)))   # dropped flat by the hand
 
 
+def ready(p, t, pump=0.0):
+    """The knife held ready at the hip, edge down, point forward and a little up; `pump` swings the arm with the
+    stride (the walk's own arm swing stays under it)."""
+    p.rot("upper_arm.R", p=22 + 10 * pump * math.cos(TAU * t), r=6).rot("forearm.R", p=52)
+    rig.orient(p, "hand.R", frame_turn(BLADE, FACE, Vector((0.12, 1, 0.3 + 0.12 * pump * math.cos(TAU * t))),
+                                       Vector((1, 0, 0))))
+
+
 def attack(t):
     """Knife raised high behind the head, a lunging slash down and across, back to the crouch."""
     base = imp_stance(K)
+    ready(base, 0.0)
     wind = imp_stance(K).move("hips", y=-0.03, z=0.015).rot("hips", p=4)
     wind.rot("spine", y=-8).rot("chest", p=14, y=-18).rot("head", p=4, y=8).rot("jaw", p=-14)
     wind.rot("upper_arm.R", p=130, r=-40).rot("forearm.R", p=75).rot("hand.R", p=-35)
     wind.rot("upper_arm.L", p=45, r=10).rot("forearm.L", p=25)
     wind.rot("ear.R", r=-14).rot("ear.L", r=14)
-    strike = imp_stance(K).move("hips", y=0.07, z=-0.03).rot("hips", p=-10)
-    strike.rot("spine", y=10).rot("chest", p=-18, y=22).rot("head", p=-4).rot("jaw", p=-26)
-    strike.rot("upper_arm.R", p=60, r=18).rot("forearm.R", p=8).rot("hand.R", p=-20)
-    strike.rot("upper_arm.L", p=-25, r=20).rot("forearm.L", p=30)
-    follow = strike.copy().rot("chest", y=8, p=-4).rot("upper_arm.R", p=-35, r=12).rot("forearm.R", p=20)
-    follow.rot("hand.R", p=-10)
+    # the strike lunges a long step in and drives the knife out level with a man's belly in front of it
+    strike = imp_stance(K).move("hips", y=0.15, z=-0.02).rot("hips", p=-4)
+    strike.rot("spine", y=10, p=4).rot("chest", p=-4, y=22).rot("head", p=-8).rot("jaw", p=-26)
+    strike.rot("upper_arm.R", p=112, r=14).rot("forearm.R", p=6).rot("hand.R", p=-10)
+    strike.rot("upper_arm.L", p=-35, r=24).rot("forearm.L", p=30)
+    follow = strike.copy().rot("chest", y=10, p=-2).rot("upper_arm.R", p=-12, r=16).rot("forearm.R", p=14)
+    follow.rot("hand.R", p=-6)
     p = keyed(t, [(0.0, base, smooth), (0.36, wind, smooth), (0.5, strike, ease_in), (0.62, follow, ease_out),
                   (1.0, base, smooth)])
     # the blade leads: up and back over the shoulder, then driven forward and down at the target's chest
-    aims = [(0.0, None), (0.36, Vector((0.1, -0.5, 1))), (0.5, Vector((0.05, 0.9, -0.35))),
-            (0.62, Vector((-0.3, 0.7, -0.6))), (1.0, None)]
+    aims = [(0.0, None), (0.36, Vector((0.1, -0.5, 1))), (0.5, Vector((0.05, 1.0, 0.12))),
+            (0.62, Vector((-0.45, 0.9, 0.0))), (1.0, None)]
     rest_dir = rig.turn(base, "hand.R") @ BLADE
     for (t0, a0), (t1, a1) in zip(aims, aims[1:]):
         if t0 <= t <= t1:
@@ -138,19 +170,22 @@ def attack(t):
     feet = imp_feet(rig, K)
     lunge = smooth((t - 0.36) / 0.14) * (1 - smooth((t - 0.62) / 0.38))
     a, pitch, yaw = feet["L"]
-    feet["L"] = (a + Vector((0, 0.07 * lunge, 0.05 * bump(t, 0.36, 0.5))), pitch, yaw)
+    feet["L"] = (a + Vector((0, 0.17 * lunge, 0.06 * bump(t, 0.36, 0.5))), pitch, yaw)
     plant_legs(rig, p, feet)
     return p
 
 
-rig.action("idle", 2.0, lambda t: imp_idle(rig, K, t, crouch=1.0), loop=True)
-rig.action("walk", 0.6, lambda t: imp_walk(rig, K, t, stride=0.11, crouch=1.0), loop=True)   # short quick steps
+rig.action("idle", 2.0, lambda t: imp_idle(rig, K, t, crouch=0.7, hold=ready), loop=True)
+# short quick steps, bouncing: a scurry, not a stroll
+rig.action("walk", 0.5, lambda t: imp_walk(rig, K, t, stride=0.1, crouch=0.7, bob=0.04,
+                                           hold=lambda p, t: ready(p, t, pump=1.0)), loop=True)
 rig.action("attack", 0.7, attack)
-rig.action("hit", 0.35, lambda t: imp_hit(rig, K, t))
-rig.action("die", 1.2, lambda t: imp_die(rig, K, t, foot_pitch=(55.0, 85.0), hand_r=LIE_KNIFE, wrist_z=0.07), ground_from=0.2, body=body)
-rig.action("die2", 1.3, lambda t: imp_die_forward(rig, K, t, hand_r=LIE_KNIFE), ground_from=0.2, body=body)
+rig.action("die", 1.2, lambda t: imp_die(rig, K, t, foot_pitch=(55.0, 85.0), hand_r=LIE_KNIFE, wrist_z=0.07), ground_from=0.0, body=body)
+rig.action("die2", 1.3, lambda t: imp_die_forward(rig, K, t, hand_r=LIE_KNIFE), ground_from=0.0, body=body)
 rig.report(body)
 rig.extremes(body, "die")
-print(f"walk ground speed {walk_speed(0.11 * K, IMP_DUTY, 0.6):.2f} m/s")
+rig.extremes(body, "walk", 8)
+rig.extremes(body, "attack", 11)
+print(f"walk ground speed {walk_speed(0.1 * K, IMP_DUTY, 0.5):.2f} m/s")
 fx("fx_head", (0, 0.1, HEIGHT + 0.15), rig)
 export("mon_fallen")

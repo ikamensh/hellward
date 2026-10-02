@@ -106,6 +106,7 @@ static func _make(key: String) -> Material:
 # the colour a monster's flesh shows lit from behind (the imps' thin ears and fingers glow red against a fire).
 # Screen-space subsurface scattering looked softer but cost 2 ms with a wave on screen; the backlight is free.
 const FLESH := {"mon_fallen": Color(0.55, 0.06, 0.02), "mon_shaman": Color(0.55, 0.06, 0.02),
+	"mon_shaman_crest": Color(0.5, 0.1, 0.02),
 	"mon_zombie": Color(0.16, 0.18, 0.1)}
 
 
@@ -139,8 +140,32 @@ static func monster(kind: String) -> ORMMaterial3D:
 	if ResourceLoader.exists(dir + "emission.webp"):   # eyes, embers
 		m.emission_enabled = true
 		m.emission_texture = load(dir + "emission.webp")
-		m.emission_energy_multiplier = 7.0   # bright enough to bloom: eyes are what reads from the battle camera
+		m.emission_energy_multiplier = GLOW
 	return m
+
+
+const GLOW := 5.0        # a monster's eyes: bright enough to bloom a little, as they read from the battle camera
+const GLOW_OUT := 0.45   # seconds a dead monster's eyes take to go out
+
+
+## A dead body's own copies of its monster materials, so its eyes go out alone (`eyes_out`).
+static func own(root: Node) -> Array[ORMMaterial3D]:
+	var mats: Array[ORMMaterial3D] = []
+	for node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		for i in mi.mesh.get_surface_count():
+			var m := mi.get_surface_override_material(i) as ORMMaterial3D
+			if m != null and m.resource_name.begins_with("mon_") and m.emission_enabled:
+				m = m.duplicate() as ORMMaterial3D
+				mi.set_surface_override_material(i, m)
+				mats.append(m)
+	return mats
+
+
+## The glow left in a body's eyes `t` seconds after it died: gone after GLOW_OUT, quickest at first.
+static func eyes_out(mats: Array[ORMMaterial3D], t: float) -> void:
+	for m in mats:
+		m.emission_energy_multiplier = GLOW * pow(clampf(1.0 - t / GLOW_OUT, 0.0, 1.0), 2.0)
 
 
 # a pack is not cloned: each monster wears one of these tints of its kind's maps (Mats.vary)

@@ -2,9 +2,9 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c76rxwto1rjs8"
-path.s3tc="res://.godot/imported/emission.webp-f66e9e6450a3c8e136355fa8be2ee817.s3tc.ctex"
-path.etc2="res://.godot/imported/emission.webp-f66e9e6450a3c8e136355fa8be2ee817.etc2.ctex"
+uid="uid://20kvdbvr0yrs"
+path.s3tc="res://.godot/imported/normal.webp-92c85719f2eddc0a2ab56bf16eeea310.s3tc.ctex"
+path.etc2="res://.godot/imported/normal.webp-92c85719f2eddc0a2ab56bf16eeea310.etc2.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
@@ -12,8 +12,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/textures/mon_skull_staff/emission.webp"
-dest_files=["res://.godot/imported/emission.webp-f66e9e6450a3c8e136355fa8be2ee817.s3tc.ctex", "res://.godot/imported/emission.webp-f66e9e6450a3c8e136355fa8be2ee817.etc2.ctex"]
+source_file="res://assets/textures/mon_skull/normal.webp"
+dest_files=["res://.godot/imported/normal.webp-92c85719f2eddc0a2ab56bf16eeea310.s3tc.ctex", "res://.godot/imported/normal.webp-92c85719f2eddc0a2ab56bf16eeea310.etc2.ctex"]
 
 [params]
 
@@ -23,9 +23,9 @@ compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
-compress/normal_map=2
+compress/normal_map=1
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

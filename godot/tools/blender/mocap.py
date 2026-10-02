@@ -222,10 +222,11 @@ class Cycle:
         j = min(i + 1, n)
         return {k: Vector(tuple(v[i] * (1 - w) + v[j] * w)) for k, v in self.track.items()}
 
-    def pose(self, rig: Rig, t: float, base: Pose | None = None, arms: float = 1.0, own=()) -> Pose:
+    def pose(self, rig: Rig, t: float, base: Pose | None = None, arms: float = 1.0, own=(), apart: float = 0.0) -> Pose:
         """The rig's pose at cycle time t. `base` turns bones further on top of the capture (a monster's own
         hunch, head tilt, jaw); `arms` scales the arms' swing away from hanging straight down; bones in `own` take
-        `base`'s turn instead of the capture's (an arm holding a shield up)."""
+        `base`'s turn instead of the capture's (an arm holding a shield up); `apart` keeps each ankle at least that
+        far to its own side of the hips (a performer who crosses their feet on one line)."""
         P = self.at(t)
         extra = base.q if base is not None else {}
         p = Pose()
@@ -260,6 +261,9 @@ class Cycle:
             ankle = P[f"{c}Ankle"].copy()
             # the performer's ankle stands lower or higher than the rig's: planted, it stands where the rig's does
             ankle.z += rig.head[f"foot.{side}"].z - self.ground[c]
+            if apart:
+                mid = P["Hips"].x
+                ankle.x = mid + s * max(s * (ankle.x - mid), apart)
             pole = P[f"{c}Knee"] - (P[f"{c}Hip"] + P[f"{c}Ankle"]) / 2
             rig.reach(p, f"thigh.{side}", f"shin.{side}", ankle, pole)
             q_foot = self.flat[c].rotation_difference(P[f"{c}Toe"] - P[f"{c}Ankle"])

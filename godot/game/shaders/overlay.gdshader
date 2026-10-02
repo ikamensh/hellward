@@ -12,6 +12,7 @@ uniform float curse = 0.0;
 uniform vec3 kind_rim = vec3(0.0);
 uniform float xray = 0.0;
 uniform float moonrim = 0.0;   // a cool rim from above at every distance, so dark bodies keep their shape
+uniform float kindglow = 0.0;  // a faint rim in the kind's own colour, at range: a red hide stays red under the moon
 uniform vec3 tint = vec3(0.0);   // a stand-in's colour wash, while its kind borrows another's model
 uniform sampler2D depth_tex : hint_depth_texture, filter_nearest;
 
@@ -39,6 +40,8 @@ void fragment() {
 		c += vec3(0.6, 0.15, 1.0) * curse * (0.08 + rim * 1.6) * pulse;
 		float up = clamp((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y * 0.6 + 0.4, 0.0, 1.0);
 		c += vec3(0.32, 0.45, 0.75) * moonrim * rim * up;
+		// from the battle camera only: close up the body's own light and maps carry its colour
+		c += kind_rim * kindglow * rim * (0.6 + 0.4 * up) * smoothstep(5.0, 16.0, length(VERTEX));
 		c += tint * (0.12 + rim * 0.5);
 		ALBEDO = c;
 	}

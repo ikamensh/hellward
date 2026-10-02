@@ -27,9 +27,9 @@ func _ready() -> void:
 		add_child(env)
 	else:
 		Atmosphere.night(self)
-		for side in [-1.0, 1.0]:
-			var fire := Fx.fire_light(9.0, 11.0, true)
-			fire.position = Vector3(side * 5.0, 1.6, 3.0)
+		for side in [-1.0, 1.0]:   # off to the sides, as braziers stand along a street, not over the walkers
+			var fire := Fx.fire_light(6.0, 11.0, true)
+			fire.position = Vector3(side * 7.0, 1.6, 1.0)
 			add_child(fire)
 	var floor := MeshInstance3D.new()
 	var pm := PlaneMesh.new()
@@ -74,11 +74,11 @@ func _ready() -> void:
 				black.albedo_color = Color.BLACK
 				(mi as MeshInstance3D).material_override = black
 			else:
-				var overlay := ShaderMaterial.new()
-				overlay.shader = preload("res://shaders/overlay.gdshader")
-				overlay.set_shader_parameter("kind_rim", Monster.RIM[kind])
-				overlay.set_shader_parameter("xray", 0.0 if _args.has("noxray") else 1.0)
-				overlay.set_shader_parameter("moonrim", float(_args.get("moonrim", "0.12")))
+				var overlay := Monster.overlay(Monster.RIM[kind])
+				if _args.has("noxray"):
+					overlay.set_shader_parameter("xray", 0.0)
+				if _args.has("moonrim"):
+					overlay.set_shader_parameter("moonrim", float(_args["moonrim"]))
 				(mi as MeshInstance3D).material_overlay = overlay
 		var player := Models.player(body)
 		var anim := Models.anim_name(player, _args.get("anim", "walk"))

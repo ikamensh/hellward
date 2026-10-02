@@ -1,5 +1,5 @@
 #!/bin/sh
-# One sheet reviewing a monster: tools/review.sh MODEL OUT.png [yaw=200] [pitch=15] [views=6] [anims="idle walk attack hit die"]
+# One sheet reviewing a monster: tools/review.sh MODEL OUT.png [yaw=200] [pitch=15] [views=6] [anims="idle walk attack die"]
 # Each row is one animation sampled `views` times across its length, from the front three-quarters, under game
 # light (game/scripts/preview.gd). MODEL is a name in game/assets/models or a path to a .glb.
 set -e
@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 model=$1; out=$2; shift 2
 case "$model" in *.glb) ;; *) model="game/assets/models/$model.glb" ;; esac
 model=$(cd "$(dirname "$model")" && pwd)/$(basename "$model")
-yaw=200; pitch=15; views=6; anims="idle walk attack hit die cast"
+yaw=200; pitch=15; views=6; anims="idle walk attack die cast"
 for a in "$@"; do case "$a" in yaw=*) yaw=${a#yaw=} ;; pitch=*) pitch=${a#pitch=} ;; views=*) views=${a#views=} ;;
   anims=*) anims=${a#anims=} ;; esac; done
 tmp=$(mktemp -d /tmp/hw3d-review.XXXXXX)

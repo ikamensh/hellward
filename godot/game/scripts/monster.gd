@@ -7,9 +7,10 @@ extends Node3D
 # kinds with a model of their own; the others wear the nearest one, tinted and sized (`STAND_INS`) until theirs exist
 const HEIGHTS := {"fallen": 1.2, "shaman": 1.75, "zombie": 1.9, "skeleton": 1.85}
 const BODY := 1.3                    # bodies a size up from life, so they read from the battle camera
-# each kind's rim, faint and only at a distance: Fallen ember, Shaman violet, Zombie grave-green, Skeleton bone
+# each kind's rim (and its x-ray behind a tower): Fallen ember, Shaman violet, Zombie grave-green, Skeleton bone
 const RIM := {"fallen": Color(1.0, 0.32, 0.1), "shaman": Color(0.8, 0.3, 1.0), "zombie": Color(0.35, 0.7, 0.25),
 	"skeleton": Color(0.9, 0.88, 0.75)}
+const KINDGLOW := 0.25              # how strongly that rim lights a living body at any distance
 # how fast each walk cycle carries the body at speed_scale 1 (m/s): the walk plays faster as the body speeds up
 const WALK := {"fallen": 0.67, "shaman": 0.85, "zombie": 0.44, "skeleton": 0.89}
 # a kind without a model: [the model it borrows, its tint]; its height follows its size in the rules
@@ -64,6 +65,7 @@ var _ring: MeshInstance3D            # a leader's violet ring on the ground
 var _flash := 0.0
 var _flinch: Flinch
 var _zap := 0.0                      # lightning still crawling over a corpse, seconds
+var _dying: Array[ORMMaterial3D] = []   # a corpse's own materials, its eyes going out
 
 # how each element marks a blow, and a death
 const ELEMENT_FLASH := {"fire": Color(1.0, 0.45, 0.1), "cold": Color(0.45, 0.75, 1.0),
@@ -89,6 +91,18 @@ func setup(w: World, ident: int, facts: Dictionary, table: Dictionary) -> void:
 	_s1 = 0.0
 
 
+## The overlay every living monster wears (shaders/overlay.gdshader), in its kind's colour `rim`: the review
+## stages (preview.gd, lineup.gd) dress models in it too, so they show what a battle shows.
+static func overlay(rim: Color) -> ShaderMaterial:
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://shaders/overlay.gdshader")
+	m.set_shader_parameter("kind_rim", rim)
+	m.set_shader_parameter("xray", 1.0)
+	m.set_shader_parameter("moonrim", 0.12)   # a hint only: more washes a detailed body grey-blue
+	m.set_shader_parameter("kindglow", KINDGLOW)
+	return m
+
+
 func title() -> String:
 	return String(stats["name"])
 
@@ -107,11 +121,7 @@ func _ready() -> void:
 		if found != "":
 			_anim.get_animation(found).loop_mode = Animation.LOOP_LINEAR
 	_play("walk", randf())
-	_overlay = ShaderMaterial.new()
-	_overlay.shader = preload("res://shaders/overlay.gdshader")
-	_overlay.set_shader_parameter("kind_rim", RIM.get(kind, STAND_INS.get(kind, [null, Color(0.9, 0.4, 0.3)])[1]))
-	_overlay.set_shader_parameter("xray", 1.0)
-	_overlay.set_shader_parameter("moonrim", 0.12)   # a hint only: more washes a detailed body grey-blue
+	_overlay = overlay(RIM.get(kind, STAND_INS.get(kind, [null, Color(0.9, 0.4, 0.3)])[1]))
 	if STAND_INS.has(kind):
 		_overlay.set_shader_parameter("tint", STAND_INS[kind][1])
 	for mi in _model.find_children("*", "MeshInstance3D", true, false):
@@ -212,6 +222,7 @@ func _process(delta: float) -> void:
 			if _state_t >= 1.4:
 				gone = true
 		"dead":
+			Mats.eyes_out(_dying, _state_t)
 			if _state_t > 3.0:
 				position.y -= delta * 0.5
 			if _state_t > 5.0:
@@ -276,6 +287,8 @@ func die(element: String, bounty: int) -> void:
 	else:   # bones leave no blood: a puff of bone dust where it falls apart
 		Vfx.dust(world, global_position, 0.6, Color(0.6, 0.56, 0.48))
 	_mark_death(element)
+	if element != "fire":   # a charred body's embers smoulder on
+		_dying = Mats.own(_model)
 	if leader:
 		Vfx.burst(world, chest(), Color(0.7, 0.2, 1.0), 40)
 
