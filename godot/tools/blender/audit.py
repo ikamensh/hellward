@@ -22,7 +22,7 @@ MODELS = ROOT / "game" / "assets" / "models"
 SINK = 0.02          # metres a body may go under the ground
 LOOP_GAP = 0.02      # metres a looping clip's last frame may stand from its first
 LIE = 0.5            # a corpse at most this share of its standing height
-SLIDE = 0.035        # metres a planted foot may skate in a step (today's worst is 3.2; docs/monsters.md L2 aims at 1)
+SLIDE = 0.035        # metres a planted foot may skate in a step (today's worst is 2.8; docs/monsters.md L2 aims at 1)
 LOOPS = ("idle", "walk", "cast")
 
 
@@ -83,26 +83,31 @@ def ground_speed(body, fs: list[np.ndarray], fps: float) -> float:
 def slide(body, fs: list[np.ndarray], speed: float, fps: float) -> float:
     """The worst skate of a planted foot over one contact, in metres: how far it ends from where it was put down,
     the ground running back under it at `speed` (frame-to-frame jitter as a sole rolls from heel to toe is not a
-    skate, and summing its size would grow with the frame rate)."""
+    skate, and summing its size would grow with the frame rate). The loop's last frame repeats its first, so the
+    cycle is its other frames, walked from one where the foot is up: a contact across the seam counts whole."""
     step = np.array([0.0, -speed / fps])
+    cycle = fs[:-1]
+    pairs = list(zip(cycle, cycle[1:] + cycle[:1]))
     worst = 0.0
     for side in ("L", "R"):
         g = body.vertex_groups.get(f"foot.{side}")
         if g is None:
             continue
         mine = np.array([any(e.group == g.index and e.weight > 0.5 for e in v.groups) for v in body.data.vertices])
+        touching = [mine & (a[:, 2] < 0.01) & (b[:, 2] < 0.01) & (np.abs(b[:, 2] - a[:, 2]) < 0.002) for a, b in pairs]
+        up = [i for i, t in enumerate(touching) if t.sum() < 3]
+        if not up:   # never lifted: no step to judge
+            continue
         run = None
-        for a, b in zip(fs, fs[1:] + fs[:1]):
-            touching = mine & (a[:, 2] < 0.01) & (b[:, 2] < 0.01) & (np.abs(b[:, 2] - a[:, 2]) < 0.002)
-            if touching.sum() < 3:
+        for i in [(up[0] + k) % len(pairs) for k in range(len(pairs) + 1)]:
+            if touching[i].sum() < 3:
                 if run is not None:
                     worst = max(worst, float(np.linalg.norm(run)))
                 run = None
                 continue
-            d = b[touching] - a[touching]
+            a, b = pairs[i]
+            d = b[touching[i]] - a[touching[i]]
             run = (run if run is not None else np.zeros(2)) + np.median(d[:, :2], axis=0) - step
-        if run is not None:
-            worst = max(worst, float(np.linalg.norm(run)))
     return worst
 
 

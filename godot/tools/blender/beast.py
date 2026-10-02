@@ -25,6 +25,7 @@ class Beast:
     kind: str
     height: float                 # as generated: a spider's body top, a flyer's wing-tip to feet
     eyes: tuple | None = (1.0, 0.2, 0.12)
+    eyes_at: tuple | None = None    # ((x, z), (x, z)) of the eyes as generated, if the search misses them
     grade: dict = field(default_factory=lambda: {"sat": 0.85, "value": 0.95, "mottle": 0.1})
     rough: float = 0.7
     faces: int = 12000
@@ -42,7 +43,7 @@ def _body(spec: Beast):
 def _maps(spec: Beast, obj, m, joints: dict, h: float) -> None:
     glow = None
     if spec.eyes is not None:
-        glow = {"eyes": find_eyes(obj, joints, h), "radius": 0.012 * h, "colour": spec.eyes}
+        glow = {"eyes": find_eyes(obj, joints, h, spec.eyes_at), "radius": 0.012 * h, "colour": spec.eyes}
     if not os.environ.get("HW_FAST"):
         grade = sculpted.grade(**spec.grade)
         sculpted.write_maps(spec.kind, obj, sculpted.bake_detail(obj, spec.kind, m), glow=glow,

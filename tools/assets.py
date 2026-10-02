@@ -28,6 +28,7 @@ LEADER_CLIPS = ("cast",)
 ANCHORS = ("fx_head",)
 LEADER_ANCHORS = ("fx_cast",)
 MAPS = ("albedo.webp", "normal.webp", "orm.webp")
+TILE = 2.0                                          # metres a map tile is in the client (the rules' speeds are tiles/s)
 
 
 def glb(path: Path) -> dict:
@@ -65,6 +66,14 @@ def keys(script: str, name: str) -> set[str]:
     return set(re.findall(r'"([a-z_]+)":', block.group(1))) if block else set()
 
 
+def number(script: str, name: str, key: str | None = None) -> float:
+    """A client script's `const NAME := 1.5`, or the entry `key` of its `const NAME := {...}` table."""
+    if key is None:
+        return float(re.search(rf"const {name} := ([0-9.]+)", script).group(1))
+    block = re.search(rf"const {name} := \{{(.*?)\}}\s*\n", script, re.S).group(1)
+    return float(re.search(rf'"{key}": ([0-9.]+)', block).group(1))
+
+
 def monster(kind: str) -> dict:
     """One monster kind's state in the client: its model (or the one it borrows) and what is wrong with it."""
     path = MODELS / f"mon_{kind}.glb"
@@ -86,6 +95,11 @@ def monster(kind: str) -> dict:
     # monster.gd shows a kind's own model only once it knows its height; its rim and (a walker's) pace go with it
     tables = ("HEIGHTS", "RIM") + (() if MONSTERS[kind].flying else ("WALK",))
     problems += [f"monster.gd {t} has no entry" for t in tables if kind not in keys(script, t)]
+    if not MONSTERS[kind].flying and kind in keys(script, "WALK"):   # at the rules' pace, how fast its walk plays
+        rate = MONSTERS[kind].speed * TILE / (number(script, "WALK", kind) * number(script, "BODY"))
+        if rate > number(script, "MAX_STRIDE"):
+            problems.append(f"its walk plays at {rate:.1f}x to keep up with the rules (most {number(script, 'MAX_STRIDE')}): "
+                            f"the feet slide")
     return {"kind": kind, "model": path.name, "stand_in": None, "tris": info["tris"],
             "clips": sorted(info["clips"]), "problems": problems}
 

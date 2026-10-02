@@ -85,16 +85,16 @@ class Clip:
             joints[k] = joints[k] * scale
         return cls(joints, 1.0 / frame_time, scale)
 
-    def cycle(self, settle: float = 0.1) -> Cycle:
+    def cycle(self, settle: float = 0.1, touch: float = 0.01) -> Cycle:
         """One stride (the left ankle passing the right and back) walked straight: of the candidates, the one
         whose ends match best. A swaying walk (Old) never goes 97% straight: then 94% will do."""
         for straight in (0.97, 0.94):
-            found = self._cycle(settle, straight)
+            found = self._cycle(settle, straight, touch)
             if found is not None:
                 return found
         raise ValueError("no straight steady stride found")
 
-    def _cycle(self, settle: float, straight: float) -> Cycle | None:
+    def _cycle(self, settle: float, straight: float, touch: float) -> Cycle | None:
         hips = self.j["Hips"]
         w = max(1, int(self.fps * 0.25))
         vel = np.zeros_like(hips)
@@ -120,10 +120,10 @@ class Clip:
                 err += float(np.linalg.norm(eb - ea))
             if best is None or err < best[0]:
                 best = (err, a, b)
-        return None if best is None else Cycle(self, best[1], best[2])
+        return None if best is None else Cycle(self, best[1], best[2], touch=touch)
 
 
-    def loop(self, seconds: float, settle: float = 0.15) -> Cycle:
+    def loop(self, seconds: float, settle: float = 0.15, touch: float = 0.01) -> Cycle:
         """A stretch of standing (an idle capture) `seconds` long that loops: of the windows in the clip's middle,
         the one whose ends match best, faced the way its hips face."""
         n = int(seconds * self.fps)
@@ -138,7 +138,7 @@ class Clip:
                 best = (err, a, b)
         if best is None:
             raise ValueError("clip shorter than the loop")
-        return Cycle(self, best[1], best[2], still=True)
+        return Cycle(self, best[1], best[2], still=True, touch=touch)
 
 
 def _facing(disp: np.ndarray) -> np.ndarray:
@@ -149,7 +149,7 @@ def _facing(disp: np.ndarray) -> np.ndarray:
 
 
 class Cycle:
-    def __init__(self, clip: Clip, a: int, b: int, still: bool = False):
+    def __init__(self, clip: Clip, a: int, b: int, still: bool = False, touch: float = 0.01):
         self.clip, self.a, self.b = clip, a, b
         self.seconds = (b - a) / clip.fps
         if still:   # standing: face the way the hips face (their left-right line turned a quarter)
@@ -174,7 +174,8 @@ class Cycle:
             self.track[k] = seg
         # each ankle's height while planted: its lowest over the cycle
         self.ground = {c: float(self.track[f"{c}Ankle"][:, 2].min()) for c in CAP.values()}
-        self.lock_feet()
+        self.toe_ground = {c: float(self.track[f"{c}Toe"][:, 2].min()) for c in CAP.values()}
+        self.lock_feet(touch=touch)
         # each foot's direction while planted (ankle within 2 cm of its lowest): the rig's foot turns only by how
         # far the performer's turns from it, so a differently shaped foot still stands flat
         self.flat = {}
@@ -185,16 +186,25 @@ class Cycle:
             self.flat[c] = Vector(tuple(d)).normalized()
         print(f"cycle frames {a}..{b}: {self.seconds:.2f} s, {self.speed:.2f} m/s, scale {clip.scale:.3f}")
 
-    def lock_feet(self, rise: float = 0.04, blend: int = 2) -> None:
-        """Planted feet stay planted: while an ankle is within `rise` of its lowest, it moves back at exactly the
-        cycle's speed along a straight line fitted to the capture (the performer's pace varies within a stride, so
-        taking the average speed out leaves a planted foot sliding to and fro). The toe moves with its ankle; the
-        lock eases in and out over `blend` frames."""
+    def lock_feet(self, rise: float = 0.04, blend: int = 2, touch: float = 0.01) -> None:
+        """Planted feet stay planted: what of a foot is on the ground moves back at exactly the cycle's speed (the
+        performer's pace varies within a stride, so taking the average speed out leaves a planted foot sliding to
+        and fro). That is its ankle while the ankle is within `rise` of its lowest and the heel down, then its toe
+        while the heel lifts and the toe stays within `touch` of its lowest (a toe-off, and a run's whole contact):
+        the toe moves with its ankle, the shift carries over from one to the other, and the lock eases in and out
+        over `blend` frames."""
         n = len(self.track["Hips"]) - 1          # the last frame repeats the first
         back = self.speed * self.seconds / n     # metres the ground runs back per frame
+        self.strike = {c: {} for c in CAP.values()}   # a heel strike's frames: the frame its foot lies flat
         for c in CAP.values():
             ank, toe = self.track[f"{c}Ankle"], self.track[f"{c}Toe"]
-            down = ank[:n, 2] < self.ground[c] + rise
+            heel = ank[:n, 2] < self.ground[c] + rise
+            # a toe on the ground and nearly still against it (a dragged toe, as DragLeftLeg's, is no pivot)
+            slip = np.abs(np.roll(toe[:n, 1], -1) - toe[:n, 1] + back)
+            ball = (toe[:n, 2] < self.toe_ground[c] + touch) & (slip < 2 * back)
+            # the toe is the pivot once the heel has lifted off its lowest with the toe still down
+            on_toe = ball & (ank[:n, 2] > self.ground[c] + touch)
+            down = heel | ball
             if down.all() or not down.any():
                 continue
             start = int(np.argmin(down))         # walk from a frame in the air, so no run wraps
@@ -209,15 +219,27 @@ class Cycle:
             if cur:
                 runs.append(cur)
             for run in runs:
-                k = np.arange(len(run))
-                y = ank[run, 1] + back * k            # where each frame's ankle would be with the ground stopped
-                anchor = np.array([ank[run, 0].mean(), y.mean()])
+                first = [i for i in run if not on_toe[i]] or run
+                k = np.arange(len(first))
+                y = (ank if first is not run or not on_toe[run[0]] else toe)[first, 1] + back * k
+                pin, target, shift = None, None, np.zeros(2)
                 for j, i in enumerate(run):
+                    point = toe if on_toe[i] else ank
+                    if pin is None:   # the run's first pivot: where its frames, the ground stopped, sit on average
+                        target = np.array([point[first, 0].mean(), y.mean()])
+                    elif pin is not point:   # the pivot passes from heel to toe: no jump
+                        target = point[i, :2] + shift
+                    else:
+                        target = target - np.array([0.0, back])
+                    pin = point
+                    shift = target - point[i, :2]
                     w = min(1.0, (j + 1) / (blend + 1), (len(run) - j) / (blend + 1))
-                    want = np.array([anchor[0], anchor[1] - back * j])
-                    shift = (want - ank[i, :2]) * w
-                    ank[i, :2] += shift
-                    toe[i, :2] += shift
+                    ank[i, :2] += shift * w
+                    toe[i, :2] += shift * w
+                flat = next((i for i in run if ball[i]), None)
+                for i in run[:run.index(flat)] if flat is not None else ():
+                    if heel[i]:
+                        self.strike[c][i] = flat
             ank[n], toe[n] = ank[0], toe[0]
 
     def at(self, t: float) -> dict[str, Vector]:
@@ -227,6 +249,25 @@ class Cycle:
         w = x - i
         j = min(i + 1, n)
         return {k: Vector(tuple(v[i] * (1 - w) + v[j] * w)) for k, v in self.track.items()}
+
+    def heel_pin(self, rig: Rig, side: str, t: float) -> Vector:
+        """How far to move the ankle at cycle time t so that, through a heel strike, the rig's heel stays where it
+        will stand once the foot lies flat (the foot lands pivoting about its heel, not its ankle: a long heel,
+        swung about the ankle, sweeps the ground). Nothing once the foot is flat."""
+        c, foot = CAP[side], f"foot.{side}"
+        back = getattr(rig, "heel", {}).get(side, 0.05)
+        heel = Vector((0.0, -back, 0.005 - rig.head[foot].z))   # the heel from the ankle, at rest
+        ank, toe = self.track[f"{c}Ankle"], self.track[f"{c}Toe"]
+        turn = lambda k: self.flat[c].rotation_difference(Vector(tuple(toe[k] - ank[k])))  # noqa: E731
+        n = self.b - self.a
+        x = (t % 1.0) * n
+        i = int(x)
+        shift = Vector()
+        for k, w in ((i % n, 1.0 - (x - i)), ((i + 1) % n, x - i)):
+            if k in self.strike[c]:
+                d = turn(self.strike[c][k]) @ heel - turn(k) @ heel
+                shift += w * Vector((d.x, d.y, 0.0))
+        return shift
 
     def pose(self, rig: Rig, t: float, base: Pose | None = None, arms: float = 1.0, own=(), apart: float = 0.0) -> Pose:
         """The rig's pose at cycle time t. `base` turns bones further on top of the capture (a monster's own
@@ -262,11 +303,13 @@ class Cycle:
                     p.q[bone] = extra.get(bone, Quaternion())
                 elif bone in extra:
                     p.q[bone] = extra[bone] @ p.q[bone]
+        lift = {}
         for s, side in SIDES:
             c = CAP[side]
             ankle = P[f"{c}Ankle"].copy()
             # the performer's ankle stands lower or higher than the rig's: planted, it stands where the rig's does
             ankle.z += rig.head[f"foot.{side}"].z - self.ground[c]
+            ankle += self.heel_pin(rig, side, t)
             if apart:   # from the body's centre line, not the swaying hips: a planted foot stays put
                 mid = rig.head["hips"].x
                 ankle.x = mid + s * max(s * (ankle.x - mid), apart)
@@ -274,15 +317,21 @@ class Cycle:
             rig.reach(p, f"thigh.{side}", f"shin.{side}", ankle, pole)
             q_foot = self.flat[c].rotation_difference(P[f"{c}Toe"] - P[f"{c}Ankle"])
             rig.orient(p, f"foot.{side}", q_foot)
-            # the heel, under and behind the ankle at rest, must not go through the ground at a heel strike
+            # the heel, under and behind the ankle at rest, must not go through the ground at a heel strike, and a
+            # swinging foot clears the ground at least as far as the performer's did
             foot = f"foot.{side}"
+            # (not while the ankle is low enough for lock_feet's heel lock: a heel strike's toes are up, its heel down)
+            ankle_up = P[f"{c}Ankle"].z - self.ground[c]
+            up = max(0.0, min(ankle_up, P[f"{c}Toe"].z - self.toe_ground[c])) * min(max((ankle_up - 0.03) / 0.02, 0.0), 1.0)
+            lift[side] = up + min(up, 0.012)   # and a little more: the rig's sole is not the performer's
             back = getattr(rig, "heel", {}).get(side, 0.05)   # how far the heel reaches behind the ankle
             heel = rig.where(p, foot, Vector((rig.head[foot].x, rig.head[foot].y - back, 0.005)))
-            if heel.z < 0.0:
-                ankle.z -= heel.z
+            if heel.z < lift[side]:
+                ankle.z += lift[side] - heel.z
                 rig.reach(p, f"thigh.{side}", f"shin.{side}", ankle, pole)
                 rig.orient(p, foot, q_foot)
-        keep_above(rig, p, ("foot.R", "foot.L"), reach=1.25)
+        for side in ("R", "L"):
+            keep_above(rig, p, (f"foot.{side}",), reach=1.25, lift=lift[side])
         for bone, q in extra.items():   # bones the capture has no say over (jaw, ears, weapons)
             if bone not in SEGMENTS and not bone.startswith(("thigh", "shin", "foot")):
                 p.q[bone] = q

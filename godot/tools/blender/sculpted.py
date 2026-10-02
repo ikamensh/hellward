@@ -457,7 +457,7 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
     given `glow`, emission.webp. Each has an .import that compresses it for the GPU with mipmaps.
 
     glow: {"eyes": [hint, ...], "colour": (r, g, b), "radius": metres, "find": mode}: each eye is found as the
-    yellowest, brightest texels within 3 cm of its hint ("dark": the darkest, a socket; "bright": the palest, a
+    yellowest, brightest texels within 3 cm of its hint, on its side of the face ("dark": the darkest, a socket; "bright": the palest, a
     painted milky eye; "fixed": the hint itself), and a ball of `radius` round it lights up in `colour` (eyes,
     embers in sockets). "hot": {"hues": (lo, hi), "strength": k} also lights what the painting shows burning in
     that hue range (bright and saturated: lava cracks, a glowing orb) in its own colour.
@@ -527,7 +527,8 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
         r = (glow or {}).get("radius", 0.012)
         for hint in (glow or {}).get("eyes", []):
             d = np.linalg.norm(pos - np.array(hint), axis=-1)
-            near = d < 0.03
+            # on the hint's side of the face: a wide search would find the brighter eye for both
+            near = (d < 0.03) & (pos[..., 0] * np.sign(hint[0]) >= 0)
             best = near & (score >= np.percentile(score[near], 97)) & (score > 0.25) if near.any() else near
             if glow.get("find") == "dark":
                 best = best & False

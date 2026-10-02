@@ -127,6 +127,25 @@ hand-made AAA work: surfaces from one generated atlas per body, walks from captu
    head, here the red feathers); winged Azazel's hands are searched under its wings (`hands_below`). A sole span
    over 0.2 of the height is a robe's hem (the foot goes under the hip), and a robe's skirt below the knee follows
    the shins (with no legs inside, it all went to the thighs and knelt 84 cm into the ground).
+   All nineteen kinds have their own model now (`STAND_INS` in `monster.gd` is empty); the audit passes with the
+   worst skate 2.8 cm (the Priest). Traps the last five taught:
+   - The eye search looks between the skull and crown joints: on the Overlord the eyes sit below that window (it
+     took brow spikes), on the Witch the horn bases outshine the dark-lined eyes, the Zealot's shadowed sockets
+     read as nothing (it lit the hood instead), and on the Spider one side straddled an eye and the warm carapace.
+     All four read their eyes off `views.py --focus` into `eyes_at` (`Beast` grew the same knob); dark eyes take
+     `eyes_find="fixed"`, bright painted ones snap from the hint.
+   - A capture's head pitch on a long lever folds the headpiece: BentForward bent the Zealot's 44 cm hood to its
+     waist. It walks Neutral stooped by `hunch` (which pitches the head back up) instead. Old at 0.19 m/s was
+     tried first and cannot keep up with the rules: check the stride (rules pace over `WALK × BODY`) against
+     `MAX_STRIDE` when choosing a walk, as with the Flayer's run.
+   - A toe-runner's peel outlasts the 1 cm toe-lock gate (the sole stays planted three frames past where the toe
+     joint rises out of it): `Spec.touch` widens the gate per kind, the Flayer runs at 2 cm, and the audit counts
+     a contact across the loop seam whole. The toe stays the pivot while the heel lifts, and a heel strike pins
+     the heel where the foot will lie flat (`Cycle.heel_pin`).
+   - The ground pass (`Rig.action`'s `ground_from`) did not cover the cast: the Witch's gown flared 9 cm under on
+     each beat. It covers the cast now (a no-op for casts that already clear). Her walk is a glide (her feet hang
+     inside the gown and never plant), so her WALK is the capture's own rate and the audit's "feet say" reads
+     -0.00 for her: expected, not a failure.
 4. Godot: `Mats.monster` builds the ORM material for any `mon_*` name. Review with `tools/review.sh` (clips),
    `tools/lineup.sh` (side by side at battle distance, or as silhouettes), `tools/preview.sh`, and
    `tools/review_set.sh DIR` for the whole L3 picture set the critics read.

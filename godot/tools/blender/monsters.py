@@ -492,15 +492,15 @@ def lift_feet(rig: Rig, pose: Pose, min_z: float, pole=(0, 1, -0.3)) -> None:
             rig.orient(pose, ft, q_foot)
 
 
-def keep_above(rig: Rig, pose: Pose, bones, floor: float | None = None, reach: float = 1.0) -> None:
+def keep_above(rig: Rig, pose: Pose, bones, floor: float | None = None, reach: float = 1.0, lift: float = 0.0) -> None:
     """Tip each of `bones` (feet, hands) up about its joint just enough that its far end stays above `floor`
-    (default: where that end rests in the rest pose, a toe's or claw's own height). `reach` moves the tested end
-    past the bone's tail, to toe tips that stick out beyond it."""
+    (default: where that end rests in the rest pose, a toe's or claw's own height, plus `lift`). `reach` moves the
+    tested end past the bone's tail, to toe tips that stick out beyond it."""
     for bone in bones:
         head = rig.where(pose, bone, rig.head[bone])
         end = rig.head[bone] + (rig.tail[bone] - rig.head[bone]) * reach
         tip = rig.where(pose, bone, end)
-        low = max(end.z, 0.005) if floor is None else floor
+        low = max(end.z, 0.005) + lift if floor is None else floor
         if tip.z >= low:
             continue
         d = tip - head

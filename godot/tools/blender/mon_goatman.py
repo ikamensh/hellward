@@ -5,5 +5,5 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 from biped import Spec, Weapon, build  # noqa: E402
 
-build(Spec("goatman", 1.9, walk="Strutting", idle="Proud", hunch=6, eyes=(1.0, 0.5, 0.1),
+build(Spec("goatman", 1.9, walk="Strutting", run=True, idle="Proud", hunch=6, eyes=(1.0, 0.5, 0.1),
             weapon=Weapon("goat_axe", 1.6, grip=0.25)))

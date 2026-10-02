@@ -58,16 +58,12 @@ def fit(body: bpy.types.Object, hands_below: float = 0.85, hands_within: float =
 
 def find_eyes(body: bpy.types.Object, joints: dict, h: float, at: tuple | None = None) -> list[tuple]:
     """Where the painting's eyes are: the brightest saturated vertices on the front of the head, one cluster either
-    side of its middle (falling back to two points a third of the way down the head). `at` (x, z) of the right eye,
-    read off the views, places them instead (on the face's surface there, the left mirrored): a crest of bright
-    feathers outshines eyes."""
+    side of its middle (falling back to two points a third of the way down the head). `at`, the (x, z) of each eye
+    read off the generated body's textured views (views.py --stand), places them instead, on the face's surface
+    there: a crest of bright feathers outshines eyes."""
     co = np.array([tuple(v.co) for v in body.data.vertices])
-    if at is not None:
-        out = []
-        for s in (1, -1):
-            near = np.hypot(co[:, 0] - s * at[0], co[:, 2] - at[1]) < 0.025 * h   # the fitted body is decimated
-            out.append((s * at[0], float(co[near, 1].max()), at[1]))
-        return out
+    if at is not None:   # (the fitted body is decimated: its surface is found within 2.5% of the height)
+        return [(x, float(co[np.hypot(co[:, 0] - x, co[:, 2] - z) < 0.025 * h, 1].max()), z) for x, z in at]
     rgb = sculpted.vertex_colours(body)
     hsv = sculpted.hue_sat_val(rgb)
     skull, crown = np.array(joints["skull"]), np.array(joints["crown"])
@@ -104,10 +100,13 @@ class Spec:
     kind: str
     height: float                       # sole to crown as generated
     walk: str = "Neutral"               # 100STYLE style of its walk (<style>_FW) and, unless `idle`, its idle
+    run: bool = False                   # the style's run (<style>_FR): short legs that must keep up with the rules
     idle: str | None = None
+    touch: float = 0.01             # the toe-lock's height gate (mocap.lock_feet): a toe-runner's peel outlasts it
     weapon: Weapon | None = None
     eyes: tuple | None = (1.0, 0.72, 0.15)   # the glow's colour; None: the painting's eyes, no glow
-    eyes_at: tuple | None = None        # (x, z) of the right eye as generated, if the search misses it (find_eyes)
+    eyes_at: tuple | None = None        # ((x, z), (x, z)) of the eyes as generated, if the search misses them
+    eyes_find: str | None = None        # how the painting's eye is found near each (sculpted.write_maps glow "find")
     grade: dict = field(default_factory=lambda: {"sat": 0.8, "value": 0.95, "mottle": 0.1})
     rough: float = 0.78
     cavity: float = 0.5
@@ -142,7 +141,7 @@ class Biped:
         glow = {"hot": spec.hot} if spec.hot else None
         if spec.eyes is not None:
             glow = {**(glow or {}), "eyes": find_eyes(obj, j, self.h, spec.eyes_at), "radius": 0.007 * self.h,
-                    "colour": spec.eyes}
+                    "colour": spec.eyes, "find": spec.eyes_find}
         if not os.environ.get("HW_FAST"):
             grade = sculpted.grade(**spec.grade)
             sculpted.write_maps(k, obj, sculpted.bake_detail(obj, k, m), glow=glow,
@@ -259,24 +258,22 @@ class Biped:
     def _clips(self):
         spec, rig, H = self.spec, self.rig, self.H
         leg = mocap.leg(rig)
-        self.walkc = mocap.Clip.load(f"{spec.walk}_FW", leg).cycle()
-        self.idlec = mocap.Clip.load(f"{spec.idle or spec.walk}_ID", leg).loop(3.0)
+        self.walkc = mocap.Clip.load(f"{spec.walk}_{'FR' if spec.run else 'FW'}", leg).cycle(touch=spec.touch)
+        self.idlec = mocap.Clip.load(f"{spec.idle or spec.walk}_ID", leg).loop(3.0, touch=spec.touch)
         own = ARM_R if spec.weapon else ()
 
         def walk(t):
             base = self.flex(self._hunch(), 6 * math.sin(TAU * t), 4)   # the wings rise and fall with the stride
             self.carry(base, t)
             p = self.walkc.pose(rig, t, base, arms=spec.arms, own=own)
-            if spec.weapon and not spec.weapon.staff:
-                self.carry(p, t)
+            self.carry(p, t)   # again over the captured spine's lean: a staff stands upright in the world
             return p
 
         def idle(t):
-            base = self.flex(self._hunch(), 4 * math.sin(TAU * t / 1.5), 6)   # breathing, the wings settle
+            base = self.flex(self._hunch(), 4 * math.sin(TAU * 2 * t), 6)   # two breaths a loop, the wings settle
             self.carry(base, t)
             p = self.idlec.pose(rig, t, base, arms=spec.arms, own=own)
-            if spec.weapon and not spec.weapon.staff:
-                self.carry(p, t)
+            self.carry(p, t)   # again over the captured spine's lean: a staff stands upright in the world
             return p
 
         self.walk = walk
@@ -294,7 +291,7 @@ class Biped:
         rig.action("die", 1.3, self.die, ground_from=0.0, body=self.body)
         rig.action("die2", 1.5, self.die_down, ground_from=0.0, body=self.body)
         if spec.leader:
-            rig.action("cast", 2.4, self.cast, loop=True)
+            rig.action("cast", 2.4, self.cast, loop=True, ground_from=0.0, body=self.body)
 
     def stance(self) -> Pose:
         return self.W0.copy()

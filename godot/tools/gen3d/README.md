@@ -44,3 +44,13 @@ blender -b --factory-startup -P tools/blender/intake.py -- skull 1 --faces 20000
 The first seed takes a few minutes (loading the models); each further seed about two. `views.png` shows each
 seed's shading, base colour and normals: pick by those, then take the seed in with `intake.py` (the seed folders
 are git-ignored; `art/gen/<kind>/game.glb` and the decimated `sculpt.glb` are committed).
+
+## Cloud notes (2026-10-02)
+
+The `hw3d-monsters-gen` L40S that rendered every generation so far was deleted after the last batch (server,
+volumes and IP all gone; no cloud spend remains). Its `trellis2` image and `~/hf` weights went with the root
+disk: the next box rebuilds them from "Once per VM" above, a few unattended hours.
+GPU stock runs out: on 2026-10-02 every GPU type was short in fr-par-2 and pl-waw-2, and a retry loop took five
+hours to catch an L40S. Start the VM early and generate while it is up; stop it when idle, delete it when done.
+The `saga2d-deploy` key cannot read billing (`scw billing` wants more rights), so track spend by the clock
+(about €1.47 an hour while running) rather than the API.
