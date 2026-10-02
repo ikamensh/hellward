@@ -30,6 +30,7 @@ class Beast:
     faces: int = 12000
     yaw: float = 180.0
     beat: float = 0.45            # a flyer's wingbeat, seconds
+    out: str | None = None        # the model's name, if not mon_<kind> (a trial)
 
 
 def _body(spec: Beast):
@@ -184,7 +185,7 @@ class Spider:
     def finish(self):
         self.rig.report(self.body)
         fx("fx_head", (0, 0, self.h + 0.15), self.rig)
-        return export(f"mon_{self.spec.kind}")
+        return export(self.spec.out or f"mon_{self.spec.kind}")
 
 
 # ---------------------------------------------------------------------------------------------------------- flyer
@@ -297,4 +298,4 @@ class Flyer:
     def finish(self):
         self.rig.report(self.body)
         fx("fx_head", (0, self.j["crown"].y, self.h + 0.1), self.rig)
-        return export(f"mon_{self.spec.kind}")
+        return export(self.spec.out or f"mon_{self.spec.kind}")

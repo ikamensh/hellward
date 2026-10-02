@@ -26,6 +26,13 @@ SLIDE = 0.035        # metres a planted foot may skate in a step (today's worst 
 LOOPS = ("idle", "walk", "cast")
 
 
+def flyers() -> set[str]:
+    """The kinds the rules fly (hellward/sim/data/monsters.toml): they hover in every clip but their deaths."""
+    import tomllib
+    table = tomllib.loads((ROOT.parent / "hellward" / "sim" / "data" / "monsters.toml").read_text())
+    return {k for k, row in table.items() if isinstance(row, dict) and row.get("flying")}
+
+
 def walk_speeds() -> dict[str, float]:
     """monster.gd's WALK table: how fast each kind's walk carries it at speed 1 (m/s)."""
     text = (ROOT / "game" / "scripts" / "monster.gd").read_text()
@@ -63,17 +70,13 @@ def frames(scene, arm, body, action) -> list[np.ndarray]:
 
 def ground_speed(body, fs: list[np.ndarray], fps: float) -> float:
     """How fast the walk's planted feet move back under it (m/s): the speed the client must carry the body at for
-    them to stand still on the ground, and so what monster.gd WALK should say."""
+    them to stand still on the ground, and so what monster.gd WALK should say. Whatever rests on the ground in two
+    frames running is a planted foot, however many feet the walker has."""
     backs = []
-    for side in ("L", "R"):
-        g = body.vertex_groups.get(f"foot.{side}")
-        if g is None:
-            continue
-        mine = np.array([any(e.group == g.index and e.weight > 0.5 for e in v.groups) for v in body.data.vertices])
-        for a, b in zip(fs, fs[1:]):
-            touching = mine & (a[:, 2] < 0.01) & (b[:, 2] < 0.01) & (np.abs(b[:, 2] - a[:, 2]) < 0.002)
-            if touching.sum() >= 3:
-                backs.append(-float(np.median(b[touching, 1] - a[touching, 1])) * fps)
+    for a, b in zip(fs, fs[1:]):
+        touching = (a[:, 2] < 0.01) & (b[:, 2] < 0.01) & (np.abs(b[:, 2] - a[:, 2]) < 0.002)
+        if touching.sum() >= 3:
+            backs.append(-float(np.median(b[touching, 1] - a[touching, 1])) * fps)
     return float(np.median(backs)) if backs else 0.0
 
 
@@ -103,7 +106,7 @@ def slide(body, fs: list[np.ndarray], speed: float, fps: float) -> float:
     return worst
 
 
-def audit(path: Path, speeds: dict[str, float]) -> tuple[list[str], list[str]]:
+def audit(path: Path, speeds: dict[str, float], flying: set[str] = frozenset()) -> tuple[list[str], list[str]]:
     kind = path.stem.removeprefix("mon_")
     scene, arm, body = load(path)
     rows, fails = [], []
@@ -116,7 +119,7 @@ def audit(path: Path, speeds: dict[str, float]) -> tuple[list[str], list[str]]:
         if name == "idle":
             stand = tall
         notes = [f"low {low * 100:+.1f} cm"]
-        if low < -SINK:
+        if low < -SINK and not (kind in flying and not name.startswith("die")):   # a flyer hovers above it
             fails.append(f"{kind} {name}: {-low * 100:.1f} cm under the ground")
         if name in LOOPS:
             gap = float(np.linalg.norm(fs[-1] - fs[0], axis=1).max())
@@ -131,7 +134,7 @@ def audit(path: Path, speeds: dict[str, float]) -> tuple[list[str], list[str]]:
                 fails.append(f"{kind} {name}: ends {height:.2f} m high (stands {stand:.2f})")
             if ground > 0.03:
                 fails.append(f"{kind} {name}: the corpse floats {ground * 100:.1f} cm up")
-        if name == "walk" and kind in speeds:
+        if name == "walk" and kind in speeds and kind not in flying:
             worst = slide(body, fs, speeds[kind], scene.render.fps)
             true = ground_speed(body, fs, scene.render.fps)
             notes.append(f"slide {worst * 100:.1f} cm at WALK {speeds[kind]:.2f} (its feet say {true:.2f} m/s)")
@@ -147,9 +150,10 @@ def main() -> int:
     out = Path(argv[argv.index("--json") + 1]) if "--json" in argv else None
     paths = [Path(a) for a in argv if a.endswith(".glb")] or sorted(MODELS.glob("mon_*.glb"))
     speeds = walk_speeds()
+    flying = flyers()
     rows, fails = [], []
     for path in paths:
-        r, f = audit(path, speeds)
+        r, f = audit(path, speeds, flying)
         rows += r
         fails += f
     print("\n".join(rows))
