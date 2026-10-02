@@ -54,6 +54,7 @@ G2.5's targets: the factors a run can stack on one hit multiply to at most ×2. 
 | G3.4 | The power budget closes. | scorecard (power table) | at every location, the reference board's damage per second covers the last wave's life on the field per second, without relics or charges |
 
 G3.3's targets:
+- stake 3 is net-positive for the strong bot (wager plus profit, against leaks);
 - by each act's end the strong bot holds ≥ 5× the gold of a bot that never summons;
 - the strong bot summons ≤ 3 a location;
 - the middling bot summoning every break wins fewer runs.
@@ -63,7 +64,7 @@ G3.3's targets:
 | ID | Criterion | Judge | Target |
 |---|---|---|---|
 | M1 | A meta currency every run earns, win or lose, spent on things to collect. Everything can be bought eventually. | test; scorecard | whole shop ≈ 20 runs' median income |
-| M2 | Diablo's XP bar: kills and clears give XP, and level-ups come often and are celebrated. | test; scorecard (run bots) | first level-up in Tristram's second wave; ~40 levels by the Temple |
+| M2 | Diablo's XP bar: kills and clears give XP, and level-ups come often and are celebrated. | test; scorecard (run bots) | first level-up in Tristram's second wave; ~55 levels by the Temple; a level-up refills the mana orb |
 | M3 | Skill points = levels + sigils. Sigils: 3 for lives lost at the location, 3 for its goals about how it was won. | test; scorecard | see below |
 | M4 | A tech tree too expensive to open, paid in skill points, with reskill points as the only way back. | scorecard | ≥ 14 tower kinds; whole tree ≥ 2.5× a perfect run's points |
 | M5 | Different runs end in different builds, pushed by their relics. | run bots | ≥ 6 distinct tower sets over 10 seeds of the strongest bot |
