@@ -93,11 +93,16 @@ pictures; each critic sees only them), scores per lens across the four kinds:
 | 4 | 4-6 | 4-5 | 4-6 | 5-7 | 4-7 | modelled crest, generated staff skull, squat Fallen, deaths open on the blow |
 | 5 | 4-6 | 4-6 | 4-5 | 5-6 | 5-7 | Shaman a head taller, upright crown, overhead cast, pale Zombie |
 | 6 | 5-6 | 4-6 | 3-5 | 4-7 | 5-7 | generated Zombie head, crimson that holds under the moon |
+| 7 | 4-6 | 4-6 | 4-6 | 4-7 | 5-7 | oxblood, war paint, Skeleton thrust and popped skull, jabbing cast, pale corpses |
+| 8 | 4-6 | 4-5 | 4-5 | 4-7 | 6-7 | Shaman true to the 2D painting (mohawk, white skull at head height) |
+| 9 | 4-7 | 4-5 | 4-6 | 4-6 | 5-7 | metal maps made metal, 12-17k triangle bodies, a three-beat cast |
 
-What the panel keeps asking for, beyond what is done: a wet/dry/metal surface language richer than one sheen
-per body; walks with more character than captured or keyed cycles give at six samples; each kind told apart by
-colour at the default camera, where monsters are 25-30 px tall. Blocking defects named in every round so far
-were fixed in the next; the 8/10 bar is not met.
+The 8/10 bar is not met, and the panel has stopped converging: from round 6 on, fresh critics reverse each other
+(the staff skull at head height as the 2D painting carries it, then above the crest; a fan crest, then a mohawk,
+then a fan; a bigger knife, then a shorter one; brighter imps, then darker), and the scores stay at 5 +- 1 whatever
+moves. Blocking defects one round names are fixed in the next; what every round repeats is the distance from
+hand-made AAA work: surfaces from one generated atlas per body, walks from captured or keyed cycles, and monsters
+25-30 px tall at the default camera. Whether this level is the AAA Ilya meant is his call, by eye.
 
 ## Pipeline (as built)
 

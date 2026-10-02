@@ -156,7 +156,7 @@ from mathutils.bvhtree import BVHTree  # noqa: E402
 tree = BVHTree.FromObject(body, bpy.context.evaluated_depsgraph_get())
 for i, (start, out) in enumerate((((0.12, -0.8, 1.3), (0.2, -0.85, 0.4)), ((-0.24, -0.8, 1.52), (-0.35, -0.7, 0.6)))):
     hit = tree.ray_cast(Vector(start), Vector((0, 1, 0)))[0]
-    shaft = feathers.arrow(f"arrow{i}", hit - Vector(out).normalized() * 0.05, Vector(out), 0.6, seed=i)
+    shaft = feathers.arrow(f"arrow{i}", hit - Vector(out).normalized() * 0.05, Vector(out), 0.38, seed=i)   # broken off short
     sculpted.give(shaft, rig, "chest")
 rig.repose(sculpted.hang(rig, arm=12))
 rig.springs = {"cloth.F": (35.0, 0.3, 0.7), "cloth.F2": (30.0, 0.25, 0.8), "cloth.B": (35.0, 0.3, 0.7)}

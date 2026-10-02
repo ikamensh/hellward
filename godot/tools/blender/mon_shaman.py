@@ -33,12 +33,11 @@ def feather_colour(rgb, pos):
 # material families: the crest by place (above the horns); the rest by the colours the generator painted
 # (tools/blender/clusters.py shaman 1.6 8): red skin, tan and brown hide and fur, light bone fetishes, dark hooves
 def war_paint(x, y, z, lab):
-    """The 2D shaman's white paint: three chevrons down its chest and a stripe under each eye (a share 0..1)."""
+    """The 2D shaman's white paint: three chevrons down its chest (a share 0..1). Stripes placed under the eyes by
+    position landed as a block on the muzzle: the face keeps the marks the generator painted."""
     chest = (y > 0.0) & (np.abs(x) < 0.13)
-    stripes = sum(np.abs(z - (c + 0.35 * np.abs(x))) < 0.007 for c in (0.79, 0.84, 0.89))
-    cheeks = sum((np.abs(x - ex) < 0.009) & (z > 1.035) & (z < 1.072) & (y > ey - 0.025)
-                 for ex, ey in ((-0.04, 0.16), (-0.113, 0.09)))
-    return 1.0 * ((chest & (stripes > 0)) | (cheeks > 0))
+    stripes = sum(np.abs(z - (c + 0.35 * np.abs(x))) < 0.008 for c in (0.79, 0.84, 0.89))
+    return 1.0 * (chest & (stripes > 0))
 
 
 FAMILIES = {

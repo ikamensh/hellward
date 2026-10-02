@@ -816,7 +816,9 @@ def bone_colour(rgb, hue, sat, val, pos):
     boneish = (((hue > 15) & (hue < 60)) & (sat < 0.65) & (val > 0.12))[..., None]
     g = _grey(rgb)
     # grey-ivory, not yellow: a fire turned a yellower bone traffic-cone orange beside the moonlit rest of it
-    ivory = np.clip(g * 1.65, 0.0, 0.64) * np.array([0.97, 0.93, 0.84]) * _mottle(pos, 0.12, 0.12)   # broad: no speckle
+    # the generator painted shadow between the ribs into the colour: lift the darks so the light, not the paint,
+    # shades the bone (the ribcage read as a black mass beside white limbs)
+    ivory = np.clip(0.16 + g * 1.3, 0.0, 0.64) * np.array([0.97, 0.93, 0.84]) * _mottle(pos, 0.12, 0.12)
     red = _skin_red(hue, sat)
     return np.where(red, (g + (rgb - g) * 0.7) * 0.85, np.where(boneish, ivory, rgb))
 
