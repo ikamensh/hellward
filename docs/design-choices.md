@@ -302,37 +302,37 @@ current breaches become authored bonus waves.
 
 One difficulty, hard. Later, an ascension ladder for players who win.
 
-## 20. Order of building
+## 20. Readiness stages *(Ilya: ship in stages; Skip in parallel)*
 
-0. **Guards:**
-   - the Kit;
-   - clone-fidelity scenarios for every new field;
-   - a p95 planner-decision gate (`sim_bench`);
-   - the scorecard's static checks.
-1. **Rules pass:**
-   - numbers and the damage model;
-   - armor and the Ballista;
-   - the shrine and the boss's return;
-   - spells (no Cleanse, no interrupts, Battle Hymn).
+Each stage ends in a release Ilya plays in the Godot client, with the suite and the client tests green. Before a
+stage is built, its own short spec (`docs/stages/N-name.md`) fixes its rules, events and exit criteria; what Ilya
+says after playing may reorder what follows. Skip is a parallel track: it is a reusable system but not needed for
+the game to be playable, so it joins whichever release is current when it is ready.
 
-   Bots and plans are updated to match.
-2. **Skip,** on the current campaign.
-3. **A thin Act I run:**
-   - run life, carried gold, XP and levels, lives sigils;
-   - a camp with relic drops: about eight counter relics on overkill and banish;
-   - the Tolling Bell and the Soul Jar.
+| Stage | Delivers | Exit, in short |
+|---|---|---|
+| 1. Armor and the pirate arsenal | the damage model (whole hits, protected/vulnerable, armor), the Ballista, the Hook Tower, the Knife Post, the shrine strike and the boss's return, no Cleanse or interrupts, Battle Hymn | M9, M10, S1, S3, R3; the strong bot still wins every location; client shows all of it |
+| 2. Ten to a hundred, on scarce ground | v3's number scale, four-to-six-wave locations, rock and water, cell worth while placing, the Kit | G2.1–G2.4, G3.4, R1–R3, R5 |
+| 3. One run | the run: pool life, carried gold, XP and levels, sigils with goals, the reskill point, bonus waves, the camp; run bots | G3.1–G3.3, M2, M3, T2 |
+| 4. Relics and four verbs | relics (drops, the merchant), corpse, overkill, banish, debuff consumed; the Grove, the Soul Jar, the Tolling Bell, the Bone Altar reworked; Ilya's next physical kind | V1–V8, M5, M6 |
+| 5. Charges and great towers | charges, AI dials, the meta shop, the Moon Well, the Effigy, the Firewall Pillar, the Tempest Spire | M1, M4, M7, G2.5, G2.6 |
+| 6. The map fights back | blight, route choice, Flayer sprint, the final tuning | R6, R7, G3.1 again |
+| Parallel: Skip | the predictor process, adopting the predicted world, the vision | G1.1–G1.6 |
 
-   It is playable in the Godot client and shown to Ilya before more content.
-4. **Charges, AI modes, the meta shop.**
-5. **The remaining verbs,** one at a time, each with its tower and three relics.
-6. **Then:**
-   - the tree rewrite with reskill points;
-   - goals;
-   - bonus waves;
-   - the merchant;
-   - the great towers.
-7. **Last:**
-   - terrain on every map;
-   - blight;
-   - Act II's routes and kinds;
-   - the final tuning.
+## 21. The physical family *(Ilya: pirate hooks, knives; Knife Post; movers once per kind)*
+
+Physical towers decide where and when damage lands as well as how much. They carry no element tags (armor is what
+physical fears), and none attacks faster than the Arrow, since every hit deals at least 1.
+
+| Tower | Rule | Hit / rate / reach | Price | Niche | Stage |
+|---|---|---|---|---|---|
+| Arrow | one arrow at the monster nearest the shrine | 2/3/4, 1.0, 2.8–3.2 | 1.0 | cheapest damage on the move | now |
+| Ballista | a heavy bolt, slowly | 7/10/14, 0.4, 3.2–3.6 | 1.5 | the general answer to armor | 1 |
+| Hook Tower | every few seconds hooks the foremost small monster past its spot and drags it 2 tiles back | 3/4/5, every 6/5/4 s, 2.8–3.2 | 1.5 | time under fire; the only tower that sends a flyer back | 1 |
+| Knife Post | throws at a monster standing at a gate or held, if one is in reach, hitting a small one twice as hard | 2/3/4, 0.8, 2.6–3.0 | 1.0 | turns a gate into a kill zone for chaff | 1 |
+
+- **Movers** move only **small monsters** (worth 1 life): never leaders, heavies or bosses, and never a monster
+  standing at a gate. Each mover kind moves a given monster back at most once; different kinds stack. Every backward
+  move is a banish.
+- Further physical kinds (a swinging anchor, a net thrower, a fan of knives) are candidates Ilya picks after playing
+  stage 1.
