@@ -137,7 +137,6 @@ class Battle:
         self.world.sell(t.id)
         return [list(t.tile)]
 
-
     def _gate(self, door: int) -> list:
         if not offers(self.location, "gate"):
             raise Refused(_not_here(self.location, "gate"))

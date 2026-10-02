@@ -144,7 +144,7 @@ func _process(_delta: float) -> void:
 			_reach_mark.visible = false
 			if t:
 				_tile_mark.global_position = world.level.tile_pos(tile) + Vector3(0, 0.06, 0)
-				(_tile_mark.material_override as ShaderMaterial).set_shader_parameter("color", Color(Hud.SPELL_TONES["hymn"], 0.95))
+				(_tile_mark.material_override as ShaderMaterial).set_shader_parameter("color", Color(Hud.SPELL_TONES[held.substr(6)], 0.95))
 			return
 		var radius: float = max(float(spell["radius"]), 0.6) * Level.TILE
 		_show_reach(Vector3(p.x, 0, p.z), radius, Color(0.6, 0.8, 1.0, 0.9))
