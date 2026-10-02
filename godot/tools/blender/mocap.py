@@ -87,7 +87,14 @@ class Clip:
 
     def cycle(self, settle: float = 0.1) -> Cycle:
         """One stride (the left ankle passing the right and back) walked straight: of the candidates, the one
-        whose ends match best."""
+        whose ends match best. A swaying walk (Old) never goes 97% straight: then 94% will do."""
+        for straight in (0.97, 0.94):
+            found = self._cycle(settle, straight)
+            if found is not None:
+                return found
+        raise ValueError("no straight steady stride found")
+
+    def _cycle(self, settle: float, straight: float) -> Cycle | None:
         hips = self.j["Hips"]
         w = max(1, int(self.fps * 0.25))
         vel = np.zeros_like(hips)
@@ -103,7 +110,7 @@ class Clip:
                 continue
             disp = hips[b, :2] - hips[a, :2]
             path = float(np.sum(np.linalg.norm(np.diff(hips[a:b + 1, :2], axis=0), axis=1)))
-            if np.linalg.norm(disp) < 0.97 * path or np.linalg.norm(disp) < 0.15:
+            if np.linalg.norm(disp) < straight * path or np.linalg.norm(disp) < 0.15:
                 continue
             rot = _facing(disp)
             err = 0.0
@@ -113,9 +120,7 @@ class Clip:
                 err += float(np.linalg.norm(eb - ea))
             if best is None or err < best[0]:
                 best = (err, a, b)
-        if best is None:
-            raise ValueError("no straight steady stride found")
-        return Cycle(self, best[1], best[2])
+        return None if best is None else Cycle(self, best[1], best[2])
 
 
     def loop(self, seconds: float, settle: float = 0.15) -> Cycle:

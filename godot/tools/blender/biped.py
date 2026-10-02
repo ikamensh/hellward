@@ -56,12 +56,20 @@ def fit(body: bpy.types.Object, hands_below: float = 0.85, hands_within: float =
     return out
 
 
-def find_eyes(body: bpy.types.Object, joints: dict, h: float) -> list[tuple]:
+def find_eyes(body: bpy.types.Object, joints: dict, h: float, at: tuple | None = None) -> list[tuple]:
     """Where the painting's eyes are: the brightest saturated vertices on the front of the head, one cluster either
-    side of its middle (falling back to two points a third of the way down the head)."""
+    side of its middle (falling back to two points a third of the way down the head). `at` (x, z) of the right eye,
+    read off the views, places them instead (on the face's surface there, the left mirrored): a crest of bright
+    feathers outshines eyes."""
+    co = np.array([tuple(v.co) for v in body.data.vertices])
+    if at is not None:
+        out = []
+        for s in (1, -1):
+            near = np.hypot(co[:, 0] - s * at[0], co[:, 2] - at[1]) < 0.025 * h   # the fitted body is decimated
+            out.append((s * at[0], float(co[near, 1].max()), at[1]))
+        return out
     rgb = sculpted.vertex_colours(body)
     hsv = sculpted.hue_sat_val(rgb)
-    co = np.array([tuple(v.co) for v in body.data.vertices])
     skull, crown = np.array(joints["skull"]), np.array(joints["crown"])
     head = (co[:, 2] > skull[2]) & (co[:, 2] < crown[2]) & (np.abs(co[:, 0]) < 0.12 * h)
     front = head & (co[:, 1] > np.median(co[head, 1]) if head.any() else head)
@@ -99,6 +107,7 @@ class Spec:
     idle: str | None = None
     weapon: Weapon | None = None
     eyes: tuple | None = (1.0, 0.72, 0.15)   # the glow's colour; None: the painting's eyes, no glow
+    eyes_at: tuple | None = None        # (x, z) of the right eye as generated, if the search misses it (find_eyes)
     grade: dict = field(default_factory=lambda: {"sat": 0.8, "value": 0.95, "mottle": 0.1})
     rough: float = 0.78
     cavity: float = 0.5
@@ -132,7 +141,8 @@ class Biped:
         print("biped", k, "robe" if self.robe else "legs", {n: tuple(round(c, 3) for c in v) for n, v in j.items()})
         glow = {"hot": spec.hot} if spec.hot else None
         if spec.eyes is not None:
-            glow = {**(glow or {}), "eyes": find_eyes(obj, j, self.h), "radius": 0.007 * self.h, "colour": spec.eyes}
+            glow = {**(glow or {}), "eyes": find_eyes(obj, j, self.h, spec.eyes_at), "radius": 0.007 * self.h,
+                    "colour": spec.eyes}
         if not os.environ.get("HW_FAST"):
             grade = sculpted.grade(**spec.grade)
             sculpted.write_maps(k, obj, sculpted.bake_detail(obj, k, m), glow=glow,
@@ -148,6 +158,11 @@ class Biped:
         # the leg pushed off
         ankle = {side: j[f"ankle.{side}"].z for side in ("R", "L")}
         masks = {f"shin.{side}": (lambda co, hsv, thick, z=ankle[side]: co.z > 0.85 * z) for side in ("R", "L")}
+        # and a robe's skirt below the knee to the shins: a generated robe has no legs inside it, and its hem, all
+        # the thighs' by nearness, went the thighs' length under the ground as they knelt
+        knee = {side: j[f"knee.{side}"].z for side in ("R", "L")}
+        masks |= {f"thigh.{side}": (lambda co, hsv, thick, z=knee[side]: co.z > z - 0.04 * self.h)
+                  for side in ("R", "L")}
         if spec.wings:   # a wing's bones move only the wing on their side, above the arms
             low = spec.wings_above * self.h
             for s, side in SIDES:
@@ -189,20 +204,17 @@ class Biped:
         rig = self.rig
         self.fist = rig.head["hand.R"].lerp(rig.tail["hand.R"], 0.45)
         self.FIST = self.fist - rig.head["hand.R"]
-        if w is None:
+        # with the hand's turn none, a staff (or a bare fist) stands upright in it, a blade points ahead of it
+        self.REST = Vector((0, 0, 1)) if w is None or w.staff else Vector((0, 1, 0))
+        self.FLAT = Vector((1, 0, 0))
+        if w is None:   # a bare fist (a leader casts from it)
             return
         obj, f = sculpted.prop(w.kind, w.length, metal=w.metal, faces=3000, glow=w.glow)
         along = [(v.co - f["centre"]).dot(f["axis"]) for v in obj.data.vertices]
         lo, hi = min(along), max(along)   # its two ends along its length (the mean sits toward the heavy end)
         grip = sculpted.snap(obj, f["centre"] + f["axis"] * (lo + w.grip * (hi - lo)), 0.06 * w.length)
         self.top = w.length * (1 - w.grip)   # fist to the business end
-        if w.staff:   # upright in the fist whenever the hand's turn is none
-            sculpted.hold(obj, rig, "hand.R", grip, f["axis"], f["flat"], self.fist, Vector((0, 0, 1)), Vector((1, 0, 0)))
-            self.REST = Vector((0, 0, 1))
-        else:   # pointing ahead of the fist whenever the hand's turn is none
-            sculpted.hold(obj, rig, "hand.R", grip, f["axis"], f["flat"], self.fist, Vector((0, 1, 0)), Vector((1, 0, 0)))
-            self.REST = Vector((0, 1, 0))
-        self.FLAT = Vector((1, 0, 0))
+        sculpted.hold(obj, rig, "hand.R", grip, f["axis"], f["flat"], self.fist, self.REST, self.FLAT)
 
     def aim(self, p: Pose, direction: Vector) -> None:
         """Turn the right hand so its weapon points along `direction` (world), its flat facing sideways."""

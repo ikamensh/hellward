@@ -105,6 +105,8 @@ def fit(verts: np.ndarray, hands_below: float = 0.85, hands_within: float = 1.0)
             hip = np.array([s * min(max(0.6 * abs(mid[0]), 0.05 * h), 0.09 * h), mid[1],
                             min(max(crotch + 0.04 * h, 0.5 * h), 0.58 * h)])
         back, front = (feet[:, 1].min(), feet[:, 1].max()) if len(feet) > 5 else (foot[1] - 0.05 * h, foot[1] + 0.07 * h)
+        if front - back > 0.2 * h:   # longer than any foot (about 0.15 h): a hem on the floor hides the sole
+            back, front = hip[1] - 0.05 * h, hip[1] + 0.1 * h
         ankle = np.array([foot[0], back + 0.25 * (front - back), 0.055 * h])   # over the back quarter of the sole
         knee = (hip + ankle) / 2 + np.array([0, 0.012 * h, 0])
         toe = np.array([foot[0], front - 0.01 * h, 0.01 * h])
