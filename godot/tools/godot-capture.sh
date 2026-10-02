@@ -23,9 +23,13 @@ if [ -z "$HW_NO_IMPORT" ] && { [ ! -f "$cache" ] || [ -n "$(find "$game/scripts"
   env $inject "$godot" --headless --path "$game" --import >/dev/null 2>&1
   touch "$cache"
 fi
-# the server the game starts saves into a scratch folder, never the player's ~/.hellward
-[ -n "$HELLWARD_DATA" ] || { HELLWARD_DATA=$(mktemp -d /tmp/hw-capture-data.XXXXXX); export HELLWARD_DATA; }
+# the server the game starts saves into a scratch folder, never the player's ~/.hellward (removed afterwards)
+made=""
+[ -n "$HELLWARD_DATA" ] || { made=$(mktemp -d /tmp/hw-capture-data.XXXXXX); HELLWARD_DATA=$made; export HELLWARD_DATA; }
 # and the client keeps its settings there too, never in the player's own
 [ -n "$HELLWARD_PREFS" ] || { HELLWARD_PREFS="$HELLWARD_DATA/client-settings.cfg"; export HELLWARD_PREFS; }
 # captures are silent: a recording's soundtrack is mixed from the game's sound log (tools/mixdown.py)
-exec env $inject "$godot" --audio-driver Dummy "$@"
+env $inject "$godot" --audio-driver Dummy "$@"
+code=$?
+[ -z "$made" ] || rm -rf "$made"
+exit $code
