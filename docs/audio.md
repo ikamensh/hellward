@@ -14,13 +14,14 @@ spectrograms and levels, not by ear.
 | `tools/pieces.py` | the pieces' prompts, seeds and style suffixes; `refresh` remakes what changed |
 | `hellward/audio/cues.py` | every cue the scene plays, composed from pieces and `sagaforge.synth` |
 | `hellward/audio/music.py`, `instruments.py` | six dungeon scores, the title and boss music, and their instruments |
-| `hellward/audio/bank.py` | `SoundBank`: the cache, takes, pitch, the voice budget, music crossfades |
+| `tools/export_audio.py` | renders every cue's takes (WAV) and every track (MP3) into the client, `godot/game/assets/audio/` |
+| `godot/game/scripts/sfx.gd` | the client's player: a random take, at most four voices of a cue, positional battle sounds, music buses |
 | `tools/sampler.py` | every cue back to back in one WAV, and the music, to listen to |
 
 ## The cues
 
-A cue with several takes is written as `<cue>_<n>.wav`; the bank never plays the same take twice
-in a row and varies the pitch of repeated cues by up to ±4 % (deaths ±3 %).
+A cue with several takes is written as `<cue>_<n>.wav`; the client picks one at random and plays at most four voices
+of a cue at once (`sfx.gd`), battle sounds placed in the world.
 
 | Cue | Takes | Sound |
 |---|---|---|
@@ -77,12 +78,7 @@ next one.
 
 Each cue is levelled by its loudest 50 ms (RMS): interface 0.06, actions 0.1, battle 0.12,
 alerts 0.16, with a peak cap per class (battle 0.55, so four landing together stay under full
-scale). The bank admits at most four `battle` cues in 0.12 s and eight in 0.5 s, and the same cue
-not again within 0.08 s; tower sounds (casts, hits, door blows, gold) stop one voice short of
-those limits, so the last voice of a burst is always free for a death. Interface cues, actions,
-alerts, leaders, `door_break` and `death_azazel` always play. `x` is accepted by `play` but
-saga2d does not pan effects, so it changes nothing yet. In a demo battle of 300 s the bank played
-415 of 836 requests; deaths were almost never dropped.
+scale). (The 2D game's sound bank also held a battle budget; the Godot client keeps four voices per cue.)
 
 ## The pieces
 
@@ -112,8 +108,8 @@ uv run python tools/pieces.py sampler /tmp/pieces   # pieces.wav + pieces.txt, e
 uv run python tools/sampler.py /tmp/cues --music    # cues.wav + cues.txt, and one WAV per track
 ```
 
-After a refresh, or any change to a cue or the music, bump `VERSION` in `hellward/audio/bank.py`
-so every player's cache is rebuilt, and run `uv run pytest -q tests/test_audio.py`.
+After a refresh, or any change to a cue or the music, render them into the client
+(`uv run python tools/export_audio.py --music`) and run `uv run pytest -q tests/test_audio.py tests/test_client_assets.py`.
 
 ## The music
 
@@ -143,22 +139,16 @@ crossfade in the room; the complete score fades out and plays once. The title re
 | `battle_temple` | ≈5 | B phrygian-dominant: the mother lamp's hall, choir and organ, the heart rising to the last fight |
 | `boss` | about 4 min | Azazel's last wave: the gate's music driven harder, then emptied out at the end |
 
-A location's intro already plays its battle track (`Flow.intro`), so the briefing carries the
-dungeon's feel before the first wave; a defence keeps it, and Azazel's wave breaks in with `boss`.
-`SoundBank.prepare` renders the cues synchronously (about 2.5 s of CPU on an M-series Mac) and
-composes the music in a background thread, title first, then the dungeons in the campaign's order,
-boss last; `bank.music(mood)` starts a track, crossfading 1.5–2.5 s, the moment it is
-on disk. The dungeon and boss scores play once. The cache is about 20 MB of cues and 364 MB
-of music under the game's asset path.
+A location's intro already plays its battle track (`game.gd` `_open_intro`), so the briefing carries the
+dungeon's feel before the first wave; a defence keeps it, and a boss's last wave breaks in with `boss`.
+The client ships every track rendered (MP3) and crossfades between them (`Sfx.music`).
 
 ## Tests
 
-`tests/test_audio.py` prepares a cache once and checks: the cue set is exactly the scene's list
+`tests/test_audio.py` renders the cues and scores once and checks: the cue set is exactly the list
 plus a death per monster; every file is finite, non-silent, under full scale, 0.04–7 s long and
 silent at both edges; interface cues sit under the fight; bigger monsters die lower (spectral
 centroid) and a fireball carries more sub-100 Hz energy than any fire bolt; frost and lightning
-ring brighter than fire; the bell rings on; stingers last 3–6 s; `prepare` is idempotent, restores
-a missing file and discards the cache on a new `VERSION`; the budget holds, keeps the last voice
-for a death, and a second of budget-admitted battle mixes under full scale; takes rotate and pitch
-wanders within ±4 %; music starts, crossfades and waits for its track; each score is stereo,
-the right length, ends cleanly, and has quiet and strong passages.
+ring brighter than fire; the bell rings on; stingers last 3–6 s; each score is stereo, the right
+length, ends cleanly, and has quiet and strong passages. `tests/test_client_assets.py` holds the client to
+the set: it plays every cue, plays nothing that is not rendered, and every file is in its assets.

@@ -1,8 +1,8 @@
 """The campaign's story: every page, what its painted panel shows, and the people and things the panels share.
 
-A page is one painted panel (``hellward/assets/story/<key>.jpg``) and a few paragraphs. A location has a page
+A page is one painted panel (``godot/game/assets/story/<key>.jpg``, which the client shows) and a few paragraphs. A location has a page
 before its first fight and one after its first victory; each act's last fight has no after page, since the act's
-ending takes its place. The prologue is the intro comic (``assets/story/prologue``) and is not here.
+ending takes its place. The prologue is the intro comic (``godot/game/assets/story/prologue``) and is not here.
 ``docs/story.md`` keeps the rules the words follow and the panel bible that :data:`REFERENCES`, :data:`STYLES`
 and each :class:`Page` put into the painter's prompt (``tools/story.py``).
 """
@@ -47,7 +47,7 @@ FRAMING = ("Keep the designs of the reference images, redrawn in this ink style.
 
 @dataclass(frozen=True)
 class Page:
-    key: str                     # its panel's picture, hellward/assets/story/<key>.jpg
+    key: str                     # its panel's picture, godot/game/assets/story/<key>.jpg
     panel: str                   # what the panel shows, for the painter
     text: tuple[str, ...]        # the paragraphs
     refs: tuple[str, ...] = ()   # names in REFERENCES: the figures and objects it shows

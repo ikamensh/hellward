@@ -1,0 +1,69 @@
+# The Windows package: the server's tests on Windows, the simulation compiled with MSVC, the Godot client exported,
+# the packaged server smoke-tested from the package, and the portable zip kept as an artifact (and attached to the
+# release when a v* tag is pushed). The Mac package is built on a Mac: tools/package.py mac.
+name: Windows package
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  package:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: hellward
+      - uses: actions/checkout@v4
+        with:
+          repository: ikamensh/sagaforge
+          path: sagaforge
+      - uses: astral-sh/setup-uv@v6
+      - name: The server's environment
+        working-directory: hellward
+        run: uv sync --extra dev
+      - name: Godot and its export templates
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}-windows
+      - name: Fetch Godot when not cached
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          if [ ! -f templates.tpz ]; then
+            curl -sSL -o editor.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_win64.exe.zip"
+            curl -sSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          fi
+          unzip -oq editor.zip
+          dest="$APPDATA/Godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$dest" && unzip -oq templates.tpz -d tpz && cp -r tpz/templates/* "$dest/"
+          echo "GODOT=$(cygpath -w ~/godot/Godot_v${GODOT_VERSION}-stable_win64_console.exe)" >> "$GITHUB_ENV"
+      - name: The server on Windows
+        working-directory: hellward
+        run: uv run pytest -q tests/test_server.py tests/test_campaign_server.py tests/test_progress.py
+      - name: The client against the server, headless
+        working-directory: hellward/godot
+        run: tools/test.sh
+      - name: Package
+        working-directory: hellward
+        run: uv run python tools/package.py windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hellward-windows
+          path: |
+            hellward/dist/Hellward-*-windows-x64-portable.zip
+            hellward/dist/Hellward-*-windows-x64-portable.json
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: hellward
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/Hellward-*-windows-x64-portable.zip --clobber

@@ -189,8 +189,8 @@ nova route and single-target solutions; the campaign must never require a trophy
 | `sim/level.py` | validated entrances, routes, coverage, gate crossings | position/heading/remaining/coverage by route |
 | `sim/model.py` | deterministic movement, drops, breaches, run receipt | existing commands plus open breach and sell salvage |
 | `sim/skills.py` | bake ranks and an equipped pattern together | immutable run loadout |
-| `ui/progress.py` | best salvage, trophy claims, patterns, equipment | atomic result recording and pre-run equip |
-| `ui/battle.py`, `ui/briefing.py`, `ui/hud.py` | choices and readable threat/reward feedback | world commands and progress operations |
+| `server/progress.py` | best salvage, trophy claims, patterns, equipment | atomic result recording and pre-run equip |
+| `server/battle.py`, `server/campaign.py`, the Godot client's briefing and HUD | choices and readable threat/reward feedback | world commands and progress operations |
 | players, planner, replay, art | follow world/level interface | no direct assumption of one global `s` |
 
 All movement and drops must be deterministic across source, mypyc, clone, pickle and

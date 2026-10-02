@@ -10,3 +10,5 @@ dist/
 *.wav
 !hellward/assets/**/*.png
 !hellward/assets/**/*.wav
+!godot/**/*.png
+!godot/**/*.wav
