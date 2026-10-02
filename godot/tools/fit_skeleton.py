@@ -52,13 +52,14 @@ def armpit(verts: np.ndarray, h: float, s: int, hand: np.ndarray):
     return last
 
 
-def fit(verts: np.ndarray) -> dict:
+def fit(verts: np.ndarray, hands_below: float = 0.85, hands_within: float = 1.0) -> dict:
     h = verts[:, 2].max()
     x, y, z = verts[:, 0], verts[:, 1], verts[:, 2]
     joints = {}
     hands, pits = {}, {}
     for s in (1, -1):
-        band = (z > 0.25 * h) & (z < 0.85 * h) & (s * x > 0)
+        # under a winged body's wings, and no further out than an arm reaches
+        band = (z > 0.25 * h) & (z < hands_below * h) & (s * x > 0) & (s * x < hands_within * h)
         hands[s] = verts[band][np.argmax(s * x[band])]
         za, xa = armpit(verts, h, s, hands[s])
         if 0.6 * h < za < 0.9 * h and 0.04 * h < xa < 0.25 * h:   # a plausible armpit
@@ -137,7 +138,7 @@ def fit(verts: np.ndarray) -> dict:
 
 if __name__ == "__main__":
     d = np.load(sys.argv[1])
-    out = fit(d["verts"])
+    out = fit(d["verts"], float(d["hands_below"]), float(d["hands_within"]))
     print("fit_skeleton:", "robe" if out["robe"] else "legs", f"height {out['height']:.2f}")
     with open(sys.argv[2], "w") as f:
         json.dump(out, f, indent=1)

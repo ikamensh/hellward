@@ -134,7 +134,10 @@ def audit(path: Path, speeds: dict[str, float], flying: set[str] = frozenset()) 
                 fails.append(f"{kind} {name}: ends {height:.2f} m high (stands {stand:.2f})")
             if ground > 0.03:
                 fails.append(f"{kind} {name}: the corpse floats {ground * 100:.1f} cm up")
-        if name == "walk" and kind in speeds and kind not in flying:
+        if name == "walk" and kind not in flying and kind not in speeds:
+            fails.append(f"{kind} walk: monster.gd WALK has no speed for it (its feet say "
+                         f"{ground_speed(body, fs, scene.render.fps):.2f} m/s)")
+        elif name == "walk" and kind not in flying:
             worst = slide(body, fs, speeds[kind], scene.render.fps)
             true = ground_speed(body, fs, scene.render.fps)
             notes.append(f"slide {worst * 100:.1f} cm at WALK {speeds[kind]:.2f} (its feet say {true:.2f} m/s)")

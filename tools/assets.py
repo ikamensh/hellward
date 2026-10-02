@@ -59,10 +59,17 @@ def stand_ins(script: str) -> dict[str, str]:
     return dict(re.findall(r'"([a-z_]+)": \["([a-z_]+)"', block.group(1))) if block else {}
 
 
+def keys(script: str, name: str) -> set[str]:
+    """The kinds a client script's `const NAME := {...}` table lists."""
+    block = re.search(rf"const {name} := \{{(.*?)\}}\s*\n", script, re.S)
+    return set(re.findall(r'"([a-z_]+)":', block.group(1))) if block else set()
+
+
 def monster(kind: str) -> dict:
     """One monster kind's state in the client: its model (or the one it borrows) and what is wrong with it."""
     path = MODELS / f"mon_{kind}.glb"
-    borrowed = stand_ins((GAME / "scripts" / "monster.gd").read_text()).get(kind)
+    script = (GAME / "scripts" / "monster.gd").read_text()
+    borrowed = stand_ins(script).get(kind)
     if not path.is_file():
         problems = [] if borrowed else ["no model and no stand-in"]
         if borrowed and MONSTERS[kind].leader is not None and "cast" not in summary(MODELS / f"mon_{borrowed}.glb")["clips"]:
@@ -76,6 +83,9 @@ def monster(kind: str) -> dict:
         problems += [f"{mat} has no {f}" for f in MAPS if not (TEXTURES / mat / f).is_file()]
     if borrowed:
         problems.append(f"has a model but still wears {borrowed} as a stand-in")
+    # monster.gd shows a kind's own model only once it knows its height; its rim and (a walker's) pace go with it
+    tables = ("HEIGHTS", "RIM") + (() if MONSTERS[kind].flying else ("WALK",))
+    problems += [f"monster.gd {t} has no entry" for t in tables if kind not in keys(script, t)]
     return {"kind": kind, "model": path.name, "stand_in": None, "tris": info["tris"],
             "clips": sorted(info["clips"]), "problems": problems}
 

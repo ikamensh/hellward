@@ -35,12 +35,12 @@ from monsters import (SIDES, TAU, Pose, Q, Rig, bump, ease_in, ease_out, export,
 ARM_R = ("upper_arm.R", "forearm.R", "hand.R")
 
 
-def fit(body: bpy.types.Object) -> dict:
+def fit(body: bpy.types.Object, hands_below: float = 0.85, hands_within: float = 1.0) -> dict:
     """{"joints": {name: Vector}, "robe": bool, "height": h} for `body` standing in the model contract in an A-pose;
     the limbs' middle joints snapped to the middle of the limb's cross-section."""
     verts = np.array([tuple(v.co) for v in body.data.vertices])
     with tempfile.TemporaryDirectory() as tmp:
-        np.savez(Path(tmp) / "in.npz", verts=verts)
+        np.savez(Path(tmp) / "in.npz", verts=verts, hands_below=hands_below, hands_within=hands_within)
         subprocess.run(["uv", "run", "--project", str(lib.ROOT), "python", str(lib.ROOT / "tools" / "fit_skeleton.py"),
                         str(Path(tmp) / "in.npz"), str(Path(tmp) / "out.json")], check=True)
         out = json.loads((Path(tmp) / "out.json").read_text())
@@ -110,6 +110,10 @@ class Spec:
     leader: bool = False                # bakes the cast: needs a staff
     out: str | None = None              # the model's name, if not mon_<kind> (a trial)
     hot: dict | None = None             # what its painting shows burning glows (sculpted.write_maps glow["hot"])
+    hands_below: float = 0.85           # the hands are searched under this share of the height (under the wings)
+    hands_within: float = 1.0           # and no further out than this share of it
+    wings: tuple | None = None          # (root, wrist, tip) of the right wing, as generated; the left mirrors
+    wings_above: float = 0.55           # a wing bone moves only the body above this share of the height
 
 
 class Biped:
@@ -120,7 +124,7 @@ class Biped:
         start()
         k = spec.kind
         obj, m = sculpted.body(k, spec.height, spec.yaw, spec.faces)
-        fitted = fit(obj)
+        fitted = fit(obj, spec.hands_below, spec.hands_within)
         j = fitted["joints"]
         j.update({n: Vector(v) for n, v in spec.joints.items()})
         self.h = fitted["height"]
@@ -143,8 +147,13 @@ class Biped:
         # the heel and sole belong to the foot, not the shin: a shin's weight on them swung them under the ground as
         # the leg pushed off
         ankle = {side: j[f"ankle.{side}"].z for side in ("R", "L")}
-        sculpted.skin(obj, self.rig, masks={f"shin.{side}": (lambda co, hsv, thick, z=ankle[side]: co.z > 0.85 * z)
-                                            for side in ("R", "L")})
+        masks = {f"shin.{side}": (lambda co, hsv, thick, z=ankle[side]: co.z > 0.85 * z) for side in ("R", "L")}
+        if spec.wings:   # a wing's bones move only the wing on their side, above the arms
+            low = spec.wings_above * self.h
+            for s, side in SIDES:
+                for b in (f"wing.{side}", f"wingtip.{side}"):
+                    masks[b] = lambda co, hsv, thick, s=s, low=low: s * co.x > 0.08 * self.h and co.z > low
+        sculpted.skin(obj, self.rig, masks=masks)
         self.rig.repose(sculpted.hang(self.rig, arm=12))
         self.H = self.h / 1.73   # the old human frame's scale: distances in the keyed poses below
         self._weapon()
@@ -166,6 +175,10 @@ class Biped:
             rig.bone(f"thigh.{side}", j[f"hip.{side}"], j[f"knee.{side}"], "hips")
             rig.bone(f"shin.{side}", j[f"knee.{side}"], j[f"ankle.{side}"], f"thigh.{side}")
             rig.bone(f"foot.{side}", j[f"ankle.{side}"], j[f"toe.{side}"], f"shin.{side}")
+            if self.spec.wings:
+                root, wrist, tip = (Vector((s * a[0], a[1], a[2])) for a in self.spec.wings)
+                rig.bone(f"wing.{side}", root, wrist, "chest")
+                rig.bone(f"wingtip.{side}", wrist, tip, f"wing.{side}")
         rig.build()
         return rig
 
@@ -216,6 +229,15 @@ class Biped:
 
     # -- clips
 
+    def flex(self, p: Pose, up: float, back: float = 0.0) -> Pose:
+        """A winged body's wings raised `up` degrees (negative: drooping) and swept `back` degrees behind it; the
+        outer half follows a little more. Nothing for a body without wings."""
+        if self.spec.wings:
+            for s, side in SIDES:
+                p.rot(f"wing.{side}", r=-s * up, y=-s * back)
+                p.rot(f"wingtip.{side}", r=-s * 0.5 * up, y=-s * 0.6 * back)
+        return p
+
     def _hunch(self) -> Pose:
         a = self.spec.hunch
         return Pose().rot("spine", p=-0.4 * a).rot("chest", p=-0.6 * a).rot("neck", p=0.5 * a).rot("head", p=0.5 * a)
@@ -228,7 +250,7 @@ class Biped:
         own = ARM_R if spec.weapon else ()
 
         def walk(t):
-            base = self._hunch()
+            base = self.flex(self._hunch(), 6 * math.sin(TAU * t), 4)   # the wings rise and fall with the stride
             self.carry(base, t)
             p = self.walkc.pose(rig, t, base, arms=spec.arms, own=own)
             if spec.weapon and not spec.weapon.staff:
@@ -236,7 +258,7 @@ class Biped:
             return p
 
         def idle(t):
-            base = self._hunch()
+            base = self.flex(self._hunch(), 4 * math.sin(TAU * t / 1.5), 6)   # breathing, the wings settle
             self.carry(base, t)
             p = self.idlec.pose(rig, t, base, arms=spec.arms, own=own)
             if spec.weapon and not spec.weapon.staff:
@@ -311,7 +333,7 @@ class Biped:
         step = smooth((t - 0.36) / 0.14) * (1 - smooth((t - 0.66) / 0.34))
         feet["L"] = (a + Vector((0, 0.24 * H * step, 0.08 * H * bump(t, 0.36, 0.5))), pitch, yaw)
         plant_legs(rig, p, feet, pole_out=0.2)
-        return p
+        return self.flex(p, 30 * bump(t, 0.1, 0.5) - 10 * bump(t, 0.45, 0.8), -10 * bump(t, 0.1, 0.5))
 
     def jolt(self) -> Pose:
         """The killing blow: the head snaps back, the body rocks back half a step, the arms thrown."""
@@ -367,6 +389,7 @@ class Biped:
         lie, bounce = self.corpse(), self.corpse(lift=0.03 * H)
         p = keyed(t, [(0.0, self.jolt(), ease_out), (0.28, buckle, smooth), (0.5, fall, ease_in),
                       (0.68, lie, ease_in), (0.78, bounce, ease_out), (0.88, lie, ease_in), (1.0, lie, smooth)])
+        self.flex(p, 20 * bump(t, 0.0, 0.3) - 25 * smooth((t - 0.3) / 0.5), 30 * smooth((t - 0.3) / 0.5))
         return self._settle(p, t, 0.28)
 
     def kneel(self, slump: float = 0.0) -> Pose:
@@ -413,6 +436,7 @@ class Biped:
         p = keyed(t, [(0.0, self.jolt(), ease_out), (0.15, thud, ease_in), (0.23, knees, ease_out), (0.32, knees, smooth),
                       (0.48, sag, smooth), (0.66, lie, ease_in), (0.74, bounce, ease_out), (0.84, lie, ease_in),
                       (1.0, lie, smooth)])
+        self.flex(p, -30 * smooth(t / 0.5), 20 * smooth((t - 0.4) / 0.4))   # the wings sag, then spread on the ground
         return self._settle(p, t, 0.12)
 
     def cast(self, t: float) -> Pose:
@@ -432,7 +456,7 @@ class Biped:
         a, pitch, yaw = feet["L"]
         feet["L"] = (a + Vector((0, 0.12 * H * w, 0.03 * H * bump(w, 0.2, 0.8))), pitch, yaw)
         plant_legs(self.rig, p, feet, pole_out=0.2)
-        return p
+        return self.flex(p, 25 * (1 - w), -15 * (1 - w))   # wings flared as it hauls the staff up
 
     def finish(self) -> Path:
         rig = self.rig
