@@ -18,8 +18,9 @@ from sagaforge.foley import mono, read_wav
 from sagaforge.synth import SAMPLE_RATE, write_wav
 
 SCENE_CUES = {"click", "refuse", "build", "upgrade", "sell", "door_build", "door_hit", "door_break", "wave", "cleared", "leak",
-              "gold", "cleanse", "ponder", "chant", "curse", "fizzle", "arrow_cast", "arrow_hit", "fire_cast", "fire_hit", "fireball", "lightning", "frost",
-              "venom_cast", "venom_hit", "victory", "defeat", "smite", "meteor_fall", "meteor", "orb", "ward", "broken"}
+              "gold", "ponder", "chant", "curse", "fizzle", "arrow_cast", "arrow_hit", "ballista_cast", "ballista_hit",
+              "knife_cast", "knife_hit", "hook", "fire_cast", "fire_hit", "fireball", "lightning", "frost", "venom_cast",
+              "venom_hit", "victory", "defeat", "smite", "hymn", "meteor_fall", "meteor", "orb", "returned"}
 STEMS = list(files())
 
 

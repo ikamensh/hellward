@@ -537,7 +537,7 @@ def soundtrack(out: Path, plan: dict) -> np.ndarray:
         for name, at, *gain in shot.sounds:
             lay(track, cue(name), row["start"] + at, gain[0] if gain else 0.45)
     title = shots[-1]["start"]
-    lay(track, cue("cleanse"), title + 0.9, 0.6)
+    lay(track, cue("hymn"), title + 0.9, 0.6)
     lay(track, cue("cleared"), title + 1.9, 0.5)
     lay(track, cue("wave"), title + 2.0, 0.3)
     speaking = speech > 0.02

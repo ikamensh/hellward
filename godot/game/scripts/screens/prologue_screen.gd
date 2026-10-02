@@ -43,7 +43,7 @@ const CUES := {"glass": [["wave", 0.3, CUE_DB]], "fire": [["fireball", 0.1, CUE_
 	"thunder": [["lightning", 0.05, CUE_DB]], "frost": [["frost", 0.05, CUE_DB]], "dead": [["venom_cast", 0.0, -10.0]],
 	"priest": [["ponder", 0.2, CUE_DB]], "bones": [["chant", 1.5, CUE_DB]],
 	"curse": [["curse", 0.2, CUE_DB], ["door_hit", 1.2, CUE_DB], ["door_hit", 2.1, CUE_DB]],
-	"ember": [["leak", 1.2, CUE_DB]], "title": [["cleanse", 0.9, -4.0], ["cleared", 1.9, -6.0], ["wave", 2.0, -10.0]]}
+	"ember": [["leak", 1.2, CUE_DB]], "title": [["hymn", 0.9, -4.0], ["cleared", 1.9, -6.0], ["wave", 2.0, -10.0]]}
 
 var _shots: Array
 var _words: Array

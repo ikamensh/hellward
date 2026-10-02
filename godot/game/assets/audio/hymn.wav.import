@@ -2,13 +2,13 @@
 
 importer="wav"
 type="AudioStreamWAV"
-uid="uid://bv8d3b2hou68s"
-path="res://.godot/imported/ward.wav-1d7915adf9fccaa335c88404347f0740.sample"
+uid="uid://bxks5ccsqftdv"
+path="res://.godot/imported/hymn.wav-d57f2b6f032677aac7f82619519957f0.sample"
 
 [deps]
 
-source_file="res://assets/audio/ward.wav"
-dest_files=["res://.godot/imported/ward.wav-1d7915adf9fccaa335c88404347f0740.sample"]
+source_file="res://assets/audio/hymn.wav"
+dest_files=["res://.godot/imported/hymn.wav-d57f2b6f032677aac7f82619519957f0.sample"]
 
 [params]
 
