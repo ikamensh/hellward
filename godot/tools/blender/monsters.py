@@ -451,6 +451,25 @@ def foot_track(phase: float, stride: float, lift: float, duty: float = 0.6, ankl
     return dy, za, pitch
 
 
+def foldable(rig: Rig, pose: Pose, feet: dict[str, tuple], margin: float = 0.02) -> None:
+    """Lift the hips just enough that each leg can still fold to its foot: a leg reaches no nearer than its long bone
+    minus its short one (a goat's long shin), and a crouch or a bob sunk deeper than that drove the hoof into the
+    ground."""
+    lift = 0.0
+    for s, side in SIDES:
+        if side not in feet:
+            continue
+        th, sh = f"thigh.{side}", f"shin.{side}"
+        near = abs((rig.tail[th] - rig.head[th]).length - (rig.tail[sh] - rig.head[sh]).length) + margin
+        hip = rig.where(pose, "hips", rig.head[th])
+        d = Vector(feet[side][0]) - hip
+        flat = d.x * d.x + d.y * d.y
+        if d.length < near and flat < near * near:
+            lift = max(lift, math.sqrt(near * near - flat) - (hip.z - Vector(feet[side][0]).z))
+    if lift > 0:
+        pose.move("hips", z=lift)
+
+
 def plant_legs(rig: Rig, pose: Pose, feet: dict[str, tuple], pole_out: float = 0.45) -> None:
     """IK both legs to ankle targets {side: (Vector ankle, pitch, yaw)}; knees forward (and a little out)."""
     for s, side in SIDES:
@@ -534,7 +553,7 @@ def start() -> None:
 def imp_stance(k: float = 1.0) -> Pose:
     p = Pose()
     p.move("hips", z=-0.07 * k).rot("hips", p=-16)
-    p.rot("spine", p=-6).rot("chest", p=-10).rot("neck", p=14).rot("head", p=18).rot("jaw", p=-7)
+    p.rot("spine", p=-6).rot("chest", p=-10).rot("neck", p=14).rot("head", p=18).rot("jaw", p=-16)   # a snarl
     for s, side in SIDES:
         p.rot(f"upper_arm.{side}", p=12, r=-s * 10)
         p.rot(f"forearm.{side}", p=28)
@@ -567,7 +586,7 @@ def imp_walk(rig: Rig, k: float, t: float, stride: float = 0.16, hold=None, crou
     p.rot("neck", p=-7 * math.cos(2 * TAU * (t - 0.2)) * bob / 0.034)
     p.rot("hips", r=6 * wave(t), y=-11 * c, p=-3 * math.cos(2 * TAU * (t - 0.1)))
     p.rot("spine", y=5 * c, p=-3)
-    p.rot("chest", y=10 * c, p=-5 * math.cos(2 * TAU * (t - 0.12)) - 4)
+    p.rot("chest", y=10 * c, r=5 * wave(t, 1, 0.1), p=-5 * math.cos(2 * TAU * (t - 0.12)) - 4)   # the shoulders roll
     # the head darts about, out of step with the stride: an imp looks for something to stab
     p.rot("head", y=-5 * c + 12 * wave(t, 1, 0.37) * bump(t, 0.3, 0.8), p=6 * math.cos(2 * TAU * (t - 0.2)) + 4)
     for s, side in SIDES:
@@ -589,6 +608,7 @@ def imp_walk(rig: Rig, k: float, t: float, stride: float = 0.16, hold=None, crou
                                   clear=sole.get("clear", 1.0))
         a = rig.head[f"foot.{side}"]
         feet[side] = (Vector((a.x + s * 0.01 * k, a.y + dy, z)), pitch, -s * 6)
+    foldable(rig, p, feet)
     plant_legs(rig, p, feet)
     return p
 
@@ -640,7 +660,7 @@ def imp_die(rig: Rig, k: float, t: float, lie_z: float = 0.1, hand_r: Quaternion
     settle = imp_corpse(rig, k, lie_z, settle=1.0, hand_r=hand_r, wrist_z=wrist_z, foot_pitch=foot_pitch)
     feet = imp_feet(rig, k)
     if hold:   # called with each key's time, so a held weapon can follow the collapse
-        for q, tk in ((recoil, 0.0), (buckle, 0.26)):
+        for q, tk in ((recoil, 0.0), (buckle, 0.18)):
             hold(q, tk)
     if "crest" in rig.defs:
         recoil.rot("crest", p=-16)
@@ -648,9 +668,9 @@ def imp_die(rig: Rig, k: float, t: float, lie_z: float = 0.1, hand_r: Quaternion
     for q in (recoil, buckle):
         plant_legs(rig, q, feet)
     # it opens on the blow (a battle cross-fades into it from the walk): no standing frames before the death
-    p = keyed(t, [(0.0, recoil, ease_out), (0.26, buckle, smooth), (0.46, fall, ease_in),
-                  (0.62, lie, ease_in), (0.72, lie_b, ease_out), (0.82, lie, ease_in), (1.0, settle, smooth)])
-    if t < 0.26:
+    p = keyed(t, [(0.0, recoil, ease_out), (0.18, buckle, smooth), (0.38, fall, ease_in),
+                  (0.56, lie, ease_in), (0.66, lie_b, ease_out), (0.76, lie, ease_in), (1.0, settle, smooth)])
+    if t < 0.18:
         plant_legs(rig, p, feet)
     else:   # the legs fly free: no hoof through the ground
         lift_feet(rig, p, 0.06 * k)
@@ -659,8 +679,12 @@ def imp_die(rig: Rig, k: float, t: float, lie_z: float = 0.1, hand_r: Quaternion
 
 
 def imp_die_forward(rig: Rig, k: float, t: float, lie_z: float = 0.12, hold=None, hand_r: Quaternion | None = None) -> Pose:
-    """The second death: hit in the back, it lurches forward, stumbles a step and pitches onto its face, arms
-    under it, one leg kicking once."""
+    """The second death: hit in the back, it arches upright with the blow, lurches forward, stumbles a step and
+    pitches onto its face, arms under it, one leg kicking once."""
+    struck = imp_stance(k).move("hips", y=0.03 * k, z=0.02 * k).rot("hips", p=6)
+    struck.rot("spine", p=8).rot("chest", p=14).rot("neck", p=8).rot("head", p=24).rot("jaw", p=-34)
+    for s, side in SIDES:
+        struck.rot(f"upper_arm.{side}", p=-34, r=-s * 26).rot(f"forearm.{side}", p=14).rot(f"ear.{side}", r=-s * 24)
     lurch = imp_stance(k).move("hips", y=0.07 * k, z=-0.03 * k).rot("hips", p=-18)
     lurch.rot("chest", p=-22, y=10).rot("head", p=-16, y=-10).rot("jaw", p=-30)
     for s, side in SIDES:
@@ -674,6 +698,7 @@ def imp_die_forward(rig: Rig, k: float, t: float, lie_z: float = 0.12, hold=None
     step = dict(feet)
     a, pitch, yaw = step["L"]
     step["L"] = (a + Vector((0, 0.16 * k, 0)), pitch, yaw)
+    plant_legs(rig, struck, feet)
     plant_legs(rig, lurch, feet)
     plant_legs(rig, stumble, step)
     hz = rig.head["hips"].z
@@ -689,7 +714,7 @@ def imp_die_forward(rig: Rig, k: float, t: float, lie_z: float = 0.12, hold=None
         rig.orient(face, "hand.R", hand_r)
         rig.orient(kick, "hand.R", hand_r)
     if hold:
-        for q, tk in ((lurch, 0.0), (stumble, 0.24)):
+        for q, tk in ((struck, 0.0), (lurch, 0.12), (stumble, 0.28)):
             hold(q, tk)
     if "crest" in rig.defs:
         face.rot("crest", p=-45)   # face down, the feathers fall flat ahead of its head
@@ -697,7 +722,7 @@ def imp_die_forward(rig: Rig, k: float, t: float, lie_z: float = 0.12, hold=None
     settle = face.copy()
     if "eyes" in rig.defs:
         settle.scale("eyes", 0.02)
-    p = keyed(t, [(0.0, lurch, ease_out), (0.24, stumble, smooth), (0.5, face, ease_in),
+    p = keyed(t, [(0.0, struck, ease_out), (0.12, lurch, smooth), (0.28, stumble, smooth), (0.5, face, ease_in),
                   (0.64, kick, ease_out), (0.8, face, smooth), (1.0, settle, smooth)])
     return p
 

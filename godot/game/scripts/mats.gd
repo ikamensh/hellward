@@ -112,7 +112,7 @@ const FLESH := {"mon_fallen": Color(0.55, 0.06, 0.02), "mon_shaman": Color(0.55,
 
 # fine surface for a close look, laid over a generated body's own maps as a world-scaled triplanar detail normal:
 # [library texture set, metres per repeat]
-const GRAIN := {"mon_fallen": ["demon_skin", 0.18], "mon_shaman": ["demon_skin", 0.2],
+const GRAIN := {"mon_fallen": ["demon_skin", 0.12], "mon_shaman": ["demon_skin", 0.13],
 	"mon_zombie": ["corpse_skin", 0.25], "mon_skeleton": ["bone", 0.15]}
 
 
@@ -128,7 +128,9 @@ static func monster(kind: String) -> ORMMaterial3D:
 		m.detail_normal = load(TEX + String(GRAIN[kind][0]) + "_normal.png")
 		m.detail_albedo = _flat_texture(Color.WHITE)   # the colour left as it is (multiplied by white)
 		m.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
-		m.detail_mask = _flat_texture(Color(0.45, 0.45, 0.45))   # the grain under the body's own forms, not instead
+		# the grain under the body's own forms, not instead; a hide's wrinkles and veins show more than bone's
+		var share := 0.55 if kind in ["mon_fallen", "mon_shaman"] else 0.45
+		m.detail_mask = _flat_texture(Color(share, share, share))
 	if FLESH.has(kind):
 		m.backlight_enabled = true
 		m.backlight = FLESH[kind]

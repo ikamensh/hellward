@@ -52,23 +52,24 @@ def card(bm: bmesh.types.BMesh, root: Vector, up: Vector, side: Vector, length: 
 
 
 def crest(name: str, root: Vector, length: float, width: float = 0.05) -> bpy.types.Object:
-    """A double fan of feathers on the crown at `root`, in the posing rest (the monster facing +Y): eight long ones
-    behind, spread side to side and leaning back, five shorter ones in front of them, more upright; the middle
-    ones longest, every third golden."""
+    """A crown of feathers on the head at `root`, in the posing rest (the monster facing +Y): eight long ones
+    behind, spread side to side and leaning a little back, five shorter ones in front of them standing upright, so
+    it reads from above and in profile; the middle ones longest, crimson and gold by turns. Upright: leaning back,
+    they read from the battle camera as spines down its back."""
     bm = bmesh.new()
-    rows = ((8, 96.0, 30.0, 1.0, Vector((0, -0.025, 0))), (5, 56.0, 14.0, 0.7, Vector((0, 0.03, -0.01))))
+    rows = ((8, 86.0, 6.0, 1.0, Vector((0, -0.03, 0))), (5, 50.0, -6.0, 0.72, Vector((0, 0.03, -0.01))))
     k = 0
     for n, spread, lean, size, shift in rows:
         for i in range(n):
             f = i / (n - 1) - 0.5                     # -0.5 (its right) .. 0.5 (its left)
             tilt = math.radians(spread * f)
-            back = math.radians(lean + 14 * abs(f))
+            back = math.radians(lean + 8 * abs(f))
             up = Vector((math.sin(tilt), -math.sin(back), math.cos(tilt) * math.cos(back)))
             side = Vector((math.cos(tilt), 0, -math.sin(tilt)))
             at = root + shift + Vector((0.05 * f, -0.03 * abs(f), -0.03 * (2 * f) ** 2))
             ln = length * size * (1.0 - 0.3 * (2 * f) ** 2) * (0.9 + 0.2 * ((k * 37) % 7) / 6)
             card(bm, at, up, side, ln, width * (0.85 + 0.3 * ((k * 53) % 5) / 4), curl=0.2 * ln, fold=0.4,
-                 gold=k % 3 == 1, seed=k)
+                 gold=k % 2 == 1, seed=k)
             k += 1
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
@@ -99,7 +100,7 @@ def write_maps(kind: str) -> None:
     quill = np.clip(1 - np.abs(a) / 0.06, 0, 1)
     band = np.exp(-((v - 0.8) / 0.05) ** 2)          # a dark bar across the crimson ones near the tip
     crimson = np.array([0.42, 0.035, 0.03])[None, None] * (0.45 + 0.7 * v[..., None]) * (1 - 0.6 * band[..., None])
-    golden = np.stack([0.6 + 0.1 * v, 0.28 + 0.22 * v, 0.04 + 0.03 * v], -1)
+    golden = np.stack([0.66 + 0.1 * v, 0.42 + 0.2 * v, 0.05 + 0.04 * v], -1)   # yellow, not orange, under a fire
     into = np.clip((v - 0.25) / 0.2, 0, 1)[..., None]   # gold ones are crimson at the root
     base = np.where(gold[..., None], crimson * 1.1 * (1 - into) + golden * into, crimson)
     shade = (1 - 0.45 * np.abs(a) ** 3) * (0.62 + 0.38 * ridge)

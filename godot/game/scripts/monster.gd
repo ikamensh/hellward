@@ -5,14 +5,15 @@ extends Node3D
 ## it moves. Its death, its leak into the sanctuary and a leader's curse come as events (World._event).
 
 # kinds with a model of their own; the others wear the nearest one, tinted and sized (`STAND_INS`) until theirs exist
-const HEIGHTS := {"fallen": 1.2, "shaman": 1.75, "zombie": 1.9, "skeleton": 1.85}
+const HEIGHTS := {"fallen": 1.2, "shaman": 1.95, "zombie": 1.9, "skeleton": 1.85}
 const BODY := 1.3                    # bodies a size up from life, so they read from the battle camera
-# each kind's rim (and its x-ray behind a tower): Fallen ember, Shaman violet, Zombie grave-green, Skeleton bone
-const RIM := {"fallen": Color(1.0, 0.32, 0.1), "shaman": Color(0.8, 0.3, 1.0), "zombie": Color(0.35, 0.7, 0.25),
-	"skeleton": Color(0.9, 0.88, 0.75)}
+# each kind's rim (and its x-ray behind a tower): Fallen ember, Shaman crimson (the leader's violet is its skull's
+# eyes and its ring, never on its hide), Zombie grave-green, Skeleton bone
+const RIM := {"fallen": Color(1.3, 0.4, 0.12), "shaman": Color(1.25, 0.26, 0.22), "zombie": Color(0.5, 0.6, 0.38),
+	"skeleton": Color(0.72, 0.68, 0.56)}   # dimmer: a bright rim on every thin bone shimmers at range
 const KINDGLOW := 0.25              # how strongly that rim lights a living body at any distance
 # how fast each walk cycle carries the body at speed_scale 1 (m/s): the walk plays faster as the body speeds up
-const WALK := {"fallen": 0.67, "shaman": 0.85, "zombie": 0.44, "skeleton": 0.89}
+const WALK := {"fallen": 0.86, "shaman": 0.94, "zombie": 0.44, "skeleton": 0.89}
 # a kind without a model: [the model it borrows, its tint]; its height follows its size in the rules
 const STAND_INS := {
 	"goatman": ["zombie", Color(0.55, 0.38, 0.22)], "overlord": ["zombie", Color(0.75, 0.2, 0.12)],

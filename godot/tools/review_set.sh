@@ -9,10 +9,12 @@ tmp=$(mktemp -d /tmp/hw-review.XXXXXX)
 for k in fallen shaman zombie skeleton; do
   tools/preview.sh "mon_$k" "$out/turntable_$k.png" views=8 pitch=12 >/dev/null
 done
-tools/review.sh mon_fallen "$out/clips_fallen.png" "anims=walk attack die die2" >/dev/null
-tools/review.sh mon_shaman "$out/clips_shaman.png" "anims=walk attack cast die die2" >/dev/null
-tools/review.sh mon_zombie "$out/clips_zombie.png" "anims=walk attack die die2" >/dev/null
-tools/review.sh mon_skeleton "$out/clips_skeleton.png" "anims=walk attack die die2" >/dev/null
+# clips from three-quarters side, as the battle camera sees monsters cross the road (from the front a stride
+# foreshortens away and a walk reads as standing still)
+tools/review.sh mon_fallen "$out/clips_fallen.png" "anims=walk attack die die2" yaw=240 >/dev/null
+tools/review.sh mon_shaman "$out/clips_shaman.png" "anims=walk attack cast die die2" yaw=240 >/dev/null
+tools/review.sh mon_zombie "$out/clips_zombie.png" "anims=walk attack die die2" yaw=240 >/dev/null
+tools/review.sh mon_skeleton "$out/clips_skeleton.png" "anims=walk attack die die2" yaw=240 >/dev/null
 for v in fallen:0.7:1.9 shaman:1.05:3.0 zombie:1.25:3.0 skeleton:1.2:3.0; do
   k=${v%%:*}; rest=${v#*:}; f=${rest%%:*}; d=${rest#*:}
   mkdir -p "$tmp/$k"

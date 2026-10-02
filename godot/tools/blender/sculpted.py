@@ -452,13 +452,14 @@ def family_weights(rgb: np.ndarray, pos: np.ndarray, families: dict, sigma: floa
 
 def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Image], glow=None, metal=None,
                rough=None, colour=None, cavity: float = 0.45, families=None, looks=None,
-               fill: float = 0.0) -> Path:
+               fill=0.0) -> Path:
     """game/assets/textures/mon_<kind>/: albedo.webp, normal.webp, orm.webp (occlusion, roughness, metal) and,
     given `glow`, emission.webp. Each has an .import that compresses it for the GPU with mipmaps.
 
-    glow: {"eyes": [hint, ...], "colour": (r, g, b), "radius": metres}: each eye is found as the yellowest,
-    brightest texels within 4 cm of its hint (falling back to the hint), and a ball of `radius` round it lights up
-    in `colour` (eyes, embers in sockets).
+    glow: {"eyes": [hint, ...], "colour": (r, g, b), "radius": metres, "find": mode}: each eye is found as the
+    yellowest, brightest texels within 3 cm of its hint ("dark": the darkest, a socket; "bright": the palest, a
+    painted milky eye; "fixed": the hint itself), and a ball of `radius` round it lights up in `colour` (eyes,
+    embers in sockets).
     metal: f(hue, sat, val, position) -> 0..1, where the surface is metal. The generator's own metalness is not
     trusted (it reads glossy painted skin as metal), so without it everything is a dielectric.
     rough: f(hue, sat, val, roughness, occlusion) -> roughness: a monster's own surfaces (oily hide, wet wounds,
@@ -522,13 +523,16 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
         lit = np.zeros((h, h), np.float32)
         warm = (hue > 15) & (hue < 75)
         score = val * sat * warm
-        r = glow.get("radius", 0.012)
+        r = (glow or {}).get("radius", 0.012)
         for hint in (glow or {}).get("eyes", []):
             d = np.linalg.norm(pos - np.array(hint), axis=-1)
             near = d < 0.03
             best = near & (score >= np.percentile(score[near], 97)) & (score > 0.25) if near.any() else near
             if glow.get("find") == "dark":
                 best = best & False
+            if glow.get("find") == "bright" and near.any():   # painted milky or white eyes: the palest texels
+                pale = val * (1 - sat)
+                best = near & (pale >= np.percentile(pale[near], 95))
             if best.sum() < 6 and near.any():   # no painted glow: the eye is the socket, the darkest spot near
                 best = near & (val <= np.percentile(val[near], 5))
             centre = np.median(pos[best], axis=0) if best.sum() >= 6 and glow.get("find") != "fixed" else np.array(hint)
@@ -537,7 +541,7 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
         # the glow, and a faint fill of the body's own colours: under the blue moon a red hide would go grey-black
         # with nothing else lighting it
         eyes = np.array((glow or {}).get("colour", (1.0, 0.72, 0.15)))[None, None, :] * lit[..., None]
-        save(np.maximum(eyes, albedo[..., :3] * fill), folder / "emission.webp", data=False)
+        save(np.maximum(eyes, albedo[..., :3] * np.asarray(fill)), folder / "emission.webp", data=False)   # fill: a share or (r, g, b)
         names.append("emission")
     for name in names:
         # the glow map has no mipmaps: averaged down, an eye's few lit texels bled into the neighbouring islands of
@@ -696,13 +700,13 @@ def iron(hue, sat, val, pos):
 
 
 # worn steel: grey, a little rust in its pits, bright where it is smooth
-STEEL = {"colour": lambda rgb, pos: grade(sat=0.3, value=1.1, toward=(0.34, 0.33, 0.32), mix=0.6, mottle=0.2,
+STEEL = {"colour": lambda rgb, pos: grade(sat=0.3, value=1.3, toward=(0.42, 0.41, 0.4), mix=0.6, mottle=0.2,
                                           scale=0.02)(rgb, pos),
          "rough": lambda ao: 0.3 + 0.45 * (1 - ao), "metal": 0.85}
 
 
 def prop(kind: str, length: float, yaw: float = 180.0, metal=iron, faces: int = 1500, colour=None,
-         rough=None, glow=None, families=None, looks=None) -> tuple[bpy.types.Object, dict]:
+         rough=None, glow=None, families=None, looks=None, fill=0.0) -> tuple[bpy.types.Object, dict]:
     """A generated prop (art/gen/<kind>/: a weapon, a staff, a shield) stood upright `length` metres long, its maps
     baked like a body's (material mon_<kind>). Returns it with its frame from the shape's spread (PCA): "axis",
     the long direction pointing up; "flat", across its thinnest; "centre", its middle."""
@@ -710,7 +714,7 @@ def prop(kind: str, length: float, yaw: float = 180.0, metal=iron, faces: int = 
     obj, m = body(kind, length, yaw, faces)
     if not os.environ.get("HW_FAST"):
         write_maps(kind, obj, bake_detail(obj, kind, m), metal=metal, colour=colour, rough=rough, glow=glow,
-                   families=families, looks=looks)
+                   families=families, looks=looks, fill=fill)
     name_material(obj, f"mon_{kind}")
     co = np.array([v.co for v in obj.data.vertices])
     c = co.mean(0)
@@ -767,19 +771,21 @@ def _skin_red(hue, sat):
 
 
 def wounds(rgb) -> np.ndarray:
-    """Where the generator painted open wounds and sores: dark, saturated red."""
+    """Where the generator painted open wounds, sores and rot: dark, saturated red, or near black."""
     hue, sat, val = _hsv(rgb)
-    return ((hue < 20) | (hue > 300)) & (sat > 0.45) & (val < 0.4)
+    return (((hue < 20) | (hue > 300)) & (sat > 0.45) & (val < 0.4)) | (val < 0.09)
 
 
 def corpse_colour(rgb, hue, sat, val, pos):
-    """A sickly olive corpse, bruised violet in blotches: yellow enough that the blue moon leaves it green, not
-    grey-blue (docs/monsters.md L3); its wounds dark, wet red."""
+    """The concept's corpse: ash-grey with a sick olive cast (the lightest thing on a dark street, so it reads; never
+    the teal or slime green the moon pushes a greener skin to), livid violet bruises in blotches; its wounds and
+    rot wet red-purple flesh, not black."""
     g = _grey(rgb)
-    sick = (g + (rgb - g) * 0.1) * np.array([0.95, 1.04, 0.66]) * _mottle(pos, 0.09, 0.16)   # no painted cyan
-    bruise = np.clip(_mottle(pos, 0.05, 1.0) - 1.6, 0, 0.4)[..., :1] / 0.4   # a few violet blotches
-    sick = sick * (1 - 0.5 * bruise) + g * np.array([0.75, 0.55, 0.85]) * 0.5 * bruise
-    return np.where(wounds(rgb)[..., None], rgb * np.array([0.8, 0.55, 0.55]), sick)
+    pale = np.clip(g * 1.35, 0.0, 0.55) * np.array([0.98, 0.97, 0.86]) * _mottle(pos, 0.09, 0.14)
+    bruise = np.clip(_mottle(pos, 0.06, 1.0) - 1.5, 0, 0.4)[..., :1] / 0.4
+    sick = pale * (1 - 0.6 * bruise) + np.clip(g * 1.2, 0, 0.5) * np.array([0.72, 0.5, 0.78]) * 0.6 * bruise
+    flesh = np.array([0.34, 0.09, 0.1]) * (0.6 + 0.8 * g / max(float(g.mean()), 1e-3) * 0.5)
+    return np.where(wounds(rgb)[..., None], flesh, sick)
 
 
 def bone_colour(rgb, hue, sat, val, pos):
@@ -787,7 +793,8 @@ def bone_colour(rgb, hue, sat, val, pos):
     iron and the cloth a grade duller."""
     boneish = (((hue > 15) & (hue < 60)) & (sat < 0.65) & (val > 0.12))[..., None]
     g = _grey(rgb)
-    ivory = np.clip(g * 1.4, 0.0, 0.52) * np.array([1.0, 0.88, 0.68]) * _mottle(pos, 0.05, 0.14)
+    # grey-ivory, not yellow: a fire turned a yellower bone traffic-cone orange beside the moonlit rest of it
+    ivory = np.clip(g * 1.5, 0.0, 0.58) * np.array([0.95, 0.93, 0.87]) * _mottle(pos, 0.12, 0.12)   # broad: no speckle
     red = _skin_red(hue, sat)
     return np.where(red, (g + (rgb - g) * 0.7) * 0.85, np.where(boneish, ivory, rgb))
 
@@ -861,7 +868,7 @@ def kmeans(x: np.ndarray, k: int, seed: int = 1, rounds: int = 40) -> np.ndarray
     return c[np.argsort(c[:, 0])]   # darkest first
 
 
-DIRT = np.array((0.16, 0.11, 0.07))   # the dried mud a walker's legs gather
+DIRT = np.array((0.15, 0.12, 0.09))   # the dried mud a walker's legs gather
 
 
 def grade(sat: float = 1.0, value: float = 1.0, toward=None, mix: float = 0.0, mottle: float = 0.0, scale: float = 0.07,
@@ -878,7 +885,7 @@ def grade(sat: float = 1.0, value: float = 1.0, toward=None, mix: float = 0.0, m
         if mottle:
             out = out * _mottle(pos, scale, mottle)
         if grime:
-            w = grime * np.clip(1.0 - pos[..., 2:3] / knee, 0.0, 1.0) ** 1.5 * _mottle(pos, 0.05, 0.5)
+            w = grime * np.clip(1.0 - pos[..., 2:3] / knee, 0.0, 1.0) ** 1.5 * _mottle(pos, 0.1, 0.5)
             out = out * (1 - w) + DIRT * (0.6 + g) * w
         return out
     return fn

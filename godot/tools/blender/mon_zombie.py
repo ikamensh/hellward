@@ -40,16 +40,21 @@ LOOKS = {
              "metal": 0.9},
 }
 body = sculpted.prepare(
-    "zombie", HEIGHT, yaw=180, faces=9000, families=FAMILIES, looks=LOOKS, fill=0.14,   # olive, not teal, in the moon
-    glow={"eyes": [(0.04, 0.287, 1.825), (0.11, 0.273, 1.825)], "radius": 0.011, "colour": (0.7, 0.85, 0.55)})   # milky
+    "zombie", HEIGHT, yaw=180, faces=9000, families=FAMILIES, looks=LOOKS, fill=0.14)   # its eyes are the head's
 
 
 def BELLY(p):
     """The concept's slumped gut: the front of the belly pushed forward and down (a pear in profile)."""
     if p.y < 0.0 or abs(p.x) > 0.32:
         return p
-    w = sculpted.smooth(1.0 - abs(p.z - 1.1) / 0.3) * sculpted.smooth(p.y / 0.18) * sculpted.smooth(1 - abs(p.x) / 0.32)
-    return Vector((p.x * (1 + 0.22 * w), p.y + 0.16 * w, p.z - 0.06 * w))   # wider than the hips from the front
+    w = sculpted.smooth(1.0 - abs(p.z - 1.1) / 0.32) * sculpted.smooth(p.y / 0.18) * sculpted.smooth(1 - abs(p.x) / 0.32)
+    return Vector((p.x * (1 + 0.3 * w), p.y + 0.22 * w, p.z - 0.08 * w))   # wider than the hips from the front
+
+
+def BULK(p):
+    """The concept's slab of a body: the trunk and shoulders broad and deep (the generator made a gaunt old man)."""
+    w = sculpted.smooth((p.z - 0.95) / 0.12) * (1 - sculpted.smooth((p.z - 1.66) / 0.06))
+    return Vector((p.x * (1 + 0.28 * w), -0.02 + (p.y + 0.02) * (1 + 0.18 * w), p.z))
 
 
 def NECK(p):
@@ -60,7 +65,7 @@ def NECK(p):
 
 
 def SHAPE(p):
-    return NECK(BELLY(p))
+    return NECK(BULK(BELLY(p)))
 
 
 sculpted.reshape(body, SHAPE)
@@ -128,12 +133,17 @@ def linen(co, thick):
     return abs(co.x) < 0.32 and (thick < 0.04 or thick > 0.29 or off_legs(co))
 
 
-# the shroud cut above the knee (it hung to the shins and made the legs stubs under a column), the shins thinner:
-# a fat corpse on stick legs
+# the shroud cut above the knee (it hung to the shins and made the legs stubs under a column)
 thick = sculpted.thickness(body)
 print("trimmed", sculpted.trim(body, np.array([v.co.z < 0.6 and linen(v.co, thick[v.index]) for v in body.data.vertices])),
       "linen vertices")
-print("thinned", sculpted.thicken(body, rig, ["shin.R", "shin.L"], 0.85, reach=0.1), "vertices")
+print("thickened", sculpted.thicken(body, rig, ["thigh.R", "thigh.L"], 1.2, reach=0.14)
+      + sculpted.thicken(body, rig, ["shin.R", "shin.L"], 1.1, reach=0.1), "vertices")   # the concept's tree-trunk legs
+# the generated head was a featureless sack: it is cut off at the jaw, and a head generated alone from its own
+# concept (art/gen/zombie_head: a face, milky eyes, a slack jaw, hair) is set on the neck once the rig is posed
+NECK_TOP = 1.74
+print("trimmed", sculpted.trim(body, np.array([v.co.z > NECK_TOP and (v.co.x - 0.07) ** 2 + (v.co.y - 0.2) ** 2 < 0.19 ** 2
+                                               for v in body.data.vertices])), "head vertices")
 sculpted.skin(body, rig, sigma=0.035, masks={
     "cloth.F": lambda co, hsv, thick: 0.7 < co.z < 1.08 and co.y > -0.02 and linen(co, thick),
     "cloth.F2": lambda co, hsv, thick: 0.4 < co.z < 0.86 and co.y > -0.02 and linen(co, thick),
@@ -148,6 +158,22 @@ for i, (start, out) in enumerate((((0.12, -0.8, 1.3), (0.2, -0.85, 0.4)), ((-0.2
     sculpted.give(shaft, rig, "chest")
 rig.repose(sculpted.hang(rig, arm=12))
 rig.springs = {"cloth.F": (35.0, 0.3, 0.7), "cloth.F2": (30.0, 0.25, 0.8), "cloth.B": (35.0, 0.3, 0.7)}
+
+HEAD_LEN = 0.52   # stump to crown; the head itself a third of that, as big as the concept's
+hk = HEAD_LEN / 0.4   # the hints below were read off tools/blender/views.py --stand 0.4 180
+head, _ = sculpted.prop(
+    "zombie_head", HEAD_LEN, metal=None, faces=5000, fill=0.14,
+    colour=lambda rgb, hue, sat, val, pos: sculpted.grade(sat=0.75, value=1.05, mottle=0.1)(rgb, pos),
+    rough=lambda hue, sat, val, rough, ao: np.where(((hue < 20) | (hue > 300)) & (sat > 0.45) & (val < 0.4), 0.25,
+                                                    0.7 + 0.15 * (1 - ao)),   # a wet mouth and torn neck
+    glow={"eyes": [(0.044 * hk, 0.1 * hk, 0.306 * hk), (-0.031 * hk, 0.1 * hk, 0.306 * hk)], "radius": 0.009 * hk,
+          "colour": (0.62, 0.7, 0.55), "find": "bright"})   # dead eyes, a faint cold gleam
+# it was made thrown back, face to the sky: pitched forward about its ears to look ahead, the stump sinking back
+# into the neck, the ears where the old head's were
+EARS_AT = Vector((0.0, -0.03, 0.22)) * hk
+PITCH = -32.0
+sculpted.attach(head, rig, "head", Matrix.Translation(Vector((0.07, 0.19, 1.86)))
+                @ Matrix.Rotation(math.radians(PITCH), 4, "X") @ Matrix.Translation(-EARS_AT))
 HD = rig.head
 
 
@@ -161,16 +187,22 @@ def walk(t):
     """The captured shamble, the head held up and out, the arms dragging a beat behind the body's sway and the gut
     settling at every footfall."""
     own = Pose().rot("jaw", p=-14 - 8 * bump(t, 0.1, 0.4)).rot("neck", p=8).rot("head", r=10, p=6)
-    own.rot("spine", p=2.5 * math.cos(2 * TAU * (t - 0.1)))
+    own.rot("hips", r=5 * math.sin(TAU * t))   # the gut swung from side to side, a step at a time
+    own.rot("spine", p=-6 + 2.5 * math.cos(2 * TAU * (t - 0.1)), r=-3 * math.sin(TAU * (t - 0.1)))
+    own.rot("chest", p=-6)   # the trunk leaning out over it
     for s, side in SIDES:
         own.rot(f"upper_arm.{side}", p=9 * s * math.sin(TAU * (t - 0.12)))
-        own.rot(f"forearm.{side}", p=10 * s * math.sin(TAU * (t - 0.25)) + 4)
-        own.rot(f"hand.{side}", p=12 * s * math.sin(TAU * (t - 0.35)))
-    return shamble.pose(rig, t, own)
+        own.rot(f"forearm.{side}", p=10 * s * math.sin(TAU * (t - 0.25)) + 10)
+        own.rot(f"hand.{side}", p=12 * s * math.sin(TAU * (t - 0.35)) + 10)
+    return shamble.pose(rig, t, own, arms=0.75)
 
 
 def idle(t):
-    return sway.pose(rig, t, Pose().rot("jaw", p=-10 - 10 * bump(t, 0.2, 0.45) - 6 * bump(t, 0.6, 0.8)))
+    """The captured sway, the arms hanging heavy (the performer held them out like a film's zombie)."""
+    own = Pose().rot("jaw", p=-10 - 10 * bump(t, 0.2, 0.45) - 6 * bump(t, 0.6, 0.8)).rot("chest", p=-5)
+    for s, side in SIDES:
+        own.rot(f"forearm.{side}", p=20).rot(f"hand.{side}", p=22)
+    return sway.pose(rig, t, own, arms=0.4)
 
 
 # the keyed clips start and end on the walk's first pose, so they cut in and out of it without a jump
@@ -212,11 +244,13 @@ def corpse(lift=0.0, settle=0.0):
     p.rot("jaw", p=-24)
     for s, side in SIDES:
         sh = rig.where(p, "chest", HD[f"upper_arm.{side}"])
-        wrist = sh + (Vector((0.12, 0.42, 0)) if s > 0 else Vector((-0.3, -0.12, 0))) * H
+        # the arms flat on the ground, near straight: one reaching on ahead, one flung back along its side (a
+        # bent arm under a fat body propped it up like a crab)
+        wrist = sh + (Vector((0.22, 0.46, 0)) if s > 0 else Vector((-0.38, -0.2, 0))) * H   # elbows bent flat
         wrist.z = (0.115 if s > 0 else 0.09) * H   # the right drags its manacle chain
-        rig.reach(p, f"upper_arm.{side}", f"forearm.{side}", wrist, (s * 0.7, 0, 1))
+        rig.reach(p, f"upper_arm.{side}", f"forearm.{side}", wrist, (s, 0, -0.4))
         rig.orient(p, f"hand.{side}", Q(p=80, r=-s * 80) if s > 0 else Q(p=-10, r=-s * 75, y=-60))
-        p.rot(f"thigh.{side}", p=12, r=-s * 8).rot(f"shin.{side}", p=-8 if s > 0 else -18)
+        p.rot(f"thigh.{side}", p=8, r=-s * 10).rot(f"shin.{side}", p=-10 if s > 0 else -22)   # slack, flat (a bent knee face down lifts the shin)
         p.rot(f"foot.{side}", p=60)
     return p
 
@@ -260,10 +294,11 @@ def die(t):
 def kneel(slump=0.0):
     """Down on its knees where it stood, shins flat behind, arms hanging dead, the head lolling forward; `slump`
     sinks it back onto its heels, the torso and head falling back."""
-    p = stance().move("hips", z=(0.5 - 0.1 * slump) * H - hip_h, y=(0.05 - 0.08 * slump) * H)
-    p.rot("hips", p=8 + 18 * slump, r=6 * slump)
-    p.rot("spine", p=6 * slump).rot("chest", p=-8 + 16 * slump, y=6).rot("neck", p=-10 + 16 * slump)
-    p.rot("head", p=-25 + 40 * slump, r=18 + 10 * slump).rot("jaw", p=-30)
+    # upright on its knees from the first, so the sag back never reads as it rising again
+    p = stance().move("hips", z=(0.5 - 0.1 * slump) * H - hip_h, y=(0.02 - 0.06 * slump) * H)
+    p.rot("hips", p=14 + 14 * slump, r=6 * slump)
+    p.rot("spine", p=2 + 6 * slump).rot("chest", p=2 + 10 * slump, y=6).rot("neck", p=-4 + 12 * slump)
+    p.rot("head", p=-20 + 36 * slump, r=18 + 10 * slump).rot("jaw", p=-30)
     for s, side in SIDES:
         p.q[f"upper_arm.{side}"] = Q(p=4, r=-s * 6)
         p.q[f"forearm.{side}"] = Q(p=8)

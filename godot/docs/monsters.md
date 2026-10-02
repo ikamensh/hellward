@@ -62,7 +62,8 @@ Not yet seen by Ilya; concepts approved by the agent, not by him.
   they never go through the ground. Cloth bones move only their cloth (skin masks by colour and thickness).
 - Animation craft: partly met. Planted feet slide (tools/blender/slide.py) a step: Fallen 0.8/1.0 cm, Shaman
   0.6/2.2, Zombie 1.6/1.9, Skeleton 0.9/2.3 — the swarm meets 1 cm, the rest are within 2.5 cm, invisible from the
-  battle camera. Attacks wind up, strike and follow through; hits recoil and settle.
+  battle camera. Attacks wind up, strike and follow through; a hit is a spring layered over whatever clip plays
+  (`game/scripts/flinch.gd`), so the walk goes on under it.
 - Variation: met for what the client plays: each monster ±6% in size and one of three tints by its id, cycles out
   of step. (Only a pondering Shaman idles in battle, so a second idle would not be seen; dropped.)
 - Readability: met. tools/lineup.sh at 48 m and as silhouettes: four distinct outlines.
@@ -95,13 +96,10 @@ Not yet seen by Ilya; concepts approved by the agent, not by him.
    maps; joints read off `tools/blender/views.py` sheets and snapped to the limbs; voxel geodesic skin weights
    (`tools/skinweights.py`); the old pose library through `Rig.repose`; captured walks through `mocap.py`;
    props held by `sculpted.hold`; follow-through springs and a ground pass on deaths in `Rig.action`.
+   Parts the generator gets wrong are modelled instead (`tools/blender/feathers.py`: the Shaman's crest, the
+   Zombie's arrows) or generated alone and fitted (the Shaman's staff skull, `art/gen/skull`); a part to replace is
+   cut off with `sculpted.trim`.
 4. Godot: `Mats.monster` builds the ORM material for any `mon_*` name. Review with `tools/review.sh` (clips),
-   `tools/lineup.sh` (side by side at battle distance, or as silhouettes), `tools/preview.sh`.
-
-## Pipeline (first plan)
-
-1. `tools/concept.py`: concept renders (Codex image tool; the 2D paintings as references for Fallen and Shaman).
-2. Image-to-3D on a Scaleway GPU (TRELLIS.2): a 1M-triangle textured sculpt per concept.
-3. Blender (`tools/blender/`): clean, decimate to budget, unwrap, bake base colour, normal and ORM from the sculpt,
-   fit the rig, weight, bake the animations, export `game/assets/models/mon_<kind>.glb`.
-4. Godot: per-monster materials in `game/scripts/mats.gd`, looked at with `tools/preview.sh` and in battle frames.
+   `tools/lineup.sh` (side by side at battle distance, or as silhouettes), `tools/preview.sh`, and
+   `tools/review_set.sh DIR` for the whole L3 picture set the critics read.
+5. The GPU box and a TRELLIS run: `tools/gen3d/README.md`.

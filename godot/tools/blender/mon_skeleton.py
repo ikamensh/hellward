@@ -25,7 +25,7 @@ def mail(rgb, pos):
     ring = np.exp(-((d - 0.3) / 0.09) ** 2)[..., None]
     g = rgb.mean(-1, keepdims=True)
     rust = np.array([0.24, 0.16, 0.11]) * (0.55 + 0.9 * g)
-    return rust * (0.35 + 0.95 * ring)
+    return rust * (0.6 + 0.55 * ring)   # soft: hard rings shimmer as noise from the battle camera
 
 
 def _chroma(lab):
@@ -45,13 +45,13 @@ LOOKS = {
                                        grime=0.4, knee=1.1),
               "rough": 0.92},
     "mail": {"colour": mail, "rough": lambda ao: 0.5 + 0.3 * (1 - ao), "metal": 0.8},
-    "iron": {"colour": sculpted.grade(sat=0.6, value=0.85, toward=(0.24, 0.17, 0.12), mix=0.45, mottle=0.3, scale=0.03),
+    "iron": {"colour": sculpted.grade(sat=0.7, value=1.15, toward=(0.3, 0.2, 0.14), mix=0.45, mottle=0.3, scale=0.03),
              "rough": lambda ao: 0.42 + 0.4 * (1 - ao), "metal": 0.8},
-    "bone": {"colour": lambda rgb, pos: sculpted.grade(grime=0.55, knee=0.55)(
+    "bone": {"colour": lambda rgb, pos: sculpted.grade(grime=0.25, knee=0.45)(
                  sculpted.bone_colour(rgb, *sculpted.hue_sat_val(rgb).transpose(2, 0, 1), pos), pos),
              "rough": lambda ao: 0.72 + 0.15 * (1 - ao)},
 }
-body = sculpted.prepare("skeleton", HEIGHT, yaw=180, faces=9000, families=FAMILIES, looks=LOOKS, cavity=0.65,
+body = sculpted.prepare("skeleton", HEIGHT, yaw=180, faces=9000, families=FAMILIES, looks=LOOKS, cavity=0.45,
                         glow={"eyes": [(0.045, 0.09, 1.692), (-0.025, 0.09, 1.692)], "radius": 0.016,
                               "colour": EMBER})
 
@@ -68,8 +68,12 @@ def CHUNK(p):
     return Vector((p.x * (1 + k), -0.05 + (p.y + 0.05) * (1 + k), p.z))
 
 
+PAULDRON = sculpted.grow((-0.2, -0.08, 1.46), 1.22, 1.34, 1.4)   # the concept's one big plate, on its left
+
+
 def SHAPE(p):
-    return HELM(CHUNK(p))
+    q = HELM(CHUNK(p))
+    return PAULDRON(q) if q.x < -0.1 and q.z < 1.66 else q
 
 
 sculpted.reshape(body, SHAPE)
@@ -117,8 +121,12 @@ rig.bone("tabard2", (0.0, 0.05, 0.84), (0.0, 0.04, 0.6), "tabard")
 rig.bone("mail.B", (0.0, -0.12, 1.06), (0.0, -0.15, 0.74), "hips")
 for s_, side in SIDES:
     rig.bone(f"mail.{side}", (s_ * 0.17, -0.03, 1.06), (s_ * 0.2, -0.03, 0.78), "hips")
+# the shield's own bone on the forearm (it follows the arm in every clip; in a death it falls on its own)
+_mid = (at(*SIDE["L"]["elbow"], SNAP["elbow"]) + at(*SIDE["L"]["wrist"], SNAP["wrist"])) / 2
+rig.bone("shield", _mid, _mid + Vector((0, 0.1, 0)), "forearm.L")
 rig.build()
 rig.obj.data.bones["eyes"].use_deform = False
+rig.obj.data.bones["shield"].use_deform = False   # until the body is skinned: no body weight goes to it
 
 
 def red(hsv):
@@ -140,13 +148,14 @@ def give(co):
 
 # limb bones half as thick again: life-thin bones break into dotted lines from the battle camera
 LIMBS = [f"{b}.{side}" for b in ("upper_arm", "forearm", "thigh", "shin") for _, side in SIDES]
-print("thickened", sculpted.thicken(body, rig, LIMBS, 1.7, reach=0.05), "vertices")
+print("thickened", sculpted.thicken(body, rig, LIMBS, 1.9, reach=0.05), "vertices")
 sculpted.skin(body, rig, sigma=give, masks={
     "tabard": lambda co, hsv, thick: 0.8 < co.z < 1.1 and abs(co.x) < 0.13 and co.y > -0.04 and red(hsv),
     "tabard2": lambda co, hsv, thick: 0.55 < co.z < 0.9 and abs(co.x) < 0.13 and co.y > -0.04 and red(hsv),
     "mail.B": lambda co, hsv, thick: 0.68 < co.z < 1.08 and co.y < -0.07 and iron(hsv),
     "mail.R": lambda co, hsv, thick: 0.68 < co.z < 1.08 and co.x > 0.1 and iron(hsv),
     "mail.L": lambda co, hsv, thick: 0.68 < co.z < 1.08 and co.x < -0.1 and iron(hsv)})
+rig.obj.data.bones["shield"].use_deform = True   # the shield alone hangs from it
 rig.repose(sculpted.hang(rig, arm=12))
 rig.springs = {"tabard": (40.0, 0.3, 0.7), "tabard2": (35.0, 0.25, 0.8), "mail.B": (70.0, 0.4, 0.5),
                "mail.R": (70.0, 0.4, 0.5), "mail.L": (70.0, 0.4, 0.5)}   # mail is heavy and stiff
@@ -156,10 +165,10 @@ FEET = human_feet(rig, 1.0, spread=0.03, out=6)
 
 def stance() -> Pose:
     p = Pose()
-    p.move("hips", z=-0.03).rot("hips", p=-4)
-    p.rot("spine", p=-3).rot("chest", p=-6).rot("neck", p=4).rot("head", p=4).rot("jaw", p=-6)
+    p.move("hips", z=-0.055).rot("hips", p=-6)   # a soldier's crouch behind the shield, knees unlocked
+    p.rot("spine", p=-5).rot("chest", p=-7).rot("neck", p=6).rot("head", p=4).rot("jaw", p=-6)
     p.rot("upper_arm.R", p=14, r=-6).rot("forearm.R", p=48).rot("hand.R", p=-10)
-    p.rot("upper_arm.L", p=22, r=10).rot("forearm.L", p=78, y=-4).rot("hand.L", p=-10)
+    p.rot("upper_arm.L", p=30, r=22).rot("forearm.L", p=78, y=-4).rot("hand.L", p=-10)   # the shield out to the side: the ribs show
     return p
 
 
@@ -180,7 +189,7 @@ blade = Vector((0.0, 0.85, 0.3)).normalized()   # forward and a little up: at th
 sculpted.hold(sword, rig, "hand.R", grip, wf["axis"], wf["flat"], HD["hand.R"].lerp(rig.tail["hand.R"], 0.6),
               q_hand.inverted() @ -blade, q_hand.inverted() @ Vector((1, 0, 0)))
 
-SHIELD = 0.5   # a third of its height: big enough to read, small enough to show the skeleton behind it
+SHIELD = 0.52   # big enough to read from the battle camera, small enough to show the ribcage beside it
 SHIELD_C = (-0.019, 0.25)   # its centre across and up, read off tools/blender/views.py --stand 0.5 180 (front +y)
 
 
@@ -197,12 +206,12 @@ def shield_colour(rgb, hue, sat, val, pos):
     plank = np.floor(x)
     seam = np.exp(-((x - np.round(x)) / 0.05) ** 2)[..., None]
     grain = 0.85 + 0.15 * np.sin(x * 60 + np.sin(pos[..., 2] * 40 + plank * 3) * 2)[..., None]
-    oak = np.array([0.24, 0.16, 0.1]) * (0.85 + 0.12 * np.sin(plank * 2.3))[..., None] * grain * (1 - 0.6 * seam)
+    oak = np.array([0.36, 0.26, 0.17]) * (0.85 + 0.12 * np.sin(plank * 2.3))[..., None] * grain * (1 - 0.6 * seam)
     g = rgb.mean(-1, keepdims=True)
     oak = oak * (0.6 + 0.8 * g / max(float(g.mean()), 1e-3) * 0.5)
     hue_, sat_, val_ = sculpted.hue_sat_val(rgb).transpose(2, 0, 1)
     paint = (((hue_ < 20) | (hue_ > 330)) & (sat_ > 0.3))[..., None]
-    wood = np.where(paint, oak * 0.65 + np.array([0.3, 0.06, 0.04]) * 0.4, oak)   # the sigil faded into the oak
+    wood = np.where(paint, oak * 0.45 + np.array([0.42, 0.08, 0.05]) * 0.55, oak)   # the sigil, faded but red
     iron = np.array([0.22, 0.19, 0.17]) * (0.6 + 0.8 * g)
     return np.where((r > 0.9) | (r < 0.27), iron, wood)
 
@@ -214,8 +223,10 @@ d = (co - np.array(hf["centre"])) @ np.array(hf["flat"])
 front = hf["flat"] if d.max() > -d.min() else -hf["flat"]   # the boss stands out of the front
 q_arm = rig.turn(S0, "forearm.L")
 face = Vector((-0.35, 1.0, 0.05)).normalized()
+FACE_REST = q_arm.inverted() @ face   # which way the shield faces, in the forearm's (and its bone's) rest frame
 arm_mid = HD["forearm.L"].lerp(rig.tail["forearm.L"], 0.55)
-sculpted.hold(shield, rig, "forearm.L", hf["centre"] - front * 0.1, front, hf["axis"], arm_mid,   # the fist behind it
+SHIELD_AT = arm_mid + FACE_REST * 0.1 - HD["shield"]   # its middle from its bone's head, at rest
+sculpted.hold(shield, rig, "shield", hf["centre"] - front * 0.1, front, hf["axis"], arm_mid,   # the fist behind it
               q_arm.inverted() @ face, q_arm.inverted() @ Vector((0, 0, 1)))
 
 march = mocap.Clip.load("March_FW", mocap.leg(rig)).cycle()
@@ -229,9 +240,12 @@ SWORD_ARM = ("upper_arm.R", "forearm.R", "hand.R")
 def walk(t):
     """A captured march, stiff and in step: the shield held up before the chest, the sword at guard, its point
     forward and up and held there whatever the body does, the feet a stride apart, the jaw clacking."""
-    c = math.cos(TAU * t)
-    base = S0.copy().rot("jaw", p=-8 * (bump(t, 0.02, 0.18) + bump(t, 0.52, 0.68))).rot("head", p=-4)
-    base.rot("upper_arm.R", p=4 * c).rot("forearm.R", p=4)
+    c, step = math.cos(TAU * t), math.cos(2 * TAU * (t - 0.1))
+    base = S0.copy().rot("jaw", p=-8 * (bump(t, 0.02, 0.18) + bump(t, 0.52, 0.68)))
+    base.rot("head", p=-4 + 6 * step)   # the skull nods with each step
+    base.rot("upper_arm.R", p=10 * c).rot("forearm.R", p=4)   # the sword shoulder swings in time
+    base.rot("upper_arm.L", p=5 * step).rot("forearm.L", p=-4 * step)   # the shield bounces on the beat
+    base.move("hips", z=-0.02 * step)   # and the whole frame drops on each footfall
     p = march.pose(rig, t, base, own=SHIELD_ARM + SWORD_ARM, apart=0.1)
     guard(p)
     return p
@@ -307,9 +321,34 @@ def thickness_of(bone: str) -> float:
     return far or 0.03
 
 
+def bone_lows(pose: Pose) -> dict[str, float]:
+    """The lowest point of each bone's own mesh (the vertices it weighs most) with the body in `pose`."""
+    rig.apply(pose)
+    bpy.context.view_layer.update()
+    ev = body.evaluated_get(bpy.context.evaluated_depsgraph_get())
+    m = ev.to_mesh()
+    names = {g.index: g.name for g in body.vertex_groups}
+    lows: dict[str, float] = {}
+    for v, w in zip(m.vertices, body.data.vertices):
+        if w.groups:
+            bone = names[max(w.groups, key=lambda e: e.weight).group]
+            lows[bone] = min(lows.get(bone, 9.0), v.co.z)
+    ev.to_mesh_clear()
+    rig.apply(Pose())
+    return lows
+
+
 def heap(seed: int = 3, centre=Vector((0.0, -0.05, 0.0)), skull=Vector((0.42, 0.25, 0))) -> Pose:
     """What is left when the malice goes out of it: every bone fallen round `centre`, flat on the ground, a little
-    scattered, the skull rolled furthest (to `skull` from it). Bones are placed in world space, parents first."""
+    scattered, the skull rolled furthest (to `skull` from it); then each bone set down so its own lowest point
+    rests on the ground (a guess from its thickness left the helmeted neck sunk and the ground pass lifted the whole
+    pile off the ground with it)."""
+    pile = _heap(seed, centre, skull, {})
+    lows = bone_lows(pile)
+    return _heap(seed, centre, skull, {b: 0.004 - z for b, z in lows.items()})
+
+
+def _heap(seed, centre, skull, settle: dict[str, float]) -> Pose:
     import random
     rng = random.Random(seed)
     p = Pose()
@@ -324,13 +363,16 @@ def heap(seed: int = 3, centre=Vector((0.0, -0.05, 0.0)), skull=Vector((0.42, 0.
         flat = Vector((axis.x, axis.y, 0.0))
         flat = flat.normalized() if flat.length > 0.2 else Vector((0, 1, 0))
         q = Quaternion((0, 0, 1), math.radians(yaw)) @ axis.rotation_difference(flat)
-        out = (Vector((head.x, head.y, 0)) - centre) * rng.uniform(0.35, 0.6)
+        out = (Vector((head.x, head.y, 0)) - centre) * rng.uniform(0.5, 0.85)   # scattered: a pile of bones
         if bone == "head":
             out = skull   # the skull rolls away
-        lie = min(thickness_of(bone), 0.2) * 0.8 + 0.01
+        lie = min(thickness_of(bone), 0.2) * 0.8 + 0.01 + settle.get(bone, 0.0)
         to = centre + out + Vector((rng.uniform(-0.06, 0.06), rng.uniform(-0.06, 0.06), lie))
+        if bone == "shield":   # it falls flat on its back beside the arm, face up, not on its rim
+            q = Quaternion((0, 0, 1), math.radians(yaw)) @ FACE_REST.rotation_difference(Vector((0, 0, 1)))
+            to = centre + out * 1.2 + Vector((0, 0, 0.035)) - q @ SHIELD_AT
         rig.orient(p, bone, q)
-        rig.place(p, bone, to - (q @ Vector((0, 0, 0))) - q @ ((head - head)))
+        rig.place(p, bone, to)
     lay_blade(p)
     return p
 
@@ -355,13 +397,13 @@ def jolt(back: float = 0.0) -> Pose:
 def collapse(t, pile=HEAP, back=0.0):
     """Struck, it rattles, the knees give and it drops, falling apart as it goes: each bone lands on its own in
     `pile`, the low ones first, the skull last, rolling away; the sword is let go on the way down."""
-    sag = stance().move("hips", z=-0.25, y=-0.12 * back).rot("hips", p=8 + 10 * back).rot("chest", p=-25 + 20 * back, r=8)
+    sag = stance().move("hips", z=-0.25 - 0.12 * back, y=-0.12 * back).rot("hips", p=8 + 10 * back).rot("chest", p=-25 + 20 * back, r=8)
     sag.rot("head", p=-25 + 30 * back, r=18).rot("upper_arm.R", p=-10, r=-20).rot("upper_arm.L", p=-5, r=20).rot("jaw", p=-30)
     for s, side in SIDES:
         sag.rot(f"thigh.{side}", p=40, r=-s * 18).rot(f"shin.{side}", p=-70)
     # it opens on the blow (a battle cross-fades into it from the walk)
-    base = keyed(min(t, 0.3), [(0.0, jolt(back), ease_out), (0.3, sag, smooth)])
-    if t <= 0.3:
+    base = keyed(min(t, 0.22), [(0.0, jolt(back), ease_out), (0.22, sag, smooth)])
+    if t <= 0.22:
         if t < 0.1:
             plant_legs(rig, base, FEET, pole_out=0.3)
         else:
@@ -370,7 +412,7 @@ def collapse(t, pile=HEAP, back=0.0):
     out = Pose()
     for bone in rig.defs:
         # a bone lets go when the body has sunk to it: the feet and shins at once, the skull last
-        start = 0.3 + 0.35 * min(1.0, rig.head[bone].z / 1.7)
+        start = 0.22 + 0.28 * min(1.0, rig.head[bone].z / 1.7)
         w = ease_in(clamp01((t - start) / 0.22))
         bounce = 0.05 * bump(t, start + 0.22, start + 0.34)
         qa, qb = base.q.get(bone, Quaternion()), pile.q.get(bone, Quaternion())
@@ -384,9 +426,13 @@ def collapse(t, pile=HEAP, back=0.0):
 
 rig.action("idle", stand_still.seconds, idle, loop=True)
 rig.action("walk", march.seconds, walk, loop=True)
-rig.action("attack", 0.7, attack)
-rig.action("die", 1.6, collapse, ground_from=0.0, body=body)
-rig.action("die2", 1.6, lambda t: collapse(t, HEAP_BACK, back=1.0), ground_from=0.0, body=body)
+rig.action("attack", 0.7, attack, ground_from=0.0, body=body)
+# falling apart, the rags go down with their bones: a swinging tabard sank through the ground and the ground pass
+# lifted the whole pile with it
+cloth, rig.springs = rig.springs, {}
+rig.action("die", 1.4, collapse, ground_from=0.0, body=body)
+rig.action("die2", 1.4, lambda t: collapse(t, HEAP_BACK, back=1.0), ground_from=0.0, body=body)
+rig.springs = cloth
 rig.report(body)
 rig.extremes(body, "die")
 rig.extremes(body, "die2")

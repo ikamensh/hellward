@@ -76,6 +76,12 @@ CONCEPTS: dict[str, tuple[str, str | None]] = {
               "white with grey-brown grime in its cracks and sutures, deep dark eye sockets, a broken nose "
               "cavity, a full row of worn upper teeth and the lower jaw still attached, slightly open. Seen from the "
               "front and a little to its left, so the sockets, cheekbones and the jaw's depth all show.", None),
+    "zombie_head": (PROP + "The head of the Zombie, alone, cut off low on its thick neck (the neck stump included): "
+                    "a risen plague corpse's face, puffy mottled grey-green rotting skin with livid purple bruises and "
+                    "dark veins, sunken cheeks, milky white blind eyes, a slack jaw hanging open with broken yellow "
+                    "teeth and black gums, thin dark matted hair hanging in strands over a balding scalp, one torn "
+                    "ear. Seen from the front and a little to its left, so the face and the hanging jaw both show. "
+                    "Nothing glows.", None),
     "sword": (PROP + "The Skeleton's sword: an old rusted arming sword, notched and pitted blade, a simple iron "
               "crossguard, grip of rotten leather, round iron pommel. Standing upright, point down, the whole sword "
               "in frame.", None),
