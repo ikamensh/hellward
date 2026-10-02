@@ -15,13 +15,15 @@ plan, found by the same search.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from hellward.sim.balance import BALANCE
 from hellward.sim.campaign import ORDER, Location
-from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, Curse, Element, felt_hit
-from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
+from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, TOWERS, Curse, Element, felt_hit
+from hellward.sim.model import DOOR, DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.skills import can_learn
 
@@ -50,6 +52,7 @@ class Plan:
     orb_worth: float = 3.0         # the same, for a Frozen Orb on a crowd
     reserve: float = 30.0          # mana kept for a Smite while a leader walks
     trained: dict = field(default_factory=dict)   # how the search found it, for the record
+    map: str = ""                # the fingerprint of the map, waves and prices it was searched on
 
     def to_json(self) -> dict:
         data = asdict(self)
@@ -90,6 +93,33 @@ def load(location: str) -> Plan:
     return Plan.from_json(json.loads(plan_path(location).read_text()))
 
 
+def fingerprint(location: Location) -> str:
+    """The map, waves and prices a plan was searched on: a stored plan for a location that has changed
+    since is not played."""
+    stage = ORDER.index(location.key)
+    unit = BALANCE.gold_unit(stage)
+    prices = tuple((kind, tuple(round(level.cost * unit / BALANCE.base_gold_unit)
+                                for level in TOWERS[kind].levels)) for kind in sorted(TOWERS))
+    door = round(DOOR.cost * unit / BALANCE.base_gold_unit)
+    level, arsenal = location.level, location.arsenal
+    text = repr((level.width, level.height, level.waypoints, level.extra_routes, level.doors,
+                 sorted(level.walkable_tiles), sorted(level.obstacles), sorted(level.pools),
+                 arsenal.towers, arsenal.gates, arsenal.spells,
+                 location.waves, location.start_gold, prices, door))
+    return hashlib.sha1(text.encode()).hexdigest()[:12]
+
+
+def check(location: Location) -> Plan:
+    """The stored plan for a location, refused when it is missing or was searched on something else."""
+    path = plan_path(location.key)
+    if not path.exists():
+        raise ValueError(f"no plan searched for {location.key} yet")
+    plan = Plan.from_json(json.loads(path.read_text()))
+    if plan.map != fingerprint(location):
+        raise ValueError(f"the {location.key} plan was searched on another map, waves or prices")
+    return plan
+
+
 @dataclass
 class Planned:
     name: str = "planned"
@@ -105,13 +135,13 @@ class Planned:
 
     def skills(self, location: Location, sigils: int) -> frozenset[str]:
         if self.plan is None:
-            self.plan = load(location.key)
+            self.plan = check(location)
         return self.plan.learn(sigils, ORDER.index(location.key))
 
     def act(self, hands: Hands) -> None:
         world = hands.world
         if self.plan is None:
-            self.plan = load(world.location.key)
+            self.plan = check(world.location)
         self._answer(hands)
         if world.time >= self.look:
             self.look = world.time + LOOK

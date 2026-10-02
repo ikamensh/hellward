@@ -365,6 +365,7 @@ class World:
         """A private copy to look ahead in: no events, no planner, its own random stream."""
         w = World(self.location, hardness=self.hardness, perks=self.perks, record=False, curse_scale=self.curse_scale,
                   loadout=self.loadout)
+        w.tower_levels = self.tower_levels   # the derived ranks are copied, not rebuilt
         w.rng.setstate(self.rng.getstate())
         w.route_rng.setstate(self.route_rng.getstate())
         w.loot_ordinals, w.spawn_ordinal = self.loot_ordinals, self.spawn_ordinal

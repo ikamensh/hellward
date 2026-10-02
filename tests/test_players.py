@@ -400,7 +400,10 @@ def test_every_player_plays_an_act_two_location_with_its_towers_to_an_outcome(na
     makes of the altar (a whole Act II defence per player, uncompiled, is the balance tools' work)."""
     docks = LOCATIONS["docks"]
     short = replace(docks, waves=docks.waves[:2], wave_names=docks.wave_names[:2])
-    world, _ = defend(short, PLAYERS[name](1), seed=1, sigils=18, planner=planner.smart)
+    player = PLAYERS[name](1)
+    if name == "planned":
+        player.plan = load("docks")   # the short waves are not what the stored plan was searched on
+    world, _ = defend(short, player, seed=1, sigils=18, planner=planner.smart)
     assert world.outcome in ("victory", "defeat")
 
 

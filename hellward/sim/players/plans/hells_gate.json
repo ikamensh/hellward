@@ -7,6 +7,7 @@
  "orb_worth": 2.4,
  "reserve": 30.0,
  "trained": {"confirmed_on": [45, 46, 47, 48, 49, 50, 51, 52], "life": 1.191, "smart_score": 28.31, "smart_score_at_1": 36.75, "defences": 1064, "minutes": 1.3, "generations": 40},
+ "map": "97e110b64611",
  "steps": [
   ["build", "ballista", [2, 1]],
   ["build", "arrow", [11, 5]],

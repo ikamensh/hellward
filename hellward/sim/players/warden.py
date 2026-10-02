@@ -104,6 +104,13 @@ def load_plans() -> dict[str, Plan]:
     return {key: Plan.of(row) for key, row in json.loads(PLANS.read_text()).items()}
 
 
+def check(location: Location, sigils: int) -> None:
+    """Refuse a stored plan searched on another map; with no stored plan the draft plays, which is allowed."""
+    stored = load_plans().get(plan_key(location, sigils))
+    if stored is not None and stored.map != fingerprint(location):
+        raise ValueError(f"the warden {plan_key(location, sigils)} plan was searched on another map")
+
+
 # -- Reading the intro ----------------------------------------------------------------------------
 
 

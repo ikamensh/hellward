@@ -37,6 +37,7 @@ if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of it
 from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
+from hellward.sim.players import planned, warden  # noqa: E402
 from hellward.sim.players.ghost import Ghost  # noqa: E402
 from hellward.sim.players.hands import Player, defend  # noqa: E402
 from hellward.sim.skills import cost  # noqa: E402
@@ -51,6 +52,10 @@ def contender(who: str, seed: int) -> Player:
 
 
 def wins(who: str, key: str, seed: int, sigils: int, leaders: str, life_mult: float, curse_scale: float = 1.0) -> bool:
+    if who == "planned":
+        planned.check(LOCATIONS[key])
+    elif who == "warden":
+        warden.check(LOCATIONS[key], sigils)
     policy = planner.smart if leaders == "smart" else planner.RandomLeaders(seed)
     loc = dataclasses.replace(LOCATIONS[key], life=LOCATIONS[key].life * life_mult)
     world, _ = defend(loc, contender(who, seed), seed=seed, sigils=sigils, planner=policy, hp=1.0, curse_scale=curse_scale)
