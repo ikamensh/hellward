@@ -68,6 +68,7 @@ static func _make(key: String) -> Material:
 		"stone": return textured("stone", Color(0.8, 0.8, 0.78), 1.2)
 		"slate": return textured("slate", Color(0.75, 0.78, 0.85), 1.0)
 		"iron": return textured("iron", Color(0.7, 0.68, 0.66), 1.0, 0.65)
+		"steel": return textured("iron", Color(1.0, 1.05, 1.15), 0.6, 0.9, 0.4)   # blades, a prod: catches the light
 		"copper": return textured("iron", Color(1.1, 0.55, 0.3), 1.0, 0.8, 0.6)
 		"gold": return textured("iron", Color(1.4, 1.0, 0.4), 0.6, 1.0, 0.45)
 		"demon_skin": return textured("demon_skin", Color(1.0, 0.85, 0.85), 1.2, 0.0, 0.9)
