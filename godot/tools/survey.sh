@@ -10,11 +10,12 @@ out=$(mkdir -p "$1/locations" && cd "$1" && pwd)
 q() { (cd .. && uv run --quiet python -c "$1"); }
 towers=$(q "from hellward.sim.content import TOWERS; print(','.join(TOWERS))")
 monsters=$(q "from hellward.sim.content import MONSTERS; print(','.join(MONSTERS))")
+flying=$(q "from hellward.sim.content import MONSTERS; print(','.join(k for k, m in MONSTERS.items() if m.flying))")
 locations=$(q "from hellward.sim.campaign import LOCATIONS; print(' '.join(LOCATIONS))")
 cap() { tools/godot-capture.sh --path game --fixed-fps 30 res://scenes/capture.tscn -- "$@" 2>&1 \
   | grep -E "SCRIPT ERROR|^ERROR" | head -5 || true; }
 cap scene=res://scenes/survey.tscn res=1920x1080 what=towers "kinds=$towers" "out=$out/towers.png"
-cap scene=res://scenes/survey.tscn res=1920x1080 what=monsters "kinds=$monsters" "out=$out/monsters.png"
+cap scene=res://scenes/survey.tscn res=1920x1080 what=monsters "kinds=$monsters" "flying=$flying" "out=$out/monsters.png"
 for loc in $locations; do
   tools/shot.sh overview "$out/locations/$loc.png" 900 demo "location=$loc" >/dev/null 2>&1 || echo "FAILED $loc"
 done

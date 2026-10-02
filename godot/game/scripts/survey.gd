@@ -2,9 +2,11 @@ extends Node3D
 ## Everything of a kind the rules have, side by side under the game's night (tools/survey.sh drives it), so a
 ## glance shows what is built and what still wears a stand-in: `what=towers` every tower kind at each rank (a
 ## column a kind, its ranks from back to front, as tower.gd dresses them); `what=monsters` every monster kind in the rules,
-## in its own model or its tinted stand-in (as monster.gd wears them), a stand-in marked by a red post. The frame
-## is saved to `out`, then the run quits.
-## User args: what=towers|monsters out=PNG kinds=a,b,c (the rules' kinds, from the server's tables) [anim=idle]
+## in its own model with its kind's rim or its tinted stand-in (as monster.gd wears them), a stand-in marked by a red
+## post, a flyer off the ground (lower than in battle, to keep the row behind it in sight). The frame is saved to
+## `out`, then the run quits.
+## User args: what=towers|monsters out=PNG kinds=a,b,c flying=a,b (the rules' kinds, from the server's tables)
+## [anim=idle]
 
 const SKIP := 8
 
@@ -43,13 +45,14 @@ func _ready() -> void:
 		cam.look_at(Vector3(0, 1.5, 0))
 	else:
 		var cols := 7
+		var flying: PackedStringArray = String(_args.get("flying", "")).split(",", false)
 		for i in kinds.size():
 			var kind := kinds[i]
 			var own := ResourceLoader.exists("res://assets/models/mon_%s.glb" % kind)
 			var base := kind if own else String(Monster.STAND_INS.get(kind, ["fallen"])[0])
 			var body := Models.make("mon_" + base)
 			body.scale = Vector3.ONE * Monster.BODY
-			body.position = Vector3((i % cols - (cols - 1) * 0.5) * 3.0, 0, (i / cols) * 3.4)
+			body.position = Vector3((i % cols - (cols - 1) * 0.5) * 3.0, 1.2 if kind in flying else 0.0, (i / cols) * 3.4)
 			body.rotation.y = deg_to_rad(155)
 			add_child(body)
 			var player := Models.player(body)
@@ -58,7 +61,11 @@ func _ready() -> void:
 				player.play(anim)
 				player.seek(player.get_animation(anim).length * 0.3, true)
 				player.pause()
-			if not own:   # a stand-in: its tint, as the battle shows it, and a red post beside it
+			if own:
+				var rim := Monster.overlay(Monster.RIM[kind])
+				for mi in body.find_children("*", "MeshInstance3D", true, false):
+					(mi as MeshInstance3D).material_overlay = rim
+			else:   # a stand-in: its tint, as the battle shows it, and a red post beside it
 				var overlay := Monster.overlay(Color.BLACK)
 				overlay.set_shader_parameter("tint", Monster.STAND_INS[kind][1])
 				for mi in body.find_children("*", "MeshInstance3D", true, false):
@@ -70,7 +77,7 @@ func _ready() -> void:
 				cyl.height = 0.6
 				post.mesh = cyl
 				post.material_override = Mats.glow(Color(1.0, 0.1, 0.05), 3.0)
-				post.position = body.position + Vector3(1.1, 0.3, 0)
+				post.position = Vector3(body.position.x + 1.1, 0.3, body.position.z)
 				add_child(post)
 		var rows := ceili(kinds.size() / float(cols))
 		cam.position = Vector3(0, 9.0 + rows * 1.5, rows * 3.4 + 9.0)
