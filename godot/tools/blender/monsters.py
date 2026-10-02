@@ -371,8 +371,9 @@ class Rig:
         # a foot's ground contact for the walk (foot_track's ankle_z, heel, toe; lift, strike, push), when it is
         # not the imps' default (a hoof standing high on a long foot)
         self.sole: dict | None = None
-        # bones that lag behind the pose (ears, feathers, cloth): {bone: (stiffness in 1/s², damping ratio)}
-        self.springs: dict[str, tuple[float, float]] = {}
+        # bones that lag behind the pose (ears, feathers, cloth): {bone: (stiffness in 1/s², damping ratio[,
+        # gravity])}; gravity (0..1) pulls the bone's rest direction toward hanging straight down (cloth)
+        self.springs: dict[str, tuple] = {}
 
     def bone(self, name: str, head, tail, parent: str | None = None) -> str:
         self.defs[name] = (Vector(head), Vector(tail), parent)
@@ -512,15 +513,23 @@ class Rig:
             for i in range(n):
                 p = poses[i].copy()
                 for b in order:
-                    k, zeta = self.springs[b]
+                    k, zeta, *rest = self.springs[b]
                     head = self.where(p, b, self.head[b])
                     target = self.where(p, b, self.tail[b])
                     length = (target - head).length
+                    if rest and rest[0]:   # cloth: hangs toward the ground as much as its stiffness allows
+                        hang = (target - head).normalized().lerp(Vector((0, 0, -1)), rest[0]).normalized()
+                        target = head + hang * length
                     pos, vel = state.get(b, (target.copy(), Vector()))
                     vel = vel + ((target - pos) * k - vel * (2 * zeta * math.sqrt(k))) * dt
                     pos = pos + vel * dt
                     d = pos - head
                     pos = head + (d.normalized() if d.length > 1e-6 else (target - head).normalized()) * length
+                    if pos.z < 0.02:   # lying on the ground, not through it
+                        flat = Vector((pos.x - head.x, pos.y - head.y, 0.0))
+                        z = 0.02 - head.z
+                        pos = head + (flat.normalized() * math.sqrt(max(length ** 2 - z * z, 0.0)) if flat.length > 1e-6
+                                      else Vector()) + Vector((0, 0, z))
                     state[b] = [pos, vel]
                     lag = (target - head).rotation_difference(pos - head)
                     if returns:
@@ -565,7 +574,8 @@ class Rig:
                     if dz:
                         poses[f] = poses[f].copy().move("hips", z=dz)
                 self._bake(name, frames, poses, loop)
-                print(f"  {name}: lifted up to {max(lift) * 100:.1f} cm off the ground")
+                print(f"  {name}: lifted up to {max(lift) * 100:.1f} cm off the ground"
+                      f" (most at frame {lift.index(max(lift))} of {frames})")
 
     def _bake(self, name: str, frames: int, poses: list[Pose], loop: bool) -> None:
         act = bpy.data.actions.new(name)
@@ -640,7 +650,7 @@ class Rig:
 
 def foot_track(phase: float, stride: float, lift: float, duty: float = 0.6, ankle_z: float = 0.07,
                heel=(-0.06, -0.068), toe=(0.13, -0.065), strike: float = 12.0, push: float = -30.0,
-               drag: float = 0.0):
+               drag: float = 0.0, clear: float = 1.0):
     """One foot's ankle (dy, z) and pitch at a gait `phase` (0 = heel strike, in front): the stance carries
     it back by 2 * stride along the ground, the swing lifts it forward. The sole never dips below the ground;
     a heel lift pivots on the toe. `drag` keeps the toe scraping the ground through the swing (0..1)."""
@@ -652,13 +662,17 @@ def foot_track(phase: float, stride: float, lift: float, duty: float = 0.6, ankl
         pitch = strike * (1 - smooth(s / 0.2)) + push * smooth((s - 0.7) / 0.3)
     else:
         s = (ph - duty) / (1 - duty)
-        dy = stride * (-1 + 2 * smooth(s))
-        z = lift * math.sin(math.pi * s) * (1 - drag)
+        # a Hermite curve whose ends move back as fast as the stance does: the foot leaves the ground and lands
+        # already moving with it (a curve easing to rest would land moving forward over the ground: a slide)
+        m = -2 * stride * (1 - duty) / duty
+        h00, h10, h01, h11 = 2 * s ** 3 - 3 * s ** 2 + 1, s ** 3 - 2 * s ** 2 + s, -2 * s ** 3 + 3 * s ** 2, s ** 3 - s ** 2
+        dy = h00 * -stride + h10 * m + h01 * stride + h11 * m
+        z = lift * math.sin(math.pi * s) ** clear * (1 - drag)   # clear < 1: off the ground at once
         pitch = lerp(push, strike, smooth((s - 0.15) / 0.75))
     a = math.radians(pitch)
     pts = [(hy * math.cos(a) - hz * math.sin(a), hy * math.sin(a) + hz * math.cos(a), hy) for hy, hz in (heel, toe)]
     low = min(pts, key=lambda p: p[1])
-    za = max(ankle_z + z, -low[1])
+    za = max(ankle_z, -low[1]) + z   # the swing lifts from wherever the pivot holds the ankle
     dy += low[2] - low[0]   # the lowest point (the pivot) stays where it would be on a flat foot
     return dy, za, pitch
 
@@ -1045,14 +1059,15 @@ def imp_walk(rig: Rig, k: float, t: float, stride: float = 0.16, hold=None) -> P
     """The scurry: two footfalls a cycle, the hips bobbing low after each, arms swinging against the legs."""
     p = imp_stance(k)
     c = math.cos(TAU * t)
-    p.move("hips", x=-0.016 * k * wave(t), z=-0.018 * k * math.cos(2 * TAU * (t - 0.08)))
-    p.rot("hips", r=4 * wave(t), y=-9 * c)
-    p.rot("spine", y=4 * c)
-    p.rot("chest", y=8 * c, p=-2.5 * math.cos(2 * TAU * (t - 0.12)))
-    p.rot("head", y=-4 * c, p=4 * math.cos(2 * TAU * (t - 0.2)))
+    p.move("hips", x=-0.02 * k * wave(t), z=-0.034 * k * math.cos(2 * TAU * (t - 0.08)))
+    p.rot("hips", r=6 * wave(t), y=-11 * c, p=-3 * math.cos(2 * TAU * (t - 0.1)))
+    p.rot("spine", y=5 * c, p=-3)
+    p.rot("chest", y=10 * c, p=-5 * math.cos(2 * TAU * (t - 0.12)) - 4)
+    # the head darts about, out of step with the stride: an imp looks for something to stab
+    p.rot("head", y=-5 * c + 12 * wave(t, 1, 0.37) * bump(t, 0.3, 0.8), p=6 * math.cos(2 * TAU * (t - 0.2)) + 4)
     for s, side in SIDES:
-        p.rot(f"upper_arm.{side}", p=s * 26 * c)
-        p.rot(f"forearm.{side}", p=12 + s * 12 * c)
+        p.rot(f"upper_arm.{side}", p=s * 38 * c, r=-s * 6 * abs(c))
+        p.rot(f"forearm.{side}", p=18 + s * 18 * c)
         p.rot(f"ear.{side}", r=s * 8 * math.cos(2 * TAU * (t - 0.2)))
     if "crest" in rig.defs:
         p.rot("crest", p=-5 * math.cos(2 * TAU * (t - 0.3)), r=4 * math.cos(TAU * (t - 0.15)))
@@ -1062,9 +1077,11 @@ def imp_walk(rig: Rig, k: float, t: float, stride: float = 0.16, hold=None) -> P
     for s, side in SIDES:
         sole = getattr(rig, "sole", None) or {"ankle_z": 0.07 * k, "heel": (-0.06 * k, -0.068 * k),
                                               "toe": (0.14 * k, -0.066 * k)}
+        sole = sole.get(side, sole)   # one per foot, or one for both
         dy, z, pitch = foot_track(t + (0.5 if s > 0 else 0.0), stride * k, sole.get("lift", 0.07 * k),
                                   duty=IMP_DUTY, ankle_z=sole["ankle_z"], heel=sole["heel"], toe=sole["toe"],
-                                  strike=sole.get("strike", 12.0), push=sole.get("push", -30.0))
+                                  strike=sole.get("strike", 12.0), push=sole.get("push", -30.0),
+                                  clear=sole.get("clear", 1.0))
         a = rig.head[f"foot.{side}"]
         feet[side] = (Vector((a.x + s * 0.01 * k, a.y + dy, z)), pitch, -s * 6)
     plant_legs(rig, p, feet)
@@ -1093,15 +1110,19 @@ def imp_idle(rig: Rig, k: float, t: float, hold=None) -> Pose:
 
 
 def imp_hit(rig: Rig, k: float, t: float, hold=None) -> Pose:
+    """Struck: the head and chest snap back in two frames, the crouch kept, then a little lunge forward past the
+    stance (the overshoot) and settling."""
     base = imp_stance(k)
-    hit = imp_stance(k).move("hips", y=-0.065 * k, z=-0.02 * k).rot("hips", p=12)
-    hit.rot("spine", p=6).rot("chest", p=20, y=-12).rot("neck", p=8).rot("head", p=26, y=16).rot("jaw", p=-24)
+    hit = imp_stance(k).move("hips", y=-0.035 * k, z=-0.025 * k).rot("hips", p=2)
+    hit.rot("chest", p=6, y=-10).rot("neck", p=8).rot("head", p=20, y=14).rot("jaw", p=-24)
     for s, side in SIDES:
-        hit.rot(f"upper_arm.{side}", p=-16, r=-s * 34).rot(f"forearm.{side}", p=22)
+        hit.rot(f"upper_arm.{side}", p=-10, r=-s * 16).rot(f"forearm.{side}", p=18)
         hit.rot(f"ear.{side}", r=-s * 22)
+    over = imp_stance(k).move("hips", y=0.012 * k).rot("chest", p=-5).rot("head", p=-6).rot("jaw", p=-8)
     if "crest" in rig.defs:
         hit.rot("crest", p=-14)
-    p = keyed(t, [(0.0, base, smooth), (0.3, hit, ease_out), (1.0, base, smooth)])
+    p = keyed(t, [(0.0, base, smooth), (0.14, hit, ease_out), (0.32, hit, smooth), (0.62, over, smooth),
+                  (1.0, base, smooth)])
     if hold:
         hold(p, t)
     plant_legs(rig, p, imp_feet(rig, k))
@@ -1112,14 +1133,14 @@ def imp_die(rig: Rig, k: float, t: float, lie_z: float = 0.1, hand_r: Quaternion
             hand_fall: Quaternion | None = None, wrist_z: float = 0.03, hold=None, foot_pitch=(0.0, 75.0)) -> Pose:
     """Struck back, the knees buckle, it topples onto its back and the light leaves its eyes."""
     base = imp_stance(k)
-    recoil = imp_stance(k).move("hips", y=-0.06 * k).rot("hips", p=10)
-    recoil.rot("chest", p=20, y=-10).rot("head", p=26, y=14).rot("jaw", p=-24)
+    recoil = imp_stance(k).move("hips", y=-0.04 * k, z=-0.06 * k).rot("hips", p=-4)
+    recoil.rot("chest", p=4, y=-12).rot("neck", p=10).rot("head", p=26, y=14).rot("jaw", p=-28)
     buckle = imp_stance(k).move("hips", y=-0.07 * k, z=-0.17 * k).rot("hips", p=4)
     buckle.rot("chest", p=-10, y=6).rot("head", p=-10, y=10).rot("jaw", p=-14)
     fall = Pose().move("hips", y=-0.22 * k, z=-0.3 * k).rot("hips", p=55)
     fall.rot("chest", p=10).rot("head", p=24).rot("jaw", p=-20)
     for s, side in SIDES:
-        recoil.rot(f"upper_arm.{side}", p=-10, r=-s * 30).rot(f"forearm.{side}", p=20)
+        recoil.rot(f"upper_arm.{side}", p=-8, r=-s * 18).rot(f"forearm.{side}", p=24)
         recoil.rot(f"ear.{side}", r=-s * 18)
         buckle.rot(f"upper_arm.{side}", p=-6, r=-s * 6).rot(f"forearm.{side}", p=6)
         buckle.rot(f"ear.{side}", r=s * 14)
@@ -1133,20 +1154,67 @@ def imp_die(rig: Rig, k: float, t: float, lie_z: float = 0.1, hand_r: Quaternion
     settle = imp_corpse(rig, k, lie_z, settle=1.0, hand_r=hand_r, wrist_z=wrist_z, foot_pitch=foot_pitch)
     feet = imp_feet(rig, k)
     if hold:   # called with each key's time, so a held weapon can follow the collapse
-        for q, tk in ((base, 0.0), (recoil, 0.12), (buckle, 0.34)):
+        for q, tk in ((base, 0.0), (recoil, 0.08), (buckle, 0.3)):
             hold(q, tk)
     if "crest" in rig.defs:
         recoil.rot("crest", p=-16)
         fall.rot("crest", p=-10)
     for q in (base, recoil, buckle):
         plant_legs(rig, q, feet)
-    p = keyed(t, [(0.0, base, smooth), (0.12, recoil, ease_out), (0.34, buckle, smooth), (0.56, fall, ease_in),
-                  (0.72, lie, ease_in), (0.8, lie_b, ease_out), (0.9, lie, ease_in), (1.0, settle, smooth)])
-    if t < 0.34:
+    p = keyed(t, [(0.0, base, smooth), (0.08, recoil, ease_out), (0.3, buckle, smooth), (0.5, fall, ease_in),
+                  (0.66, lie, ease_in), (0.76, lie_b, ease_out), (0.86, lie, ease_in), (1.0, settle, smooth)])
+    if t < 0.3:
         plant_legs(rig, p, feet)
     else:   # the legs fly free: no hoof through the ground
         lift_feet(rig, p, 0.06 * k)
         keep_above(rig, p, ("foot.R", "foot.L"), floor=0.05, reach=1.1)   # a hoof is 4 cm thick
+    return p
+
+
+def imp_die_forward(rig: Rig, k: float, t: float, lie_z: float = 0.12, hold=None, hand_r: Quaternion | None = None) -> Pose:
+    """The second death: hit in the back, it lurches forward, stumbles a step and pitches onto its face, arms
+    under it, one leg kicking once."""
+    base = imp_stance(k)
+    lurch = imp_stance(k).move("hips", y=0.06 * k, z=-0.02 * k).rot("hips", p=-14)
+    lurch.rot("chest", p=-16, y=8).rot("head", p=-12, y=-8).rot("jaw", p=-26)
+    for s, side in SIDES:
+        lurch.rot(f"upper_arm.{side}", p=-30, r=-s * 24).rot(f"forearm.{side}", p=10)
+        lurch.rot(f"ear.{side}", r=s * 20)
+    stumble = imp_stance(k).move("hips", y=0.16 * k, z=-0.1 * k).rot("hips", p=-30)
+    stumble.rot("chest", p=-20).rot("head", p=-10).rot("jaw", p=-20)
+    for s, side in SIDES:
+        stumble.rot(f"upper_arm.{side}", p=40, r=-s * 18).rot(f"forearm.{side}", p=30)
+    feet = imp_feet(rig, k)
+    step = dict(feet)
+    a, pitch, yaw = step["L"]
+    step["L"] = (a + Vector((0, 0.16 * k, 0)), pitch, yaw)
+    plant_legs(rig, lurch, feet)
+    plant_legs(rig, stumble, step)
+    hz = rig.head["hips"].z
+    face = Pose().move("hips", y=0.36 * k, z=lie_z * k - hz).rot("hips", p=-88, r=6)
+    face.rot("spine", p=4).rot("chest", p=2).rot("neck", p=26).rot("head", p=10, y=-60).rot("jaw", p=-16)
+    for s, side in SIDES:
+        face.rot(f"upper_arm.{side}", p=150 if s > 0 else 20, r=-s * 30).rot(f"forearm.{side}", p=30 if s > 0 else 80)
+        face.rot(f"thigh.{side}", p=-6, r=-s * 10).rot(f"shin.{side}", p=-25 if s > 0 else -70)
+        face.rot(f"foot.{side}", p=50)
+        face.rot(f"ear.{side}", y=60)
+    kick = face.copy().rot("shin.L", p=-50).rot("thigh.L", p=-10)
+    if hand_r is not None:
+        rig.orient(face, "hand.R", hand_r)
+        rig.orient(kick, "hand.R", hand_r)
+    if hold:
+        for q, tk in ((base, 0.0), (lurch, 0.12), (stumble, 0.32)):
+            hold(q, tk)
+    if "crest" in rig.defs:
+        face.rot("crest", p=40)
+        kick.rot("crest", p=40)
+    settle = face.copy()
+    if "eyes" in rig.defs:
+        settle.scale("eyes", 0.02)
+    p = keyed(t, [(0.0, base, smooth), (0.12, lurch, ease_out), (0.32, stumble, smooth), (0.55, face, ease_in),
+                  (0.68, kick, ease_out), (0.82, face, smooth), (1.0, settle, smooth)])
+    if t < 0.12:
+        plant_legs(rig, p, feet)
     return p
 
 

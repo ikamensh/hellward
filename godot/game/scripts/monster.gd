@@ -5,13 +5,13 @@ extends Node3D
 ## it moves. Its death, its leak into the sanctuary and a leader's curse come as events (World._event).
 
 # kinds with a model of their own; the others wear the nearest one, tinted and sized (`STAND_INS`) until theirs exist
-const HEIGHTS := {"fallen": 1.15, "shaman": 1.5, "zombie": 1.9, "skeleton": 1.85}
+const HEIGHTS := {"fallen": 1.2, "shaman": 1.75, "zombie": 1.9, "skeleton": 1.85}
 const BODY := 1.3                    # bodies a size up from life, so they read from the battle camera
 # each kind's rim, faint and only at a distance: Fallen ember, Shaman violet, Zombie grave-green, Skeleton bone
 const RIM := {"fallen": Color(1.0, 0.32, 0.1), "shaman": Color(0.8, 0.3, 1.0), "zombie": Color(0.35, 0.7, 0.25),
 	"skeleton": Color(0.9, 0.88, 0.75)}
 # how fast each walk cycle carries the body at speed_scale 1 (m/s): the walk plays faster as the body speeds up
-const WALK := {"fallen": 0.67, "shaman": 0.72, "zombie": 0.46, "skeleton": 0.92}
+const WALK := {"fallen": 0.67, "shaman": 0.85, "zombie": 0.44, "skeleton": 0.89}
 # a kind without a model: [the model it borrows, its tint]; its height follows its size in the rules
 const STAND_INS := {
 	"goatman": ["zombie", Color(0.55, 0.38, 0.22)], "overlord": ["zombie", Color(0.75, 0.2, 0.12)],
@@ -62,6 +62,14 @@ var _overlay: ShaderMaterial
 var _bar: MeshInstance3D
 var _ring: MeshInstance3D            # a leader's violet ring on the ground
 var _flash := 0.0
+var _flinch: Flinch
+var _zap := 0.0                      # lightning still crawling over a corpse, seconds
+
+# how each element marks a blow, and a death
+const ELEMENT_FLASH := {"fire": Color(1.0, 0.45, 0.1), "cold": Color(0.45, 0.75, 1.0),
+	"lightning": Color(0.75, 0.85, 1.0), "poison": Color(0.45, 0.9, 0.25)}
+# what each body leaves when it dies: blood for the living, ichor for the dead flesh, bone dust for bones
+const REMAINS := {"fallen": Color(1, 1, 1), "shaman": Color(1, 1, 1), "zombie": Color(0.32, 0.36, 0.2)}
 
 
 func setup(w: World, ident: int, facts: Dictionary, table: Dictionary) -> void:
@@ -88,6 +96,10 @@ func title() -> String:
 func _ready() -> void:
 	_model = Models.make("mon_" + _base)
 	_model.scale = Vector3.ONE * BODY * (1.0 if HEIGHTS.has(kind) else height / (HEIGHTS[_base] * BODY))
+	# a pack is not cloned: each a little larger or smaller (±6%) and one of three tints, fixed by its id
+	_model.scale *= 1.0 + 0.06 * (float((id * 7919) % 101) / 50.0 - 1.0)
+	if HEIGHTS.has(kind):
+		Mats.vary(_model, id % Mats.VARIANTS.size())
 	add_child(_model)
 	_anim = Models.player(_model)
 	for n in ["walk", "idle", "cast"]:
@@ -105,6 +117,10 @@ func _ready() -> void:
 	for mi in _model.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_overlay = _overlay
 		(mi as MeshInstance3D).layers = 2   # decals (cull_mask 1) never land on a body
+	var skeletons := _model.find_children("*", "Skeleton3D", true, false)
+	if skeletons.size() > 0:
+		_flinch = Flinch.new()
+		skeletons[0].add_child(_flinch)
 	_bar = Vfx.health_bar(0.9 if height < 1.9 else 1.2)
 	_bar.position = Vector3(0, height + 0.35, 0)
 	add_child(_bar)
@@ -181,6 +197,9 @@ func _where(s: float) -> Vector3:
 func _process(delta: float) -> void:
 	_age += delta
 	_flash = max(0.0, _flash - delta * 6.0)
+	if _zap > 0.0:   # lightning crawls over the corpse a while: it flickers
+		_zap -= delta
+		_flash = 0.9 if fmod(_age * 23.0, 1.0) < 0.45 else 0.0
 	_overlay.set_shader_parameter("flash", _flash)
 	_overlay.set_shader_parameter("chill", 1.0 if _chilled or _frozen else 0.0)
 	_state_t += delta
@@ -229,6 +248,9 @@ func hit(element: String) -> void:
 	if not alive():
 		return
 	_flash = 1.0
+	_overlay.set_shader_parameter("flash_color", ELEMENT_FLASH.get(element, Color(1.0, 0.55, 0.35)))
+	if _flinch:
+		_flinch.kick(7.0 + randf() * 4.0, randf_range(-1.0, 1.0))
 
 
 func die(element: String, bounty: int) -> void:
@@ -237,7 +259,8 @@ func die(element: String, bounty: int) -> void:
 	_state = "dead"
 	_state_t = 0.0
 	_anim.speed_scale = 1.0
-	_play("die")
+	# two deaths a kind where it has them, one or the other by its id
+	_play("die2" if id % 2 == 1 and Models.anim_name(_anim, "die2") != "" else "die")
 	_bar.visible = false
 	_overlay.set_shader_parameter("kind_rim", Color.BLACK)   # the dead stop catching the eye
 	_overlay.set_shader_parameter("xray", 0.0)
@@ -248,9 +271,35 @@ func die(element: String, bounty: int) -> void:
 		Vfx.coin(world, global_position + Vector3(0, height + 0.3, 0), bounty)
 		Sfx.play("gold", global_position)
 	Sfx.play("death_" + kind, chest())
-	Vfx.blood(world, global_position, 0.5 + height * 0.25)
+	if REMAINS.has(_base):
+		Vfx.blood(world, global_position, 0.5 + height * 0.25, REMAINS[_base])
+	else:   # bones leave no blood: a puff of bone dust where it falls apart
+		Vfx.dust(world, global_position, 0.6, Color(0.6, 0.56, 0.48))
+	_mark_death(element)
 	if leader:
 		Vfx.burst(world, chest(), Color(0.7, 0.2, 1.0), 40)
+
+
+## The element that killed it marks the corpse: fire chars it and leaves it smouldering, cold rimes it, lightning
+## crawls over it, poison leaves it in a green fume.
+func _mark_death(element: String) -> void:
+	match element:
+		"fire":
+			Mats.burnt(_model)
+			var flames := Fx.fire(0.6, 0.6)
+			add_child(flames)
+			flames.position = Vector3(0, 0.3, 0)
+			var tw := flames.create_tween()
+			tw.tween_interval(2.0)
+			tw.tween_property(flames, "amount_ratio", 0.0, 1.0)
+		"cold":
+			Mats.frozen(_model)
+			Vfx.frost_burst(world, chest())
+		"lightning":
+			_zap = 0.6
+			Vfx.impact(world, chest(), Color(0.7, 0.85, 1.0), 30)
+		"poison":
+			Vfx.dust(world, global_position, 0.5, Color(0.35, 0.55, 0.2))
 
 
 ## Gone from the rules unseen (it died in the step it came): it fades where it stands.

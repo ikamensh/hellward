@@ -9,23 +9,45 @@ import sculpted
 K = 1.06
 HEIGHT = 1.15   # hoof to horn tip, standing in the A-pose it was generated in
 start()
-body = sculpted.prepare("fallen", HEIGHT, yaw=180,
-                        glow={"eyes": [(0.046, 0.2, 0.955), (-0.046, 0.2, 0.955)], "radius": 0.014})   # the yellow eyes glow
+body = sculpted.prepare("fallen", HEIGHT, yaw=180, colour=sculpted.imp_colour, faces=7000, rough=sculpted.imp_hide,
+                        glow={"eyes": [(0.062, 0.2, 0.955), (-0.048, 0.2, 0.955)], "radius": 0.014})   # (found before the reshape)   # the yellow eyes glow
+
+
+# the 2D Fallen's proportions: a head a third bigger than the generator made it, and ears half as long again
+HEAD = sculpted.grow((0, 0.05, 0.86), 1.3, 0.83, 0.9)
+
+
+def EARS(p):
+    """Stretch each ear out from its root along x, the further out the more."""
+    if p.z < 0.9 or abs(p.x) < 0.1:
+        return p
+    root = 0.1 * math.copysign(1, p.x)
+    k = sculpted.smooth((abs(p.x) - 0.1) / 0.05)
+    return Vector((root + (p.x - root) * (1 + 0.5 * k), p.y, p.z + (p.z - 0.95) * 0.3 * k))
+
+
+def SHAPE(p):
+    return HEAD(EARS(p))
+
+
+sculpted.reshape(body, SHAPE)
 
 
 def at(x, y, z, r=None):
-    """A joint on the body's centre line or a limb's axis: snapped to the limb's cross-section when `r` is given."""
-    return sculpted.snap(body, (x, y, z), r) if r else Vector((x, y, z))
+    """A joint on the body's centre line or a limb's axis (given as on the generated body, moved like it), snapped
+    to the limb's cross-section when `r` is given."""
+    p = SHAPE(Vector((x, y, z)))
+    return sculpted.snap(body, p, r) if r else p
 
 
 # the joints, read off tools/blender/views.py --stand 1.15 180; the right side (+X), mirrored for the left
-J = {"hips": at(0, -0.03, 0.50), "spine": at(0, -0.035, 0.61), "chest": at(0, -0.035, 0.72),
-     "neck": at(0, -0.01, 0.84), "skull": at(0, 0.03, 0.91), "crown": at(0, 0.05, 1.08),
-     "jaw": at(0, 0.09, 0.93), "chin": at(0, 0.19, 0.885), "eyes": at(0, 0.17, 0.97)}
-R = {"shoulder": at(0.19, -0.03, 0.84, 0.06), "elbow": at(0.285, -0.01, 0.71, 0.05),
-     "wrist": at(0.33, 0.03, 0.585, 0.04), "fingers": at(0.345, 0.06, 0.46),
-     "hip": at(0.09, -0.03, 0.49), "knee": at(0.115, 0.05, 0.36, 0.06), "hock": at(0.15, -0.15, 0.195, 0.05),
-     "hoof": at(0.17, 0.11, 0.02), "ear": at(0.15, 0.03, 0.99), "ear_tip": at(0.32, 0.0, 1.08)}
+J = {"hips": at(0, -0.03, 0.50), "spine": at(0, -0.035, 0.61), "chest": at(0, -0.03, 0.72),
+     "neck": at(0, 0.02, 0.85), "skull": at(0, 0.07, 0.92), "crown": at(0, 0.09, 1.07),
+     "jaw": at(0, 0.1, 0.915), "chin": at(0, 0.19, 0.845), "eyes": at(0, 0.2, 0.955)}
+R = {"shoulder": at(0.19, -0.05, 0.77, 0.06), "elbow": at(0.24, -0.06, 0.67, 0.05),
+     "wrist": at(0.28, 0.0, 0.56, 0.04), "fingers": at(0.30, 0.06, 0.44),
+     "hip": at(0.086, -0.03, 0.48), "knee": at(0.125, 0.07, 0.36, 0.06), "hock": at(0.155, -0.19, 0.19, 0.05),
+     "hoof": at(0.17, 0.06, 0.02), "ear": at(0.11, 0.03, 0.95), "ear_tip": at(0.30, 0.0, 1.075)}
 print("joints", {k: tuple(round(c, 3) for c in v) for k, v in {**J, **R}.items()})
 
 rig = Rig("rig")
@@ -45,15 +67,25 @@ for s, side in SIDES:
     rig.bone(f"thigh.{side}", m["hip"], m["knee"], "hips")
     rig.bone(f"shin.{side}", m["knee"], m["hock"], f"thigh.{side}")
     rig.bone(f"foot.{side}", m["hock"], m["hoof"], f"shin.{side}")
+# the loincloth's front and back flaps, swinging after the hips (only leather moves with them, not crimson skin)
+rig.bone("skirt.F", (0, 0.06, 0.6), (0, 0.08, 0.38), "hips")
+rig.bone("skirt.B", (0, -0.14, 0.6), (0, -0.16, 0.36), "hips")
 rig.build()
 rig.obj.data.bones["eyes"].use_deform = False
-sculpted.skin(body, rig)
+
+
+def leather(hsv):
+    return hsv[1] < 0.55 or hsv[0] > 22
+
+
+sculpted.skin(body, rig, masks={
+    "skirt.F": lambda co, hsv, thick: 0.3 < co.z < 0.6 and co.y > -0.02 and abs(co.x) < 0.13 and leather(hsv),
+    "skirt.B": lambda co, hsv, thick: 0.3 < co.z < 0.6 and co.y < -0.09 and abs(co.x) < 0.15 and leather(hsv)})
 
 rig.repose(sculpted.hang(rig))
-hock = rig.head["foot.R"]
-rig.sole = {"ankle_z": hock.z, "heel": (-0.10 - hock.y, -hock.z), "toe": (0.11 - hock.y, -hock.z),
-            "lift": 0.08, "strike": 6.0, "push": -18.0}
+rig.sole = {side: sculpted.sole(body, rig, side) for side in ("R", "L")}
 rig.springs = {"ear.R": (90.0, 0.3), "ear.L": (90.0, 0.3)}   # the ears flop after the head
+rig.springs.update({"skirt.F": (45.0, 0.3, 0.7), "skirt.B": (45.0, 0.3, 0.7)})   # cloth hangs and swings
 
 # the knife in the right fist, blade forward and its curved edge down
 knife, kf = sculpted.prop("kukri", 0.42)
@@ -93,6 +125,7 @@ rig.action("walk", 0.87, lambda t: imp_walk(rig, K, t, stride=0.16), loop=True)
 rig.action("attack", 0.7, attack)
 rig.action("hit", 0.35, lambda t: imp_hit(rig, K, t))
 rig.action("die", 1.2, lambda t: imp_die(rig, K, t, foot_pitch=(55.0, 85.0), hand_r=LIE_KNIFE, wrist_z=0.07), ground_from=0.2, body=body)
+rig.action("die2", 1.3, lambda t: imp_die_forward(rig, K, t, hand_r=LIE_KNIFE), ground_from=0.2, body=body)
 rig.report(body)
 rig.extremes(body, "die")
 print(f"walk ground speed {walk_speed(0.16 * K, IMP_DUTY, 0.87):.2f} m/s")

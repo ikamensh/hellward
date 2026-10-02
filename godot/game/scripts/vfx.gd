@@ -74,7 +74,7 @@ static func frost_burst(parent: Node, at: Vector3) -> void:
 	_flash_light(parent, at, Color(0.45, 0.75, 1.0), 3.0, 6.0, 0.3)
 
 
-static func dust(parent: Node, at: Vector3, size: float) -> void:
+static func dust(parent: Node, at: Vector3, size: float, color := Color(0.35, 0.3, 0.25)) -> void:
 	var p := GPUParticles3D.new()
 	p.amount = 24
 	p.lifetime = 1.6
@@ -96,8 +96,7 @@ static func dust(parent: Node, at: Vector3, size: float) -> void:
 	pm.damping_max = 2.0
 	pm.scale_curve = Fx.curve([[0.0, 0.4], [1.0, 1.0]])
 	pm.anim_offset_max = 1.0
-	pm.color_ramp = Fx.ramp([[0.0, Color(0.35, 0.3, 0.25, 0.0)], [0.15, Color(0.35, 0.3, 0.25, 0.6)],
-		[1.0, Color(0.3, 0.27, 0.24, 0.0)]])
+	pm.color_ramp = Fx.ramp([[0.0, Color(color, 0.0)], [0.15, Color(color, 0.6)], [1.0, Color(color * 0.88, 0.0)]])
 	p.process_material = pm
 	var q := QuadMesh.new()
 	q.size = Vector2(1.6, 1.6)
@@ -345,9 +344,10 @@ static func ponder(m: Node3D) -> void:
 	tw.tween_callback(root.queue_free)
 
 
-static func blood(parent: Node, at: Vector3, size: float) -> void:
+static func blood(parent: Node, at: Vector3, size: float, tint := Color.WHITE) -> void:
 	var d := Decal.new()
 	d.texture_albedo = load("res://assets/fx/blood_decal.png")
+	d.modulate = tint
 	d.size = Vector3(size * 2.0, 0.6, size * 2.0)
 	d.normal_fade = 0.5
 	d.cull_mask = 1

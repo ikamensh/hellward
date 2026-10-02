@@ -1,7 +1,7 @@
 """Motion capture onto the monsters' rigs (docs/monsters.md, L2): a walk cycle cut from a 100STYLE clip
 (CC BY 4.0, Mason et al. 2022; raw files in art/mocap/raw/, not committed), retargeted by matching directions.
 
-    clip = Clip.load("Zombie_FW", rig)       # a .bvh in art/mocap/raw/, scaled to the rig's hip height
+    clip = Clip.load("Zombie_FW", leg(rig))  # a .bvh in art/mocap/raw/, scaled to the rig's legs
     cycle = clip.cycle()                     # one steady stride, start and end blended to loop
     rig.action("walk", cycle.seconds, lambda t: cycle.pose(rig, t, base), loop=True)
 
@@ -37,6 +37,13 @@ SEGMENTS = {
 CAP = {"R": "Right", "L": "Left"}
 
 
+def leg(rig: Rig, slack: float = 0.95) -> float:
+    """The length a capture's legs should be scaled to for `rig`: its thigh and shin, less some slack."""
+    thigh = (rig.head["shin.R"] - rig.head["thigh.R"]).length
+    shin = (rig.tail["shin.R"] - rig.head["shin.R"]).length
+    return (thigh + shin) * slack
+
+
 class Clip:
     """Joint positions of a capture, per frame: metres, Z up, scaled to the rig's hip height. The performer
     walks back and forth across the stage; each stride is turned to face +Y when it is cut (`cycle`)."""
@@ -47,7 +54,9 @@ class Clip:
         self.scale = scale
 
     @classmethod
-    def load(cls, name: str, hip_height: float) -> Clip:
+    def load(cls, name: str, leg: float) -> Clip:
+        """The capture `name`, scaled so the performer's longest stretch from hip joint to ankle is `leg` metres
+        (mocap.leg(rig) leaves the rig's legs a little slack: a planted foot never asks for more than they reach)."""
         path = RAW / f"{name}.bvh"
         before = set(bpy.data.objects)
         bpy.ops.import_anim.bvh(filepath=str(path), axis_forward="-Z", axis_up="Y", rotate_mode="NATIVE",
@@ -68,7 +77,9 @@ class Clip:
                     ends[pb.name + "_end"].append(tuple(arm.matrix_world @ pb.tail))
         bpy.data.objects.remove(arm)
         joints = {k: np.array(v) for k, v in {**heads, **ends}.items()}
-        scale = hip_height / float(np.median(joints["Hips"][:, 2]))
+        stretch = max(float(np.percentile(np.linalg.norm(joints[f"{c}Hip"] - joints[f"{c}Ankle"], axis=1), 99))
+                      for c in CAP.values())
+        scale = leg / stretch
         for k in joints:
             joints[k] = joints[k] * scale
         return cls(joints, 1.0 / frame_time, scale)
@@ -157,6 +168,7 @@ class Cycle:
             self.track[k] = seg
         # each ankle's height while planted: its lowest over the cycle
         self.ground = {c: float(self.track[f"{c}Ankle"][:, 2].min()) for c in CAP.values()}
+        self.lock_feet()
         # each foot's direction while planted (ankle within 2 cm of its lowest): the rig's foot turns only by how
         # far the performer's turns from it, so a differently shaped foot still stands flat
         self.flat = {}
@@ -166,6 +178,41 @@ class Cycle:
             d = (toe - ank)[down].mean(0)
             self.flat[c] = Vector(tuple(d)).normalized()
         print(f"cycle frames {a}..{b}: {self.seconds:.2f} s, {self.speed:.2f} m/s, scale {clip.scale:.3f}")
+
+    def lock_feet(self, rise: float = 0.04, blend: int = 2) -> None:
+        """Planted feet stay planted: while an ankle is within `rise` of its lowest, it moves back at exactly the
+        cycle's speed along a straight line fitted to the capture (the performer's pace varies within a stride, so
+        taking the average speed out leaves a planted foot sliding to and fro). The toe moves with its ankle; the
+        lock eases in and out over `blend` frames."""
+        n = len(self.track["Hips"]) - 1          # the last frame repeats the first
+        back = self.speed * self.seconds / n     # metres the ground runs back per frame
+        for c in CAP.values():
+            ank, toe = self.track[f"{c}Ankle"], self.track[f"{c}Toe"]
+            down = ank[:n, 2] < self.ground[c] + rise
+            if down.all() or not down.any():
+                continue
+            start = int(np.argmin(down))         # walk from a frame in the air, so no run wraps
+            order = [(start + i) % n for i in range(n)]
+            runs, cur = [], []
+            for i in order:
+                if down[i]:
+                    cur.append(i)
+                elif cur:
+                    runs.append(cur)
+                    cur = []
+            if cur:
+                runs.append(cur)
+            for run in runs:
+                k = np.arange(len(run))
+                y = ank[run, 1] + back * k            # where each frame's ankle would be with the ground stopped
+                anchor = np.array([ank[run, 0].mean(), y.mean()])
+                for j, i in enumerate(run):
+                    w = min(1.0, (j + 1) / (blend + 1), (len(run) - j) / (blend + 1))
+                    want = np.array([anchor[0], anchor[1] - back * j])
+                    shift = (want - ank[i, :2]) * w
+                    ank[i, :2] += shift
+                    toe[i, :2] += shift
+            ank[n], toe[n] = ank[0], toe[0]
 
     def at(self, t: float) -> dict[str, Vector]:
         n = self.b - self.a

@@ -112,6 +112,7 @@ const FLESH := {"mon_fallen": Color(0.55, 0.06, 0.02), "mon_shaman": Color(0.55,
 static func monster(kind: String) -> ORMMaterial3D:
 	var dir := TEX + kind + "/"
 	var m := ORMMaterial3D.new()
+	m.resource_name = kind
 	if FLESH.has(kind):
 		m.backlight_enabled = true
 		m.backlight = FLESH[kind]
@@ -125,6 +126,52 @@ static func monster(kind: String) -> ORMMaterial3D:
 		m.emission_texture = load(dir + "emission.webp")
 		m.emission_energy_multiplier = 3.0
 	return m
+
+
+# a pack is not cloned: each monster wears one of these tints of its kind's maps (Mats.vary)
+const VARIANTS := [Color(1.0, 1.0, 1.0), Color(0.86, 0.88, 0.92), Color(1.1, 1.02, 0.94)]
+
+
+## Give every monster material under `root` the tint of variant `n` (one of VARIANTS).
+static func vary(root: Node, n: int) -> void:
+	restyle(root, str(n), func(m: ORMMaterial3D) -> void: m.albedo_color = VARIANTS[n % VARIANTS.size()])
+
+
+## A corpse a fire killed: charred black, embers glowing in its cracks.
+static func burnt(root: Node) -> void:
+	restyle(root, "burnt", func(m: ORMMaterial3D) -> void:
+		m.albedo_color = Color(0.13, 0.1, 0.09)
+		m.roughness = 1.0
+		m.emission_enabled = true
+		m.emission = Color(1.0, 0.3, 0.05)
+		m.emission_energy_multiplier = 0.35
+		m.emission_texture = m.orm_texture)
+
+
+## A corpse the cold killed: rimed white-blue and glassy.
+static func frozen(root: Node) -> void:
+	restyle(root, "frozen", func(m: ORMMaterial3D) -> void:
+		m.albedo_color = Color(0.85, 1.0, 1.25)
+		m.roughness = 0.25
+		m.rim_enabled = true
+		m.rim = 0.8
+		m.rim_tint = 0.0)
+
+
+## Every monster material under `root` swapped for its variant `tag`, made once by `change` on a copy.
+static func restyle(root: Node, tag: String, change: Callable) -> void:
+	for node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		for i in mi.mesh.get_surface_count():
+			var m := mi.get_surface_override_material(i) as ORMMaterial3D
+			if m == null or not m.resource_name.begins_with("mon_"):
+				continue
+			var key := "%s~%s" % [m.resource_name, tag]
+			if not _cache.has(key):
+				var copy := m.duplicate() as ORMMaterial3D
+				change.call(copy)
+				_cache[key] = copy
+			mi.set_surface_override_material(i, _cache[key])
 
 
 static func _ice() -> StandardMaterial3D:

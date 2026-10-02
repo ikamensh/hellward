@@ -14,9 +14,20 @@ H = 1.13        # the old human frame's scale: distances in the poses below
 start()
 WRIST_R = (0.5, -0.03, 1.05)
 body = sculpted.prepare(
-    "zombie", HEIGHT, yaw=180,
+    "zombie", HEIGHT, yaw=180, colour=sculpted.corpse_colour, faces=9000, rough=sculpted.corpse,
     # the manacle and its chain are iron
     metal=lambda hue, sat, val, pos: (np.linalg.norm(pos - np.array(WRIST_R), axis=-1) < 0.12) * (sat < 0.35) * 0.8)
+
+
+def BELLY(p):
+    """The concept's slumped gut: the front of the belly pushed forward and down (a pear in profile)."""
+    if p.y < 0.0 or abs(p.x) > 0.32:
+        return p
+    w = sculpted.smooth(1.0 - abs(p.z - 1.1) / 0.28) * sculpted.smooth(p.y / 0.18) * sculpted.smooth(1 - abs(p.x) / 0.32)
+    return Vector((p.x, p.y + 0.09 * w, p.z - 0.04 * w))
+
+
+sculpted.reshape(body, BELLY)
 
 
 def at(x, y, z, r=None):
@@ -53,28 +64,45 @@ for s, side in SIDES:
     rig.bone(f"thigh.{side}", m["hip"], m["knee"], "hips")
     rig.bone(f"shin.{side}", m["knee"], m["ankle"], f"thigh.{side}")
     rig.bone(f"foot.{side}", m["ankle"], m["toe"], f"shin.{side}")
+# the burial linen: a long front fall in two pieces and a back flap, swinging after the hips
+rig.bone("cloth.F", (-0.03, 0.14, 1.04), (-0.03, 0.13, 0.78), "hips")
+rig.bone("cloth.F2", (-0.03, 0.13, 0.78), (-0.03, 0.12, 0.5), "cloth.F")
+rig.bone("cloth.B", (0.0, -0.18, 1.04), (0.0, -0.2, 0.64), "hips")
 rig.build()
 rig.obj.data.bones["eyes"].use_deform = False
-sculpted.skin(body, rig, sigma=0.035)
+
+
+LEGS = [(rig.head[b], rig.tail[b]) for b in ("thigh.R", "thigh.L", "shin.R", "shin.L")]
+
+
+def off_legs(co, radius=0.14):
+    """Farther than a leg's flesh from every leg bone."""
+    def dist(a, b):
+        ab = b - a
+        t = max(0.0, min(1.0, (co - a).dot(ab) / ab.length_squared))
+        return (co - (a + ab * t)).length
+    return min(dist(a, b) for a, b in LEGS) > radius
+
+
+def linen(co, thick):
+    """The linen, not the legs behind it: a sheet is either thin or open (a ray into it meets nothing), a leg is
+    15-25 cm through, and linen hangs clear of the legs' flesh; the hands hang outside |x| < 0.32."""
+    return abs(co.x) < 0.32 and (thick < 0.04 or thick > 0.29 or off_legs(co))
+
+
+sculpted.skin(body, rig, sigma=0.035, masks={
+    "cloth.F": lambda co, hsv, thick: 0.7 < co.z < 1.08 and co.y > -0.02 and linen(co, thick),
+    "cloth.F2": lambda co, hsv, thick: 0.4 < co.z < 0.86 and co.y > -0.02 and linen(co, thick),
+    "cloth.B": lambda co, hsv, thick: 0.55 < co.z < 1.08 and co.y < -0.08 and linen(co, thick)})
 rig.repose(sculpted.hang(rig, arm=12))
+rig.springs = {"cloth.F": (35.0, 0.3, 0.7), "cloth.F2": (30.0, 0.25, 0.8), "cloth.B": (35.0, 0.3, 0.7)}
 HD = rig.head
 
 
 # -- animation: the walk and the idle are captured; the rest keyed from the old stance
-def stance() -> Pose:
-    p = Pose()
-    p.move("hips", z=-0.07 * H, y=-0.03 * H).rot("hips", p=-10, r=2)
-    p.rot("spine", p=-10, r=-3).rot("chest", p=-20, r=-4, y=4)
-    p.rot("neck", p=10).rot("head", p=2, r=14, y=-6).rot("jaw", p=-14)
-    p.rot("upper_arm.R", p=132, y=12).rot("forearm.R", p=10).rot("hand.R", p=-38)
-    p.rot("upper_arm.L", p=118, y=-8).rot("forearm.L", p=20).rot("hand.L", p=-44)
-    return p
-
-
-FEET = human_feet(rig, H, spread=0.03)
 hip_h = HD["hips"].z
-shamble = mocap.Clip.load("Zombie_FW", hip_h).cycle()
-sway = mocap.Clip.load("Zombie_ID", hip_h).loop(3.0)
+shamble = mocap.Clip.load("Zombie_FW", mocap.leg(rig)).cycle()
+sway = mocap.Clip.load("Zombie_ID", mocap.leg(rig)).loop(3.0)
 
 
 def walk(t):
@@ -83,6 +111,15 @@ def walk(t):
 
 def idle(t):
     return sway.pose(rig, t, Pose().rot("jaw", p=-10 - 10 * bump(t, 0.2, 0.45) - 6 * bump(t, 0.6, 0.8)))
+
+
+# the keyed clips start and end on the walk's first pose, so they cut in and out of it without a jump
+W0 = walk(0.0)
+FEET = {side: (rig.where(W0, f"shin.{side}", rig.tail[f"shin.{side}"]), 0.0, -s * 8.0) for s, side in SIDES}
+
+
+def stance() -> Pose:
+    return W0.copy()
 
 
 def attack(t):
@@ -109,12 +146,16 @@ def attack(t):
 
 
 def hit(t):
+    """A lurch: the head snaps back, the body rocks back half a step with the arms flung, then sags forward past
+    where it stood and recovers."""
     base = stance()
-    jolt = stance().move("hips", y=-0.06 * H, z=-0.015 * H).rot("hips", p=8)
-    jolt.rot("chest", p=16, y=-10, r=6).rot("head", p=24, r=-18).rot("jaw", p=-20)
-    jolt.rot("upper_arm.R", p=-30, r=-10).rot("upper_arm.L", p=-24, r=10)
-    jolt.rot("forearm.R", p=20).rot("forearm.L", p=20)
-    p = keyed(t, [(0.0, base, smooth), (0.3, jolt, ease_out), (1.0, base, smooth)])
+    jolt = stance().move("hips", y=-0.1 * H, z=-0.02 * H).rot("hips", p=10)
+    jolt.rot("chest", p=22, y=-14, r=8).rot("neck", p=10).rot("head", p=30, r=-20).rot("jaw", p=-28)
+    jolt.rot("upper_arm.R", p=-40, r=-25).rot("upper_arm.L", p=-35, r=25)
+    jolt.rot("forearm.R", p=25).rot("forearm.L", p=25)
+    sag = stance().move("hips", y=0.03 * H, z=-0.03 * H).rot("chest", p=-10).rot("head", p=-12, r=8)
+    p = keyed(t, [(0.0, base, smooth), (0.16, jolt, ease_out), (0.36, jolt, smooth), (0.68, sag, smooth),
+                  (1.0, base, smooth)])
     plant_legs(rig, p, FEET, pole_out=0.2)
     return p
 
@@ -166,8 +207,53 @@ def die(t):
 rig.action("idle", sway.seconds, idle, loop=True)
 rig.action("walk", shamble.seconds, walk, loop=True)
 rig.action("attack", 0.75, attack)
-rig.action("hit", 0.35, hit)
+rig.action("hit", 0.6, hit)
+def corpse_back(lift=0.0):
+    """On its back where it fell, arms flung wide, the gut up."""
+    p = Pose().move("hips", y=-0.45 * H, z=(0.2 + lift) * H - hip_h).rot("hips", p=88, r=-4)
+    p.rot("spine", p=4).rot("chest", p=6).rot("neck", p=-10).rot("head", p=-6, y=40).rot("jaw", p=-34)
+    for s, side in SIDES:
+        sh = rig.where(p, "chest", HD[f"upper_arm.{side}"])
+        wrist = sh + Vector((s * 0.5, 0.15, 0)) * H
+        wrist.z = 0.09 * H
+        rig.reach(p, f"upper_arm.{side}", f"forearm.{side}", wrist, (s * 0.6, 0.2, 1))
+        rig.orient(p, f"hand.{side}", Q(r=s * 80))
+        h = rig.where(p, "hips", HD[f"thigh.{side}"])
+        ankle = h + (Vector((0.12, 0.7, 0)) if s > 0 else Vector((-0.2, 0.55, 0))) * H
+        ankle.z = 0.1 * H
+        rig.reach(p, f"thigh.{side}", f"shin.{side}", ankle, (s * 0.5, 0, 1))
+        rig.orient(p, f"foot.{side}", Q(p=80))
+    return p
+
+
+def die_back(t):
+    """Struck full in the chest: it rears up, staggers back two steps and topples on its back with a thud."""
+    base = stance()
+    rear = stance().move("hips", y=-0.08 * H, z=0.02 * H).rot("hips", p=14).rot("chest", p=20).rot("head", p=30)
+    rear.rot("jaw", p=-34).rot("upper_arm.R", p=-40, r=-20).rot("upper_arm.L", p=-40, r=20)
+    stagger = stance().move("hips", y=-0.3 * H, z=-0.08 * H).rot("hips", p=22).rot("chest", p=14).rot("head", p=24)
+    stagger.rot("upper_arm.R", p=-60, r=-40).rot("upper_arm.L", p=-50, r=40)
+    fall = Pose().move("hips", y=-0.4 * H, z=-0.45 * H).rot("hips", p=60).rot("chest", p=10).rot("head", p=-10)
+    for s, side in SIDES:
+        fall.rot(f"upper_arm.{side}", p=-70, r=-s * 60)
+        fall.rot(f"thigh.{side}", p=40).rot(f"shin.{side}", p=-30)
+    lie, bounce = corpse_back(), corpse_back(lift=0.04)
+    steps = dict(FEET)
+    for q, back in ((rear, 0.0), (stagger, 0.22)):
+        f = {sd: (a + Vector((0, -back * H, 0)), pt, yw) for sd, (a, pt, yw) in FEET.items()}
+        plant_legs(rig, q, f, pole_out=0.2)
+    p = keyed(t, [(0.0, base, smooth), (0.14, rear, ease_out), (0.38, stagger, smooth), (0.6, fall, ease_in),
+                  (0.74, lie, ease_in), (0.82, bounce, ease_out), (1.0, lie, smooth)])
+    if t < 0.14:
+        plant_legs(rig, p, FEET, pole_out=0.2)
+    else:
+        lift_feet(rig, p, 0.07 * H)
+        keep_above(rig, p, ("hand.R", "hand.L"), floor=0.03, reach=1.4)
+    return p
+
+
 rig.action("die", 1.25, die, ground_from=0.4, body=body)
+rig.action("die2", 1.4, die_back, ground_from=0.14, body=body)
 rig.report(body)
 rig.extremes(body, "die")
 print(f"walk ground speed {shamble.speed:.2f} m/s")

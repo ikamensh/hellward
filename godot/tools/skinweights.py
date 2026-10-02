@@ -2,7 +2,8 @@
 
     python tools/skinweights.py IN.npz OUT.npz
 
-IN holds verts (N, 3), faces (M, 3), heads and tails (B, 3) of the deforming bones, cell (voxel size, metres) and
+IN holds verts (N, 3), faces (M, 3), heads and tails (B, 3) of the deforming bones, optionally allow (N, B: which
+bones each vertex may follow), cell (voxel size, metres) and
 sigma (how wide a joint's blend is, metres: one value, or one per vertex, small where the body is rigid bone and
 large where it is flesh or cloth). OUT holds weights (N, B), at most four per vertex, summing to one.
 
@@ -66,7 +67,8 @@ def graph(mask: np.ndarray, cell: float):
     return cells, g.tocsr()
 
 
-def weights(verts, faces, heads, tails, cell=0.01, sigma=0.025, smooth=6) -> np.ndarray:
+def weights(verts, faces, heads, tails, cell=0.01, sigma=0.025, smooth=6, allow=None) -> np.ndarray:
+    """`allow` (N, B), when given, says which bones each vertex may follow (a cloth bone only its cloth)."""
     sigma = np.asarray(sigma, float)
     pad = 4 * cell
     origin = verts.min(0) - pad
@@ -82,6 +84,15 @@ def weights(verts, faces, heads, tails, cell=0.01, sigma=0.025, smooth=6) -> np.
         seeds = np.unique(tree.query(h + np.linspace(0, 1, n)[:, None] * (t - h))[1])
         geo = dijkstra(g, indices=seeds, min_only=True)
         dist[:, k] = geo[vi] + vd
+    lost = ~np.isfinite(dist).any(1)   # pieces the solid does not join to any bone: straight-line distance
+    if lost.any():
+        for k, (h, t) in enumerate(zip(heads, tails)):
+            ab = t - h
+            u = np.clip(((verts[lost] - h) @ ab) / max(ab @ ab, 1e-12), 0, 1)
+            dist[lost, k] = np.linalg.norm(verts[lost] - (h + u[:, None] * ab), axis=1)
+        print(f"skin weights: {int(lost.sum())} vertices on pieces apart from the body, weighted by straight distance")
+    if allow is not None:
+        dist[~allow] = np.inf
     rel = dist - dist.min(1, keepdims=True)
     sig = np.broadcast_to(np.asarray(sigma, float).reshape(-1, 1), (len(verts), 1))
     w = np.exp(-rel / sig)
@@ -98,6 +109,8 @@ def weights(verts, faces, heads, tails, cell=0.01, sigma=0.025, smooth=6) -> np.
     soft = (sig / sig.max()).ravel()[:, None] if sig.max() > 0 else 1.0   # rigid parts keep their edges
     for _ in range(smooth):
         w = w + 0.5 * soft * ((adj @ w) / deg[:, None] - w)
+        if allow is not None:
+            w[~allow] = 0.0
     top = np.argsort(-w, axis=1)[:, 4:]
     np.put_along_axis(w, top, 0.0, axis=1)
     w /= w.sum(1, keepdims=True)
@@ -107,5 +120,6 @@ def weights(verts, faces, heads, tails, cell=0.01, sigma=0.025, smooth=6) -> np.
 
 if __name__ == "__main__":
     d = np.load(sys.argv[1])
-    w = weights(d["verts"], d["faces"], d["heads"], d["tails"], float(d["cell"]), d["sigma"])
+    w = weights(d["verts"], d["faces"], d["heads"], d["tails"], float(d["cell"]), d["sigma"],
+                allow=d["allow"] if "allow" in d.files else None)
     np.savez(sys.argv[2], weights=w)

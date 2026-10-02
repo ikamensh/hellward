@@ -25,9 +25,19 @@ def mail(hue, sat, val, pos):
     return (helm | pauldron | skirt) * (sat < 0.3) * (val < 0.5) * 0.8
 
 
-body = sculpted.prepare("skeleton", HEIGHT, yaw=180, metal=mail,
-                        glow={"eyes": [(0.045, 0.09, 1.692), (-0.025, 0.09, 1.692)], "radius": 0.011,
+body = sculpted.prepare("skeleton", HEIGHT, yaw=180, colour=sculpted.bone_colour, faces=9000, rough=sculpted.bones, metal=mail,
+                        glow={"eyes": [(0.045, 0.09, 1.692), (-0.025, 0.09, 1.692)], "radius": 0.016,
                               "colour": EMBER})
+
+
+# the left pauldron flattened onto the shoulder (from the front it read as a second skull beside the helmet)
+_hsv = sculpted.hue_sat_val(sculpted.COLOURS[body.name])
+_shoulder = Vector((-0.22, -0.08, 1.47))
+for _i, _v in enumerate(body.data.vertices):
+    if _v.co.x < -0.1 and 1.3 < _v.co.z < 1.66 and _hsv[_i, 2] < 0.22:
+        d = _v.co - _shoulder
+        _v.co = _shoulder + Vector((d.x * 0.75, d.y * 0.85, d.z * 0.7))
+body.data.update()
 
 
 def at(x, y, z, r=None):
@@ -64,8 +74,22 @@ for s, side in SIDES:
     rig.bone(f"thigh.{side}", m["hip"], m["knee"], "hips")
     rig.bone(f"shin.{side}", m["knee"], m["ankle"], f"thigh.{side}")
     rig.bone(f"foot.{side}", m["ankle"], m["toe"], f"shin.{side}")
+# the crimson tabard strip in two pieces, and the mail skirt behind and at the sides
+rig.bone("tabard", (0.0, 0.06, 1.06), (0.0, 0.05, 0.84), "hips")
+rig.bone("tabard2", (0.0, 0.05, 0.84), (0.0, 0.04, 0.6), "tabard")
+rig.bone("mail.B", (0.0, -0.12, 1.06), (0.0, -0.15, 0.74), "hips")
+for s_, side in SIDES:
+    rig.bone(f"mail.{side}", (s_ * 0.17, -0.03, 1.06), (s_ * 0.2, -0.03, 0.78), "hips")
 rig.build()
 rig.obj.data.bones["eyes"].use_deform = False
+
+
+def red(hsv):
+    return (hsv[0] < 15 or hsv[0] > 340) and hsv[1] > 0.4
+
+
+def iron(hsv):
+    return hsv[2] < 0.19
 
 
 def give(co):
@@ -77,8 +101,15 @@ def give(co):
     return 0.006
 
 
-sculpted.skin(body, rig, sigma=give)
+sculpted.skin(body, rig, sigma=give, masks={
+    "tabard": lambda co, hsv, thick: 0.8 < co.z < 1.1 and abs(co.x) < 0.13 and co.y > -0.04 and red(hsv),
+    "tabard2": lambda co, hsv, thick: 0.55 < co.z < 0.9 and abs(co.x) < 0.13 and co.y > -0.04 and red(hsv),
+    "mail.B": lambda co, hsv, thick: 0.68 < co.z < 1.08 and co.y < -0.07 and iron(hsv),
+    "mail.R": lambda co, hsv, thick: 0.68 < co.z < 1.08 and co.x > 0.1 and iron(hsv),
+    "mail.L": lambda co, hsv, thick: 0.68 < co.z < 1.08 and co.x < -0.1 and iron(hsv)})
 rig.repose(sculpted.hang(rig, arm=12))
+rig.springs = {"tabard": (40.0, 0.3, 0.7), "tabard2": (35.0, 0.25, 0.8), "mail.B": (70.0, 0.4, 0.5),
+               "mail.R": (70.0, 0.4, 0.5), "mail.L": (70.0, 0.4, 0.5)}   # mail is heavy and stiff
 HD = rig.head
 FEET = human_feet(rig, 1.0, spread=0.03, out=6)
 
@@ -100,12 +131,12 @@ SWORD = 0.92
 sword, wf = sculpted.prop("sword", SWORD)   # made standing point down: its axis runs from the point to the pommel
 grip = sculpted.snap(sword, Vector((wf["centre"].x, wf["centre"].y, SWORD - 0.12)), 0.05)
 q_hand = rig.turn(S0, "hand.R")
-blade = Vector((0.0, 0.75, -0.66)).normalized()
+blade = Vector((0.0, 0.85, 0.3)).normalized()   # forward and a little up: at the ready
 sculpted.hold(sword, rig, "hand.R", grip, wf["axis"], wf["flat"], HD["hand.R"].lerp(rig.tail["hand.R"], 0.6),
               q_hand.inverted() @ -blade, q_hand.inverted() @ Vector((1, 0, 0)))
 
-SHIELD = 0.62
-shield, hf = sculpted.prop("shield", SHIELD)
+SHIELD = 0.5   # a third of its height: big enough to read, small enough to show the skeleton behind it
+shield, hf = sculpted.prop("shield", SHIELD, colour=sculpted.weathered)
 co = np.array([v.co for v in shield.data.vertices])
 d = (co - np.array(hf["centre"])) @ np.array(hf["flat"])
 front = hf["flat"] if d.max() > -d.min() else -hf["flat"]   # the boss stands out of the front
@@ -115,15 +146,21 @@ arm_mid = HD["forearm.L"].lerp(rig.tail["forearm.L"], 0.55)
 sculpted.hold(shield, rig, "forearm.L", hf["centre"] - front * 0.035, front, hf["axis"], arm_mid,
               q_arm.inverted() @ face, q_arm.inverted() @ Vector((0, 0, 1)))
 
-march = mocap.Clip.load("March_FW", HD["hips"].z).cycle()
-stand_still = mocap.Clip.load("Stiff_ID", HD["hips"].z).loop(3.0)
+march = mocap.Clip.load("March_FW", mocap.leg(rig)).cycle()
+stand_still = mocap.Clip.load("Stiff_ID", mocap.leg(rig)).loop(3.0)
 SHIELD_ARM = ("upper_arm.L", "forearm.L", "hand.L")
 
 
+SWORD_ARM = ("upper_arm.R", "forearm.R", "hand.R")
+
+
 def walk(t):
-    """A captured march, the shield held up before the chest, the jaw clacking with the steps."""
+    """A captured march, the shield held up before the chest, the sword carried forward at the ready and swinging
+    with the stride (a captured arm would let it hang into the ground), the jaw clacking with the steps."""
+    c = math.cos(TAU * t)
     base = S0.copy().rot("jaw", p=-8 * (bump(t, 0.02, 0.18) + bump(t, 0.52, 0.68)))
-    return march.pose(rig, t, base, arms=0.8, own=SHIELD_ARM)
+    base.rot("upper_arm.R", p=10 * c).rot("forearm.R", p=6 + 6 * c)
+    return march.pose(rig, t, base, own=SHIELD_ARM + SWORD_ARM)
 
 
 def idle(t):
@@ -131,23 +168,44 @@ def idle(t):
     return stand_still.pose(rig, t, base, own=SHIELD_ARM + ("upper_arm.R", "forearm.R", "hand.R"))
 
 
+BLADE_REST = q_hand.inverted() @ blade              # the blade's direction in the hand's rest frame
+FLAT_REST = q_hand.inverted() @ Vector((1, 0, 0))   # and its flat's
+
+
+def aim_blade(p: Pose, direction: Vector) -> None:
+    """Turn the sword hand so the blade points along `direction` (world), its flat facing sideways."""
+    rig.orient(p, "hand.R", frame_turn(BLADE_REST, FLAT_REST, direction, Vector((1, 0, 0))))
+
+
 def attack(t):
-    """Sword raised high over the skull, a chopping blow, the shield thrust forward."""
+    """An overhead chop: the sword raised straight up behind the skull, the weight back, then a step in and the
+    blade brought down in front, the shield drawn back out of the way; recover."""
     base = stance()
-    wind = stance().move("hips", y=-0.03, z=0.01).rot("hips", p=3).rot("chest", p=10, y=-18).rot("head", p=8, y=10)
-    wind.q["upper_arm.R"], wind.q["forearm.R"], wind.q["hand.R"] = Q(p=160, r=-18), Q(p=70), Q(p=-40)
-    wind.rot("upper_arm.L", p=10).rot("jaw", p=-18)
-    strike = stance().move("hips", y=0.1, z=-0.05).rot("hips", p=-10).rot("chest", p=-14, y=18).rot("head", p=-6)
-    strike.q["upper_arm.R"], strike.q["forearm.R"], strike.q["hand.R"] = Q(p=78, r=8), Q(p=4), Q(p=10)
-    strike.rot("upper_arm.L", p=-10, r=10).rot("jaw", p=-20)
+    wind = stance().move("hips", y=-0.05, z=0.01).rot("hips", p=4).rot("chest", p=8, y=-10).rot("head", p=6)
+    wind.q["upper_arm.R"], wind.q["forearm.R"], wind.q["hand.R"] = Q(p=170, r=-4), Q(p=75), Q(p=-50)
+    wind.rot("upper_arm.L", p=14, r=6).rot("jaw", p=-18)
+    strike = stance().move("hips", y=0.14, z=-0.06).rot("hips", p=-12).rot("chest", p=-16, y=8).rot("head", p=-6)
+    strike.q["upper_arm.R"], strike.q["forearm.R"], strike.q["hand.R"] = Q(p=80, r=2), Q(p=4), Q(p=95)
+    strike.rot("upper_arm.L", p=-24, r=26).rot("forearm.L", p=-10).rot("jaw", p=-24)
     follow = strike.copy()
-    follow.q["upper_arm.R"], follow.q["forearm.R"], follow.q["hand.R"] = Q(p=52, r=16), Q(p=14), Q(p=0)
-    p = keyed(t, [(0.0, base, smooth), (0.38, wind, smooth), (0.52, strike, ease_in), (0.64, follow, ease_out),
-                  (1.0, base, smooth)])
+    follow.q["upper_arm.R"], follow.q["forearm.R"], follow.q["hand.R"] = Q(p=50, r=6), Q(p=10), Q(p=105)
+    keys = [(0.0, base, smooth), (0.36, wind, smooth), (0.5, strike, ease_in), (0.62, follow, ease_out),
+            (1.0, base, smooth)]
+    p = keyed(t, keys)
+    # the blade aimed in the world: up and back over the skull, then down in front of it
+    aims = [(0.0, None), (0.36, Vector((0, -0.45, 1))), (0.5, Vector((0, 0.55, -0.8))),
+            (0.62, Vector((0.1, 0.25, -1))), (1.0, None)]
+    rest_dir = rig.turn(base, "hand.R") @ BLADE_REST
+    for (t0, a0), (t1, a1) in zip(aims, aims[1:]):
+        if t0 <= t <= t1:
+            d0, d1 = (a0 or rest_dir).normalized(), (a1 or rest_dir).normalized()
+            w = smooth((t - t0) / (t1 - t0))
+            aim_blade(p, d0.slerp(d1, w) if d0.dot(d1) > -0.99 else d1)
+            break
     feet = dict(FEET)
     a, pitch, yaw = feet["L"]
-    step = smooth((t - 0.38) / 0.14) * (1 - smooth((t - 0.66) / 0.34))
-    feet["L"] = (a + Vector((0, 0.14 * step, 0.07 * bump(t, 0.38, 0.52))), pitch, yaw)
+    step = smooth((t - 0.36) / 0.14) * (1 - smooth((t - 0.68) / 0.32))
+    feet["L"] = (a + Vector((0, 0.22 * step, 0.08 * bump(t, 0.36, 0.5))), pitch, yaw)
     plant_legs(rig, p, feet, pole_out=0.1)
     return p
 
@@ -216,13 +274,91 @@ def die(t):
     return p
 
 
+def thickness_of(bone: str) -> float:
+    """How far the bone's own mesh reaches from its axis (its vertices weighted mostly to it), at rest."""
+    g = body.vertex_groups.get(bone)
+    if g is None:
+        return 0.03
+    head, tail = rig.head[bone], rig.tail[bone]
+    ab = tail - head
+    far = 0.0
+    for v in body.data.vertices:
+        if any(e.group == g.index and e.weight > 0.6 for e in v.groups):
+            u = max(0.0, min(1.0, (v.co - head).dot(ab) / max(ab.length_squared, 1e-9)))
+            far = max(far, (v.co - (head + ab * u)).length)
+    return far or 0.03
+
+
+def heap(seed: int = 3) -> Pose:
+    """What is left when the malice goes out of it: every bone fallen where it stood, flat on the ground, a little
+    scattered, the skull rolled furthest. Bones are placed in world space, parents first."""
+    import random
+    rng = random.Random(seed)
+    p = Pose()
+    centre = Vector((0.0, -0.05, 0.0))
+    for bone in rig.defs:   # parents come before their children in the rig's order
+        if bone == "eyes":
+            continue
+        head, tail = rig.head[bone], rig.tail[bone]
+        length = (tail - head).length
+        yaw = rng.uniform(0, 360) if bone not in ("hips", "spine", "chest") else rng.uniform(-30, 30)
+        # lying flat: the bone's own axis turned into the ground plane, then spun about the vertical
+        axis = (tail - head).normalized()
+        flat = Vector((axis.x, axis.y, 0.0))
+        flat = flat.normalized() if flat.length > 0.2 else Vector((0, 1, 0))
+        q = Quaternion((0, 0, 1), math.radians(yaw)) @ axis.rotation_difference(flat)
+        out = (Vector((head.x, head.y, 0)) - centre) * rng.uniform(0.35, 0.6)
+        if bone == "head":
+            out = Vector((0.42, 0.25, 0))   # the skull rolls away
+        lie = min(thickness_of(bone), 0.2) * 0.8 + 0.01
+        to = centre + out + Vector((rng.uniform(-0.06, 0.06), rng.uniform(-0.06, 0.06), lie))
+        rig.orient(p, bone, q)
+        rig.place(p, bone, to - (q @ Vector((0, 0, 0))) - q @ ((head - head)))
+    return p
+
+
+HEAP = heap()
+
+
+def collapse(t):
+    """Struck, it rattles, the knees give and it drops straight down, falling apart as it goes: each bone lands on
+    its own, the low ones first, the skull last, rolling away."""
+    jolt = hit(0.3)
+    sag = stance().move("hips", z=-0.25).rot("hips", p=8).rot("chest", p=-25, r=8).rot("head", p=-25, r=18)
+    sag.rot("upper_arm.R", p=-10, r=-20).rot("upper_arm.L", p=-5, r=20).rot("jaw", p=-30)
+    for s, side in SIDES:
+        sag.rot(f"thigh.{side}", p=40, r=-s * 18).rot(f"shin.{side}", p=-70)
+    base = keyed(min(t, 0.3), [(0.0, stance(), smooth), (0.12, jolt, ease_out), (0.3, sag, smooth)])
+    if t <= 0.3:
+        if t < 0.12:
+            plant_legs(rig, base, FEET, pole_out=0.3)
+        else:
+            lift_feet(rig, base, 0.09)
+        return base
+    out = Pose()
+    for bone in rig.defs:
+        # a bone lets go when the body has sunk to it: the feet and shins at once, the skull last
+        start = 0.3 + 0.35 * min(1.0, rig.head[bone].z / 1.7)
+        w = ease_in(clamp01((t - start) / 0.22))
+        bounce = 0.05 * bump(t, start + 0.22, start + 0.34)
+        qa, qb = base.q.get(bone, Quaternion()), HEAP.q.get(bone, Quaternion())
+        if qa.dot(qb) < 0:
+            qb = -qb
+        out.q[bone] = qa.slerp(qb, w)
+        la, lb = base.loc.get(bone, Vector()), HEAP.loc.get(bone, Vector())
+        out.loc[bone] = la.lerp(lb, w) + Vector((0, 0, bounce))
+    return out
+
+
 rig.action("idle", stand_still.seconds, idle, loop=True)
 rig.action("walk", march.seconds, walk, loop=True)
 rig.action("attack", 0.7, attack)
 rig.action("hit", 0.35, hit)
-rig.action("die", 1.2, die, ground_from=0.36, body=body)
+rig.action("die", 1.6, collapse, ground_from=0.3, body=body)
+rig.action("die2", 1.2, die, ground_from=0.36, body=body)
 rig.report(body)
 rig.extremes(body, "die")
+rig.extremes(body, "die2")
 print(f"walk ground speed {march.speed:.2f} m/s")
 fx("fx_head", (0, 0.05, HEIGHT + 0.1), rig)
 export("mon_skeleton")

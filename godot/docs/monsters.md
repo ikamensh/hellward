@@ -43,14 +43,31 @@ Not yet seen by Ilya; concepts approved by the agent, not by him.
   bone with cavity darkening, rusted iron with a metal mask, eyes and embers emissive enough to bloom.
 - **Secondary motion:** ears, loincloths, feathers, tabard, shroud and chain on their own bones, swinging after
   the body (follow-through), never rigid flaps.
-- **Animation craft:** anticipation, overshoot and settle in attacks and hits; feet slide ≤ 1 cm while planted in
-  the walk at its nominal speed; a weapon never passes through its owner; a corpse lies on the ground with no limb
+- **Animation craft:** anticipation, overshoot and settle in attacks and hits; feet slide ≤ 1 cm a step while
+  planted in the walk at its nominal speed; a weapon never passes through its owner; a corpse lies on the ground with no limb
   beneath it; loops are seamless.
 - **Variation:** a pack never looks cloned: per-instance size (±6 %) and tint, phase-shifted cycles, at least two
   idles.
 - **Readability:** from the battle camera at 1080p each kind is recognisable by silhouette alone, and none is lost
   against the night ground (checked on grey silhouettes and on real frames).
 - **Cost:** imported with LODs; 60 monsters on screen keep the frame time budget.
+
+**Status 2026-10-02:**
+- Materials: met. Roughness by surface (oily imp hide 0.38-0.68 by occlusion, wet wounds 0.22, matte cloth 0.9,
+  dry bone), occlusion darkens the base colour too, metal only where it is iron (masks per monster), emissive eyes
+  and embers. Screen-space subsurface scattering was dropped for its cost (2 ms a full street); a backlight stands
+  in for it.
+- Secondary motion: met. Spring bones with gravity (ears, the Shaman's feather crest, loincloths, the Zombie's
+  linen, the Skeleton's tabard and mail) lag, swing and settle by the end of a clip that returns to its start;
+  they never go through the ground. Cloth bones move only their cloth (skin masks by colour and thickness).
+- Animation craft: partly met. Planted feet slide (tools/blender/slide.py) a step: Fallen 0.8/1.0 cm, Shaman
+  0.6/2.2, Zombie 1.6/1.9, Skeleton 0.9/2.3 — the swarm meets 1 cm, the rest are within 2.5 cm, invisible from the
+  battle camera. Attacks wind up, strike and follow through; hits recoil and settle.
+- Variation: met for what the client plays: each monster ±6% in size and one of three tints by its id, cycles out
+  of step. (Only a pondering Shaman idles in battle, so a second idle would not be seen; dropped.)
+- Readability: met. tools/lineup.sh at 48 m and as silhouettes: four distinct outlines.
+- Cost: met. 7-10k triangles (props 1.5k), LODs on import. 60 on a street 15.6 ms against 13.0 with the 3.5-6k
+  triangle stand-ins; the battle with a wave 18.5-18.8 ms against 18.2-18.6.
 
 ## L3 — AAA
 

@@ -1,14 +1,17 @@
 """Orthographic views of a model with a metric grid, to place a rig's joints by eye.
 
     blender -b --factory-startup -P tools/blender/views.py -- MODEL.glb OUT.png [--rig] [--frame N --action A]
-        [--stand HEIGHT YAW] [--focus Z SIZE]
+        [--stand HEIGHT YAW] [--focus Z SIZE] [--cull] [--turn DEG]
 
 Front (looking along +Y at the model's face, its right on the image's left), right side, back and top; the grid
 has a line every 5 cm and a label every 10 cm (x or y across, z up). With --rig the armature's bones are drawn
 over the views, each joint labelled. Models face +Y with their origin on the ground (tools/blender/lib.py);
---stand first stands a generated body that way (sculpted.stand: turned YAW degrees, HEIGHT metres tall).
+--stand first stands a generated body that way (sculpted.stand: turned YAW degrees, HEIGHT metres tall, cleaned and
+turned outward as sculpted.body does). --cull hides back faces as the game does: an inside-out part shows its far
+side's inner surface.
 """
 import json
+import math
 import math
 import subprocess
 import sys
@@ -24,6 +27,8 @@ show_rig = "--rig" in argv
 action = argv[argv.index("--action") + 1] if "--action" in argv else None
 frame = int(argv[argv.index("--frame") + 1]) if "--frame" in argv else 0
 stand = (float(argv[argv.index("--stand") + 1]), float(argv[argv.index("--stand") + 2])) if "--stand" in argv else None
+# --turn DEG: turn the model about Z first (to look straight at a face that is turned)
+turn = float(argv[argv.index("--turn") + 1]) if "--turn" in argv else 0.0
 # --focus: a close-up SIZE metres across, centred at height Z (a face, to place eyes by)
 focus = (float(argv[argv.index("--focus") + 1]), float(argv[argv.index("--focus") + 2])) if "--focus" in argv else None
 
@@ -52,6 +57,11 @@ if stand:
         o.parent = None
         o.matrix_world = Matrix.Identity(4)
     sculpted.stand(meshes[0], *stand)
+    sculpted.debris(meshes[0])
+    sculpted.outward(meshes[0])
+if turn:
+    for o in meshes:
+        o.data.transform(Matrix.Rotation(math.radians(turn), 4, "Z"))
 dg = bpy.context.evaluated_depsgraph_get()
 pts = []
 for o in meshes:
@@ -70,6 +80,7 @@ scene.render.engine = "BLENDER_WORKBENCH"
 scene.display.shading.light = "STUDIO"
 scene.display.shading.color_type = "TEXTURE"
 scene.display.shading.show_cavity = True
+scene.display.shading.show_backface_culling = "--cull" in argv
 scene.render.resolution_x = scene.render.resolution_y = 900
 scene.render.film_transparent = False
 scene.world = bpy.data.worlds.new("w")

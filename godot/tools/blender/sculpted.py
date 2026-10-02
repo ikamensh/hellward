@@ -8,6 +8,7 @@ game/assets/textures/mon_<kind>/ for game/scripts/mats.gd, where the material na
 """
 from __future__ import annotations
 
+
 import math
 from pathlib import Path
 
@@ -52,14 +53,44 @@ def stand(obj: bpy.types.Object, height: float, yaw: float = 0.0) -> Matrix:
     return m
 
 
-def body(kind: str, height: float, yaw: float = 0.0) -> tuple[bpy.types.Object, Matrix]:
+def body(kind: str, height: float, yaw: float = 0.0, faces: int | None = None) -> tuple[bpy.types.Object, Matrix]:
+    """The generated body stood in the model contract and cleaned; with `faces`, decimated to about that many
+    triangles first (its UVs, and so the generator's maps, carry over)."""
     obj = _import(GEN / kind / "game.glb")
     obj.name = kind
+    if faces and len(obj.data.polygons) > faces:
+        mod = obj.modifiers.new("decimate", "DECIMATE")
+        mod.ratio = faces / len(obj.data.polygons)
+        lib.apply_modifiers(obj)
     m = stand(obj, height, yaw)
     debris(obj)
     outward(obj)
+    two_sided(obj)
     smooth_normals(obj)
     return obj, m
+
+
+def two_sided(obj: bpy.types.Object, reach: float = 0.3) -> int:
+    """Give open sheets (feathers, tatters, a cloth strip's end) a back: a face whose inward ray leaves the body
+    without meeting anything is a sheet seen from one side only, and the game culls it from the other (the
+    critics saw the Shaman's crest as see-through shards). Such faces are copied with their own vertices and the
+    winding reversed. Returns the faces copied."""
+    import bmesh
+    from mathutils.bvhtree import BVHTree
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    tree = BVHTree.FromBMesh(bm)
+    bm.faces.ensure_lookup_table()
+    sheet = [f for f in bm.faces
+             if tree.ray_cast(f.calc_center_median() - f.normal * 1e-4, -f.normal, reach)[0] is None]
+    if sheet:
+        made = bmesh.ops.duplicate(bm, geom=sheet)
+        bmesh.ops.reverse_faces(bm, faces=[g for g in made["geom"] if isinstance(g, bmesh.types.BMFace)])
+        bm.to_mesh(obj.data)
+        obj.data.update()
+        print(f"{obj.name}: {len(sheet)} faces of open sheets given a back")
+    bm.free()
+    return len(sheet)
 
 
 def debris(obj: bpy.types.Object, faces: int = 60, gap: float = 0.015) -> int:
@@ -107,44 +138,97 @@ def debris(obj: bpy.types.Object, faces: int = 60, gap: float = 0.015) -> int:
     return len(doomed)
 
 
-def outward(obj: bpy.types.Object) -> int:
-    """Turn inside-out parts the right way: the generator leaves some (a horn, a claw) wound inside out, which the
-    game culls, showing their hollow from the front. A part is flipped when its signed volume (about its own
-    middle) is clearly negative; open parts (cloth strips) are left as they are. Returns the faces flipped."""
+def _directions(n: int = 48) -> list[Vector]:
+    """`n` directions spread evenly over the sphere (a Fibonacci lattice)."""
+    out = []
+    for i in range(n):
+        z = 1 - 2 * (i + 0.5) / n
+        r = math.sqrt(1 - z * z)
+        a = i * math.pi * (3 - math.sqrt(5))
+        out.append(Vector((r * math.cos(a), r * math.sin(a), z)))
+    return out
+
+
+def outward(obj: bpy.types.Object, margin: float = 0.12) -> int:
+    """Turn the faces that point into the body outward: the generator leaves patches (a horn, a whole head, a
+    claw) wound inside out, which the game culls, showing the inside of the far side, and which the bakes invert.
+    A face's front should see more open sky than its back: from its middle, rays over each hemisphere count how
+    many leave the body without hitting it, the counts are averaged over neighbouring faces (a patch turns as one),
+    and a face whose back sees clearly more sky than its front is flipped. Sheets open on both sides stay as they
+    are. Returns the faces flipped."""
+    from mathutils.bvhtree import BVHTree
+    mesh = obj.data
+    tree = BVHTree.FromPolygons([v.co for v in mesh.vertices], [p.vertices for p in mesh.polygons])
+    dirs = _directions()
+    n = len(mesh.polygons)
+    score = np.zeros(n)
+    for i, p in enumerate(mesh.polygons):
+        c, nrm = p.center, p.normal
+        front = back = seen_f = seen_b = 0
+        for d in dirs:
+            k = d.dot(nrm)
+            if abs(k) < 0.2:
+                continue
+            hit = tree.ray_cast(c + d * 1e-4, d, 3.0)[0]
+            if k > 0:
+                seen_f += 1
+                front += hit is None
+            else:
+                seen_b += 1
+                back += hit is None
+        score[i] = front / max(seen_f, 1) - back / max(seen_b, 1)
+    # neighbours by shared edge
+    edge_faces: dict[tuple, list[int]] = {}
+    for p in mesh.polygons:
+        for e in p.edge_keys:
+            edge_faces.setdefault(e, []).append(p.index)
+    pairs = np.array([f[:2] for f in edge_faces.values() if len(f) >= 2])
+    for _ in range(4):
+        acc = score.copy()
+        cnt = np.ones(n)
+        np.add.at(acc, pairs[:, 0], score[pairs[:, 1]])
+        np.add.at(acc, pairs[:, 1], score[pairs[:, 0]])
+        np.add.at(cnt, pairs[:, 0], 1)
+        np.add.at(cnt, pairs[:, 1], 1)
+        score = acc / cnt
+    flip = score < -margin
+    if flip.any():
+        reverse(obj, flip)
+        print(f"{obj.name}: {int(flip.sum())} of {n} faces pointed into the body, turned outward")
+    return int(flip.sum())
+
+
+def reverse(obj: bpy.types.Object, which: np.ndarray) -> None:
+    """Reverse the winding of the faces flagged in `which` (their UVs and normals follow)."""
     import bmesh
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     bm.faces.ensure_lookup_table()
-    seen = set()
-    flipped = 0
-    for f0 in bm.faces:
-        if f0.index in seen:
-            continue
-        part, stack = [], [f0]
-        seen.add(f0.index)
-        while stack:
-            f = stack.pop()
-            part.append(f)
-            for e in f.edges:
-                for g in e.link_faces:
-                    if g.index not in seen:
-                        seen.add(g.index)
-                        stack.append(g)
-        mid = sum((f.calc_center_median() for f in part), Vector()) / len(part)
-        signed = sum((f.calc_center_median() - mid).dot(f.normal) * f.calc_area() for f in part)
-        size = sum(f.calc_area() for f in part)
-        if signed < -0.002 * size ** 1.5:
-            bmesh.ops.reverse_faces(bm, faces=part)
-            flipped += len(part)
+    bmesh.ops.reverse_faces(bm, faces=[bm.faces[i] for i in np.flatnonzero(which)])
     bm.to_mesh(obj.data)
     bm.free()
     obj.data.update()
-    if flipped:
-        print(f"{obj.name}: {flipped} faces of inside-out parts turned outward")
-    return flipped
 
 
-def smooth_normals(obj: bpy.types.Object, radius: float = 0.02) -> None:
+def orient_like(high: bpy.types.Object, low: bpy.types.Object) -> int:
+    """Wind each face of a sculpt like the nearest face of its (already outward) game mesh: the sculpt is too dense
+    to test face by face, and the two describe the same surface."""
+    from mathutils.bvhtree import BVHTree
+    lm = low.data
+    tree = BVHTree.FromPolygons([v.co for v in lm.vertices], [p.vertices for p in lm.polygons])
+    hm = high.data
+    flip = np.zeros(len(hm.polygons), bool)
+    for i, p in enumerate(hm.polygons):
+        loc, nrm, idx, dist = tree.find_nearest(p.center, 0.05)
+        if idx is not None and nrm.dot(p.normal) < -0.3:
+            flip[i] = True
+    if flip.any():
+        reverse(high, flip)
+        print(f"{high.name}: {int(flip.sum())} of {len(flip)} faces wound like the game mesh")
+    return int(flip.sum())
+
+
+def smooth_normals(obj: bpy.types.Object, radius: float = 0.035) -> None:
     """Give the body normals averaged over the surface within `radius` metres (faces on the same side only, so a
     thin ear or a cloth strip keeps its two faces). A generated body is bumpy at the scale of a centimetre or two,
     and anything shading by vertex normals alone (the game's rim overlays) lights every bump; with smooth normals
@@ -170,13 +254,15 @@ def smooth_normals(obj: bpy.types.Object, radius: float = 0.02) -> None:
     mesh.normals_split_custom_set_from_vertices(normals)
 
 
-def prepare(kind: str, height: float, yaw: float = 0.0, glow=None, metal=None) -> bpy.types.Object:
+def prepare(kind: str, height: float, yaw: float = 0.0, glow=None, metal=None, rough=None, colour=None,
+            faces: int | None = None) -> bpy.types.Object:
     """The body stood in the model contract, its maps baked and written, its material named mon_<kind>. With
     HW_FAST=1 in the environment the maps already written are kept (fitting a rig needs no bake)."""
     import os
-    obj, m = body(kind, height, yaw)
+    obj, m = body(kind, height, yaw, faces)
     if not os.environ.get("HW_FAST"):
-        write_maps(kind, obj, bake_detail(obj, kind, m), glow=glow, metal=metal)
+        write_maps(kind, obj, bake_detail(obj, kind, m), glow=glow, metal=metal, rough=rough, colour=colour)
+    COLOURS[obj.name] = vertex_colours(obj)   # before the generator's material gives way to the library's
     name_material(obj, f"mon_{kind}")
     return obj
 
@@ -199,12 +285,13 @@ def _cycles() -> None:
     scene.cycles.samples = 64
 
 
-def bake_detail(low: bpy.types.Object, kind: str, m: Matrix, size: int = 2048, cage: float = 0.012,
+def bake_detail(low: bpy.types.Object, kind: str, m: Matrix, size: int = 2048, cage: float = 0.05,
                 ao_distance: float = 0.05) -> dict[str, bpy.types.Image]:
     """Bake the sculpt's tangent-space normals and ambient occlusion onto `low`'s UVs."""
     high = _import(GEN / kind / "sculpt.glb")
     high.data.transform(m)
     high.data.update()
+    orient_like(high, low)   # inside-out parts would bake inverted bumps and black occlusion
     # the occlusion rays must see only the sculpt: the body lies on it and would shade every texel
     for attr in ("visible_diffuse", "visible_glossy", "visible_shadow", "visible_transmission",
                  "visible_volume_scatter"):
@@ -332,7 +419,8 @@ def _hsv(rgb: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return h * 60.0, d / (mx + 1e-9), mx
 
 
-def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Image], glow=None, metal=None) -> Path:
+def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Image], glow=None, metal=None,
+               rough=None, colour=None, cavity: float = 0.45) -> Path:
     """game/assets/textures/mon_<kind>/: albedo.webp, normal.webp, orm.webp (occlusion, roughness, metal) and,
     given `glow`, emission.webp. Each has an .import that compresses it for the GPU with mipmaps.
 
@@ -340,24 +428,45 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
     brightest texels within 4 cm of its hint (falling back to the hint), and a ball of `radius` round it lights up
     in `colour` (eyes, embers in sockets).
     metal: f(hue, sat, val, position) -> 0..1, where the surface is metal. The generator's own metalness is not
-    trusted (it reads glossy painted skin as metal), so without it everything is a dielectric."""
+    trusted (it reads glossy painted skin as metal), so without it everything is a dielectric.
+    rough: f(hue, sat, val, roughness, occlusion) -> roughness: a monster's own surfaces (oily hide, wet wounds,
+    matte cloth); the generator's roughness is nearly one value per body.
+    colour: f(rgb, hue, sat, val, position) -> rgb, the base colour graded to the monster's standard (the
+    generator paints saturated and bright; docs/monsters.md L3).
+    cavity: how much the occlusion darkens the base colour too (it only shades ambient light in the engine; creases
+    and the gaps between bones read better darkened under direct light as well)."""
     folder = TEX / f"mon_{kind}"
     folder.mkdir(parents=True, exist_ok=True)
     maps = material_maps(low)
     size = baked["normal"].size[0]
     albedo = maps["albedo"]
     h = albedo.shape[0]
-    rough = maps.get("rough", np.full((h, h), 0.8, np.float32))
     hue, sat, val = _hsv(albedo[..., :3])
     pos = baked["position"]
     metal = np.zeros((h, h), np.float32) if metal is None else metal(hue, sat, val, pos).astype(np.float32)
     ao = _pixels(baked["ao"])[..., 0]
+    normal = _pixels(baked["normal"])
+    missed = normal[..., :3].max(-1) < 0.05   # texels whose rays found no sculpt: neutral, not black
+    normal[missed, :3] = (0.5, 0.5, 1.0)
     if ao.shape[0] != h:
         ao = _resize(ao, h)
+        missed = _resize(missed, h)
+    ao = np.where(missed, 0.85, ao)
+    print(f"bake: {missed.mean() * 100:.1f}% of texels missed by the sculpt's rays")
+    if rough is not None:
+        rough = np.clip(rough(hue, sat, val, rough_map := maps.get("rough", np.full((h, h), 0.8, np.float32)), ao),
+                        0.05, 1.0).astype(np.float32)
+    else:
+        rough = maps.get("rough", np.full((h, h), 0.8, np.float32))
+    albedo = albedo.copy()
+    if colour is not None:
+        albedo[..., :3] = np.clip(colour(albedo[..., :3], hue, sat, val, pos), 0.0, 1.0)
+    albedo[..., :3] *= (1.0 - cavity + cavity * ao)[..., None]
+    albedo[..., :3] = np.minimum(albedo[..., :3], 0.8)   # no painted white: albedo stays under 0.8
     for old in folder.glob("*.png*"):
         old.unlink()
     save(albedo, folder / "albedo.webp", data=False)
-    save(_pixels(baked["normal"]), folder / "normal.webp", data=True, lossless=True)
+    save(normal, folder / "normal.webp", data=True, lossless=True)
     save(np.dstack([ao, rough, metal]), folder / "orm.webp", data=True)
     names = ["albedo", "normal", "orm"]
     if glow:
@@ -369,6 +478,8 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
             d = np.linalg.norm(pos - np.array(hint), axis=-1)
             near = d < 0.03
             best = near & (score >= np.percentile(score[near], 97)) & (score > 0.25) if near.any() else near
+            if best.sum() < 6 and near.any():   # no painted glow: the eye is the socket, the darkest spot near
+                best = near & (val <= np.percentile(val[near], 5))
             centre = np.median(pos[best], axis=0) if best.sum() >= 6 else np.array(hint)
             lit = np.maximum(lit, np.clip(1.5 - np.linalg.norm(pos - centre, axis=-1) / r, 0, 1))
             print(f"glow at {tuple(np.round(centre, 3))} ({int(best.sum())} texels found) for hint {hint}")
@@ -402,11 +513,53 @@ def snap(obj: bpy.types.Object, guess, radius: float) -> Vector:
     return sum(near, Vector()) / len(near)
 
 
-def skin(body: bpy.types.Object, rig, rigid: dict | None = None, cell: float = 0.01, sigma=0.025) -> None:
+COLOURS: dict[str, np.ndarray] = {}   # each prepared body's vertex colours, for skin masks
+
+
+def vertex_colours(obj: bpy.types.Object) -> np.ndarray:
+    """Each vertex's base colour (linear RGB, 0..1) read from the generator's map at its UVs."""
+    albedo = material_maps(obj)["albedo"][..., :3]
+    h, w = albedo.shape[:2]
+    uv = obj.data.uv_layers.active.data
+    acc = np.zeros((len(obj.data.vertices), 3))
+    n = np.zeros(len(obj.data.vertices))
+    for loop in obj.data.loops:
+        u, v = uv[loop.index].uv
+        acc[loop.vertex_index] += albedo[min(h - 1, max(0, int(v * h))), min(w - 1, max(0, int(u * w)))]
+        n[loop.vertex_index] += 1
+    return acc / np.maximum(n, 1)[:, None]
+
+
+def thickness(obj: bpy.types.Object, reach: float = 0.3) -> np.ndarray:
+    """How far each vertex's ray straight into the body travels before leaving it again: a cloth sheet or an ear
+    is a centimetre or two, a thigh tens of centimetres (`reach` when nothing is hit)."""
+    from mathutils.bvhtree import BVHTree
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    tree = BVHTree.FromBMesh(bm)
+    bm.free()
+    out = np.full(len(obj.data.vertices), reach)
+    for i, v in enumerate(obj.data.vertices):
+        hit = tree.ray_cast(v.co - v.normal * 1e-4, -v.normal, reach)
+        if hit[0] is not None:
+            out[i] = hit[3]
+    return out
+
+
+def hue_sat_val(rgb: np.ndarray) -> np.ndarray:
+    """Hue in degrees, saturation and value of linear RGB rows."""
+    h, s, v = _hsv(rgb)
+    return np.stack([h, s, v], axis=-1)
+
+
+def skin(body: bpy.types.Object, rig, rigid: dict | None = None, cell: float = 0.01, sigma=0.025,
+         masks: dict | None = None) -> None:
     """Bind `body` to the rig by geodesic voxel weights (tools/skinweights.py; bones with use_deform off take
     none). `sigma`, the width of a joint's blend in metres, is one value or f(rest position): small for rigid
     bone, larger for flesh and cloth. `rigid` maps a bone to a test of a rest position: vertices passing it belong
-    to that bone alone (a held weapon)."""
+    to that bone alone (a held weapon). `masks` maps a cloth bone to f(position, (hue, sat, value), thickness):
+    only vertices passing it may follow that bone."""
     import subprocess
     import tempfile
     arm = rig.obj
@@ -414,8 +567,16 @@ def skin(body: bpy.types.Object, rig, rigid: dict | None = None, cell: float = 0
     tmp = Path(tempfile.mkdtemp())
     verts = np.array([v.co for v in body.data.vertices], np.float64)
     faces = np.array([p.vertices[:3] for p in body.data.polygons], np.int64)
+    allow = np.ones((len(verts), len(bones)), bool)
+    if masks:   # a cloth bone moves only its cloth
+        colours = hue_sat_val(COLOURS[body.name])
+        thick = thickness(body)
+        for k, b in enumerate(bones):
+            if b.name in masks:
+                allow[:, k] = [bool(masks[b.name](v.co, colours[i], thick[i])) for i, v in enumerate(body.data.vertices)]
+                print(f"  {b.name}: {int(allow[:, k].sum())} vertices may follow it")
     np.savez(tmp / "in.npz", verts=verts, faces=faces, heads=np.array([b.head_local for b in bones]),
-             tails=np.array([b.tail_local for b in bones]), cell=cell,
+             tails=np.array([b.tail_local for b in bones]), cell=cell, allow=allow,
              sigma=np.array([sigma(v.co) for v in body.data.vertices]) if callable(sigma) else np.array(sigma))
     subprocess.run(["uv", "run", "--project", str(lib.ROOT), "python", str(lib.ROOT / "tools" / "skinweights.py"),
                     str(tmp / "in.npz"), str(tmp / "out.npz")], check=True)
@@ -463,14 +624,15 @@ def iron(hue, sat, val, pos):
     return (sat < 0.25) * 0.85
 
 
-def prop(kind: str, length: float, yaw: float = 180.0, metal=iron) -> tuple[bpy.types.Object, dict]:
+def prop(kind: str, length: float, yaw: float = 180.0, metal=iron, faces: int = 1500, colour=None,
+         rough=None) -> tuple[bpy.types.Object, dict]:
     """A generated prop (art/gen/<kind>/: a weapon, a staff, a shield) stood upright `length` metres long, its maps
     baked like a body's (material mon_<kind>). Returns it with its frame from the shape's spread (PCA): "axis",
     the long direction pointing up; "flat", across its thinnest; "centre", its middle."""
     import os
-    obj, m = body(kind, length, yaw)
+    obj, m = body(kind, length, yaw, faces)
     if not os.environ.get("HW_FAST"):
-        write_maps(kind, obj, bake_detail(obj, kind, m), metal=metal)
+        write_maps(kind, obj, bake_detail(obj, kind, m), metal=metal, colour=colour, rough=rough)
     name_material(obj, f"mon_{kind}")
     co = np.array([v.co for v in obj.data.vertices])
     c = co.mean(0)
@@ -496,3 +658,112 @@ def hold(obj: bpy.types.Object, rig, bone: str, grip, axis, flat, at, toward, fa
     obj.parent = rig.obj
     mod = obj.modifiers.new("rig", "ARMATURE")
     mod.object = rig.obj
+
+
+# -- the material standard (docs/monsters.md, L3): matte, saturation capped, creases dark, one family per kind
+
+def _grey(rgb):
+    return rgb.mean(-1, keepdims=True)
+
+
+def _mottle(pos, scale: float = 0.07, amount: float = 0.1):
+    """A slow blotchy variation over the body (by position: the same on both sides of a UV seam)."""
+    p = pos / scale
+    n = np.sin(p[..., 0] * 1.7 + np.sin(p[..., 1] * 1.3)) * np.sin(p[..., 1] * 1.1 + np.sin(p[..., 2] * 1.9)) \
+        * np.sin(p[..., 2] * 1.4 + np.sin(p[..., 0] * 0.7))
+    return 1.0 + amount * n[..., None]
+
+
+def _skin_red(hue, sat):
+    return (((hue < 18) | (hue > 340)) & (sat > 0.45))[..., None]
+
+
+def imp_colour(rgb, hue, sat, val, pos):
+    """The 2D game's brick red: the generator's crimson desaturated and darkened, blotched; bone (horns, claws,
+    teeth) a dull dirty ivory, not a bright cream."""
+    skin = _skin_red(hue, sat)
+    brick = (_grey(rgb) + (rgb - _grey(rgb)) * 0.62) * 0.82 * _mottle(pos)
+    bone = (((hue > 20) & (hue < 60)) & (val > 0.4))[..., None]
+    dull = (_grey(rgb) + (rgb - _grey(rgb)) * 0.6) * 0.72
+    return np.where(skin, brick, np.where(bone, dull, rgb * 0.92))
+
+
+def imp_hide(hue, sat, val, rough, ao):
+    """The imps' hide is leathery: matte, a little sheen on the swells only; leather, bone and feathers matte."""
+    skin = ((hue < 18) | (hue > 340)) & (sat > 0.45)
+    return np.where(skin, 0.58 + 0.17 * (1.0 - ao), np.maximum(rough, 0.7))
+
+
+def corpse_colour(rgb, hue, sat, val, pos):
+    """A cold grey-violet corpse (the concept), its wounds left dark and red, its linen a dirty grey."""
+    wound = ((((hue < 20) | (hue > 300)) & (sat > 0.45) & (val < 0.4)))[..., None]
+    g = _grey(rgb)
+    cold = (g + (rgb - g) * 0.3) * np.array([0.93, 0.97, 1.06]) * _mottle(pos, 0.09, 0.14)
+    return np.where(wound, rgb * 0.9, cold)
+
+
+def corpse(hue, sat, val, rough, ao):
+    """Rotting flesh: wet in its wounds and sores, clammy and dull elsewhere, the linen matte."""
+    wet = (((hue < 20) | (hue > 300)) & (sat > 0.45) & (val < 0.4))
+    return np.where(wet, 0.25, np.where(sat < 0.3, 0.92, 0.66 + 0.15 * (1.0 - ao)))
+
+
+def bone_colour(rgb, hue, sat, val, pos):
+    """Pale old ivory bone that holds its own against the dark ground; rusted iron and the cloth a grade duller."""
+    boneish = (((hue > 15) & (hue < 60)) & (sat < 0.65) & (val > 0.12))[..., None]
+    g = _grey(rgb)
+    ivory = np.clip(g * 1.7, 0.0, 0.62) * np.array([1.0, 0.93, 0.8]) * _mottle(pos, 0.05, 0.08)
+    red = _skin_red(hue, sat)
+    return np.where(red, (g + (rgb - g) * 0.7) * 0.85, np.where(boneish, ivory, rgb))
+
+
+def bones(hue, sat, val, rough, ao):
+    """Old bone is dry and matte; the crimson cloth matte."""
+    red = ((hue < 15) | (hue > 340)) & (sat > 0.4)
+    return np.where(red, 0.92, 0.72 + 0.1 * (1.0 - ao))
+
+
+def weathered(rgb, hue, sat, val, pos):
+    """Old wood, rust and paint, faded: half the saturation."""
+    g = _grey(rgb)
+    return g + (rgb - g) * 0.5
+
+
+def sole(body: bpy.types.Object, rig, side: str = "R", lift: float = 0.08, strike: float = 0.0, push: float = -14.0,
+         clear: float = 0.5) -> dict:
+    """The imps' walk's ground contact (Rig.sole) read off the body: the heel and toe are the back- and front-most
+    points of the hoof's sole (its vertices within 1.5 cm of the ground), relative to the ankle, at rest."""
+    g = body.vertex_groups[f"foot.{side}"].index
+    pts = np.array([tuple(v.co) for v in body.data.vertices
+                    if v.co.z < 0.015 and any(e.group == g and e.weight > 0.5 for e in v.groups)])
+    ankle = rig.head[f"foot.{side}"]
+    heel_y, toe_y = pts[:, 1].min() - ankle.y, pts[:, 1].max() - ankle.y
+    low = pts[:, 2].min() - ankle.z
+    print(f"sole {side}: heel {heel_y * 100:+.1f} cm, toe {toe_y * 100:+.1f} cm from the ankle, {-low * 100:.1f} cm below it")
+    return {"ankle_z": ankle.z, "heel": (heel_y, low), "toe": (toe_y, low), "lift": lift, "strike": strike,
+            "push": push, "clear": clear}
+
+
+def reshape(obj: bpy.types.Object, fn) -> None:
+    """Move every vertex of `obj` by fn(position) -> position (a proportion the generator got wrong: a head too
+    small, ears too short). Its maps follow, being on its UVs; joints placed afterwards must go through `fn` too."""
+    for v in obj.data.vertices:
+        v.co = fn(v.co.copy())
+    obj.data.update()
+
+
+def grow(pivot, scale: float, low: float, high: float, axis: int = 2, below: bool = False):
+    """fn for reshape: scale about `pivot` by `scale`, fully above `high` along `axis` and not at all below `low`,
+    blending between (a neck stretching into a bigger head). `below` grows what lies under instead."""
+    pivot = Vector(pivot)
+
+    def fn(p):
+        x = (p[axis] - low) / (high - low)
+        w = smooth(1.0 - x if below else x)
+        return pivot + (p - pivot) * (1.0 + (scale - 1.0) * w)
+    return fn
+
+
+def smooth(x: float) -> float:
+    x = max(0.0, min(1.0, x))
+    return x * x * (3 - 2 * x)
