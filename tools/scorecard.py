@@ -23,7 +23,8 @@ from hellward.sim.balance import BALANCE  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import MAX_POISON_STACKS, MONSTERS, SPELLS, TOWERS, TowerKind, felt_hit  # noqa: E402
 from hellward.sim.model import World  # noqa: E402
-from tools.maps import LEAST_CLUSTERED, LEAST_OCCUPIED, MOST_PRIME, survey, traffic, worth_map  # noqa: E402
+from tools.maps import (LEAST_CLUSTERED, LEAST_OCCUPIED, MOST_PRIME, REFERENCE_REACH, survey, traffic,  # noqa: E402
+                        worth_map)
 
 ATTACKS = ("bolt", "chain", "nova", "venom", "hook")   # tower attacks that deal damage; the others are mechanics towers
 
@@ -154,12 +155,12 @@ def real_estate() -> list[Result]:
 
 def power_table() -> list[Result]:
     """G3.4: at every location, on the untuned curve, the reference board's damage per second covers the last
-    wave's life per second. The reference board is the best board the location's gold buys on its eight best
-    cells (greedy by marginal felt damage per gold, at most seven at rank III); Hooks buy pulls, not damage.
-    Each route's demand is its monsters' life over their seconds inside the covered stretch; each tower's
-    supply is its felt damage per second against the last wave's mix, weighed by life. Chains, splashes and
-    venom beyond one stack are left out, so the board is weaker here than in a fight. The row says whether
-    gold or cells bind."""
+    wave's life per second. The reference board is the best board the location's gold buys: at most 8 towers
+    and not all rank III, each buy maximizing the worst walked route's supply over demand (Hooks buy pulls,
+    not damage). Each route's demand is its monsters' life over their seconds inside the covered stretch;
+    each tower's supply is its felt damage per second against the last wave's mix, weighed by life. Chains,
+    splashes and venom beyond one stack are left out, so the board is weaker here than in a fight. The row
+    says whether gold or cells bind."""
     out = []
     for stage, key in enumerate(ORDER):
         location = LOCATIONS[key]
@@ -168,19 +169,25 @@ def power_table() -> list[Result]:
         shares = {kind: life / total for kind, life in mix.items()}
         gold = BALANCE.starting_gold(stage) + sum(BALANCE.wave_income(stage, i) for i in range(len(location.waves)))
         worth = worth_map(location.level, traffic(location))
-        cells = sorted(worth, key=lambda c: worth[c], reverse=True)[:8]
         kinds = [k for k in location.arsenal.towers if TOWERS[k].attack in ATTACKS and TOWERS[k].attack != "hook"]
+        routes = [r for r in location.level.routes
+                  if any(g.route == r.key for g in location.waves[-1].groups)]
+        cells: list = []
+        for route in routes:
+            top = sorted(worth, key=lambda c: (_cover_len(route, c, REFERENCE_REACH), worth[c]), reverse=True)
+            cells += [c for c in top[:4] if _cover_len(route, c, REFERENCE_REACH) > 0]
+        cells = list(dict.fromkeys(cells))
         board: dict = {}
         left = gold
         while True:
-            offer = _best_buy(board, cells, kinds, shares, left)
+            offer = _best_buy(location, routes, board, cells, kinds, shares, stage, left)
             if offer is None:
                 break
-            (cell, rank), price, _ = offer
-            board[cell] = rank
+            (cell, placed), price = offer
+            board[cell] = placed
             left -= price
         binds = "gold" if left < min(TOWERS[k].levels[0].cost for k in kinds) else "cells"
-        route, worst = min(_route_cover(location, board, shares, stage).items(), key=lambda kv: kv[1])
+        route, worst = min(_ratios(location, routes, board, shares, stage).items(), key=lambda kv: kv[1])
         out.append(Result("G3.4", f"{key}: worst route's supply over demand ({route}; {binds} binds)",
                           f"{worst:.2f}", worst >= 1.0))
     return out
@@ -203,51 +210,84 @@ def _felt_dps(kind: str, rank: int, shares: dict[str, float]) -> float:
                for monster, share in shares.items())
 
 
-def _best_buy(board: dict, cells: list, kinds: list[str], shares: dict[str, float], gold: int):
-    """The best marginal felt damage per gold still affordable: a new rank-I tower or a rank up (at most
-    seven towers at rank III), or None when nothing affordable improves the board."""
-    best = None
+def _best_buy(location: Location, routes: list, board: dict, cells: list, kinds: list[str],
+              shares: dict[str, float], stage: int, gold: int):
+    """The buy that most raises the worst walked route's ratio: a new rank-I tower of the best damage per
+    gold, or a rank up (at most 8 towers, at most seven at rank III); None when nothing affordable helps."""
+    base = min(_ratios(location, routes, board, shares, stage).values())
+    new_kind = max(kinds, key=lambda k: _felt_dps(k, 0, shares) / TOWERS[k].levels[0].cost)
     tops = sum(1 for placed in board.values() if placed[1] == 2)
+    best = None
     for cell in cells:
         if cell in board:
-            kind, rank = board[cell][0], board[cell][1]
+            kind, rank = board[cell]
             if rank == 2 or (rank == 1 and tops >= 7):
                 continue
-            gain = _felt_dps(kind, rank + 1, shares) - _felt_dps(kind, rank, shares)
             price = TOWERS[kind].levels[rank + 1].cost
-            if gain > 0 and price <= gold and (best is None or gain / price > best[2]):
-                best = ((cell, (kind, rank + 1)), price, gain / price)
+            if price > gold:
+                continue
+            trial = {**board, cell: (kind, rank + 1)}
+        else:
+            if len(board) >= 8:
+                continue
+            price = TOWERS[new_kind].levels[0].cost
+            if price > gold:
+                continue
+            trial = {**board, cell: (new_kind, 0)}
+        if base <= 0:
+            key = _covered_key(location, routes, trial, shares)
+            if best is None or key > best[0]:
+                best = (key, price, (cell, trial[cell]))
             continue
-        for kind in kinds:
-            price = TOWERS[kind].levels[0].cost
-            gain = _felt_dps(kind, 0, shares)
-            if gain > 0 and price <= gold and (best is None or gain / price > best[2]):
-                best = ((cell, (kind, 0)), price, gain / price)
-    return best
+        worst = min(_ratios(location, routes, trial, shares, stage).values())
+        if worst > base + 1e-9 and (best is None or (worst, -price) > (best[0], -best[1])):
+            best = (worst, price, (cell, trial[cell]))
+    if base <= 0:
+        if best is None or best[0] <= _covered_key(location, routes, board, shares):
+            return None
+        return best[2], best[1]
+    return None if best is None else (best[2], best[1])
 
 
-def _route_cover(location: Location, board: dict, shares: dict[str, float], stage: int) -> dict[str, float]:
+def _covered_key(location: Location, routes: list, board: dict, shares: dict[str, float]) -> tuple:
+    """How much of the walked routes a board reaches: routes covered, then tiles covered."""
+    cover = _cover(location, routes, board, shares)
+    return (sum(1 for supply, spans in cover.values() if spans > 0),
+            round(sum(spans for supply, spans in cover.values()), 6))
+
+
+def _ratios(location: Location, routes: list, board: dict, shares: dict[str, float], stage: int) -> dict[str, float]:
     """Each walked route's supply over demand: the towers covering it deal their felt damage per second;
     its monsters' life arrives over their seconds inside the covered stretch."""
     wave = location.waves[-1]
-    cover: dict[str, list] = {}
-    for cell, (kind, rank) in board.items():
-        reach = TOWERS[kind].levels[rank].range
-        for route in location.level.routes:
-            spans = route.coverage(cell, reach)
-            if spans:
-                cover.setdefault(route.key, []).append((kind, rank, spans))
+    cover = _cover(location, routes, board, shares)
     ratios = {}
-    for route in location.level.routes:
+    for route in routes:
         groups = [g for g in wave.groups if g.route == route.key]
-        if not groups:
-            continue
-        covered = _union_length([s for _, _, spans in cover.get(route.key, []) for s in spans])
+        supply, covered = cover[route.key]
         demand = sum(MONSTERS[g.kind].hp * wave.hp * BALANCE.life_growth ** stage * g.count
                       * MONSTERS[g.kind].speed / covered for g in groups) if covered else float("inf")
-        supply = sum(_felt_dps(kind, rank, shares) for kind, rank, _ in cover.get(route.key, []))
         ratios[route.key] = supply / demand if demand else 1.0
     return ratios or {"main": 0.0}
+
+
+def _cover(location: Location, routes: list, board: dict, shares: dict[str, float]) -> dict[str, tuple]:
+    """Each walked route's supply and covered tiles: the towers covering it, and the union they reach."""
+    found: dict[str, tuple] = {}
+    for route in routes:
+        spans: list = []
+        supply = 0.0
+        for cell, (kind, rank) in board.items():
+            reached = route.coverage(cell, TOWERS[kind].levels[rank].range)
+            if reached:
+                spans += reached
+                supply += _felt_dps(kind, rank, shares)
+        found[route.key] = (supply, _union_length(spans))
+    return found
+
+
+def _cover_len(route, cell: tuple[int, int], reach: float) -> float:
+    return _union_length(route.coverage(cell, reach))
 
 
 def _union_length(spans: list[tuple[float, float]]) -> float:
