@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dwrdxsovm407f"
 path.s3tc="res://.godot/imported/basalt_rough.png-12c00b1486d9eae7a0ac6b55e025d67e.s3tc.ctex"
+path.etc2="res://.godot/imported/basalt_rough.png-12c00b1486d9eae7a0ac6b55e025d67e.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/basalt_rough.png"
-dest_files=["res://.godot/imported/basalt_rough.png-12c00b1486d9eae7a0ac6b55e025d67e.s3tc.ctex"]
+dest_files=["res://.godot/imported/basalt_rough.png-12c00b1486d9eae7a0ac6b55e025d67e.s3tc.ctex", "res://.godot/imported/basalt_rough.png-12c00b1486d9eae7a0ac6b55e025d67e.etc2.ctex"]
 
 [params]
 

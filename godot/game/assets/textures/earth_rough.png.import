@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://7gww3q5kd2fb"
 path.s3tc="res://.godot/imported/earth_rough.png-9ca15a585fafdd1e7d15d434f2e7493e.s3tc.ctex"
+path.etc2="res://.godot/imported/earth_rough.png-9ca15a585fafdd1e7d15d434f2e7493e.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/earth_rough.png"
-dest_files=["res://.godot/imported/earth_rough.png-9ca15a585fafdd1e7d15d434f2e7493e.s3tc.ctex"]
+dest_files=["res://.godot/imported/earth_rough.png-9ca15a585fafdd1e7d15d434f2e7493e.s3tc.ctex", "res://.godot/imported/earth_rough.png-9ca15a585fafdd1e7d15d434f2e7493e.etc2.ctex"]
 
 [params]
 

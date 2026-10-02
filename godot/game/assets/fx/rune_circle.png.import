@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://6l56v14wtjd5"
 path.s3tc="res://.godot/imported/rune_circle.png-e1dda148bda80d341e34643fbe22af25.s3tc.ctex"
+path.etc2="res://.godot/imported/rune_circle.png-e1dda148bda80d341e34643fbe22af25.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/fx/rune_circle.png"
-dest_files=["res://.godot/imported/rune_circle.png-e1dda148bda80d341e34643fbe22af25.s3tc.ctex"]
+dest_files=["res://.godot/imported/rune_circle.png-e1dda148bda80d341e34643fbe22af25.s3tc.ctex", "res://.godot/imported/rune_circle.png-e1dda148bda80d341e34643fbe22af25.etc2.ctex"]
 
 [params]
 

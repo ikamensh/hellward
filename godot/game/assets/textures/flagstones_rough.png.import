@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dy1v5ybcuuk2p"
 path.s3tc="res://.godot/imported/flagstones_rough.png-e41ac62a28e62fbf5884e9fde2a14148.s3tc.ctex"
+path.etc2="res://.godot/imported/flagstones_rough.png-e41ac62a28e62fbf5884e9fde2a14148.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/flagstones_rough.png"
-dest_files=["res://.godot/imported/flagstones_rough.png-e41ac62a28e62fbf5884e9fde2a14148.s3tc.ctex"]
+dest_files=["res://.godot/imported/flagstones_rough.png-e41ac62a28e62fbf5884e9fde2a14148.s3tc.ctex", "res://.godot/imported/flagstones_rough.png-e41ac62a28e62fbf5884e9fde2a14148.etc2.ctex"]
 
 [params]
 

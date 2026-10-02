@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dbu3eechif527"
 path.s3tc="res://.godot/imported/bone_albedo.png-0e961712c93a104af4c7421bf92c47bf.s3tc.ctex"
+path.etc2="res://.godot/imported/bone_albedo.png-0e961712c93a104af4c7421bf92c47bf.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/bone_albedo.png"
-dest_files=["res://.godot/imported/bone_albedo.png-0e961712c93a104af4c7421bf92c47bf.s3tc.ctex"]
+dest_files=["res://.godot/imported/bone_albedo.png-0e961712c93a104af4c7421bf92c47bf.s3tc.ctex", "res://.godot/imported/bone_albedo.png-0e961712c93a104af4c7421bf92c47bf.etc2.ctex"]
 
 [params]
 

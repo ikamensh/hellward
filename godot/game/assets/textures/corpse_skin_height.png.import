@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cyxfl5rjys08x"
 path.s3tc="res://.godot/imported/corpse_skin_height.png-17df675f7f726f7be213dee6d47b7524.s3tc.ctex"
+path.etc2="res://.godot/imported/corpse_skin_height.png-17df675f7f726f7be213dee6d47b7524.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/corpse_skin_height.png"
-dest_files=["res://.godot/imported/corpse_skin_height.png-17df675f7f726f7be213dee6d47b7524.s3tc.ctex"]
+dest_files=["res://.godot/imported/corpse_skin_height.png-17df675f7f726f7be213dee6d47b7524.s3tc.ctex", "res://.godot/imported/corpse_skin_height.png-17df675f7f726f7be213dee6d47b7524.etc2.ctex"]
 
 [params]
 

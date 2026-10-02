@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bag1h1wn6tuq8"
 path.s3tc="res://.godot/imported/scorch_glow.png-4c18513a2ac6be2a5eb6e3fb9793ab02.s3tc.ctex"
+path.etc2="res://.godot/imported/scorch_glow.png-4c18513a2ac6be2a5eb6e3fb9793ab02.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/fx/scorch_glow.png"
-dest_files=["res://.godot/imported/scorch_glow.png-4c18513a2ac6be2a5eb6e3fb9793ab02.s3tc.ctex"]
+dest_files=["res://.godot/imported/scorch_glow.png-4c18513a2ac6be2a5eb6e3fb9793ab02.s3tc.ctex", "res://.godot/imported/scorch_glow.png-4c18513a2ac6be2a5eb6e3fb9793ab02.etc2.ctex"]
 
 [params]
 

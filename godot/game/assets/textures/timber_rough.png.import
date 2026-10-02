@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://c0e6auf8nl3op"
 path.s3tc="res://.godot/imported/timber_rough.png-421f8326a347832a80cb837f18e4f6c3.s3tc.ctex"
+path.etc2="res://.godot/imported/timber_rough.png-421f8326a347832a80cb837f18e4f6c3.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/timber_rough.png"
-dest_files=["res://.godot/imported/timber_rough.png-421f8326a347832a80cb837f18e4f6c3.s3tc.ctex"]
+dest_files=["res://.godot/imported/timber_rough.png-421f8326a347832a80cb837f18e4f6c3.s3tc.ctex", "res://.godot/imported/timber_rough.png-421f8326a347832a80cb837f18e4f6c3.etc2.ctex"]
 
 [params]
 

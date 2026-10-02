@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://clqcyts50e5ev"
 path.s3tc="res://.godot/imported/bone_rough.png-811f12f6de475494996c0c85059bc408.s3tc.ctex"
+path.etc2="res://.godot/imported/bone_rough.png-811f12f6de475494996c0c85059bc408.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/bone_rough.png"
-dest_files=["res://.godot/imported/bone_rough.png-811f12f6de475494996c0c85059bc408.s3tc.ctex"]
+dest_files=["res://.godot/imported/bone_rough.png-811f12f6de475494996c0c85059bc408.s3tc.ctex", "res://.godot/imported/bone_rough.png-811f12f6de475494996c0c85059bc408.etc2.ctex"]
 
 [params]
 

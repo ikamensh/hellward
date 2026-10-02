@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://tx5amhyfy755"
 path.s3tc="res://.godot/imported/iron_height.png-cb5e15a5f06b3827a9ad35544d34690d.s3tc.ctex"
+path.etc2="res://.godot/imported/iron_height.png-cb5e15a5f06b3827a9ad35544d34690d.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/iron_height.png"
-dest_files=["res://.godot/imported/iron_height.png-cb5e15a5f06b3827a9ad35544d34690d.s3tc.ctex"]
+dest_files=["res://.godot/imported/iron_height.png-cb5e15a5f06b3827a9ad35544d34690d.s3tc.ctex", "res://.godot/imported/iron_height.png-cb5e15a5f06b3827a9ad35544d34690d.etc2.ctex"]
 
 [params]
 

@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://w0p2pk1b5q0x"
 path.s3tc="res://.godot/imported/bone_normal.png-2a638a2a335fa5f0afe111caee8ab5ae.s3tc.ctex"
+path.etc2="res://.godot/imported/bone_normal.png-2a638a2a335fa5f0afe111caee8ab5ae.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/bone_normal.png"
-dest_files=["res://.godot/imported/bone_normal.png-2a638a2a335fa5f0afe111caee8ab5ae.s3tc.ctex"]
+dest_files=["res://.godot/imported/bone_normal.png-2a638a2a335fa5f0afe111caee8ab5ae.s3tc.ctex", "res://.godot/imported/bone_normal.png-2a638a2a335fa5f0afe111caee8ab5ae.etc2.ctex"]
 
 [params]
 

@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://cfbjbocor61qo"
 path.s3tc="res://.godot/imported/iron_rough.png-1927fe1956badc3016ceb91f0691e1ea.s3tc.ctex"
+path.etc2="res://.godot/imported/iron_rough.png-1927fe1956badc3016ceb91f0691e1ea.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/iron_rough.png"
-dest_files=["res://.godot/imported/iron_rough.png-1927fe1956badc3016ceb91f0691e1ea.s3tc.ctex"]
+dest_files=["res://.godot/imported/iron_rough.png-1927fe1956badc3016ceb91f0691e1ea.s3tc.ctex", "res://.godot/imported/iron_rough.png-1927fe1956badc3016ceb91f0691e1ea.etc2.ctex"]
 
 [params]
 

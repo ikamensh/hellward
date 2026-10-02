@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://c2bkgirxgxshx"
 path.s3tc="res://.godot/imported/earth_normal.png-123818cbecc10d1f33ebc3a89d05cc4f.s3tc.ctex"
+path.etc2="res://.godot/imported/earth_normal.png-123818cbecc10d1f33ebc3a89d05cc4f.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/earth_normal.png"
-dest_files=["res://.godot/imported/earth_normal.png-123818cbecc10d1f33ebc3a89d05cc4f.s3tc.ctex"]
+dest_files=["res://.godot/imported/earth_normal.png-123818cbecc10d1f33ebc3a89d05cc4f.s3tc.ctex", "res://.godot/imported/earth_normal.png-123818cbecc10d1f33ebc3a89d05cc4f.etc2.ctex"]
 
 [params]
 

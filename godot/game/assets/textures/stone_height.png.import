@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bcepmhlk83wyg"
 path.s3tc="res://.godot/imported/stone_height.png-1d0595bb9b0a992e268ef2a6a551ca46.s3tc.ctex"
+path.etc2="res://.godot/imported/stone_height.png-1d0595bb9b0a992e268ef2a6a551ca46.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/stone_height.png"
-dest_files=["res://.godot/imported/stone_height.png-1d0595bb9b0a992e268ef2a6a551ca46.s3tc.ctex"]
+dest_files=["res://.godot/imported/stone_height.png-1d0595bb9b0a992e268ef2a6a551ca46.s3tc.ctex", "res://.godot/imported/stone_height.png-1d0595bb9b0a992e268ef2a6a551ca46.etc2.ctex"]
 
 [params]
 

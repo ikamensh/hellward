@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dsprjfp47gq44"
 path.s3tc="res://.godot/imported/basalt_height.png-0f66b70267e8a5c82ab01e511ae7cbb0.s3tc.ctex"
+path.etc2="res://.godot/imported/basalt_height.png-0f66b70267e8a5c82ab01e511ae7cbb0.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/basalt_height.png"
-dest_files=["res://.godot/imported/basalt_height.png-0f66b70267e8a5c82ab01e511ae7cbb0.s3tc.ctex"]
+dest_files=["res://.godot/imported/basalt_height.png-0f66b70267e8a5c82ab01e511ae7cbb0.s3tc.ctex", "res://.godot/imported/basalt_height.png-0f66b70267e8a5c82ab01e511ae7cbb0.etc2.ctex"]
 
 [params]
 

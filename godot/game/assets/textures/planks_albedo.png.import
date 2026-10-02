@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://dii1o1sxlyvnt"
 path.s3tc="res://.godot/imported/planks_albedo.png-fee3b356f102a28a97c71ac0ae53b0a7.s3tc.ctex"
+path.etc2="res://.godot/imported/planks_albedo.png-fee3b356f102a28a97c71ac0ae53b0a7.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/planks_albedo.png"
-dest_files=["res://.godot/imported/planks_albedo.png-fee3b356f102a28a97c71ac0ae53b0a7.s3tc.ctex"]
+dest_files=["res://.godot/imported/planks_albedo.png-fee3b356f102a28a97c71ac0ae53b0a7.s3tc.ctex", "res://.godot/imported/planks_albedo.png-fee3b356f102a28a97c71ac0ae53b0a7.etc2.ctex"]
 
 [params]
 

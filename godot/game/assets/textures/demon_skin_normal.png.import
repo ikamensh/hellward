@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bo1cjrno67c7f"
 path.s3tc="res://.godot/imported/demon_skin_normal.png-94c007102558b6173725fb1450098985.s3tc.ctex"
+path.etc2="res://.godot/imported/demon_skin_normal.png-94c007102558b6173725fb1450098985.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/demon_skin_normal.png"
-dest_files=["res://.godot/imported/demon_skin_normal.png-94c007102558b6173725fb1450098985.s3tc.ctex"]
+dest_files=["res://.godot/imported/demon_skin_normal.png-94c007102558b6173725fb1450098985.s3tc.ctex", "res://.godot/imported/demon_skin_normal.png-94c007102558b6173725fb1450098985.etc2.ctex"]
 
 [params]
 

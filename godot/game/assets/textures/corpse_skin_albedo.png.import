@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bt4n265abes52"
 path.s3tc="res://.godot/imported/corpse_skin_albedo.png-adae04f41206f4fa6ce8c8e6ec9a042f.s3tc.ctex"
+path.etc2="res://.godot/imported/corpse_skin_albedo.png-adae04f41206f4fa6ce8c8e6ec9a042f.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/corpse_skin_albedo.png"
-dest_files=["res://.godot/imported/corpse_skin_albedo.png-adae04f41206f4fa6ce8c8e6ec9a042f.s3tc.ctex"]
+dest_files=["res://.godot/imported/corpse_skin_albedo.png-adae04f41206f4fa6ce8c8e6ec9a042f.s3tc.ctex", "res://.godot/imported/corpse_skin_albedo.png-adae04f41206f4fa6ce8c8e6ec9a042f.etc2.ctex"]
 
 [params]
 

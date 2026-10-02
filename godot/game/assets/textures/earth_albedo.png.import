@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://e8yi7uyy6s58"
 path.s3tc="res://.godot/imported/earth_albedo.png-036399e36bf52d4cb285b7b5ddea57d5.s3tc.ctex"
+path.etc2="res://.godot/imported/earth_albedo.png-036399e36bf52d4cb285b7b5ddea57d5.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/earth_albedo.png"
-dest_files=["res://.godot/imported/earth_albedo.png-036399e36bf52d4cb285b7b5ddea57d5.s3tc.ctex"]
+dest_files=["res://.godot/imported/earth_albedo.png-036399e36bf52d4cb285b7b5ddea57d5.s3tc.ctex", "res://.godot/imported/earth_albedo.png-036399e36bf52d4cb285b7b5ddea57d5.etc2.ctex"]
 
 [params]
 

@@ -67,13 +67,16 @@ def server(into: Path, build: Path) -> Path:
         shutil.rmtree(into)
     base = Path(sys.base_prefix)
     shutil.copytree(base, into / "python", symlinks=True,
-                    ignore=shutil.ignore_patterns("__pycache__", "*.a", "include", "share", "Tk*", "tcl*", "tk*",
-                                                  "itcl*", "thread*", "libtcl*", "libtk*", "*.pyc"))
+                    ignore=shutil.ignore_patterns("*.a", "include", "share", "tcl[0-9]*", "tk[0-9]*", "itcl[0-9]*",
+                                                  "thread[0-9]*", "libtcl*", "libtk*", "Tk*"))   # Tcl/Tk: no tkinter here
     stdlib = Path(sysconfig.get_paths(vars={"installed_base": str(into / "python"),
                                             "base": str(into / "python")})["stdlib"])
     for name in PRUNE:
         for path in stdlib.glob(f"{name}*"):
             shutil.rmtree(path) if path.is_dir() else path.unlink()
+    site = stdlib / "site-packages" if os.name != "nt" else into / "python" / "Lib" / "site-packages"
+    shutil.rmtree(site, ignore_errors=True)   # whatever was installed into this Python: the server needs none of it
+    site.mkdir()
     for name in PACKAGE:
         src = ROOT / "hellward" / name
         dst = into / "hellward" / name
@@ -85,9 +88,10 @@ def server(into: Path, build: Path) -> Path:
     shutil.copytree(build, into / "build" / build.name, ignore=shutil.ignore_patterns("__pycache__"))
     python = into / "python" / ("python.exe" if os.name == "nt" else "bin/python3")
     env = server_env(into)
-    subprocess.run([str(python), "-m", "compileall", "-q", str(into / "hellward"), str(stdlib)], check=True, env=env)
+    # run where nothing but the package is importable: from the checkout, `-c` and `-m` would find its own hellward
+    subprocess.run([str(python), "-m", "compileall", "-q", str(into / "hellward")], check=True, env=env, cwd=into)
     key = subprocess.run([str(python), "-c", "from hellward import fastsim; print(fastsim.key())"], check=True,
-                         capture_output=True, text=True, env=env).stdout.strip()
+                         capture_output=True, text=True, env=env, cwd=into).stdout.strip()
     if key != build.name:
         raise SystemExit(f"package: the packaged Python makes key {key}, the build is {build.name}")
     return python
@@ -104,6 +108,8 @@ def smoke(python: Path, into: Path) -> dict:
     from hellward.server.client import Client
 
     with tempfile.TemporaryDirectory() as data:
+        here = Path.cwd()
+        os.chdir(data)   # the server process starts here: it must import the package's hellward, not the checkout's
         if os.name != "nt":
             subprocess.run(["chmod", "-R", "a-w", str(into)], check=True)   # as in a read-only bundle: nothing writes
         try:
@@ -114,6 +120,7 @@ def smoke(python: Path, into: Path) -> dict:
                 while (last := client.advance(400)[-1])["state"]["outcome"] is None:
                     pass
         finally:
+            os.chdir(here)
             if os.name != "nt":
                 subprocess.run(["chmod", "-R", "u+w", str(into)], check=True)
     return {"outcome": last["state"]["outcome"], "lives": last["state"]["lives"], "steps": last["step"]}
@@ -136,6 +143,8 @@ def mac() -> Path:
     if stage.exists():
         shutil.rmtree(stage)
     export("macOS", app)
+    for binary in (app / "Contents" / "MacOS").iterdir():   # Godot's template is universal; the server is arm64 only
+        subprocess.run(["lipo", "-thin", "arm64", str(binary), "-output", str(binary)], check=True)
     resources = app / "Contents" / "Resources" / "server"
     python = server(resources, build)
     played = smoke(python, resources)

@@ -41,7 +41,8 @@ class Client:
         self.reader = self.sock.makefile("rb")
         self.received = 0                   # bytes, for the benchmark
         hello = self.receive()
-        if hello != {"t": "hello", "protocol": PROTOCOL, "token": token, "pid": self.process.pid}:
+        # (its pid is not checked: on Windows a virtual environment's python.exe starts the interpreter as a child)
+        if (hello["t"], hello["protocol"], hello["token"]) != ("hello", PROTOCOL, token):
             raise RuntimeError(f"unexpected hello: {hello}")
         self.send({"t": "hello", "protocol": PROTOCOL})
         self.status: list[str] = []

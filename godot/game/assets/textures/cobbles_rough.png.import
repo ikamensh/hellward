@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://kar0283sbrgo"
 path.s3tc="res://.godot/imported/cobbles_rough.png-86ea176de54643c07eda8cbba1a5e7a8.s3tc.ctex"
+path.etc2="res://.godot/imported/cobbles_rough.png-86ea176de54643c07eda8cbba1a5e7a8.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/textures/cobbles_rough.png"
-dest_files=["res://.godot/imported/cobbles_rough.png-86ea176de54643c07eda8cbba1a5e7a8.s3tc.ctex"]
+dest_files=["res://.godot/imported/cobbles_rough.png-86ea176de54643c07eda8cbba1a5e7a8.s3tc.ctex", "res://.godot/imported/cobbles_rough.png-86ea176de54643c07eda8cbba1a5e7a8.etc2.ctex"]
 
 [params]
 
