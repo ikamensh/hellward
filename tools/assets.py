@@ -64,8 +64,10 @@ def monster(kind: str) -> dict:
     path = MODELS / f"mon_{kind}.glb"
     borrowed = stand_ins((GAME / "scripts" / "monster.gd").read_text()).get(kind)
     if not path.is_file():
-        return {"kind": kind, "model": None, "stand_in": borrowed,
-                "problems": [] if borrowed else ["no model and no stand-in"]}
+        problems = [] if borrowed else ["no model and no stand-in"]
+        if borrowed and MONSTERS[kind].leader is not None and "cast" not in summary(MODELS / f"mon_{borrowed}.glb")["clips"]:
+            problems.append(f"a leader standing in as {borrowed}, which has no cast clip")
+        return {"kind": kind, "model": None, "stand_in": borrowed, "problems": problems}
     info = summary(path)
     leader = MONSTERS[kind].leader is not None
     problems = [f"no {c} clip" for c in CLIPS + (LEADER_CLIPS if leader else ()) if c not in info["clips"]]
