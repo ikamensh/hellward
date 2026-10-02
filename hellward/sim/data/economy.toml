@@ -1,0 +1,19 @@
+# The common combat scale and the gold economy (hellward/sim/balance.py reads these).
+# Indices are zero-based: location 0 is Tristram, wave 0 its first wave.
+
+base_hp = 6.0                       # a role-1.0 monster's life at the first wave of the first location
+location_growth = 1.055             # monster life and prices grow by this per location
+wave_growth = 1.05                  # monster life grows by this per wave within a location
+arrow_hit = 2                       # a rank-I Arrow hit: the damage unit every tower's damage role multiplies
+base_gold_unit = 12                 # a rank-I Arrow's price at the first location: the gold unit
+starting_units = 3.0                # gold in hand before the first wave, in gold units
+starting_units_growth = 0.5         # ... plus this many units per later location
+wave_income_units = 1.0             # a wave's whole gold (kills and clearing), in units, at its first wave
+wave_income_growth_units = 0.5      # ... plus this many units per later wave
+wave_density_decay = 0.5            # authored swarm counts shrink with depth: 1 / (1 + decay * (location - 1)) ...
+minimum_wave_density = 0.4          # ... but never below this share
+rank_cost_units = [1.0, 0.6666666666666666, 1.0]   # rank I's price, and each upgrade's, in units
+salvage_budget = 3                  # ordinary spawns per defence that carry salvage
+salvage_sale_fraction = 0.3333333333333333         # one salvage sold in a break, in units
+breach_pack_income_units = 0.5      # extra kill gold the optional side pack carries, in units
+breach_cache_units = 0.8            # the cash cache for clearing it, in units

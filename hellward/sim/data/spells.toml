@@ -1,0 +1,49 @@
+# The player's spells. damage_hits and burn_hits are in economy.arrow_hit and grow with the monsters' life.
+
+[cleanse]
+name = "Cleanse"
+mana = 35.0
+aim = "tower"
+blurb = "Burns every curse off one tower."
+damage_hits = 0.0
+radius = 0.0
+delay = 0.0
+lasting = 0.0
+burn_hits = 0.0
+recharge = 0.0
+
+[smite]
+name = "Smite"
+mana = 35.0
+aim = "monster"
+blurb = "Holy lightning strikes one monster, and no resistance softens it. A leader it strikes while pondering or chanting loses its curse, but its next curse cannot be broken."
+damage_hits = 3.0
+radius = 0.0
+delay = 0.0
+lasting = 0.0
+burn_hits = 0.0
+recharge = 8.0
+
+[meteor]
+name = "Meteor"
+mana = 60.0
+aim = "floor"
+blurb = "Falls a moment after the cast and leaves the floor burning."
+damage_hits = 6.0
+radius = 1.4
+delay = 1.2
+lasting = 3.0
+burn_hits = 1.0
+recharge = 10.0
+
+[orb]
+name = "Frozen Orb"
+mana = 50.0
+aim = "floor"
+blurb = "Freezes everything near it: no walking, no battering, and a leader's curse breaks (its next one cannot)."
+damage_hits = 2.0
+radius = 1.8
+delay = 0.0
+lasting = 2.5
+burn_hits = 0.0
+recharge = 12.0

@@ -1,0 +1,51 @@
+# One defence's clocks, purse and rules (hellward/sim/content.py and hellward/sim/model.py read these).
+
+start_lives = 20              # the sanctuary's life at the start of a defence
+mana_max = 100.0
+mana_start = 60.0
+mana_regen = 1.5              # mana per second
+wave_break = 25.0             # seconds between a cleared wave and the next, unless called early
+first_wave_break = 30.0       # seconds before the first wave comes on its own
+early_call_seconds_per_unit = 120.0   # calling a wave early pays one gold unit per this many seconds of break left
+sell_refund = 0.7             # share of what a tower cost that selling it gives back
+max_poison_stacks = 4
+chain_jump = 1.7              # how far chain lightning leaps, in tiles
+door_stop = 0.45              # how far before a gate's centre the front of its queue stands
+jostle = 0.6                  # how deep the queue behind a gate is
+cast_slack = 1.0              # a curse lands if its leader is within cast range plus this when the chant ends
+decide_delay = 0.5            # a leader ponders this long between asking its planner and starting to chant
+hold_retry = 1.0              # a leader that holds its curse thinks again after this long
+leak_weight = 2.0             # to the planner, a monster through the sanctuary gate is worth this many times its life
+
+[gate]
+cost_units = 1.0              # a warded gate's price, in gold units
+life_hp = 10.0                # its life, in base_hp
+repair = 0.5                  # share of its missing life a standing gate regains when a wave is cleared
+
+[skills]                      # the numbers the skill tree's rules use
+burn_radius = 1.1             # the burning floor a meteor leaves
+blaze_time = 2.0              # seconds the floor burns where a fireball lands, under Blaze
+shatter_radius = 1.2
+shatter_share = 0.1           # of a shattered monster's full life
+contagion_reach = 1.5
+thorns = 0.5                  # a gate under Thorns returns this share of each blow, as it would land unchilled
+soul = 10.0                   # mana a slain leader gives under Soul Harvest
+ward = 8.0                    # seconds a cleansed tower is warded under Salvation
+corpse_share = 0.15           # share of an amplified monster's full life its burst deals
+corpse_radius = 1.2           # how far a corpse explosion reaches
+hurricane_radius = 2.5        # how far a grove's slowing reaches
+hurricane_slow = 0.8          # walkers near a grove move this share of their speed
+twister_period = 4.0          # seconds between a grove's roots
+twister_radius = 2.5          # how far a grove's root reaches
+twister_held = 1.5            # seconds a twister holds its monster
+
+[leader_defaults]             # a leader's numbers unless its monster entry says otherwise
+cast_range = 4.5
+cooldown = 9.0
+channel = 1.0                 # the visible incantation between the choice and the curse landing
+first_cast = 3.0              # seconds after it appears before it may first choose
+widen = 0.0                   # added to every radius it casts
+raises = ""                   # the monster kind it raises
+raise_reach = 3.0             # tile-centre distance within which it raises
+mark = 0.0                    # seconds a marked curse burns on its spot before it lands; 0 = chanted
+burn = 0.0                    # mana burned per tower the curse catches

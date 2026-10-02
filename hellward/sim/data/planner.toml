@@ -1,0 +1,11 @@
+# How the leaders choose their curses (hellward/sim/planner.py).
+
+horizon_pad = 3.0      # seconds a rollout runs past the curse's end, to see what it changed
+shortlist = 10         # (curse, spot) pairs that get a rollout
+delays = [2.0, 4.0]    # later moments tried for the best targets
+later_tried = 3
+later_margin = 1.2     # waiting must beat casting now by this factor ...
+min_gain = 5.0         # ... and by this much life; a curse is free but for its cooldown, so only noise is not cast
+quiet_retry = 1.5      # when nothing is worth cursing
+sample = 0.5           # the estimate's time step
+lasting = 0.5          # the weight of the pack's average life over the look-ahead in a rollout's score

@@ -1,0 +1,238 @@
+# Every monster kind. life is a role factor on economy.base_hp; speed in tiles per second; bounty weighs its share of
+# a wave's gold; lives is what it costs the sanctuary; door_dps its blows on a gate; size its drawn height in tiles.
+# resist: 1.0 immune, negative a weakness. movement: "wander" takes a seeded detour, "direct" the shortest route.
+# A leader table names its curses; its other numbers default to battle.leader_defaults.
+
+[fallen]
+name = "Fallen"
+life = 1.0
+speed = 1.35
+bounty = 1
+lives = 1
+door_dps = 1.0
+size = 0.55
+movement = "wander"
+flying = false
+resist = {}
+
+[skeleton]
+name = "Skeleton"
+life = 1.4
+speed = 1.0
+bounty = 1
+lives = 1
+door_dps = 1.5
+size = 0.75
+movement = "wander"
+flying = false
+resist = { poison = 1.0, cold = 0.25 }
+
+[zombie]
+name = "Zombie"
+life = 1.6
+speed = 0.6
+bounty = 2
+lives = 1
+door_dps = 2.0
+size = 0.8
+movement = "wander"
+flying = false
+resist = { fire = -0.5, poison = 0.5 }
+
+[goatman]
+name = "Goatman"
+life = 1.7
+speed = 1.1
+bounty = 2
+lives = 1
+door_dps = 1.5
+size = 0.85
+movement = "wander"
+flying = false
+resist = { lightning = 0.5 }
+
+[gargoyle]
+name = "Gargoyle"
+life = 1.1
+speed = 1.5
+bounty = 1
+lives = 1
+door_dps = 1.0
+size = 0.75
+movement = "direct"
+flying = true
+resist = { fire = 0.5, cold = 0.25 }
+
+[overlord]
+name = "Overlord"
+life = 4.0
+speed = 0.65
+bounty = 4
+lives = 2
+door_dps = 6.0
+size = 1.05
+movement = "direct"
+flying = false
+resist = { fire = 0.25, cold = 0.25 }
+
+[azazel]
+name = "Azazel the Flayer"
+life = 15.0
+speed = 0.5
+bounty = 8
+lives = 10
+door_dps = 12.0
+size = 1.6
+movement = "direct"
+flying = false
+resist = { fire = 1.0, lightning = 0.25, cold = 0.25, poison = 0.25 }
+
+[shaman]
+name = "Fallen Shaman"
+life = 2.0
+speed = 1.0
+bounty = 3
+lives = 2
+door_dps = 1.0
+size = 0.65
+movement = "direct"
+flying = false
+resist = { fire = 0.25 }
+leader = { curses = ["weaken"] }
+
+[priest]
+name = "Bone Acolyte"
+life = 2.5
+speed = 0.9
+bounty = 3
+lives = 2
+door_dps = 1.0
+size = 0.85
+movement = "direct"
+flying = false
+resist = { poison = 1.0, cold = 0.25 }
+leader = { curses = ["bone_prison", "dim_vision"], cooldown = 10.0 }
+
+[witch]
+name = "Blood Witch"
+life = 2.7
+speed = 0.95
+bounty = 3
+lives = 2
+door_dps = 1.0
+size = 0.85
+movement = "direct"
+flying = false
+resist = { fire = 0.25, lightning = 0.25 }
+leader = { curses = ["decrepify", "weaken"], cooldown = 8.5 }
+
+[flayer]
+name = "Flayer"
+life = 0.85
+speed = 1.45
+bounty = 1
+lives = 1
+door_dps = 1.0
+size = 0.5
+movement = "direct"
+flying = false
+resist = { fire = 0.25 }
+
+[zealot]
+name = "Zealot"
+life = 1.8
+speed = 1.0
+bounty = 2
+lives = 1
+door_dps = 1.6
+size = 0.85
+movement = "direct"
+flying = false
+resist = { lightning = 0.4, fire = 0.25 }
+
+[spider]
+name = "Spider"
+life = 1.4
+speed = 1.35
+bounty = 1
+lives = 1
+door_dps = 1.0
+size = 0.7
+movement = "wander"
+flying = false
+resist = { poison = 1.0, cold = -0.25 }
+
+[bat]
+name = "Blood Bat"
+life = 0.8
+speed = 1.9
+bounty = 1
+lives = 1
+door_dps = 1.0
+size = 0.5
+movement = "direct"
+flying = true
+resist = { cold = 0.5, poison = 0.25 }
+
+[hulk]
+name = "Thorned Hulk"
+life = 5.0
+speed = 0.55
+bounty = 5
+lives = 2
+door_dps = 6.5
+size = 1.1
+movement = "wander"
+flying = false
+resist = { poison = 1.0, cold = 0.25, fire = -0.25 }
+
+[drowned]
+name = "The Drowned"
+life = 2.2
+speed = 0.7
+bounty = 2
+lives = 1
+door_dps = 2.0
+size = 0.85
+movement = "wander"
+flying = false
+resist = { cold = 0.5, poison = 0.5, lightning = -0.25 }
+
+[fetish]
+name = "Fetish Shaman"
+life = 2.0
+speed = 1.1
+bounty = 3
+lives = 2
+door_dps = 1.0
+size = 0.6
+movement = "direct"
+flying = false
+resist = { fire = 0.25 }
+leader = { curses = ["weaken"], cooldown = 9.0, raises = "flayer" }
+
+[inquisitor]
+name = "Zakarum Inquisitor"
+life = 2.7
+speed = 0.95
+bounty = 3
+lives = 2
+door_dps = 1.0
+size = 0.9
+movement = "direct"
+flying = false
+resist = { lightning = 0.4, fire = 0.25 }
+leader = { curses = ["weaken", "dim_vision"], cooldown = 12.0, mark = 1.5 }
+
+[bone_priest]
+name = "The Bone Priest"
+life = 24.0
+speed = 0.45
+bounty = 0
+lives = 20
+door_dps = 14.0
+size = 1.6
+movement = "direct"
+flying = false
+resist = { poison = 1.0, cold = 0.25, fire = 0.25, lightning = 0.25 }
+leader = { curses = ["bone_prison", "weaken", "decrepify", "dim_vision"], cast_range = 6.0, cooldown = 8.0, widen = 1.0, burn = 5.0 }

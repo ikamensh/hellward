@@ -23,6 +23,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Final
 
+from hellward.sim import tuning
 from hellward.sim.content import CURSES, Curse, CurseSpec, LeaderSpec
 from hellward.sim.model import (
     CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, SIM_DT, ForcedCurse, Monster, Tower, World, curse_radius,
@@ -30,15 +31,15 @@ from hellward.sim.model import (
 from hellward.sim.sums import add, float_sum, settle
 
 ROLLOUT_DT: Final = SIM_DT
-HORIZON_PAD: Final = 3.0      # seconds a rollout runs past the curse's end, to see what it changed
-SHORTLIST: Final = 10         # (curse, spot) pairs that get a rollout
-DELAYS: Final = (2.0, 4.0)    # later moments tried for the best targets
-LATER_TRIED: Final = 3
-LATER_MARGIN: Final = 1.2     # waiting must beat casting now by this factor ...
-MIN_GAIN: Final = 5.0         # ... and by this much life; a curse is free but for its cooldown, so only noise is not cast
-QUIET_RETRY: Final = 1.5      # when nothing is worth cursing
-SAMPLE: Final = 0.5           # the estimate's time step
-LASTING: Final = 0.5          # the weight of the pack's average life over the look-ahead in a rollout's score
+HORIZON_PAD: Final = tuning.number("planner.horizon_pad")
+SHORTLIST: Final = tuning.integer("planner.shortlist")
+DELAYS: Final = tuning.numbers("planner.delays")
+LATER_TRIED: Final = tuning.integer("planner.later_tried")
+LATER_MARGIN: Final = tuning.number("planner.later_margin")
+MIN_GAIN: Final = tuning.number("planner.min_gain")
+QUIET_RETRY: Final = tuning.number("planner.quiet_retry")
+SAMPLE: Final = tuning.number("planner.sample")
+LASTING: Final = tuning.number("planner.lasting")
 
 
 @dataclass(frozen=True)

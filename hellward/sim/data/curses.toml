@@ -1,0 +1,41 @@
+# The leaders' curses. damage, rate and range multiply a cursed tower's own; radius is in tiles.
+
+[weaken]
+name = "Weaken"
+duration = 8.0
+radius = 1.5
+damage = 0.35
+rate = 1.0
+range = 1.0
+silenced = false
+blurb = "deals a third of its damage"
+
+[decrepify]
+name = "Decrepify"
+duration = 8.0
+radius = 1.5
+damage = 1.0
+rate = 0.4
+range = 1.0
+silenced = false
+blurb = "attacks at 40% speed"
+
+[dim_vision]
+name = "Dim Vision"
+duration = 8.0
+radius = 2.3
+damage = 1.0
+rate = 1.0
+range = 0.55
+silenced = false
+blurb = "sees half as far"
+
+[bone_prison]
+name = "Bone Prison"
+duration = 4.5
+radius = 1.0
+damage = 1.0
+rate = 1.0
+range = 1.0
+silenced = true
+blurb = "caged: cannot attack"

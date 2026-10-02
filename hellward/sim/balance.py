@@ -11,25 +11,27 @@ import math
 from dataclasses import dataclass
 from typing import Final
 
+from hellward.sim import tuning
+
 
 @dataclass(frozen=True)
 class BalanceProfile:
-    base_hp: float = 6.0
-    location_growth: float = 1.055
-    wave_growth: float = 1.05
-    arrow_hit: int = 2
-    base_gold_unit: int = 12
-    starting_units: float = 3.0
-    starting_units_growth: float = 0.5
-    wave_income_units: float = 1.0
-    wave_income_growth_units: float = 0.5
-    wave_density_decay: float = 0.5
-    minimum_wave_density: float = 0.4
-    rank_cost_units: tuple[float, float, float] = (1.0, 2 / 3, 1.0)
-    salvage_budget: int = 3
-    salvage_sale_fraction: float = 1 / 3
-    breach_pack_income_units: float = 0.5
-    breach_cache_units: float = 0.8
+    base_hp: float
+    location_growth: float
+    wave_growth: float
+    arrow_hit: int
+    base_gold_unit: int
+    starting_units: float
+    starting_units_growth: float
+    wave_income_units: float
+    wave_income_growth_units: float
+    wave_density_decay: float
+    minimum_wave_density: float
+    rank_cost_units: tuple[float, float, float]
+    salvage_budget: int
+    salvage_sale_fraction: float
+    breach_pack_income_units: float
+    breach_cache_units: float
 
     def __post_init__(self) -> None:
         for name, value in (("base_hp", self.base_hp), ("starting_units", self.starting_units),
@@ -187,4 +189,13 @@ class BalanceProfile:
             raise ValueError(f"{name} must be a nonnegative integer")
 
 
-BALANCE: Final = BalanceProfile()
+def _profile() -> BalanceProfile:
+    row = dict(tuning.table("economy"))
+    units = tuple(float(v) for v in row["rank_cost_units"])
+    if len(units) != 3:
+        raise ValueError("rank_cost_units must have three values")
+    row["rank_cost_units"] = (units[0], units[1], units[2])
+    return BalanceProfile(**row)
+
+
+BALANCE: Final = _profile()

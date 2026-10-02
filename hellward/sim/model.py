@@ -22,6 +22,7 @@ import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Final
 
+from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.breaches import BREACHES
 from hellward.sim.campaign import CATHEDRAL, ORDER, Location
@@ -38,16 +39,16 @@ from hellward.sim.skills import NO_PERKS, RANK_SKILL, SKILLS, Perks, baked
 if TYPE_CHECKING:
     from hellward.sim.planner import Decision
 
-SIM_DT: Final = 0.05
-DOOR_STOP: Final = 0.45         # how far before a door's centre the front of a queue stands
-JOSTLE: Final = 0.6             # the queue behind a door is this deep
-CHAIN_JUMP: Final = 1.7         # how far chain lightning leaps
-DECIDE_DELAY: Final = 0.5       # a leader ponders this long between asking its planner and starting to chant
-HOLD_RETRY: Final = 1.0         # a leader that holds its curse thinks again after this long
-CAST_SLACK: Final = 1.0         # a curse lands if the tower is within reach + slack when the chant ends
-FIRST_WAVE_BREAK: Final = 30.0
-LEAK_WEIGHT: Final = 2.0        # a monster through the sanctuary gate is worth twice its life to its side
-BLAZE_TIME: Final = 2.0         # seconds the floor burns where a fireball lands, under Blaze
+SIM_DT: Final = 0.05            # the clock's step: not a tuning value (replays and the protocol count steps)
+DOOR_STOP: Final = tuning.number("battle.door_stop")
+JOSTLE: Final = tuning.number("battle.jostle")
+CHAIN_JUMP: Final = tuning.number("battle.chain_jump")
+DECIDE_DELAY: Final = tuning.number("battle.decide_delay")
+HOLD_RETRY: Final = tuning.number("battle.hold_retry")
+CAST_SLACK: Final = tuning.number("battle.cast_slack")
+FIRST_WAVE_BREAK: Final = tuning.number("battle.first_wave_break")
+LEAK_WEIGHT: Final = tuning.number("battle.leak_weight")
+BLAZE_TIME: Final = tuning.number("battle.skills.blaze_time")
 
 
 class Refused(Exception):

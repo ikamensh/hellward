@@ -7,8 +7,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Final
+from typing import Any, Final
 
+from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 
 
@@ -42,10 +43,10 @@ class CurseSpec:
 
 
 CURSES: Final[dict[Curse, CurseSpec]] = {
-    Curse.WEAKEN: CurseSpec("Weaken", 8.0, radius=1.5, damage=0.35, blurb="deals a third of its damage"),
-    Curse.DECREPIFY: CurseSpec("Decrepify", 8.0, radius=1.5, rate=0.4, blurb="attacks at 40% speed"),
-    Curse.DIM_VISION: CurseSpec("Dim Vision", 8.0, radius=2.3, range=0.55, blurb="sees half as far"),
-    Curse.BONE_PRISON: CurseSpec("Bone Prison", 4.5, radius=1.0, silenced=True, blurb="caged: cannot attack"),
+    Curse(key): CurseSpec(row["name"], float(row["duration"]), radius=float(row["radius"]), damage=float(row["damage"]),
+                          rate=float(row["rate"]), range=float(row["range"]), silenced=bool(row["silenced"]),
+                          blurb=row["blurb"])
+    for key, row in tuning.table("curses").items()
 }
 
 
@@ -86,56 +87,28 @@ class MonsterKind:
         return 1.0 - self.resist.get(element, 0.0)
 
 
-F, L, C, P = Element.FIRE, Element.LIGHTNING, Element.COLD, Element.POISON
-B, N = Element.BONE, Element.NATURE
-H = Element.PHYSICAL
+def _leader(row: dict[str, Any]) -> LeaderSpec:
+    spec = dict(tuning.table("battle.leader_defaults"))
+    for key, value in row.items():
+        if key not in spec and key != "curses":
+            raise KeyError(f"unknown leader value {key}")
+        spec[key] = value
+    return LeaderSpec(tuple(Curse(c) for c in spec["curses"]), cast_range=float(spec["cast_range"]),
+                      cooldown=float(spec["cooldown"]), channel=float(spec["channel"]),
+                      first_cast=float(spec["first_cast"]), widen=float(spec["widen"]), raises=spec["raises"],
+                      raise_reach=float(spec["raise_reach"]), mark=float(spec["mark"]), burn=float(spec["burn"]))
 
-MONSTERS: Final[dict[str, MonsterKind]] = {m.key: m for m in (
-    MonsterKind("fallen", "Fallen", hp=BALANCE.effective_hp(1.0, 0, 0), speed=1.35, bounty=1, door_dps=1, size=0.55,
-                movement="wander"),
-    MonsterKind("skeleton", "Skeleton", hp=BALANCE.effective_hp(1.4, 0, 0), speed=1.0, bounty=1, door_dps=1.5,
-                resist={P: 1.0, C: 0.25}, size=0.75, movement="wander"),
-    MonsterKind("zombie", "Zombie", hp=BALANCE.effective_hp(1.6, 0, 0), speed=0.6, bounty=2, door_dps=2,
-                resist={F: -0.5, P: 0.5}, size=0.8, movement="wander"),
-    MonsterKind("goatman", "Goatman", hp=BALANCE.effective_hp(1.7, 0, 0), speed=1.1, bounty=2, door_dps=1.5,
-                resist={L: 0.5}, size=0.85, movement="wander"),
-    MonsterKind("gargoyle", "Gargoyle", hp=BALANCE.effective_hp(1.1, 0, 0), speed=1.5, bounty=1,
-                resist={F: 0.5, C: 0.25}, flying=True, size=0.75),
-    MonsterKind("overlord", "Overlord", hp=BALANCE.effective_hp(4.0, 0, 0), speed=0.65, bounty=4, lives=2, door_dps=6,
-                resist={F: 0.25, C: 0.25}, size=1.05),
-    MonsterKind("azazel", "Azazel the Flayer", hp=BALANCE.effective_hp(15.0, 0, 0), speed=0.5, bounty=8, lives=10, door_dps=12,
-                resist={F: 1.0, L: 0.25, C: 0.25, P: 0.25}, size=1.6),
-    MonsterKind("shaman", "Fallen Shaman", hp=BALANCE.effective_hp(2.0, 0, 0), speed=1.0, bounty=3, lives=2, door_dps=1, resist={F: 0.25},
-                leader=LeaderSpec((Curse.WEAKEN,)), size=0.65),
-    MonsterKind("priest", "Bone Acolyte", hp=BALANCE.effective_hp(2.5, 0, 0), speed=0.9, bounty=3, lives=2, door_dps=1,
-                resist={P: 1.0, C: 0.25},
-                leader=LeaderSpec((Curse.BONE_PRISON, Curse.DIM_VISION), cooldown=10.0), size=0.85),
-    MonsterKind("witch", "Blood Witch", hp=BALANCE.effective_hp(2.7, 0, 0), speed=0.95, bounty=3, lives=2, door_dps=1,
-                resist={F: 0.25, L: 0.25},
-                leader=LeaderSpec((Curse.DECREPIFY, Curse.WEAKEN), cooldown=8.5), size=0.85),
-    MonsterKind("flayer", "Flayer", hp=BALANCE.effective_hp(0.85, 0, 0), speed=1.45, bounty=1, door_dps=1,
-                resist={F: 0.25}, size=0.5),
-    MonsterKind("zealot", "Zealot", hp=BALANCE.effective_hp(1.8, 0, 0), speed=1.0, bounty=2, door_dps=1.6,
-                resist={L: 0.4, F: 0.25}, size=0.85),
-    MonsterKind("spider", "Spider", hp=BALANCE.effective_hp(1.4, 0, 0), speed=1.35, bounty=1, door_dps=1,
-                resist={P: 1.0, C: -0.25}, size=0.7, movement="wander"),
-    MonsterKind("bat", "Blood Bat", hp=BALANCE.effective_hp(0.8, 0, 0), speed=1.9, bounty=1, flying=True,
-                resist={C: 0.5, P: 0.25}, size=0.5),
-    MonsterKind("hulk", "Thorned Hulk", hp=BALANCE.effective_hp(5.0, 0, 0), speed=0.55, bounty=5, lives=2, door_dps=6.5,
-                resist={P: 1.0, C: 0.25, F: -0.25}, size=1.1, movement="wander"),
-    MonsterKind("drowned", "The Drowned", hp=BALANCE.effective_hp(2.2, 0, 0), speed=0.7, bounty=2, door_dps=2,
-                resist={C: 0.5, P: 0.5, L: -0.25}, size=0.85, movement="wander"),
-    MonsterKind("fetish", "Fetish Shaman", hp=BALANCE.effective_hp(2.0, 0, 0), speed=1.1, bounty=3, lives=2, door_dps=1,
-                resist={F: 0.25}, size=0.6,
-                leader=LeaderSpec((Curse.WEAKEN,), cooldown=9.0, raises="flayer")),
-    MonsterKind("inquisitor", "Zakarum Inquisitor", hp=BALANCE.effective_hp(2.7, 0, 0), speed=0.95, bounty=3, lives=2, door_dps=1,
-                resist={L: 0.4, F: 0.25}, size=0.9,
-                leader=LeaderSpec((Curse.WEAKEN, Curse.DIM_VISION), cooldown=12.0, mark=1.5)),
-    MonsterKind("bone_priest", "The Bone Priest", hp=BALANCE.effective_hp(24.0, 0, 0), speed=0.45, bounty=0, lives=20, door_dps=14,
-                resist={P: 1.0, C: 0.25, F: 0.25, L: 0.25}, size=1.6,
-                leader=LeaderSpec((Curse.BONE_PRISON, Curse.WEAKEN, Curse.DECREPIFY, Curse.DIM_VISION), cast_range=6.0,
-                                  cooldown=8.0, widen=1.0, burn=5.0)),
-)}
+
+def _monster(key: str, row: dict[str, Any]) -> MonsterKind:
+    leader = row.get("leader")
+    return MonsterKind(key, row["name"], hp=BALANCE.effective_hp(float(row["life"]), 0, 0), speed=float(row["speed"]),
+                       bounty=int(row["bounty"]), lives=int(row["lives"]), door_dps=float(row["door_dps"]),
+                       resist={Element(e): float(v) for e, v in row["resist"].items()}, flying=bool(row["flying"]),
+                       leader=None if leader is None else _leader(leader), size=float(row["size"]),
+                       movement=row["movement"])
+
+
+MONSTERS: Final[dict[str, MonsterKind]] = {key: _monster(key, row) for key, row in tuning.table("monsters").items()}
 
 
 @dataclass(frozen=True)
@@ -165,59 +138,49 @@ class TowerKind:
     bolt_speed: float = 9.0   # tiles per second; a nova and a chain strike at once
 
 
-TOWERS: Final[dict[str, TowerKind]] = {t.key: t for t in (
-    TowerKind("arrow", "Arrow Tower", H, "bolt", (
-        TowerLevel(BALANCE.tower_cost(0), BALANCE.arrow_damage(0), 1.0, 2.8),
-        TowerLevel(BALANCE.tower_cost(1), BALANCE.arrow_damage(1), 1.05, 3.0),
-        TowerLevel(BALANCE.tower_cost(2), BALANCE.arrow_damage(2), 1.1, 3.2),
-    ), "Fires one arrow at the monster closest to the sanctuary.", bolt_speed=12.0),
-    TowerKind("pyre", "Pyre", F, "bolt", (
-        TowerLevel(BALANCE.tower_cost(0, 1.5), BALANCE.tower_damage(0, 1.5), 1.0, 3.0),
-        TowerLevel(BALANCE.tower_cost(1, 1.5), BALANCE.tower_damage(1, 1.5), 1.0, 3.2),
-        TowerLevel(BALANCE.tower_cost(2, 1.5), BALANCE.tower_damage(2, 1.5), 1.05, 3.4),
-    ), "Hurls a firebolt at one enemy; a forged chamber can later give it a blast.", bolt_speed=8.0),
-    TowerKind("storm", "Storm Obelisk", L, "chain", (
-        TowerLevel(BALANCE.tower_cost(0, 1.7), BALANCE.tower_damage(0, 1.5), 1.2, 2.8),
-        TowerLevel(BALANCE.tower_cost(1, 1.7), BALANCE.tower_damage(1, 1.5), 1.3, 3.0),
-        TowerLevel(BALANCE.tower_cost(2, 1.7), BALANCE.tower_damage(2, 1.5), 1.4, 3.2),
-    ), "Strikes one enemy with lightning; a forged coil can later make it leap."),
-    TowerKind("frost", "Frost Shrine", C, "bolt", (
-        TowerLevel(BALANCE.tower_cost(0, 1.4), BALANCE.tower_damage(0, 0.5), 0.6, 2.0, chill=0.35, chill_time=2.0),
-        TowerLevel(BALANCE.tower_cost(1, 1.4), BALANCE.tower_damage(1, 0.5), 0.65, 2.2, chill=0.45, chill_time=2.2),
-        TowerLevel(BALANCE.tower_cost(2, 1.4), BALANCE.tower_damage(2, 0.5), 0.7, 2.4, chill=0.55, chill_time=2.5),
-    ), "A cold bolt chills one enemy: slower feet, weaker blows on doors."),
-    TowerKind("plague", "Plague Totem", P, "venom", (
-        TowerLevel(BALANCE.tower_cost(0, 1.5), BALANCE.tower_damage(0, 0.5), 0.8, 3.0,
-                   poison=BALANCE.tower_damage(0, 0.5), poison_time=4.0),
-        TowerLevel(BALANCE.tower_cost(1, 1.5), BALANCE.tower_damage(1, 0.5), 0.85, 3.2,
-                   poison=BALANCE.tower_damage(1, 0.5), poison_time=4.0),
-        TowerLevel(BALANCE.tower_cost(2, 1.5), BALANCE.tower_damage(2, 0.5), 0.9, 3.4,
-                   poison=BALANCE.tower_damage(2, 0.5), poison_time=4.5),
-    ), "Venom seeks the strongest monster it can poison; poison stacks up to four times.", bolt_speed=7.0),
-    TowerKind("altar", "Bone Altar", B, "amplify", (
-        TowerLevel(BALANCE.tower_cost(0, 1.6), 0.15, 0.25, 3.0, splash=1.0, lasting=2.0),
-        TowerLevel(BALANCE.tower_cost(1, 1.6), 0.20, 1 / 3.6, 3.2, splash=1.2, lasting=2.2),
-        TowerLevel(BALANCE.tower_cost(2, 1.6), 0.25, 1 / 3.2, 3.4, splash=1.4, lasting=2.5),
-    ), "Lays Amplify Damage on the thickest knot of monsters in reach: they take more damage from everything."),
-    TowerKind("grove", "Druid Grove", N, "aura", (
-        TowerLevel(BALANCE.tower_cost(0, 1.6), 0.10, 0.0, 1.5),
-        TowerLevel(BALANCE.tower_cost(1, 1.6), 0.15, 0.0, 1.5),
-        TowerLevel(BALANCE.tower_cost(2, 1.6), 0.20, 0.0, 2.3),
-    ), "Its aura makes every tower within reach strike harder. Groves do not stack."),
-)}
+def _ranks(row: dict[str, Any], name: str) -> tuple[float, ...]:
+    values = row.get(name)
+    if values is None:
+        return (0.0, 0.0, 0.0)
+    if len(values) != 3:
+        raise ValueError(f"{name} needs one value per rank")
+    return tuple(float(v) for v in values)
 
-MAX_POISON_STACKS: Final = 4
-SELL_REFUND: Final = 0.7
+
+def _tower(key: str, row: dict[str, Any]) -> TowerKind:
+    price = float(row["price"])
+    if "damage_role" in row:
+        damage: tuple[float, ...] = tuple(BALANCE.tower_damage(rank, float(row["damage_role"])) for rank in range(3))
+    else:
+        damage = _ranks(row, "damage")
+    poison: tuple[float, ...] = (tuple(BALANCE.tower_damage(rank, float(row["poison_role"])) for rank in range(3))
+                                 if "poison_role" in row else (0.0, 0.0, 0.0))
+    rate, reach, splash = _ranks(row, "rate"), _ranks(row, "range"), _ranks(row, "splash")
+    chill, chill_time, poison_time, lasting = (_ranks(row, "chill"), _ranks(row, "chill_time"),
+                                               _ranks(row, "poison_time"), _ranks(row, "lasting"))
+    levels = tuple(TowerLevel(BALANCE.tower_cost(rank, price), damage[rank], rate[rank], reach[rank], splash=splash[rank],
+                              chill=chill[rank], chill_time=chill_time[rank], poison=poison[rank],
+                              poison_time=poison_time[rank], lasting=lasting[rank])
+                   for rank in range(3))
+    return TowerKind(key, row["name"], Element(row["element"]), row["attack"], levels, row["blurb"],
+                     bolt_speed=float(row["bolt_speed"]))
+
+
+TOWERS: Final[dict[str, TowerKind]] = {key: _tower(key, row) for key, row in tuning.table("towers").items()}
+
+MAX_POISON_STACKS: Final = tuning.integer("battle.max_poison_stacks")
+SELL_REFUND: Final = tuning.number("battle.sell_refund")
 
 
 @dataclass(frozen=True)
 class DoorSpec:
-    cost: int = BALANCE.tower_cost(0)
-    hp: float = BALANCE.base_hp * 10.0
-    repair: float = 0.5    # share of its missing life a standing door regains when a wave is cleared
+    cost: int
+    hp: float
+    repair: float          # share of its missing life a standing door regains when a wave is cleared
 
 
-DOOR: Final = DoorSpec()
+DOOR: Final = DoorSpec(BALANCE.tower_cost(0, tuning.number("battle.gate.cost_units")),
+                       BALANCE.base_hp * tuning.number("battle.gate.life_hp"), tuning.number("battle.gate.repair"))
 
 
 @dataclass(frozen=True)
@@ -251,37 +214,31 @@ class SpellSpec:
     recharge: float = 0.0 # seconds after a cast before it can be cast again
 
 
-SPELLS: Final[dict[str, SpellSpec]] = {s.key: s for s in (
-    SpellSpec("cleanse", "Cleanse", 35, "tower", "Burns every curse off one tower."),
-    SpellSpec("smite", "Smite", 35, "monster", "Holy lightning strikes one monster, and no resistance softens it. "
-              "A leader it strikes while pondering or chanting loses its curse, but its next curse cannot be broken.",
-              damage=BALANCE.arrow_hit * 3,
-              recharge=8.0),
-    SpellSpec("meteor", "Meteor", 60, "floor", "Falls a moment after the cast and leaves the floor burning.",
-              damage=BALANCE.arrow_hit * 6, radius=1.4, delay=1.2, lasting=3.0,
-              burn=BALANCE.arrow_hit, recharge=10.0),
-    SpellSpec("orb", "Frozen Orb", 50, "floor", "Freezes everything near it: no walking, no battering, and a leader's "
-              "curse breaks (its next one cannot).", damage=BALANCE.arrow_hit * 2, radius=1.8,
-              lasting=2.5, recharge=12.0),
-)}
+SPELLS: Final[dict[str, SpellSpec]] = {
+    key: SpellSpec(key, row["name"], float(row["mana"]), row["aim"], row["blurb"],
+                   damage=BALANCE.arrow_hit * float(row["damage_hits"]), radius=float(row["radius"]),
+                   delay=float(row["delay"]), lasting=float(row["lasting"]), burn=BALANCE.arrow_hit * float(row["burn_hits"]),
+                   recharge=float(row["recharge"]))
+    for key, row in tuning.table("spells").items()
+}
 
-START_LIVES: Final = 20
-MANA_MAX: Final = 100.0
-MANA_START: Final = 60.0
-MANA_REGEN: Final = 1.5
-WAVE_BREAK: Final = 25.0          # seconds between a cleared wave and the next, unless called early
-EARLY_CALL_GOLD: Final = BALANCE.base_gold_unit / 120.0  # a full 25 s break buys only a little gold
-BURN_RADIUS: Final = 1.1          # the burning floor a meteor leaves
-SHATTER_RADIUS: Final = 1.2
-SHATTER_SHARE: Final = 0.1        # of a shattered monster's full life
-CONTAGION_REACH: Final = 1.5
-THORNS: Final = 0.5               # a gate under Thorns returns this share of each blow, as it would land unchilled
-SOUL: Final = 10.0                # mana a slain leader gives under Soul Harvest
-WARD: Final = 8.0                 # seconds a cleansed tower is warded under Salvation
-CORPSE_SHARE: Final = 0.15        # share of an amplified monster's full life its burst deals
-CORPSE_RADIUS: Final = 1.2        # how far a corpse explosion reaches
-HURRICANE_RADIUS: Final = 2.5     # how far a grove's slowing reaches
-HURRICANE_SLOW: Final = 0.8       # walkers near a grove move this share of their speed
-TWISTER_PERIOD: Final = 4.0       # seconds between a grove's roots
-TWISTER_RADIUS: Final = 2.5       # how far a grove's root reaches
-TWISTER_HELD: Final = 1.5         # seconds a twister holds its monster
+START_LIVES: Final = tuning.integer("battle.start_lives")
+MANA_MAX: Final = tuning.number("battle.mana_max")
+MANA_START: Final = tuning.number("battle.mana_start")
+MANA_REGEN: Final = tuning.number("battle.mana_regen")
+WAVE_BREAK: Final = tuning.number("battle.wave_break")
+EARLY_CALL_GOLD: Final = BALANCE.base_gold_unit / tuning.number("battle.early_call_seconds_per_unit")
+BURN_RADIUS: Final = tuning.number("battle.skills.burn_radius")
+SHATTER_RADIUS: Final = tuning.number("battle.skills.shatter_radius")
+SHATTER_SHARE: Final = tuning.number("battle.skills.shatter_share")
+CONTAGION_REACH: Final = tuning.number("battle.skills.contagion_reach")
+THORNS: Final = tuning.number("battle.skills.thorns")
+SOUL: Final = tuning.number("battle.skills.soul")
+WARD: Final = tuning.number("battle.skills.ward")
+CORPSE_SHARE: Final = tuning.number("battle.skills.corpse_share")
+CORPSE_RADIUS: Final = tuning.number("battle.skills.corpse_radius")
+HURRICANE_RADIUS: Final = tuning.number("battle.skills.hurricane_radius")
+HURRICANE_SLOW: Final = tuning.number("battle.skills.hurricane_slow")
+TWISTER_PERIOD: Final = tuning.number("battle.skills.twister_period")
+TWISTER_RADIUS: Final = tuning.number("battle.skills.twister_radius")
+TWISTER_HELD: Final = tuning.number("battle.skills.twister_held")
