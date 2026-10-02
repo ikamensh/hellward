@@ -152,7 +152,7 @@ def test_the_tree_learns_what_free_sigils_pay_for_says_why_not_and_unlearns_for_
     with Client(data) as c:
         tree = c.request("skills")
         assert tree["sigils"] == 3 and tree["free"] == 3 and not tree["any"]
-        with pytest.raises(Refused, match="needs Adept of Arrows first"):
+        with pytest.raises(Refused, match="needs Adept of Steel first"):
             c.request("learn", key="master_arrow")
         tree = c.request("learn", key="adept_arrow")
         assert tree["free"] == 3 - SKILLS["adept_arrow"].cost and tree["any"]

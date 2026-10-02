@@ -31,8 +31,7 @@ func _ready() -> void:
 	_main = load("res://scenes/main.tscn").instantiate()
 	_main.battle = reply["data"]
 	_main.args = {"nointro": ""}
-	add_child(_main)
-	await _main.started
+	add_child(_main)   # with its battle given, it lays the battle out at once
 	_world = _main.world
 	_world.minds = false
 	_world.happened.connect(_watch)

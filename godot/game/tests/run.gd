@@ -321,6 +321,7 @@ func test_a_monster_at_the_shrine_strikes_it_and_is_gone() -> void:
 ## arsenal deals it at each rank, as the server's table says. The Catacombs bring armored Overlords.
 func test_the_plate_of_a_monster_under_the_mouse() -> void:
 	var m := await start({"demo": "", "player": "ordinary", "location": "catacombs"})
+	m.rig.user_control = false   # the virtual cursor would pan the camera at the screen's edge
 	var w: World = m.world
 	Engine.time_scale = 8.0
 	var visible := func() -> Monster:
@@ -328,7 +329,8 @@ func test_the_plate_of_a_monster_under_the_mouse() -> void:
 			if mon._age > Monster.EMERGE and m.rig.cam.is_position_in_frustum(mon.chest()):
 				return mon
 		return null
-	check(await until(func(): return visible.call() != null, 300.0), "a monster walks in sight")
+	var ok := await until(func(): return visible.call() != null, 300.0)
+	check(ok, "a monster walks in sight")
 	Engine.time_scale = 1.0
 	w.set_paused(true)
 	await frames(2)
@@ -382,6 +384,8 @@ func test_the_watched_defence_holds_and_ends_with_victory() -> void:
 	var m := await start({"demo": "", "player": "adaptive"})
 	var w: World = m.world
 	Engine.time_scale = 8.0
+	var built := [0]   # towers raised: the bot sells those the last monsters have passed
+	w.happened.connect(func(e: Array): if e[0] == "built": built[0] += 1)
 	var largest := [""]
 	var keep := func(f: Dictionary):
 		var text := JSON.stringify(f)
@@ -397,7 +401,7 @@ func test_the_watched_defence_holds_and_ends_with_victory() -> void:
 	print("   largest frame %d bytes, parsed in %.0f us" % [largest[0].length(), parse])
 	check(parse < 500.0, "the client parses the largest frame in under half a millisecond (%.0f us)" % parse)
 	check(w.outcome == "victory", "the scripted defence wins (outcome '%s', wave %d, lives %d)" % [w.outcome, w.wave + 1, w.lives])
-	check(w.towers.size() >= 4, "it built a defence (%d towers)" % w.towers.size())
+	check(built[0] >= 4, "it built a defence (%d towers)" % built[0])
 	check(Sfx.music_name() == "title", "the title's music plays after the victory (%s)" % Sfx.music_name())
 
 
