@@ -51,20 +51,25 @@ def contender(who: str, seed: int) -> Player:
     return Ghost(who.removeprefix("replay:")) if who.startswith("replay:") else PLAYERS[who](seed)
 
 
-def wins(who: str, key: str, seed: int, sigils: int, leaders: str, life_mult: float, curse_scale: float = 1.0) -> bool:
-    if who == "planned":
-        planned.check(LOCATIONS[key])
-    elif who == "warden":
-        warden.check(LOCATIONS[key], sigils)
+def wins(who: str, key: str, seed: int, sigils: int, leaders: str, life_mult: float, curse_scale: float = 1.0,
+         waves: int | None = None) -> bool:
+    if waves is None:
+        if who == "planned":
+            planned.check(LOCATIONS[key])
+        elif who == "warden":
+            warden.check(LOCATIONS[key], sigils)
     policy = planner.smart if leaders == "smart" else planner.RandomLeaders(seed)
     loc = dataclasses.replace(LOCATIONS[key], life=LOCATIONS[key].life * life_mult)
+    if waves is not None:
+        loc = dataclasses.replace(loc, waves=loc.waves[:waves], wave_names=loc.wave_names[:waves])
     world, _ = defend(loc, contender(who, seed), seed=seed, sigils=sigils, planner=policy, hp=1.0, curse_scale=curse_scale)
     return world.outcome == "victory"
 
 
-def margin(who: str, key: str, seed: int, sigils: int, leaders: str, curse_scale: float = 1.0) -> float:
+def margin(who: str, key: str, seed: int, sigils: int, leaders: str, curse_scale: float = 1.0,
+           waves: int | None = None) -> float:
     """The largest life factor won, bisected in ratio to STEP; 0 when even LOW is lost."""
-    return life_margin(lambda life: wins(who, key, seed, sigils, leaders, life, curse_scale), LOW, HIGH,
+    return life_margin(lambda life: wins(who, key, seed, sigils, leaders, life, curse_scale, waves), LOW, HIGH,
                        step=STEP, check_low=True, check_high=True)
 
 
@@ -83,6 +88,8 @@ def main() -> None:
     parser.add_argument("--sigils", type=int, default=None)
     parser.add_argument("--leaders", default="smart", choices=("smart", "random"))
     parser.add_argument("--curse-scale", type=float, default=1.0)
+    parser.add_argument("--waves", type=int, default=None, help="fight only the first N waves (the first wave's "
+                        "margin is reported with --waves 1; the plan check is skipped on a shortened defence)")
     parser.add_argument("--jobs", type=int, default=6)
     args = parser.parse_args()
     if args.replay is not None:
@@ -100,7 +107,8 @@ def main() -> None:
             return args.sigils
         return 3 * ORDER.index(key)
 
-    jobs = [(args.player, key, seed, budget(key), args.leaders, args.curse_scale) for key in keys for seed in seeds]
+    jobs = [(args.player, key, seed, budget(key), args.leaders, args.curse_scale, args.waves)
+            for key in keys for seed in seeds]
     with ProcessPoolExecutor(args.jobs) as pool:
         found = list(pool.map(margin, *zip(*jobs)))
     for i, key in enumerate(keys):
