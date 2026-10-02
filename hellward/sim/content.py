@@ -5,7 +5,8 @@ Distances are in tiles, times in seconds, damage and life in hit points.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import math
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Final
 
@@ -64,6 +65,13 @@ class LeaderSpec:
     burn: float = 0.0         # mana burned per tower the curse catches
 
 
+PROTECTED: Final = tuning.number("battle.protected")
+VULNERABLE: Final = tuning.number("battle.vulnerable")
+FACTOR_CAP: Final = tuning.number("battle.factor_cap")
+BOSS_STRIKE_LIVES: Final = tuning.integer("battle.boss_strike_lives")
+_EDGE: Final = 1e-9   # a product that is a whole number but for the last bit rounds as that whole number
+
+
 @dataclass(frozen=True)
 class MonsterKind:
     key: str
@@ -71,9 +79,12 @@ class MonsterKind:
     hp: float
     speed: float
     bounty: int
-    lives: int = 1
+    lives: int = 1            # what one strike at the shrine costs: battle.boss_strike_lives for a boss
     door_dps: float = 1.0
-    resist: dict[Element, float] = field(default_factory=dict)  # 1.0 immune, negative a weakness
+    protected: tuple[Element, ...] = ()
+    vulnerable: tuple[Element, ...] = ()
+    armor: int = 0            # taken off every hit
+    boss: bool = False        # struck back to its portal from the shrine instead of obliterated
     flying: bool = False
     leader: LeaderSpec | None = None
     size: float = 0.6        # drawn height in tiles, for the view and the hit radius
@@ -82,9 +93,61 @@ class MonsterKind:
     def __post_init__(self) -> None:
         if self.movement not in ("direct", "wander"):
             raise ValueError(f"{self.key}: unknown movement {self.movement!r}")
+        tags = (*self.protected, *self.vulnerable)
+        if len(set(tags)) != len(tags):
+            raise ValueError(f"{self.key}: an element is tagged twice")
+        if len(tags) > 2 and not self.boss:
+            raise ValueError(f"{self.key}: at most two element tags, unless a boss")
+        if Element.PHYSICAL in tags:
+            raise ValueError(f"{self.key}: physical is never tagged: armor is what physical fears")
+        if self.armor < 0:
+            raise ValueError(f"{self.key}: negative armor")
 
-    def taken(self, element: Element) -> float:
-        return 1.0 - self.resist.get(element, 0.0)
+    def taken(self, element: Element, exposed: bool = False) -> float:
+        """The element's factor on a hit: protected, vulnerable, or whole. An exposed monster (poisoned, under
+        Lower Resist) is protected against nothing."""
+        if element in self.vulnerable:
+            return VULNERABLE
+        if element in self.protected and not exposed:
+            return PROTECTED
+        return 1.0
+
+    @property
+    def small(self) -> bool:
+        """A monster the movers move: it costs one life and is neither a boss nor a leader."""
+        return self.lives == 1 and not self.boss and self.leader is None
+
+
+def felt_hit(hit: float, element: Element | None, kind: MonsterKind, factor: float = 1.0, *,
+             exposed: bool = False) -> int:
+    """The damage a hit deals a monster of this kind: the element's factor times ``factor`` (every other factor:
+    amplification, aura, a knife on a standing monster, a leap's decay, a splash's share), capped at
+    battle.factor_cap; the hit rounded to a whole number, up when the capped product is above 1, down when below,
+    half up when it is 1; less the kind's armor; at least 1. Holy damage (``element`` None) takes no factor and no
+    armor. Every hit in the rules, the planner's estimate and the server's hover table come through here."""
+    if element is None:
+        return max(1, math.floor(hit + 0.5 + _EDGE))
+    product = factor * kind.taken(element, exposed)
+    if product > FACTOR_CAP:
+        product = FACTOR_CAP
+    value = hit * product
+    if product > 1.0:
+        whole = math.ceil(value - _EDGE)
+    elif product < 1.0:
+        whole = math.floor(value + _EDGE)
+    else:
+        whole = math.floor(value + 0.5 + _EDGE)
+    return max(1, whole - kind.armor)
+
+
+def felt_over_time(amount: float, element: Element, kind: MonsterKind, factor: float = 1.0, *,
+                   exposed: bool = False) -> float:
+    """Damage over time (venom, the burning floor): the element's factor and ``factor`` (amplification), capped as a
+    hit's are, with no armor and no rounding."""
+    product = factor * kind.taken(element, exposed)
+    if product > FACTOR_CAP:
+        product = FACTOR_CAP
+    return amount * product
 
 
 def _leader(row: dict[str, Any]) -> LeaderSpec:
@@ -101,11 +164,16 @@ def _leader(row: dict[str, Any]) -> LeaderSpec:
 
 def _monster(key: str, row: dict[str, Any]) -> MonsterKind:
     leader = row.get("leader")
+    boss = bool(row["boss"])
+    if boss == ("lives" in row):
+        raise ValueError(f"{key}: a boss's strike costs battle.boss_strike_lives, any other monster its own lives")
     return MonsterKind(key, row["name"], hp=BALANCE.effective_hp(float(row["life"]), 0, 0), speed=float(row["speed"]),
-                       bounty=int(row["bounty"]), lives=int(row["lives"]), door_dps=float(row["door_dps"]),
-                       resist={Element(e): float(v) for e, v in row["resist"].items()}, flying=bool(row["flying"]),
-                       leader=None if leader is None else _leader(leader), size=float(row["size"]),
-                       movement=row["movement"])
+                       bounty=int(row["bounty"]), lives=BOSS_STRIKE_LIVES if boss else int(row["lives"]),
+                       door_dps=float(row["door_dps"]),
+                       protected=tuple(Element(e) for e in row["protected"]),
+                       vulnerable=tuple(Element(e) for e in row["vulnerable"]), armor=int(row["armor"]), boss=boss,
+                       flying=bool(row["flying"]), leader=None if leader is None else _leader(leader),
+                       size=float(row["size"]), movement=row["movement"])
 
 
 MONSTERS: Final[dict[str, MonsterKind]] = {key: _monster(key, row) for key, row in tuning.table("monsters").items()}
@@ -132,7 +200,7 @@ class TowerKind:
     key: str
     name: str
     element: Element
-    attack: str           # "bolt", "chain", "nova", "venom", "amplify" or "aura"
+    attack: str           # "bolt", "chain", "nova", "venom", "hook", "amplify" or "aura"
     levels: tuple[TowerLevel, ...]
     blurb: str
     bolt_speed: float = 9.0   # tiles per second; a nova and a chain strike at once
@@ -154,7 +222,7 @@ def _tower(key: str, row: dict[str, Any]) -> TowerKind:
     else:
         damage = _ranks(row, "damage")
     poison: tuple[float, ...] = (tuple(BALANCE.tower_damage(rank, float(row["poison_role"])) for rank in range(3))
-                                 if "poison_role" in row else (0.0, 0.0, 0.0))
+                                 if "poison_role" in row else _ranks(row, "poison"))
     rate, reach, splash = _ranks(row, "rate"), _ranks(row, "range"), _ranks(row, "splash")
     chill, chill_time, poison_time, lasting = (_ranks(row, "chill"), _ranks(row, "chill_time"),
                                                _ranks(row, "poison_time"), _ranks(row, "lasting"))
@@ -212,13 +280,14 @@ class SpellSpec:
     lasting: float = 0.0  # seconds the ground burns, or the monsters stay frozen
     burn: float = 0.0     # damage per second of the burning ground
     recharge: float = 0.0 # seconds after a cast before it can be cast again
+    rate: float = 1.0     # multiplies the attacks per second of the tower it is aimed at, while it lasts
 
 
 SPELLS: Final[dict[str, SpellSpec]] = {
     key: SpellSpec(key, row["name"], float(row["mana"]), row["aim"], row["blurb"],
                    damage=BALANCE.arrow_hit * float(row["damage_hits"]), radius=float(row["radius"]),
                    delay=float(row["delay"]), lasting=float(row["lasting"]), burn=BALANCE.arrow_hit * float(row["burn_hits"]),
-                   recharge=float(row["recharge"]))
+                   recharge=float(row["recharge"]), rate=float(row["rate"]))
     for key, row in tuning.table("spells").items()
 }
 
@@ -234,7 +303,6 @@ SHATTER_SHARE: Final = tuning.number("battle.skills.shatter_share")
 CONTAGION_REACH: Final = tuning.number("battle.skills.contagion_reach")
 THORNS: Final = tuning.number("battle.skills.thorns")
 SOUL: Final = tuning.number("battle.skills.soul")
-WARD: Final = tuning.number("battle.skills.ward")
 CORPSE_SHARE: Final = tuning.number("battle.skills.corpse_share")
 CORPSE_RADIUS: Final = tuning.number("battle.skills.corpse_radius")
 HURRICANE_RADIUS: Final = tuning.number("battle.skills.hurricane_radius")

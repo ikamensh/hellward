@@ -22,8 +22,6 @@ from hellward.sim.players.warden import fingerprint, load_plans
 from hellward.sim.skills import SKILLS, can_learn, check, cost
 
 GRAVEYARD_SIGNS = Level("Sign timing", 25, 14, ((0, 10), (10, 10), (10, 3), (24, 3)), ((10, 7),))
-CATACOMBS_SIGNS = Level("Broken chants", 25, 14,
-                        ((4, 0), (4, 8), (12, 8), (12, 11), (20, 11), (20, 13)), ((4, 5),))
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import plan_player  # noqa: E402
@@ -96,34 +94,6 @@ def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():
     assert seen_at
     for key, seen in seen_at.items():
         assert seen >= signed_at[key] + 0.6 - 1e-6
-
-
-def test_the_record_tells_a_broken_chant_from_a_broken_pondering():
-    """Chants broken are counted among the chants begun: a pondering a spell breaks never became one."""
-    pack = Wave((g("priest", 2, 3.0),), 10)
-    world = World(replace(LOCATIONS["catacombs"], level=CATACOMBS_SIGNS,
-                          waves=(pack,), wave_names=("pack",)), seed=3, planner=planner.smart)
-    hands = Hands(world, react=0.6)
-    world.gold = 1000
-    world.build("pyre", (6, 5))
-    world.call_wave()
-    smitten: dict[str, int] = {}
-    while len(smitten) < 2:
-        world.step(SIM_DT)
-        signs = [(e[0], e[1]) for e in world.events if e[0] in ("ponder", "chant")]
-        hands.observe(world.events)
-        world.events.clear()
-        for kind, leader in signs:
-            if kind not in smitten and leader not in smitten.values():
-                world.mana = 100
-                world.recharge.clear()   # two Smites a moment apart: the test's, not a player's
-                world.smite(leader)
-                smitten[kind] = leader
-        assert world.time < 60
-    world.step(SIM_DT)
-    hands.observe(world.events)
-    assert hands.record.broken == 2
-    assert hands.record.broken_chants == 1 <= hands.record.chants
 
 
 def test_a_defence_still_undecided_at_the_limit_is_an_error():

@@ -37,9 +37,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from hellward import fastsim  # noqa: E402
+
+if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of its worker processes, not as a library
+    fastsim.activate()   # the compiled simulation, unless HELLWARD_INTERPRETED is set
+
 from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
-from hellward.sim.content import MONSTERS, TOWERS  # noqa: E402
+from hellward.sim.content import MONSTERS, TOWERS, felt_hit  # noqa: E402
 from hellward.sim.model import DOOR_STOP, JOSTLE, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.hands import defend  # noqa: E402
@@ -58,7 +63,7 @@ TRAINING = 100                # seeds 0-99; the evaluation seeds start at 1000
 SEARCH = "lite"               # the leaders most defences are played against
 CALLS = (0.0, 30.0, 50.0, 70.0, 100.0, 125.0)
 RESERVES = (0.0, 20.0, 30.0, 45.0, 60.0)
-WORTHS = ("smite_worth", "cleanse_worth", "meteor_worth", "orb_worth")
+WORTHS = ("smite_worth", "meteor_worth", "orb_worth")
 HOLD = 36.0                   # a build scoring this (16 lives kept) has room: the monsters' life goes up
 FALTER = 26.0                 # below this (a fall, or 6 lives) it comes down again
 TOP_TILES = 40                # tiles a moved or added tower may jump to
@@ -100,15 +105,18 @@ def evaluate(pool: ProcessPoolExecutor, plans: list[Plan], location: str, seeds:
 
 
 def fit(location: Location, kind: str) -> float:
-    """The share of the location's monster life a tower kind's element is felt by."""
+    """The share of a tower kind's rank-I hit the location's monster life feels: protections, vulnerabilities and
+    armor, as the rules feel them."""
     total = felt = 0.0
-    element = TOWERS[kind].element
+    tower = TOWERS[kind]
+    hit = tower.levels[0].damage
     for wave in location.waves:
         for group in wave.groups:
             monster = MONSTERS[group.kind]
             life = monster.hp * wave.hp * group.count
             total += life
-            felt += life * max(0.0, monster.taken(element))
+            felt += life * (felt_hit(hit, tower.element, monster) / hit if tower.attack not in ("aura", "amplify")
+                            else monster.taken(tower.element))
     return felt / total
 
 
@@ -165,7 +173,7 @@ def first_skills(kinds: list[str], location: Location) -> list[str]:
     for kind in dict.fromkeys(kinds):
         order += [k for k, s in SKILLS.items() if s.column == column_of(kind)]
     if location.arsenal.gates:
-        order += ["holy_shield", "salvation", "thorns"]
+        order += ["holy_shield", "thorns"]
     order += ["warmth", "soul_harvest", "spell_mastery"]
     order += [k for k in SKILLS if k not in order]
     tier = {k: SKILLS[k].tier for k in order}
@@ -173,7 +181,8 @@ def first_skills(kinds: list[str], location: Location) -> list[str]:
 
 
 MIXES = (("pyre", "frost"), ("frost", "frost", "pyre"), ("storm", "frost"), ("pyre", "frost", "storm", "plague", "pyre", "storm"),
-         ("plague", "pyre", "frost"), ("pyre", "pyre", "storm"))
+         ("plague", "pyre", "frost"), ("pyre", "pyre", "storm"), ("ballista", "pyre", "frost"),
+         ("arrow", "ballista", "knife"), ("pyre", "hook", "ballista", "storm"))
 
 
 def first_plans(location: Location) -> list[Plan]:
@@ -443,7 +452,7 @@ def table_row(player: str, location: str, sigils: int, seed: int) -> dict:
     world, record = defend(LOCATIONS[location], PLAYERS[player](seed), seed=seed, sigils=sigils,
                            planner=planner.smart)
     return {"player": player, "location": location, "seed": seed, "outcome": world.outcome,
-            "lives": world.lives, "spells": dict(record.spells), "landed": record.landed, "broken": record.broken}
+            "lives": world.lives, "spells": dict(record.spells), "landed": record.landed, "strikes": record.strikes}
 
 
 def table(pool: ProcessPoolExecutor, players: list[str], seeds: list[int]) -> None:
@@ -457,9 +466,9 @@ def table(pool: ProcessPoolExecutor, players: list[str], seeds: list[int]) -> No
             wins = sum(r["outcome"] == "victory" for r in mine)
             spells = sum((r["spells"].get(k, 0) for r in mine for k in r["spells"]), 0) / len(mine)
             landed = statistics.mean(r["landed"] for r in mine)
-            broken = statistics.mean(r["broken"] for r in mine)
+            strikes = statistics.mean(r["strikes"] for r in mine)
             print(f"{loc:11s} sigils {sig:2d}  {p:9s} wins {wins}/{len(mine)}  lives median "
-                  f"{statistics.median(lives):4.1f} fewest {min(lives):2d}  curses landed {landed:4.1f} broken {broken:4.1f}  "
+                  f"{statistics.median(lives):4.1f} fewest {min(lives):2d}  curses landed {landed:4.1f} boss strikes {strikes:4.1f}  "
                   f"spells {spells:4.1f}", flush=True)
 
 

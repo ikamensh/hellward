@@ -20,9 +20,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
-from hellward.sim.content import MONSTERS, SPELLS, TOWERS  # noqa: E402
+from hellward.sim.content import MAX_POISON_STACKS, MONSTERS, SPELLS, TOWERS, TowerKind, felt_hit  # noqa: E402
+from hellward.sim.model import World  # noqa: E402
 
-ATTACKS = ("bolt", "chain", "nova", "venom")   # tower attacks that deal damage; the others are mechanics towers
+ATTACKS = ("bolt", "chain", "nova", "venom", "hook")   # tower attacks that deal damage; the others are mechanics towers
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,7 @@ def spawns(location: Location) -> Iterator[tuple[str, float, int]]:
 
 
 def is_boss(kind: str) -> bool:
-    return MONSTERS[kind].lives >= 10
+    return MONSTERS[kind].boss
 
 
 def bodies_per_wave() -> Result:
@@ -77,25 +78,52 @@ def number_scale() -> list[Result]:
     ]
 
 
+def felt_dps(kind: TowerKind, rank: int, location: Location) -> float:
+    """A rank's damage per second as the location's host feels its hits (and its venom, as many stacks as its darts
+    keep up), each monster kind weighed by its share of the life that comes: the location's armor and element mix."""
+    level = kind.levels[rank]
+    life: dict[str, float] = {}
+    for monster, hp, _ in spawns(location):
+        life[monster] = life.get(monster, 0.0) + hp
+    total = sum(life.values())
+    stacks = min(MAX_POISON_STACKS, level.rate * level.poison_time)
+    return sum(hp / total * (level.rate * felt_hit(level.damage, kind.element, MONSTERS[monster])
+                             + level.poison * stacks * MONSTERS[monster].taken(kind.element))
+               for monster, hp in life.items())
+
+
 def rank_economy() -> list[Result]:
-    """Upgrading buys less damage per gold than a new rank-I tower, and more per cell."""
+    """Upgrading buys less damage per gold than a new rank-I tower, and more per cell, at every location that offers
+    the tower, against that location's armor mix. The worst location's marginal damage per gold is shown. Not the Hook
+    Tower: its ranks buy pulls, not damage."""
     out = []
     for key, kind in TOWERS.items():
-        if kind.attack not in ATTACKS:
+        if kind.attack not in ATTACKS or kind.attack == "hook":
             continue
-        dps = [level.damage * level.rate for level in kind.levels]
         cost = [level.cost for level in kind.levels]
-        per_gold = [dps[0] / cost[0]] + [(dps[r] - dps[r - 1]) / cost[r] for r in (1, 2)]
-        cheaper = all(per_gold[r] < per_gold[0] for r in (1, 2))
-        denser = all(dps[r] > dps[0] for r in (1, 2))
-        out.append(Result("R3", f"{kind.name}: damage per gold by rank (marginal)",
-                          " / ".join(f"{v:.3f}" for v in per_gold), cheaper and denser))
+        worst: tuple[float, str, list[float]] | None = None
+        met = True
+        for location in LOCATIONS.values():
+            if key not in location.arsenal.towers:
+                continue
+            dps = [felt_dps(kind, rank, location) for rank in range(3)]
+            per_gold = [dps[0] / cost[0]] + [(dps[r] - dps[r - 1]) / cost[r] for r in (1, 2)]
+            cheaper = all(per_gold[r] < per_gold[0] for r in (1, 2))
+            denser = all(dps[r] > dps[0] for r in (1, 2))
+            met = met and cheaper and denser
+            slack = per_gold[0] - max(per_gold[1], per_gold[2])
+            if worst is None or slack < worst[0]:
+                worst = (slack, location.key, per_gold)
+        assert worst is not None
+        out.append(Result("R3", f"{kind.name}: damage per gold by rank, at {worst[1]}",
+                          " / ".join(f"{v:.3f}" for v in worst[2]), met))
     return out
 
 
 def no_dispel() -> Result:
-    dispels = [spec.name for key, spec in SPELLS.items() if spec.aim == "tower" and key == "cleanse"]
-    return Result("S1", "spells that lift a curse", ", ".join(dispels) or "none", not dispels)
+    """No spell lifts a curse (Cleanse, Salvation's ward) or breaks a chant (tests/test_spells.py plays them all)."""
+    dispels = [name for name in ("cleanse",) if name in SPELLS or hasattr(World, name)]
+    return Result("S1", "spells that lift a curse or break a chant", ", ".join(dispels) or "none", not dispels)
 
 
 def tower_kinds() -> list[Result]:

@@ -86,6 +86,22 @@ class Route:
         """The stretches of this route within ``reach`` of a tile's centre."""
         return _cover_route(self._points, self._starts, tile, reach)
 
+    def nearest(self, tile: tuple[int, int]) -> float:
+        """The ``s`` of this route's point nearest a tile's centre; of points equally near, the first."""
+        cx, cy = tile[0] + 0.5, tile[1] + 0.5
+        points, starts = self._points, self._starts
+        best_s, best_d = 0.0, math.inf
+        for i in range(len(points) - 1):
+            (x0, y0), (x1, y1) = points[i], points[i + 1]
+            leg = starts[i + 1] - starts[i]
+            t = ((cx - x0) * (x1 - x0) + (cy - y0) * (y1 - y0)) / (leg * leg)
+            t = min(1.0, max(0.0, t))
+            x, y = x0 + (x1 - x0) * t, y0 + (y1 - y0) * t
+            d = (x - cx) * (x - cx) + (y - cy) * (y - cy)
+            if d < best_d - 1e-9:
+                best_s, best_d = starts[i] + leg * t, d
+        return best_s
+
 
 @dataclass(frozen=True)
 class Level:
@@ -113,6 +129,7 @@ class Level:
     _leg_at: tuple[int, ...] = field(init=False, repr=False, compare=False)     # the leg under each whole s
     _coverage: dict[tuple[tuple[int, int], float], tuple[tuple[float, float], ...]] = field(
         init=False, repr=False, compare=False)
+    _nearest: dict[tuple[str, tuple[int, int]], float] = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         routes = (Route("main", self.waypoints), *self.extra_routes)
@@ -176,10 +193,18 @@ class Level:
         object.__setattr__(self, "_leg_at", tuple(bisect_right(starts, k) - 1 for k in range(int(starts[-1]) + 1)))
         object.__setattr__(self, "door_s", tuple(self.s_of(d) for d in self.doors))
         object.__setattr__(self, "_coverage", {})
+        object.__setattr__(self, "_nearest", {})
 
     def route(self, key: str) -> Route:
         """The committed trail named by ``key`` (including the original ``main`` trail)."""
         return self._routes_by_key[key]
+
+    def nearest(self, key: str, tile: tuple[int, int]) -> float:
+        """The ``s`` of route ``key``'s point nearest a tile's centre (:meth:`Route.nearest`): a hook's spot."""
+        found = self._nearest.get((key, tile))
+        if found is None:
+            found = self._nearest[(key, tile)] = self._routes_by_key[key].nearest(tile)
+        return found
 
     def crossings(self, key: str) -> tuple[tuple[int, float], ...]:
         """Gate socket indices and distances along a route, in walking order."""

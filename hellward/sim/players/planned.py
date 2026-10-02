@@ -7,9 +7,9 @@ towers to raise in rank, and how full the mana orb should be before each wave is
 step by step as the gold comes in.
 
 The spells it casts as it sees the fight, since no plan knows where a leader will chant or a queue will stand:
-Smite on a chant aimed at a tower worth saving (Frozen Orb when the chanting leader stands in a crowd), Frozen
-Orb on a gate about to break, Meteor on a crowd, Smite on a monster about to reach the sanctuary, and Cleanse on
-the dearest cursed tower that has work to do. How much a spell must be worth before it is cast is part of the
+Smite on a chanting leader it kills when the chant is aimed at a tower worth saving, Frozen Orb on a gate about to
+break, Meteor on a crowd, Smite on a monster about to reach the sanctuary, and Battle Hymn on the dearest tower
+that has work to do while a Smite stays in hand. How much a spell must be worth before it is cast is part of the
 plan, found by the same search.
 """
 
@@ -20,7 +20,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from hellward.sim.campaign import ORDER, Location
-from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, Curse, Element
+from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, Curse, Element, felt_hit
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.skills import can_learn
@@ -30,7 +30,6 @@ THINK = 0.25          # seconds between two looks at the build and the next wave
 LOOK = 0.2            # seconds between two looks for a spell worth casting
 ARCH_CLEAR = 0.6      # a gate cannot be warded while a walker stands this close to its arch
 LEAK_SOON = 2.0       # seconds from the sanctuary at which a walker is about to take lives
-HIGH_STAKES = 5       # a single leak this costly deserves damage throughout its approach
 
 # The share of a tower's work a curse takes away while it lasts, as a person would reckon it: Bone Prison
 # silences wholly but for half as long, and a Weakened frost shrine still chills.
@@ -47,7 +46,6 @@ class Plan:
     calls: list[float]         # per wave: the mana the orb should hold before the wave is called
     rebuild: str = "now"       # a broken gate is warded again "now", in the "break" after its wave, or "never"
     smite_worth: float = 40.0      # the least a chant must threaten (gold in the tower times its loss) to smite it
-    cleanse_worth: float = 60.0    # the same, for burning the curses off a tower
     meteor_worth: float = 3.0      # the least life a meteor must strike, in its own damage
     orb_worth: float = 3.0         # the same, for a Frozen Orb on a crowd
     reserve: float = 30.0          # mana kept for a Smite while a leader walks
@@ -117,7 +115,7 @@ class Planned:
         self._answer(hands)
         if world.time >= self.look:
             self.look = world.time + LOOK
-            self._cleanse(hands)
+            self._hymn(hands)
             self._strike(hands)
         if world.time >= self.clock:
             self.clock = world.time + THINK
@@ -172,8 +170,7 @@ class Planned:
         """In the last stretch, move spent towers ahead of a boss that would cost many lives to leak."""
         if world.wave != len(world.waves) - 1 or world.schedule or not world.monsters:
             return False
-        boss = max((m for m in world.monsters if m.kind.lives >= HIGH_STAKES),
-                   key=lambda m: (m.kind.lives, m.hp), default=None)
+        boss = max((m for m in world.monsters if m.kind.boss), key=lambda m: m.hp, default=None)
         if boss is None:
             return False
         route = world.level.route(boss.route)
@@ -237,46 +234,38 @@ class Planned:
         return ready(world, spell, spare)
 
     def _answer(self, hands: Hands) -> None:
-        """A chant seen: smite its leader when the tower it aims at is worth it, or freeze it with its crowd."""
+        """A chant seen at a tower worth saving: smite its leader if one Smite kills it, and the curse dies with it."""
         assert self.plan is not None
         world = hands.world
         if not self._aim_ready(world) or not self._can(world, "smite"):
             return
+        blow = _smite_damage(world)
         best, best_loss = None, 0.0
         for sign in hands.threats():
-            if sign.kind != "chant" or world.monster(sign.leader) is None or sign.curse is None:
+            leader = world.monster(sign.leader)
+            if sign.kind != "chant" or leader is None or sign.curse is None:
+                continue
+            if leader.hp > felt_hit(blow, None, leader.kind):
                 continue
             loss = sum(curse_loss(world, t, sign.curse) for t in world.caught(sign.spot, sign.radius))
             if loss > best_loss:
-                best, best_loss = sign, loss
+                best, best_loss = leader, loss
         if best is None or best_loss < self.plan.smite_worth:
             return
-        leader = world.monster(best.leader)
-        assert leader is not None
-        if self._can(world, "orb"):
-            x, y = world.position(leader)
-            crowd = _orb_value(world, x, y, _positions(world, 0.0))
-            if crowd >= self.plan.orb_worth * _orb_damage(world) * 0.5:
-                hands.orb(x, y)
-                self.last_aim = world.time
-                return
-        hands.smite(leader.id)
+        hands.smite(best.id)
         self.last_aim = world.time
 
-    def _cleanse(self, hands: Hands) -> None:
+    def _hymn(self, hands: Hands) -> None:
+        """The dearest tower with monsters about it, while a Smite stays in hand for a leader."""
         assert self.plan is not None
         world = hands.world
-        if not self._can(world, "cleanse"):
+        keep = self.plan.reserve if "smite" in world.location.arsenal.spells and world.leaders() else 0.0
+        if not self._can(world, "hymn", keep):
             return
-        best, best_loss = None, 0.0
-        for t in world.towers.values():
-            if not t.curses or not _busy(world, t):
-                continue
-            loss = sum(t.spent * _share(t, c) * left / CURSES[c].duration for c, left in t.curses.items())
-            if loss > best_loss:
-                best, best_loss = t, loss
-        if best is not None and best_loss >= self.plan.cleanse_worth:
-            hands.cleanse(best.id)
+        busy = [t for t in world.towers.values()
+                if t.kind.attack not in ("aura", "amplify") and not t.silenced and _busy(world, t)]
+        if busy:
+            hands.hymn(max(busy, key=lambda t: (t.spent, -t.id)).id)
 
     def _strike(self, hands: Hands) -> None:
         """Meteor, Frozen Orb and Smite as weapons: a gate about to break, a leak, a crowd, or a full orb."""
@@ -292,8 +281,7 @@ class Planned:
         if self._can(world, "smite") and self._stop_leak(hands):
             return
         if self._can(world, "smite"):
-            boss = max((m for m in world.monsters if m.kind.lives >= HIGH_STAKES),
-                       key=lambda m: (m.kind.lives, m.hp), default=None)
+            boss = max((m for m in world.monsters if m.kind.boss), key=lambda m: m.hp, default=None)
             if boss is not None:
                 hands.smite(boss.id)
                 self.last_aim = world.time
@@ -352,7 +340,7 @@ class Planned:
 
 def curse_loss(world: World, tower: Tower | None, curse: Curse) -> float:
     """What a curse landing on a tower would cost, in the gold of the tower's work it takes away."""
-    if tower is None or tower.ward > 0:
+    if tower is None:
         return 0.0
     fresh = 1.0 - tower.curses.get(curse, 0.0) / CURSES[curse].duration
     busy = 1.0 if _busy(world, tower) else 0.4
@@ -410,8 +398,8 @@ def _best_meteor(world: World) -> tuple[float, float, float]:
     for _, cx, cy in ahead:
         value = 0.0
         for m in _struck(ahead, cx, cy, r2):
-            taken = world.taken(m, Element.FIRE)
-            value += min(m.hp, (dmg + (burn if m.door >= 0 else 0.0)) * taken)
+            value += min(m.hp, felt_hit(dmg, Element.FIRE, m.kind) + (burn * world.taken(m, Element.FIRE)
+                                                                       if m.door >= 0 else 0.0))
         if value > best[2]:
             best = (cx, cy, value)
     return best
@@ -436,7 +424,7 @@ def _orb_value(world: World, cx: float, cy: float, now: list[tuple[Monster, floa
     """The life a Frozen Orb at a point strikes, and half again for the time its frozen monsters stand still."""
     spec = SPELLS["orb"]
     dmg = spec.damage * world.power()
-    return sum(min(m.hp, dmg * world.taken(m, Element.COLD) * 1.5) for m in _struck(now, cx, cy, spec.radius ** 2))
+    return sum(min(m.hp, felt_hit(dmg, Element.COLD, m.kind) * 1.5) for m in _struck(now, cx, cy, spec.radius ** 2))
 
 
 def _smite_damage(world: World) -> float:

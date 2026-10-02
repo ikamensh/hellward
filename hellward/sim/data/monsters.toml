@@ -1,6 +1,9 @@
 # Every monster kind. life is a role factor on economy.base_hp; speed in tiles per second; bounty weighs its share of
 # a wave's gold; lives is what it costs the sanctuary; door_dps its blows on a gate; size its drawn height in tiles.
-# resist: 1.0 immune, negative a weakness. movement: "wander" takes a seeded detour, "direct" the shortest route.
+# protected and vulnerable name elements whose hits it takes at battle.protected and battle.vulnerable (at most two
+# tags between them, a boss may have more; physical is never tagged); armor is taken off every hit (at least 1 is
+# dealt). A boss (boss = true) has no lives of its own: each strike at the shrine costs battle.boss_strike_lives and
+# sends it back to its portal. movement: "wander" takes a seeded detour, "direct" the shortest route.
 # A leader table names its curses; its other numbers default to battle.leader_defaults.
 
 [fallen]
@@ -13,7 +16,10 @@ door_dps = 1.0
 size = 0.55
 movement = "wander"
 flying = false
-resist = {}
+protected = []
+vulnerable = []
+armor = 0
+boss = false
 
 [skeleton]
 name = "Skeleton"
@@ -25,7 +31,10 @@ door_dps = 1.5
 size = 0.75
 movement = "wander"
 flying = false
-resist = { poison = 1.0, cold = 0.25 }
+protected = ["poison", "cold"]
+vulnerable = []
+armor = 0
+boss = false
 
 [zombie]
 name = "Zombie"
@@ -37,7 +46,10 @@ door_dps = 2.0
 size = 0.8
 movement = "wander"
 flying = false
-resist = { fire = -0.5, poison = 0.5 }
+protected = ["poison"]
+vulnerable = ["fire"]
+armor = 0
+boss = false
 
 [goatman]
 name = "Goatman"
@@ -49,7 +61,10 @@ door_dps = 1.5
 size = 0.85
 movement = "wander"
 flying = false
-resist = { lightning = 0.5 }
+protected = ["lightning"]
+vulnerable = []
+armor = 0
+boss = false
 
 [gargoyle]
 name = "Gargoyle"
@@ -61,7 +76,10 @@ door_dps = 1.0
 size = 0.75
 movement = "direct"
 flying = true
-resist = { fire = 0.5, cold = 0.25 }
+protected = ["fire", "cold"]
+vulnerable = []
+armor = 0
+boss = false
 
 [overlord]
 name = "Overlord"
@@ -73,19 +91,24 @@ door_dps = 6.0
 size = 1.05
 movement = "direct"
 flying = false
-resist = { fire = 0.25, cold = 0.25 }
+protected = ["fire"]
+vulnerable = ["lightning"]
+armor = 2
+boss = false
 
 [azazel]
 name = "Azazel the Flayer"
 life = 15.0
 speed = 0.5
 bounty = 8
-lives = 10
 door_dps = 12.0
 size = 1.6
 movement = "direct"
 flying = false
-resist = { fire = 1.0, lightning = 0.25, cold = 0.25, poison = 0.25 }
+protected = ["fire", "lightning", "cold", "poison"]
+vulnerable = []
+armor = 2
+boss = true
 
 [shaman]
 name = "Fallen Shaman"
@@ -97,7 +120,10 @@ door_dps = 1.0
 size = 0.65
 movement = "direct"
 flying = false
-resist = { fire = 0.25 }
+protected = ["fire"]
+vulnerable = []
+armor = 0
+boss = false
 leader = { curses = ["weaken"] }
 
 [priest]
@@ -110,7 +136,10 @@ door_dps = 1.0
 size = 0.85
 movement = "direct"
 flying = false
-resist = { poison = 1.0, cold = 0.25 }
+protected = ["poison", "cold"]
+vulnerable = []
+armor = 0
+boss = false
 leader = { curses = ["bone_prison", "dim_vision"], cooldown = 10.0 }
 
 [witch]
@@ -123,7 +152,10 @@ door_dps = 1.0
 size = 0.85
 movement = "direct"
 flying = false
-resist = { fire = 0.25, lightning = 0.25 }
+protected = ["fire", "lightning"]
+vulnerable = []
+armor = 0
+boss = false
 leader = { curses = ["decrepify", "weaken"], cooldown = 8.5 }
 
 [flayer]
@@ -136,7 +168,10 @@ door_dps = 1.0
 size = 0.5
 movement = "direct"
 flying = false
-resist = { fire = 0.25 }
+protected = ["fire"]
+vulnerable = []
+armor = 0
+boss = false
 
 [zealot]
 name = "Zealot"
@@ -148,7 +183,10 @@ door_dps = 1.6
 size = 0.85
 movement = "direct"
 flying = false
-resist = { lightning = 0.4, fire = 0.25 }
+protected = ["lightning"]
+vulnerable = ["fire"]
+armor = 2
+boss = false
 
 [spider]
 name = "Spider"
@@ -160,7 +198,10 @@ door_dps = 1.0
 size = 0.7
 movement = "wander"
 flying = false
-resist = { poison = 1.0, cold = -0.25 }
+protected = ["poison"]
+vulnerable = ["cold"]
+armor = 0
+boss = false
 
 [bat]
 name = "Blood Bat"
@@ -172,7 +213,10 @@ door_dps = 1.0
 size = 0.5
 movement = "direct"
 flying = true
-resist = { cold = 0.5, poison = 0.25 }
+protected = ["cold", "poison"]
+vulnerable = []
+armor = 0
+boss = false
 
 [hulk]
 name = "Thorned Hulk"
@@ -184,7 +228,10 @@ door_dps = 6.5
 size = 1.1
 movement = "wander"
 flying = false
-resist = { poison = 1.0, cold = 0.25, fire = -0.25 }
+protected = ["poison"]
+vulnerable = ["fire"]
+armor = 3
+boss = false
 
 [drowned]
 name = "The Drowned"
@@ -196,7 +243,10 @@ door_dps = 2.0
 size = 0.85
 movement = "wander"
 flying = false
-resist = { cold = 0.5, poison = 0.5, lightning = -0.25 }
+protected = ["cold"]
+vulnerable = ["lightning"]
+armor = 0
+boss = false
 
 [fetish]
 name = "Fetish Shaman"
@@ -208,7 +258,10 @@ door_dps = 1.0
 size = 0.6
 movement = "direct"
 flying = false
-resist = { fire = 0.25 }
+protected = ["fire"]
+vulnerable = []
+armor = 0
+boss = false
 leader = { curses = ["weaken"], cooldown = 9.0, raises = "flayer" }
 
 [inquisitor]
@@ -221,7 +274,10 @@ door_dps = 1.0
 size = 0.9
 movement = "direct"
 flying = false
-resist = { lightning = 0.4, fire = 0.25 }
+protected = ["lightning", "fire"]
+vulnerable = []
+armor = 0
+boss = false
 leader = { curses = ["weaken", "dim_vision"], cooldown = 12.0, mark = 1.5 }
 
 [bone_priest]
@@ -229,10 +285,12 @@ name = "The Bone Priest"
 life = 24.0
 speed = 0.45
 bounty = 0
-lives = 20
 door_dps = 14.0
 size = 1.6
 movement = "direct"
 flying = false
-resist = { poison = 1.0, cold = 0.25, fire = 0.25, lightning = 0.25 }
+protected = ["poison", "cold", "fire", "lightning"]
+vulnerable = []
+armor = 3
+boss = true
 leader = { curses = ["bone_prison", "weaken", "decrepify", "dim_vision"], cast_range = 6.0, cooldown = 8.0, widen = 1.0, burn = 5.0 }

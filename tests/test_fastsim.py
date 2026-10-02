@@ -112,6 +112,10 @@ def busy_world() -> World:
             if world.level.buildable(x, y)]
     towers = [world.build(kind, tile) for kind, tile in zip(
         ("arrow", "pyre", "storm", "frost", "plague", "altar", "grove"), free)]
+    gx, gy = world.level.doors[0]
+    by_gate = sorted((t for t in free if t not in {u.tile for u in towers}),
+                     key=lambda t: ((t[0] - gx) ** 2 + (t[1] - gy) ** 2, t))
+    towers += [world.build(kind, tile) for kind, tile in zip(("knife", "hook", "ballista"), by_gate)]
     world.build_door(0)
     spec = world.breach_spec
     assert spec is not None
@@ -136,7 +140,13 @@ def busy_world() -> World:
     leader = Monster(world._id(), priest, world.wave, 0.0, 0.0, priest.hp * 4, priest.leader.first_cast)
     leader.s = batterer.s + 1
     world.monsters.append(leader)
-    world.wave_alive[world.wave] += 2
+    boss = Monster(world._id(), MONSTERS["bone_priest"], world.wave, 0.0, 0.0, 10_000.0, 30.0)
+    boss.s = world.level.route(boss.route).length - 0.2   # about to strike the shrine and walk again
+    boss.strikes = 1
+    batterer.moved = 1   # hooked once already
+    world.monsters.append(boss)
+    world.monsters.sort(key=world.remaining)
+    world.wave_alive[world.wave] += 3
     world.doors[0].hp -= 1.0
     world.bolts.append(Bolt(world._id(), towers[0].id, "arrow", leader.id, 0.4,
                             towers[0].stats.damage, Element.PHYSICAL, 0.0, 0.0, 0.0,
@@ -152,9 +162,9 @@ def busy_world() -> World:
     batterer.door = 0
     towers[0].curses[Curse.DECREPIFY] = 5.0
     towers[1].curses[Curse.BONE_PRISON] = 3.0
-    towers[2].ward = 4.0
+    towers[2].hymn = 4.0
     leader.chant_curse, leader.chant_spot, leader.chant_left = Curse.WEAKEN, towers[3].tile, 0.8
-    towers[-1].timer = 3.5
+    next(t for t in towers if t.kind.key == "grove").timer = 3.5
     for m in world.monsters[:3]:
         m.amplified, m.amplify = 2.0, 0.3
     return world
@@ -173,6 +183,8 @@ def test_a_clone_steps_as_its_world() -> None:
     ``clone()`` or a ``copy()`` forgets shows here, since the state is read from every attribute there is."""
     world = busy_world()
     assert world.meteors and world.hazards and world.bolts and world.schedule and world.breach_opened
+    assert any(t.hymn > 0 for t in world.towers.values())
+    assert any(m.moved for m in world.monsters) and any(m.strikes for m in world.monsters)
     assert any(m.frozen > 0 for m in world.monsters) and any(m.door >= 0 for m in world.monsters)
     assert any(d.built and d.hp < world.gate_life for d in world.doors)
     world.record = False

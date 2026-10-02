@@ -1,7 +1,8 @@
 # Every tower kind, with one value per rank in each list. price is a role factor on the gold unit (rank prices follow
 # economy.rank_cost_units); damage_role multiplies the Arrow's hit at that rank (economy.arrow_hit + rank), while
-# damage lists a support tower's fraction directly. rate is attacks per second; range in tiles.
-# attack: "bolt", "chain", "nova", "venom", "amplify" or "aura". bolt_speed in tiles per second.
+# damage lists a hit directly, or a support tower's fraction. rate is attacks per second; range in tiles.
+# attack: "bolt", "chain", "nova", "venom", "hook", "amplify" or "aura". bolt_speed in tiles per second.
+# Physical towers share the Steel column's rank skills (hellward/sim/skills.py).
 
 [arrow]
 name = "Arrow Tower"
@@ -14,12 +15,46 @@ range = [2.8, 3.0, 3.2]
 bolt_speed = 12.0
 blurb = "Fires one arrow at the monster closest to the sanctuary."
 
+[ballista]
+name = "Ballista"
+element = "physical"
+attack = "bolt"
+price = 1.5
+damage = [7.0, 10.0, 14.0]          # its hit: armor takes as much off a heavy bolt as off an arrow
+rate = [0.4, 0.42, 0.45]
+range = [3.2, 3.4, 3.6]
+bolt_speed = 14.0
+blurb = "Looses a heavy bolt, slowly, at the monster closest to the sanctuary: armor takes little from a hit this big."
+
+[hook]
+name = "Hook Tower"
+element = "physical"
+attack = "hook"
+price = 1.5
+damage = [3.0, 4.0, 5.0]
+rate = [0.16666666666666666, 0.2, 0.25]   # a hook every 6, 5 and 4 seconds, while it has a monster to hook
+range = [2.8, 3.0, 3.2]
+bolt_speed = 9.0                    # unused: the chain strikes at once
+blurb = "Hooks the foremost small monster past it and drags it two tiles back, flyers too. Never the same monster twice, never one at a gate."
+
+[knife]
+name = "Knife Post"
+element = "physical"
+attack = "bolt"
+price = 1.0
+damage = [2.0, 3.0, 4.0]
+rate = [0.8, 0.85, 0.9]
+range = [2.6, 2.8, 3.0]
+bolt_speed = 11.0
+blurb = "Throws at a small monster standing at a gate or held, if one is in reach, twice as hard; otherwise at the foremost."
+
 [pyre]
 name = "Pyre"
 element = "fire"
 attack = "bolt"
 price = 1.5
-damage_role = 1.5
+damage = [3.0, 4.0, 5.0]            # by one a rank: a bigger jump would make rank III worth more per gold than a new
+                                    # Pyre against armor (design-criteria R3)
 rate = [1.0, 1.0, 1.05]
 range = [3.0, 3.2, 3.4]
 bolt_speed = 8.0
@@ -31,7 +66,7 @@ element = "lightning"
 attack = "chain"
 price = 1.7
 damage_role = 1.5
-rate = [1.2, 1.3, 1.4]
+rate = [1.2, 1.3, 1.3]              # rank III's bigger hit is its gain; a faster one too would beat a new Obelisk (R3)
 range = [2.8, 3.0, 3.2]
 bolt_speed = 9.0
 blurb = "Strikes one enemy with lightning; a forged coil can later make it leap."
@@ -41,7 +76,7 @@ name = "Frost Shrine"
 element = "cold"
 attack = "bolt"
 price = 1.4
-damage_role = 0.5
+damage = [1.0, 1.0, 1.0]            # its ranks deepen the chill; a harder hit would beat a new Shrine per gold (R3)
 rate = [0.6, 0.65, 0.7]
 range = [2.0, 2.2, 2.4]
 chill = [0.35, 0.45, 0.55]          # slow a chill applies (0.4 = 40% slower, and 40% weaker blows on gates)
@@ -54,13 +89,13 @@ name = "Plague Totem"
 element = "poison"
 attack = "venom"
 price = 1.5
-damage_role = 0.5
-poison_role = 0.5                   # damage per second of one venom stack, on the Arrow's scale
+damage = [1.0, 1.0, 1.0]
+poison = [1.0, 1.5, 2.0]            # damage per second of one venom stack (damage over time is not rounded)
 poison_time = [4.0, 4.0, 4.5]
 rate = [0.8, 0.85, 0.9]
 range = [3.0, 3.2, 3.4]
 bolt_speed = 7.0
-blurb = "Venom seeks the strongest monster it can poison; poison stacks up to four times."
+blurb = "Venom seeks the strongest monster in reach; poison stacks up to four times."
 
 [altar]
 name = "Bone Altar"

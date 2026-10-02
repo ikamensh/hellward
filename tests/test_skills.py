@@ -40,15 +40,15 @@ def test_a_skill_needs_the_one_above_it_and_enough_sigils():
     assert can_learn(frozenset({"adept_fire", "master_fire"}), "fire_ball", 5, stage=8)
     with pytest.raises(ValueError):
         check(frozenset({"blaze", "adept_fire"}))
-    assert TREE_COST == 65
 
 
-def test_the_tree_costs_sixty_five_with_a_small_arrow_column():
-    assert TREE_COST == 65
+def test_the_tree_costs_sixty_three_with_a_small_steel_column():
+    assert TREE_COST == 63
+    assert COLUMNS["arrow"] == "Steel"
     assert sum(s.cost for s in SKILLS.values() if s.column == "arrow") == 5
     for column in ("fire", "lightning", "cold", "poison", "bone", "nature"):
         assert sum(s.cost for s in SKILLS.values() if s.column == column) == 8
-    assert sum(s.cost for s in SKILLS.values() if s.column == "warding") == 6
+    assert sum(s.cost for s in SKILLS.values() if s.column == "warding") == 4
     assert sum(s.cost for s in SKILLS.values() if s.column == "sorcery") == 6
     assert COLUMNS.keys() >= {"fire", "lightning", "cold", "poison", "bone", "nature", "warding", "sorcery"}
 
@@ -124,7 +124,7 @@ def test_holy_shield_and_thorns_make_a_gate_hold_more_life_and_hurt_its_batterer
         return world.doors[0].hp, sum(m.hp for m in world.monsters)
     plain_gate, plain_life = gate(())
     shield_gate, shield_life = gate(("holy_shield",))
-    thorn_gate, thorn_life = gate(("holy_shield", "salvation", "thorns"))
+    thorn_gate, thorn_life = gate(("holy_shield", "thorns"))
     assert shield_gate > plain_gate
     assert thorn_gate >= shield_gate
     assert thorn_life < shield_life <= plain_life
@@ -163,7 +163,7 @@ def test_shatter_hurts_the_neighbours_of_a_monster_that_dies_chilled():
     assert chilled[0] < plain[0] and chilled[1] == 1 and plain[1] == 0
 
 
-def test_contagion_carries_venom_to_the_next_monster_and_lower_resist_opens_it_up():
+def test_contagion_carries_venom_to_the_next_monster_and_lower_resist_strips_its_protections():
     learned = ("adept_poison", "master_poison", "lower_resist", "contagion")
     world = world_of(g("fallen", 6, 0.2), learned=learned)
     plague, pyre = best(world, 2)
@@ -176,14 +176,14 @@ def test_contagion_carries_venom_to_the_next_monster_and_lower_resist_opens_it_u
     goatman.call_wave()
     run(goatman, 1)
     m = goatman.monsters[0]
-    before = goatman.taken(m, Element.LIGHTNING)
+    assert goatman.taken(m, Element.LIGHTNING) < 1.0   # protected
     m.poison.append([1.0, 5.0])
-    assert goatman.taken(m, Element.LIGHTNING) == pytest.approx(before + 0.25)
-    skeleton = world_of(g("skeleton", 1), learned=learned)
-    skeleton.call_wave()
-    run(skeleton, 1)
-    skeleton.monsters[0].poison.append([1.0, 5.0])
-    assert skeleton.taken(skeleton.monsters[0], Element.POISON) == 0   # immunities hold
+    assert goatman.taken(m, Element.LIGHTNING) == 1.0
+    zombie = world_of(g("zombie", 1), learned=learned)
+    zombie.call_wave()
+    run(zombie, 1)
+    zombie.monsters[0].poison.append([1.0, 5.0])
+    assert zombie.taken(zombie.monsters[0], Element.FIRE) > 1.0   # a vulnerability stays
 
 
 def test_sorcery_fills_the_orb_faster_and_cheapens_the_spells():
@@ -193,8 +193,8 @@ def test_sorcery_fills_the_orb_faster_and_cheapens_the_spells():
         run(w, 10)
     assert warm.mana > plain.mana
     mastered = world_of(g("fallen", 1), learned=("warmth", "soul_harvest", "spell_mastery"))
-    assert mastered.spell_cost("meteor") < plain.spell_cost("meteor")
-    assert mastered.spell_cost("cleanse") == plain.spell_cost("cleanse")
+    for spell in ("smite", "hymn", "meteor", "orb"):
+        assert mastered.spell_cost(spell) < plain.spell_cost(spell)
 
 
 def test_soul_harvest_pays_mana_for_a_slain_leader():
