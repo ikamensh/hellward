@@ -13,7 +13,7 @@ signal connected                      # the server answers requests
 signal failed(why: String)            # the server stopped or said something this client cannot follow
 signal frame(message: Dictionary)     # a battle step, or what an order did
 
-const PROTOCOL := 1
+const PROTOCOL := 2
 
 var is_ready := false
 var compiled := false
@@ -177,7 +177,7 @@ func ask(kind: String, args := {}) -> Pending:
 	return p
 
 
-## A battle order (build, upgrade, sell, cleanse, smite, smite_threat, meteor, orb, gate, call_wave, breach,
+## A battle order (build, upgrade, sell, smite, hymn, meteor, orb, gate, call_wave, breach,
 ## sell_salvage, pause): its frame arrives on `frame`, then the reply says whether it was accepted and why not.
 func order(name: String, args := {}) -> Pending:
 	var a := args.duplicate()

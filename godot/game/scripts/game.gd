@@ -15,7 +15,7 @@ const MAIN := "res://scenes/main.tscn"
 # a won defence's reckoning as the server sends it, for `screen=reckoning` captures
 const SAMPLE_RECKONING := {"won": true, "title": "The Sanctuary Holds", "location": "Tristram", "earned": 2, "gained": 2,
 	"lines": ["Waves withstood: 5 of 5", "Monsters slain: 118", "Life kept: 14 of 20",
-		"Curses the leaders laid on your towers: 4. You cleansed 3 and broke 0 before they landed."],
+		"Curses the leaders laid on your towers: 4."],
 	"note": "2 new sigils: spend them on skills.", "extra": [["holy", "The way down to the Graveyard is open."],
 		["gold", "+2 salvage banked for the tower forge."]]}
 

@@ -16,11 +16,12 @@ from enum import Enum
 from typing import Any
 
 from hellward.sim.campaign import Location
-from hellward.sim.content import CURSES, MONSTERS, SELL_REFUND, SPELLS, TOWERS
+from hellward.sim.content import CURSES, MONSTERS, SELL_REFUND, SPELLS, TOWERS, MonsterKind, felt_hit
 from hellward.sim.model import SIM_DT, Bolt, Monster, Tower, World
 
 # monster flags, one bit each
-PONDERING, CHANTING, MARKING, RESOLUTE, AMPLIFIED = 1, 2, 4, 8, 16
+PONDERING, CHANTING, MARKING, AMPLIFIED = 1, 2, 4, 8
+HITLESS = ("amplify", "aura")   # tower attacks that strike no blow of their own
 
 
 def plain(value: Any) -> Any:
@@ -66,24 +67,23 @@ def tower_facts(t: Tower) -> dict:
 
 
 def monsters(world: World) -> list[list]:
-    """Every monster on the map: [id, s, hp, flags, chill, frozen, poison stacks, door]."""
+    """Every monster on the map: [id, s, hp, flags, chill, frozen, poison stacks, door, moved (the movers' bits)]."""
     out = []
     for m in world.monsters:
         flags = ((PONDERING if m.asking is not None else 0) | (CHANTING if m.chant_curse is not None else 0)
-                 | (MARKING if m.marking else 0) | (RESOLUTE if m.resolute else 0)
-                 | (AMPLIFIED if m.amplified > 0 else 0))
+                 | (MARKING if m.marking else 0) | (AMPLIFIED if m.amplified > 0 else 0))
         out.append([m.id, round(m.s, 4), round(m.hp, 2), flags, round(m.chill if m.chill_left > 0 else 0.0, 3),
-                    round(m.frozen, 2), len(m.poison), m.door])
+                    round(m.frozen, 2), len(m.poison), m.door, m.moved])
     return out
 
 
 def towers(world: World) -> list[list]:
-    """Every tower: [id, level, reach, curses {curse: seconds left}, ward, upgrade cost or None, what the next rank
-    needs or None, refund]."""
+    """Every tower: [id, level, reach, curses {curse: seconds left}, Battle Hymn's seconds left, upgrade cost or None,
+    what the next rank needs or None, refund]."""
     out = []
     for t in world.towers.values():
         out.append([t.id, t.level, round(t.reach, 3), {c.value: round(left, 2) for c, left in t.curses.items()},
-                    round(t.ward, 2), world.upgrade_cost(t), world.rank_needs(t), refund(t)])
+                    round(t.hymn, 2), world.upgrade_cost(t), world.rank_needs(t), refund(t)])
     return out
 
 
@@ -152,11 +152,12 @@ def battle_start(world: World, *, demo: bool, breach_claim: str | None) -> dict:
         "arsenal": {"towers": list(location.arsenal.towers), "gates": location.arsenal.gates,
                     "spells": list(location.arsenal.spells)},
         "towers": {kind: tower_table(world, kind) for kind in location.arsenal.towers},
-        "monsters": {kind: monster_table(kind) for kind in kinds},
+        "monsters": {kind: monster_table(world, kind) for kind in kinds},
         "curses": {c.value: {"name": s.name, "duration": s.duration, "radius": s.radius, "blurb": s.blurb}
                    for c, s in CURSES.items()},
         "spells": {key: {"name": s.name, "aim": s.aim, "blurb": s.blurb, "radius": s.radius, "delay": s.delay,
-                         "recharge": s.recharge} for key, s in SPELLS.items() if key in location.arsenal.spells},
+                         "lasting": s.lasting, "recharge": s.recharge}
+                   for key, s in SPELLS.items() if key in location.arsenal.spells},
         "gate": {"life": world.gate_life, "blurb": "Bars an arch: walkers must break it; flyers pass over."}
         if location.arsenal.gates else None,
         "breach": None if world.breach_spec is None else breach_table(world, breach_claim),
@@ -175,7 +176,7 @@ def tower_table(world: World, kind: str) -> dict:
                        for lv in world.tower_levels[kind]]}
 
 
-def monster_table(kind: str) -> dict:
+def monster_table(world: World, kind: str) -> dict:
     m = MONSTERS[kind]
     leader = None
     if m.leader is not None:
@@ -183,8 +184,20 @@ def monster_table(kind: str) -> dict:
                   "channel": m.leader.channel, "mark": m.leader.mark, "raises": m.leader.raises,
                   "widen": m.leader.widen}
     return {"name": m.name, "hp": m.hp, "speed": m.speed, "bounty": m.bounty, "lives": m.lives, "size": m.size,
-            "flying": m.flying, "movement": m.movement, "resist": {e.value: v for e, v in m.resist.items()},
-            "leader": leader}
+            "flying": m.flying, "movement": m.movement, "armor": m.armor,
+            "protected": [e.value for e in m.protected], "vulnerable": [e.value for e in m.vulnerable],
+            "boss": m.boss, "hits": hits(world, m), "leader": leader}
+
+
+def hits(world: World, kind: MonsterKind) -> dict[str, list[int]]:
+    """The hit each rank of every tower offered here that strikes blows deals this kind, as the monster feels it
+    (its armor and tags, no other factor): the hover's table, by the simulation's own reckoning."""
+    out = {}
+    for key in world.location.arsenal.towers:
+        tower = TOWERS[key]
+        if tower.attack not in HITLESS:
+            out[key] = [felt_hit(lv.damage, tower.element, kind) for lv in world.tower_levels[key]]
+    return out
 
 
 def breach_table(world: World, claim: str | None) -> dict:

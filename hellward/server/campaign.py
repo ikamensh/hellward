@@ -14,6 +14,7 @@ from pathlib import Path
 from hellward.server.battle import Battle
 from hellward.server.progress import Progress, campaign_profiles, slot_for_profile
 from hellward.server.saves import Saves
+from hellward.sim import tuning
 from hellward.sim.breaches import BREACHES
 from hellward.sim.campaign import (
     ACT_ENDS, ACT_NAMES, ACTS, CATHEDRAL, LOCATIONS, ORDER, SIGIL_LIVES, Location, idle, offers, sigils,
@@ -27,10 +28,12 @@ from hellward.sim.players.hands import Player
 from hellward.sim.skills import COLUMNS, SKILLS, above, can_learn, perks
 from hellward.story import LAST_PAGES, STORIES, Story
 
-ARSENAL = ("arrow", "pyre", "storm", "frost", "plague", "altar", "grove", "gate", "cleanse", "smite", "meteor", "orb")
+ARSENAL = ("arrow", "ballista", "hook", "knife", "pyre", "storm", "frost", "plague", "altar", "grove", "gate", "smite",
+           "hymn", "meteor", "orb")
 ELEMENT_NAMES = {Element.PHYSICAL: "Physical", Element.FIRE: "Fire", Element.LIGHTNING: "Lightning",
                  Element.COLD: "Cold", Element.POISON: "Poison", Element.BONE: "Bone", Element.NATURE: "Nature"}
 NAME_LIMIT = 24
+BOSS_STRIKE_LIVES = tuning.integer("battle.boss_strike_lives")
 
 
 class Refusal(Exception):
@@ -167,22 +170,19 @@ class Campaign:
                 if spec.raises:
                     notes.append(f"Raises fallen {MONSTERS[spec.raises].name}s")
                 if spec.mark > 0:
-                    notes.append(f"Marks its spot {spec.mark:g} s ahead: no chant, nothing breaks it")
+                    notes.append(f"Marks its spot {spec.mark:g} s before the curse lands")
                 if spec.burn > 0:
                     notes.append(f"Each curse burns {spec.burn:g} mana per tower caught")
             host.append({"kind": key, "name": kind.name, "leader": kind.leader is not None,
-                         "line": f"{life:.0f} life, {pace}{lives}", "notes": ", ".join(notes) or "No resistances"})
+                         "line": f"{life:.0f} life, {pace}{lives}", "notes": ", ".join(notes) or "Unarmored, no tags"})
         curses: list[Curse] = []
         for key in loc.monsters:
             spec = MONSTERS[key].leader
             if spec is not None:
                 curses += [c for c in spec.curses if c not in curses]
-        answers = []
+        answers = ["spread your towers, so one curse catches few", "kill the leader before it curses"]
         if offers(loc, "smite"):
-            answers.append("Smite (Q) the leader while it ponders or chants")
-        if offers(loc, "orb"):
-            answers.append("freeze it with the Frozen Orb")
-        answers.append("Cleanse (C) lifts a curse that has landed")
+            answers.append("Smite (Q) strikes it anywhere")
         previous = LOCATIONS[ORDER[index - 1]] if index > 0 else None
         learned = perks(p.learned, index)
         arsenal = []
@@ -381,8 +381,7 @@ class Campaign:
         lines = [f"Waves withstood: {world.wave + (1 if won else 0)} of {len(world.waves)}",
                  f"Monsters slain: {world.kills}",
                  f"Life kept: {world.lives} of {START_LIVES}",
-                 f"Curses the leaders laid on your towers: {world.curses_landed}. You cleansed {world.cleanses} "
-                 f"and broke {world.chants_broken} before they landed."]
+                 f"Curses the leaders laid on your towers: {world.curses_landed}."]
         if won:
             gained = reward.sigils
             note = (f"{gained} new sigil{'s' if gained > 1 else ''}: spend {'them' if gained > 1 else 'it'} on skills."
@@ -438,16 +437,14 @@ def story(tale: Story) -> dict:
 
 
 def monster_notes(kind: MonsterKind) -> list[str]:
-    """What a monster resists, in Diablo's words, and whether it flies."""
+    """A monster's armor and element tags, whether it flies, and a boss's strike on the shrine."""
     notes = []
-    for element in Element:
-        r = kind.resist.get(element, 0.0)
-        if r >= 1:
-            notes.append(f"Immune to {ELEMENT_NAMES[element]}")
-        elif r > 0:
-            notes.append(f"Resists {ELEMENT_NAMES[element]}")
-        elif r < 0:
-            notes.append(f"Weak to {ELEMENT_NAMES[element]}")
+    if kind.armor:
+        notes.append(f"Armor {kind.armor}")
+    notes += [f"Protected from {ELEMENT_NAMES[e]}" for e in kind.protected]
+    notes += [f"Vulnerable to {ELEMENT_NAMES[e]}" for e in kind.vulnerable]
     if kind.flying:
         notes.append("Flies over gates")
+    if kind.boss:
+        notes.append(f"Strikes the shrine for {BOSS_STRIKE_LIVES} lives, then walks again")
     return notes

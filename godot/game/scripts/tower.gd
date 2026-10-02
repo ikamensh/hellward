@@ -1,15 +1,17 @@
 class_name Tower
 extends Node3D
-## A tower as the server plays it: built, raised a rank, cursed, cleansed and sold by events; its shots are the
-## server's too (a bolt with its flight time, a chain of lightning, a nova), shown from its muzzle. It turns to
-## face what it last shot at.
+## A tower as the server plays it: built, raised a rank, cursed, quickened by Battle Hymn and sold by events; its
+## shots are the server's too (a bolt with its flight time, a chain of lightning, a nova, a hook on its chain),
+## shown from its muzzle. It turns to face what it last shot at.
 
-const NAMES := {"arrow": "Arrow Tower", "pyre": "Pyre", "frost": "Frost Shrine", "storm": "Storm Obelisk",
-	"plague": "Plague Totem", "altar": "Bone Altar", "grove": "Druid Grove"}
 # a family without a model of its own wears another's, tinted, until it has one
 const STAND_INS := {}   # kind -> [the model it borrows, its tint], while its own is not built
-const LOOKS := {"arrow": "arrow", "pyre": "fire", "frost": "frost", "plague": "frost", "altar": "fire", "grove": "fire"}
-const CASTS := {"arrow": "arrow_cast", "pyre": "fire_cast", "plague": "venom_cast", "altar": "fire_cast"}
+const LOOKS := {"arrow": "arrow", "ballista": "ballista", "knife": "knife", "pyre": "fire", "frost": "frost",
+	"plague": "frost", "altar": "fire", "grove": "fire"}
+const CASTS := {"arrow": "arrow_cast", "ballista": "ballista_cast", "knife": "knife_cast", "pyre": "fire_cast",
+	"plague": "venom_cast", "altar": "fire_cast"}
+const PHYSICAL := ["arrow", "ballista", "hook", "knife"]   # no fire or glow of their own: a lantern lights them
+const HYMN := Color(1.0, 0.78, 0.3)  # Battle Hymn's gold
 
 var world: World
 var id := 0
@@ -19,7 +21,7 @@ var rank := 0
 var spent := 0
 var curses := {}                     # curse -> seconds left, from the server
 var reach := 0.0                     # tiles
-var ward := 0.0
+var hymn := 0.0                      # Battle Hymn's seconds left, from the server
 var upgrade_cost = null              # int, or null at the top rank
 var needs = null                     # the skill the next rank needs, or null
 var refund := 0
@@ -34,6 +36,7 @@ var _overlay: ShaderMaterial
 var _curse_fx: Node3D
 var _t := 0.0
 var _aim: Node3D
+var _aura: Node3D                    # Battle Hymn's gold round it while the hymn lasts
 
 
 func setup(w: World, ident: int, facts: Dictionary) -> void:
@@ -69,7 +72,7 @@ static func ranked(model: String) -> bool:
 
 
 func title() -> String:
-	return NAMES.get(kind, kind.capitalize())
+	return String(world.tower_table(kind)["name"])
 
 
 func level() -> Dictionary:
@@ -109,15 +112,16 @@ func _dress() -> void:
 	for mi in _model.find_children("*", "MeshInstance3D", true, false):
 		(mi as MeshInstance3D).material_overlay = _overlay
 		(mi as MeshInstance3D).layers = 2   # decals (cull_mask 1) never land on a tower
-	if kind == "arrow":   # the others carry their own fire or glow
+	if kind in PHYSICAL:   # the others carry their own fire or glow
 		var lantern := OmniLight3D.new()
 		lantern.light_color = Color(1.0, 0.75, 0.45)
 		lantern.light_energy = 1.2 + 0.4 * rank
 		lantern.omni_range = 5.0
-		lantern.position = Vector3(0, 4.2, 0)
+		lantern.position = Vector3(0, minf(Hud._bounds(_model).end.y * 0.85, 4.2), 0)
 		_model.add_child(lantern)
 	dress_fx(_model, kind, rank)
 	_overlay.set_shader_parameter("curse", 1.0 if cursed() else 0.0)
+	_overlay.set_shader_parameter("hymn", 1.0 if hymn > 0.0 else 0.0)
 
 
 ## A tower model's own fire and glow: the Pyre's flame, the shrine's and the obelisk's light. The HUD's
@@ -160,14 +164,77 @@ static func dress_fx(model: Node3D, kind: String, rank: int) -> void:
 			(crystal if crystal else Models.node(model, "fx_muzzle")).add_child(light)
 
 
-## The server's word on it this step: [id, level, reach, curses, ward, upgrade cost, needs, refund].
+## The server's word on it this step: [id, level, reach, curses, Battle Hymn's seconds left, upgrade cost, needs,
+## refund].
 func sync(entry: Array) -> void:
 	reach = float(entry[2])
 	curses = entry[3]
-	ward = float(entry[4])
+	hymn = float(entry[4])
 	upgrade_cost = entry[5]
 	needs = entry[6]
 	refund = int(entry[7])
+	_sing(hymn > 0.0)
+
+
+## Battle Hymn falls on it: a ring of gold bursts from its foot (the aura follows the server's seconds, `sync`).
+func hymned() -> void:
+	Vfx.burst(world, global_position + Vector3(0, 2.0, 0), HYMN, 50)
+	Vfx.impact(world, global_position + Vector3(0, 0.4, 0), HYMN, 40)
+	_sing(true)
+
+
+## The hymn's aura: a gold rim pulsing on the tower at the doubled tempo, gold motes rising round it, a gold ring
+## turning at its foot, a warm light.
+func _sing(on: bool) -> void:
+	_overlay.set_shader_parameter("hymn", 1.0 if on else 0.0)
+	if on == is_instance_valid(_aura):
+		return
+	if not on:
+		var fading := _aura
+		_aura = null
+		for p in fading.find_children("*", "GPUParticles3D", true, false):
+			(p as GPUParticles3D).emitting = false
+		var tw := fading.create_tween()
+		tw.tween_property(fading.get_node("Light"), "light_energy", 0.0, 0.6)
+		tw.tween_interval(1.4)
+		tw.tween_callback(fading.queue_free)
+		return
+	_aura = Node3D.new()
+	add_child(_aura)
+	var top := Hud._bounds(_model).end.y
+	var motes := Fx.shed(HYMN, 60, 0.12, 1.6, -1.2)
+	var pm := motes.process_material as ParticleProcessMaterial
+	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
+	pm.emission_ring_axis = Vector3.UP
+	pm.emission_ring_radius = 1.3
+	pm.emission_ring_inner_radius = 0.9
+	pm.emission_ring_height = 0.3
+	pm.initial_velocity_min = 0.6
+	pm.initial_velocity_max = 1.4
+	motes.local_coords = true
+	motes.position = Vector3(0, 0.3, 0)
+	motes.emitting = true
+	_aura.add_child(motes)
+	var ring := MeshInstance3D.new()
+	var plane := PlaneMesh.new()
+	plane.size = Vector2(3.4, 3.4)
+	ring.mesh = plane
+	var rm := ShaderMaterial.new()
+	rm.shader = preload("res://shaders/ring.gdshader")
+	rm.set_shader_parameter("radius", 1.45)
+	rm.set_shader_parameter("color", Color(HYMN, 1.0))
+	ring.material_override = rm
+	ring.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	ring.position.y = 0.1
+	_aura.add_child(ring)
+	ring.create_tween().set_loops().tween_property(ring, "rotation:y", TAU, 6.0).from(0.0)
+	var light := OmniLight3D.new()
+	light.name = "Light"
+	light.light_color = HYMN
+	light.light_energy = 2.4
+	light.omni_range = 6.0
+	light.position = Vector3(0, top * 0.6, 0)
+	_aura.add_child(light)
 
 
 func promote(to: int, total: int) -> void:
@@ -234,7 +301,7 @@ func fire(bolt: Dictionary, target: Monster) -> void:
 	var speed := muzzle().distance_to(to) / flight
 	if CASTS.has(kind):
 		Sfx.play(CASTS[kind], muzzle())
-	if look == "arrow" and _turret:
+	if look in ["arrow", "ballista", "knife"] and _turret:
 		var kick := create_tween()
 		kick.tween_property(_turret, "scale", Vector3(1.0, 1.0, 0.92), 0.05)
 		kick.tween_property(_turret, "scale", Vector3.ONE, 0.25)
@@ -250,6 +317,13 @@ static func impact(w: World, bolt: Dictionary, at: Vector3, target: Monster) -> 
 		"arrow":
 			Sfx.play("arrow_hit", where)
 			Vfx.impact(w, where, Color(1.0, 0.85, 0.6), 12)
+		"ballista":   # an iron head driven home: a spray of sparks and splinters, dust off the body
+			Sfx.play("ballista_hit", where)
+			Vfx.impact(w, where, Color(1.0, 0.8, 0.5), 34)
+			Vfx.dust(w, where - Vector3(0, 1.0, 0), 0.5, Color(0.45, 0.38, 0.3))
+		"knife":
+			Sfx.play("knife_hit", where)
+			Vfx.impact(w, where, Color(0.85, 0.9, 1.0), 10)
 		"fire":
 			Sfx.play("fireball" if splash else "fire_hit", where)
 			Vfx.explosion(w, where, Color(1.0, 0.45, 0.1), splash)
@@ -259,6 +333,22 @@ static func impact(w: World, bolt: Dictionary, at: Vector3, target: Monster) -> 
 				Vfx.burst(w, where, Color(0.5, 0.9, 0.2), 24)
 			else:
 				Vfx.frost_burst(w, where)
+
+
+## A hook thrown at a monster the server has already hauled back from `from_s`: the hook hanging from the crane
+## flies out on its chain, bites, drags it back over Monster.DRAG and is reeled in.
+func hook(target: Monster, from_s: float) -> void:
+	_threat += float(level()["damage"])
+	_aim = target
+	target.drag(from_s)
+	var hanging := Models.node(_model, "hook")   # the crane's own hook, hung from its sheave
+	Chain.throw(world, hanging if hanging else (_muzzle if _muzzle else self), target)
+	Sfx.play("hook", muzzle())
+	if hanging:
+		hanging.visible = false
+		get_tree().create_timer(Monster.HOOK_FLIGHT + Monster.DRAG + Chain.RETRACT).timeout.connect(func():
+			if is_instance_valid(hanging):
+				hanging.visible = true)
 
 
 ## Lightning through the points of a chain, from the muzzle.

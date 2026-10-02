@@ -97,7 +97,11 @@ SINGLE = {
                        "the image wide. Realistic weathered marble sculpture, cool light from the upper right. The "
                        "round opening inside the ring is empty, flat pure green #00FF00, and the whole background "
                        "around the object is the same flat pure green #00FF00. No cast shadow, no text.", "square"),
-    "cleanse": ("A single game ability icon, centred, filling most of the square: a small ornate silver reliquary "
+    "hymn": ("A single game ability icon, centred, filling most of the square: an old war horn of yellowed ivory "
+             "bound in gold, raised and sounding, a stream of golden light and drifting golden motes pouring from its "
+             "bell, a faint halo behind it. Painterly dark-fantasy style. The whole background is flat pure green "
+             "#00FF00. No cast shadow, no text.", "square"),
+    "holy": ("A single game ability icon, centred, filling most of the square: a small ornate silver reliquary "
                 "cross set with a pale blue gem, wreathed in soft golden-white holy light and a few drifting motes, "
                 "violet wisps of a curse dissolving away from it. Painterly dark-fantasy style. The whole background "
                 "is flat pure green #00FF00. No cast shadow, no text.", "square"),

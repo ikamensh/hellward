@@ -78,7 +78,7 @@ def ui() -> None:
     UI.mkdir(parents=True, exist_ok=True)
     for name in ("orb_life_frame", "orb_mana_frame"):
         ui_frame(name, 768)
-    for name in ("coin", "cleanse", "smite", "meteor", "orb"):
+    for name in ("coin", "holy", "smite", "hymn", "meteor", "orb"):
         ui_icon(name, 256)
     Image.open(SRC / "icon.png").convert("RGB").resize((1024, 1024), Image.LANCZOS).save(UI / "icon.png")
     print("ui icon")

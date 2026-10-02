@@ -1,7 +1,7 @@
 class_name Bolt
 extends Node3D
-## A missile homing on a monster: a ballista bolt, a firebolt or a frost shard, drawing a streak of light behind
-## it. When it arrives it calls `on_hit` with the monster (null if the monster died on the way) and the point it
+## A missile homing on a monster: an arrow, a ballista's heavy bolt, a knife spinning end over end, a firebolt or
+## a frost shard, drawing a streak of light behind it. When it arrives it calls `on_hit` with the monster (null if the monster died on the way) and the point it
 ## reached; its streak then shrinks into that point before the bolt is freed.
 
 var target: Monster
@@ -19,6 +19,7 @@ var _linger := 0.0
 var _streak_time := 0.1              # seconds of flight the streak spans
 var _streak_width := 0.05            # its half-width at the head, metres
 var _streak_color := Color.WHITE
+var _spin := 0.0                     # turns a second end over end (a thrown knife)
 
 
 static func launch(world: World, look: String, from: Vector3, at: Monster, metres_per_s: float, hit: Callable,
@@ -35,6 +36,8 @@ static func launch(world: World, look: String, from: Vector3, at: Monster, metre
 	b.add_child(b._head)
 	match look:
 		"arrow": b._arrow()
+		"ballista": b._ballista()
+		"knife": b._knife()
 		"fire": b._firebolt()
 		"frost": b._shard()
 	b._streak()
@@ -52,6 +55,8 @@ func _process(delta: float) -> void:
 	else:
 		_fly(delta)
 		_hist.push_front([global_position, _clock])
+		if _spin != 0.0:
+			_head.rotate_object_local(Vector3.RIGHT, -TAU * _spin * delta)
 	_draw_streak()
 
 
@@ -167,6 +172,76 @@ func _arrow() -> void:
 	_streak_time = 0.1
 	_streak_width = 0.07
 	_streak_color = Color(1.0, 0.82, 0.6, 0.8)
+
+
+## A ballista's bolt: a long heavy shaft with an iron head and wooden vanes, a dull streak behind it.
+func _ballista() -> void:
+	_head.scale = Vector3.ONE * 1.6
+	var shaft := MeshInstance3D.new()
+	var cm := CylinderMesh.new()
+	cm.top_radius = 0.07
+	cm.bottom_radius = 0.07
+	cm.height = 1.7
+	shaft.mesh = cm
+	shaft.rotation_degrees.x = 90
+	shaft.material_override = Mats.named("planks")
+	_head.add_child(shaft)
+	var tip := MeshInstance3D.new()
+	var tm := CylinderMesh.new()
+	tm.top_radius = 0.0
+	tm.bottom_radius = 0.16
+	tm.height = 0.42
+	tm.radial_segments = 4
+	tip.mesh = tm
+	tip.rotation_degrees.x = -90
+	tip.position = Vector3(0, 0, -1.05)
+	tip.material_override = Mats.named("iron")
+	_head.add_child(tip)
+	for i in 3:   # three vanes at the tail
+		var vane := MeshInstance3D.new()
+		var vm := BoxMesh.new()
+		vm.size = Vector3(0.02, 0.22, 0.34)
+		vane.mesh = vm
+		vane.material_override = Mats.named("planks")
+		vane.position = Vector3(0, 0, 0.7)
+		vane.rotation.z = TAU * i / 3.0
+		vane.translate_object_local(Vector3(0, 0.12, 0))
+		_head.add_child(vane)
+	_glow(Color(1.2, 0.85, 0.5), 0.3).position = Vector3(0, 0, -1.05)
+	_streak_time = 0.08
+	_streak_width = 0.12
+	_streak_color = Color(0.9, 0.78, 0.6, 0.55)
+
+
+## A thrown knife: a steel blade on a dark grip, turning end over end, a thin cold glint behind it.
+func _knife() -> void:
+	_head.scale = Vector3.ONE * 1.5
+	var blade := MeshInstance3D.new()
+	var bm := PrismMesh.new()
+	bm.size = Vector3(0.1, 0.42, 0.02)
+	blade.mesh = bm
+	blade.position = Vector3(0, 0.16, 0)
+	blade.material_override = Mats.glow(Color(0.75, 0.8, 0.9), 1.5, Color(0.7, 0.72, 0.78))
+	_head.add_child(blade)
+	var grip := MeshInstance3D.new()
+	var gm := BoxMesh.new()
+	gm.size = Vector3(0.05, 0.2, 0.035)
+	grip.mesh = gm
+	grip.position = Vector3(0, -0.13, 0)
+	grip.material_override = Mats.named("planks")
+	_head.add_child(grip)
+	var guard := MeshInstance3D.new()
+	var cm := BoxMesh.new()
+	cm.size = Vector3(0.16, 0.025, 0.04)
+	guard.mesh = cm
+	guard.position = Vector3(0, -0.03, 0)
+	guard.material_override = Mats.named("iron")
+	_head.add_child(guard)
+	_glow(Color(0.9, 1.0, 1.3), 0.4)
+	_spin = 3.2
+	_streak_time = 0.12
+	_streak_width = 0.04
+	_streak_color = Color(0.8, 0.88, 1.0, 0.7)
 
 
 func _firebolt() -> void:

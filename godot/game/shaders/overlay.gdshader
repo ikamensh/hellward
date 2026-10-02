@@ -1,6 +1,6 @@
 shader_type spatial;
 // Drawn over a monster or tower: a rim in the blow's colour when hit, a frost rim when chilled, a violet pulse when
-// cursed, a cool moon rim so dark bodies keep their shape (kinds tell apart by their glowing eyes). With `xray`, the
+// cursed, a quick gold pulse under Battle Hymn, a cool moon rim so dark bodies keep their shape (kinds tell apart by their glowing eyes). With `xray`, the
 // parts of a monster hidden behind a tower or a house show as a faint outline in that colour; parts hidden only by
 // the body's own folds draw nothing.
 render_mode blend_add, unshaded, fog_disabled, depth_draw_never, depth_test_disabled, cull_back;
@@ -9,6 +9,7 @@ uniform float flash = 0.0;
 uniform vec3 flash_color = vec3(1.0, 0.55, 0.35);   // the blow's colour: warm for steel, its element's otherwise
 uniform float chill = 0.0;
 uniform float curse = 0.0;
+uniform float hymn = 0.0;
 uniform vec3 kind_rim = vec3(0.0);
 uniform float xray = 0.0;
 uniform float moonrim = 0.0;   // a cool rim from above at every distance, so dark bodies keep their shape
@@ -38,6 +39,7 @@ void fragment() {
 		vec3 c = flash_color * flash * (0.15 + rim * 1.4);
 		c += vec3(0.25, 0.6, 1.0) * chill * (0.12 + rim * 1.2);
 		c += vec3(0.6, 0.15, 1.0) * curse * (0.08 + rim * 1.6) * pulse;
+		c += vec3(1.0, 0.72, 0.25) * hymn * (0.06 + rim * 1.4) * (0.7 + 0.3 * sin(TIME * 10.0));
 		float up = clamp((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y * 0.6 + 0.4, 0.0, 1.0);
 		c += vec3(0.32, 0.45, 0.75) * moonrim * rim * up;
 		// from the battle camera only: close up the body's own light and maps carry its colour

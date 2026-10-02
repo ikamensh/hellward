@@ -24,7 +24,7 @@ from hellward.sim.balance import BALANCE
 from hellward.sim.campaign import ORDER, Location, first_offering, offers
 from hellward.sim.content import SPELLS
 from hellward.sim.items import EMPTY_LOADOUT, Loadout
-from hellward.sim.model import SIM_DT, Monster, Planner, Refused, World
+from hellward.sim.model import SIM_DT, Planner, Refused, World
 from hellward.sim.players.hands import AIM_GAP, REACT, Hands, Player, react_for
 from hellward.sim.skills import perks
 
@@ -112,7 +112,7 @@ class Battle:
         except Refused as refusal:
             return str(refusal), None
         if logged is not None:
-            self.commands.append([self.world.time, name if name != "smite_threat" else "smite", *logged])
+            self.commands.append([self.world.time, name, *logged])
         return None, self._flush(0.0)
 
     def _tower(self, tower: int):
@@ -137,10 +137,6 @@ class Battle:
         self.world.sell(t.id)
         return [list(t.tile)]
 
-    def _cleanse(self, tower: int) -> list:
-        t = self._tower(tower)
-        self.world.cleanse(t.id)
-        return [list(t.tile)]
 
     def _gate(self, door: int) -> list:
         if not offers(self.location, "gate"):
@@ -174,15 +170,11 @@ class Battle:
         self.world.smite(target.id)
         return [x, y]
 
-    def _smite_threat(self) -> list:
-        """The panel's Q: smite the leader closest to cursing, as the 2D game's Q did."""
-        self._ready("smite")
-        leader = self.threat()
-        if leader is None:
-            raise Refused("No leader is pondering or chanting a curse Smite can break.")
-        x, y = self.world.position(leader)
-        self.world.smite(leader.id)
-        return [x, y]
+    def _hymn(self, tower: int) -> list:
+        self._ready("hymn")
+        t = self._tower(tower)
+        self.world.hymn(t.id)
+        return [list(t.tile)]
 
     def _meteor(self, x: float, y: float) -> list:
         self._ready("meteor")
@@ -205,16 +197,6 @@ class Battle:
             raise Refused("Spells are cast in the fight's own time: resume it first (P).")
         if not offers(self.location, key):
             raise Refused(f"{SPELLS[key].name} is not yet yours: you learn it for {first_offering(key).called}.")
-
-    def threat(self) -> Monster | None:
-        """The leader closest to cursing whose curse Smite can still break: the chant nearest its end, else the
-        pondering nearest its end. A marking or resolute leader's curse lands whatever is struck."""
-        leaders = self.world.leaders()
-        chanting = [m for m in leaders if m.chant_curse is not None and not m.marking]
-        if chanting:
-            return min(chanting, key=lambda m: (m.chant_left, m.id))
-        pondering = [m for m in leaders if m.asking is not None and not m.resolute]
-        return min(pondering, key=lambda m: (m.ask_left, m.id)) if pondering else None
 
     # -- The replay -----------------------------------------------------------------------------
 

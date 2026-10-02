@@ -56,11 +56,12 @@ forecourt braziers and burning props in the field cast shadows), and clutter cas
   server plays it: the clock in whole steps, events into the scene, orders), `monster.gd`, `tower.gd` (pictures of
   the server's monsters and towers; stand-ins for kinds without a model yet), `atmosphere.gd` (the night),
   `level.gd` (the server's grid in metres, routes, where a monster stands, the floor), `dressing.gd` (each
-  location's scenery, gates), `scatter.gd`, `bolt.gd` (missiles), `vfx.gd`, `fx.gd`, `hud.gd`, `builder.gd`
+  location's scenery, gates), `scatter.gd`, `bolt.gd` (missiles), `chain.gd` (the Hook's chain), `vfx.gd`, `fx.gd`,
+  `hud.gd` (the bar, the tower card, the monster plate), `builder.gd`
   (input into orders), `camera_rig.gd`, `intro.gd`, `demo.gd` (the film director for a watched defence),
   `sfx.gd` (cues, music, the recording's sound log), `mats.gd` (the material library), `models.gd`.
-- `game/shaders/` — ground, grass, overlay (hit/chill/curse/kind rim/x-ray), bar, orb, ring, vortex, beam
-  (Cleanse), curse_beam, vignette, hud_panel/hud_bar/hud_banner.
+- `game/shaders/` — ground, grass, overlay (hit/chill/curse/hymn/kind rim/x-ray), bar, orb, ring, vortex, beam
+  (holy light: Smite, the shrine), curse_beam, vignette, hud_panel/hud_bar/hud_banner.
 - `tools/blender/` — one script per model; `lib.py` holds the contract, `monsters.py`, `towers.py`,
   `village.py`, `drystone.py` the shared kits.
 - `game/assets/` — `models/` (built), `textures/` (PBR sets), `fx/` and `ui/` (keyed sprites), `audio/`.

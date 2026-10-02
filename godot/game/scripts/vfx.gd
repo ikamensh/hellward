@@ -5,7 +5,7 @@ extends RefCounted
 
 const BOLT_HALO := Color(0.3, 0.45, 1.0, 0.55)    # lightning: the blue glow round a strike
 const BOLT_CORE := Color(0.85, 0.92, 1.0, 1.0)    # and its white-hot thread
-const BEAM_HEIGHT := 14.0                         # Cleanse's pillar of light, metres
+const BEAM_HEIGHT := 14.0                         # the holy pillar of light, metres
 
 
 static func _one_shot(parent: Node, node: Node3D, at: Vector3, life: float) -> Node3D:
@@ -297,7 +297,7 @@ static func _rune_decal(glow: float) -> Decal:
 	return d
 
 
-## Cleanse: a pillar of golden light slams down, holds, and thins away.
+## Holy light (Smite, the shrine's answer to a blow): a pillar of golden light slams down, holds, and thins away.
 static func holy(parent: Node, at: Vector3) -> void:
 	burst(parent, at + Vector3(0, 1.5, 0), Color(1.0, 0.85, 0.5), 60)
 	var col := MeshInstance3D.new()
