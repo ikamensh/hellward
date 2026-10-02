@@ -126,6 +126,21 @@ def smoke(python: Path, into: Path) -> dict:
     return {"outcome": last["state"]["outcome"], "lives": last["state"]["lives"], "steps": last["step"]}
 
 
+def game_smoke(executable: Path) -> None:
+    """The packaged game itself, headless: it starts its own bundled server, and the server saves the campaign as a
+    location's briefing opens."""
+    with tempfile.TemporaryDirectory() as data:
+        env = {k: v for k, v in os.environ.items() if not k.startswith(("PYTHON", "VIRTUAL_ENV", "HELLWARD_"))}
+        env.update(HELLWARD_DATA=data, HELLWARD_PREFS=str(Path(data) / "prefs.cfg"))
+        if sys.platform == "darwin":
+            env["DYLD_INSERT_LIBRARIES"] = str(ROOT / "godot" / "tools" / "capture" / "noactivate.dylib")
+        subprocess.run([str(executable.resolve()), "--headless", "--audio-driver", "Dummy", "--max-fps", "60", "--quit-after",
+                        "900", "--", "screen=briefing", "location=tristram"], env=env, cwd=data, timeout=300,
+                       check=True)
+        if not (Path(data) / "saves" / "save_campaign.json").is_file():
+            raise SystemExit("package: the packaged game did not start its server (no campaign saved)")
+
+
 def digest(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -151,6 +166,7 @@ def mac() -> Path:
     print(f"packaged server: {played}")
     subprocess.run(["codesign", "--force", "--deep", "--sign", "-", str(app)], check=True)
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(app)], check=True)
+    game_smoke(app / "Contents" / "MacOS" / "Hellward")
     out = DIST / f"Hellward-{VERSION}-darwin-arm64-app.zip"
     out.unlink(missing_ok=True)
     subprocess.run(["ditto", "-c", "-k", "--keepParent", str(app), str(out)], check=True)
@@ -169,6 +185,7 @@ def windows() -> Path:
     python = server(stage / "server", build)
     played = smoke(python, stage / "server")
     print(f"packaged server: {played}")
+    game_smoke(stage / "Hellward.exe")
     out = DIST / f"Hellward-{VERSION}-windows-x64-portable.zip"
     out.unlink(missing_ok=True)
     shutil.make_archive(str(out.with_suffix("")), "zip", stage.parent, "Hellward")

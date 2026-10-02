@@ -33,4 +33,4 @@ A pondering leader shows dots. A chant draws a growing violet sign at its target
 
 ## Look and sound
 
-Figures use posed low-poly stand-ins and painted sheets; the first three monsters have eight-bearing walks and individual hit and death clips ([animation](animation.md)). Effects layer glows, rings, lightning and particles over the field. The lighting draws a darkness layer with pools around sources. Seven image-generated terrain materials cover the twelve floor themes; the renderer draws exact walkable hall edges over them so tower ground and monster space remain distinct. A later full-map painting must match the route and hall fingerprint. The restrained Arrow release joins the magical tower cues. See [audio](audio.md) for the sound system.
+The battle is drawn in 3D by the Godot client (`godot/`, [the client and the server](godot-client.md)): modelled and animated monsters and towers (tinted stand-ins for the kinds still without a model), each location's own scenery, the leaders' pondering motes, chant beams and rune circles, and a HUD of orbs, slots and tower cards. See [audio](audio.md) for the sound system.
