@@ -19,7 +19,18 @@ tools/model.sh NAME...                     # build models: tools/blender/NAME.py
 uv run python tools/paint.py [NAME...]     # paint images with Codex (art/painted/)
 uv run python tools/pbr.py [NAME...]       # painted tiles -> seamless albedo/normal/rough/height maps
 uv run python tools/fxsprites.py           # painted effect/UI sprites -> game/assets/fx, game/assets/ui
+tools/review.sh MODEL OUT.png [anims=..]   # a monster's clips sampled across their length (rows), under game light
+tools/review_set.sh OUT_DIR                # the monster review set: turntables, clips, portraits, lineups, battles
+tools/survey.sh OUT_DIR                    # every tower at each rank, every monster (stand-ins marked), each location
+blender -b --factory-startup -P tools/blender/audit.py   # every monster's clips: ground, loops, corpses, foot skate
+uv run python ../tools/visual_check.py OUT  # every screen and battle rendered and checked (blank, black, errors)
+uv run python ../tools/assets.py           # every kind in the rules against its model: clips, anchors, maps
 ```
+
+Monsters (docs/monsters.md): concepts painted by `tools/concept.py`, meshes made from them on a rented GPU
+(`tools/gen3d/README.md`), then either a hand-made script (`mon_fallen.py` and the first four) or a short spec for
+`tools/blender/biped.py` (two-legged kinds) or `beast.py` (the spider, the flyers), which read the bones off the
+body's shape.
 
 Battle arguments (after `--`): `demo` watches a scripted player (`player=NAME`, `location=KEY`), `film` directs the
 camera, `nointro` skips the opening. Screens: `screen=title|profiles|map|briefing|skills|forge|chronicle|story|
