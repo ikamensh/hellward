@@ -165,3 +165,16 @@ def test_a_knife_post_throws_at_the_foremost_when_nothing_stands():
     while world.bolts:
         world.step(SIM_DT)
     assert front.max_hp - front.hp == knife.stats.damage == 2
+
+
+def test_a_knife_post_takes_a_held_monster_for_a_standing_one():
+    """Frozen (an orb, a grove's root) stands as still as battering a gate."""
+    world = field()
+    knife = world.build("knife", BESIDE_ARCH)
+    behind, front = put(world, "zombie", CROSSING - 1.0), put(world, "zombie", CROSSING + 1.0)
+    behind.frozen = 5.0
+    world.step(SIM_DT)
+    assert next(e[1] for e in world.events if e[0] == "bolt").target == behind.id
+    while world.bolts:
+        world.step(SIM_DT)
+    assert behind.max_hp - behind.hp == 2 * knife.stats.damage and front.hp == front.max_hp
