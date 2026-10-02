@@ -5,3 +5,4 @@ art/paint.log
 build/
 art/mocap/raw/
 art/gen/*/s*/
+tools/capture/noactivate.dylib

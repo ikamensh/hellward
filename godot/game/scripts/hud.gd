@@ -383,7 +383,7 @@ func _refresh_choices() -> void:
 			spec["blurb"], spec["elite_name"], world.monster_table(String(spec["elite"]["kind"]))["name"],
 			", ".join(pack)] + "kept only on victory."
 	var held := int(st["salvage"])
-	_salvage_line.get_parent().visible = held > 0 and world.outcome == ""
+	_salvage_line.get_parent().visible = held > 0 and world.outcome == "" and not world.demo
 	_salvage_line.text = "Salvage held: %d" % held
 	_salvage_sell.visible = st["break_left"] != null and not world.demo
 	if not _salvage_sell.visible:
