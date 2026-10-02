@@ -20,8 +20,8 @@ uv run hellward                      # the title screen; Descend begins the camp
 uv run hellward -- screen=map        # straight to a screen (title, map, briefing location=KEY, skills, forge...)
 ```
 
-The client starts the server itself; its first launch in a checkout compiles the leaders' minds (about a
-minute, once). The title's **Campaign profiles** button (or **P**) switches between saves or names a new one;
+The client starts the server itself. The first launch after an update imports the client's new files and
+compiles the leaders' minds (up to a minute, once). The title's **Campaign profiles** button (or **P**) switches between saves or names a new one;
 the `main` profile keeps your existing save. Saves live in `~/.hellward/saves`, replays of your defences in
 `~/.hellward/replays`; the client's own settings (volumes, fullscreen) stay on this machine.
 
