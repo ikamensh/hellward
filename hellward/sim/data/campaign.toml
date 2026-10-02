@@ -1,0 +1,18 @@
+# The campaign's tuning (hellward/sim/campaign.py reads these).
+
+# Each location's life factor on top of economy.location_growth per location: every monster's life there, and the
+# spells' strength, is multiplied by both. The knob tools/margin.py tunes (docs/campaign.md, "Tuning and
+# verification"): the strongest bot wins every location, the veteran Act I.
+[life]
+tristram = 1.0
+graveyard = 1.0
+cathedral = 1.0
+catacombs = 1.0
+caves = 1.0
+hells_gate = 1.0
+docks = 1.0
+spider_forest = 1.0
+jungle = 1.0
+drowned_city = 1.0
+travincal = 1.0
+temple = 1.0

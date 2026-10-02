@@ -52,13 +52,14 @@ class Ordinary:
     doors: bool = True
     call_early: bool = True
     shift: int = 0        # where in the element rotation this defender starts: variety for the balance tools
+    rotation: tuple[str, ...] = ROTATION   # the kinds it raises in turn (those offered here)
     towers: int = 14
     planned: list[tuple[str, tuple[int, int]]] = field(default_factory=list)
     clock: float = 0.0
 
     def plan(self, world: World) -> None:
         tiles = [tile for _, tile in tile_scores(world)]
-        rotation = [kind for kind in ROTATION if kind in world.location.arsenal.towers]
+        rotation = [kind for kind in self.rotation if kind in world.location.arsenal.towers]
         self.planned = [(rotation[(i + self.shift) % len(rotation)], tile) for i, tile in enumerate(tiles[:self.towers])]
 
     def skills(self, location: Location, sigils: int) -> frozenset[str]:

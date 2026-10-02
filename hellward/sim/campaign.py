@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.content import Group, Wave
 from hellward.sim.level import Level, Route
@@ -140,7 +141,7 @@ TRISTRAM = Location(
           "them, and a shaman sings them on.",
     taunt="Huddle your towers together, if it comforts you. When my shaman's curse falls, it falls on all of them.",
     lesson="His curses fall on a tower and the towers beside it: spread your arrows.",
-    life=BALANCE.location_growth ** 0,
+    life=BALANCE.location_growth ** 0 * tuning.number("campaign.life.tristram"),
 )
 
 GRAVEYARD = Location(
@@ -179,7 +180,7 @@ GRAVEYARD = Location(
           "your arrows behind it.",
     lesson="A gate holds the dead in a queue. A hymned tower fires twice as fast, and the acolytes curse it first.",
     requires=("tristram",),
-    life=BALANCE.location_growth ** 1,
+    life=BALANCE.location_growth ** 1 * tuning.number("campaign.life.graveyard"),
 )
 
 CATHEDRAL = Location(
@@ -216,7 +217,7 @@ CATHEDRAL = Location(
           "goatmen will take both aisles.",
     lesson="Two aisles split the host: place arrows where they cover both before spending on fire.",
     requires=("graveyard",),
-    life=BALANCE.location_growth ** 2,
+    life=BALANCE.location_growth ** 2 * tuning.number("campaign.life.cathedral"),
 )
 
 CATACOMBS = Location(
@@ -257,7 +258,7 @@ CATACOMBS = Location(
           "still here?",
     lesson="An Overlord's armor takes half an arrow's hit and little of a Ballista's bolt; frost weakens its blows.",
     requires=("cathedral",),
-    life=BALANCE.location_growth ** 3,
+    life=BALANCE.location_growth ** 3 * tuning.number("campaign.life.catacombs"),
 )
 
 CAVES = Location(
@@ -295,7 +296,7 @@ CAVES = Location(
     taunt="Walls mean nothing to wings. Look up. And tell me, keeper: why do my bones never show your face?",
     lesson="Wings ignore the gate, and the lava leaves fewer places to build.",
     requires=("catacombs",),
-    life=BALANCE.location_growth ** 4,
+    life=BALANCE.location_growth ** 4 * tuning.number("campaign.life.caves"),
 )
 
 HELLS_GATE = Location(
@@ -337,7 +338,7 @@ HELLS_GATE = Location(
     taunt="In every night I have seen, the lamp goes out. I have begun to wonder what I have not seen.",
     lesson="Every curse at once, and Azazel: no element bites him, and the shrine only sends him back to walk again.",
     requires=("caves",),
-    life=BALANCE.location_growth ** 5,
+    life=BALANCE.location_growth ** 5 * tuning.number("campaign.life.hells_gate"),
 )
 
 
@@ -382,7 +383,7 @@ DOCKS = Location(
     taunt="You crossed a sea for a lamp that is not yours. My shaman will raise every Flayer you leave whole.",
     lesson="Hooks drag Flayers back under your towers, knives make the gate a kill zone; kill the shaman before it raises the dead.",
     requires=("hells_gate",),
-    life=BALANCE.location_growth ** 6,
+    life=BALANCE.location_growth ** 6 * tuning.number("campaign.life.docks"),
 )
 
 SPIDER_FOREST = Location(
@@ -419,9 +420,9 @@ SPIDER_FOREST = Location(
     theme="spider_forest",
     blurb="The road to the temples, through a forest the spiders own. In a clearing, the druids' ring of oaks.",
     taunt="The old trees have taken your side. Stand close to them, then. One curse will find you all.",
-    lesson="Poison is useless here. A grove makes a bunch worth its risk.",
+    lesson="Venom barely bites the spiders here. A grove makes a bunch worth its risk.",
     requires=("docks",),
-    life=BALANCE.location_growth ** 7,
+    life=BALANCE.location_growth ** 7 * tuning.number("campaign.life.spider_forest"),
 )
 
 JUNGLE = Location(
@@ -459,7 +460,7 @@ JUNGLE = Location(
     taunt="My inquisitors do not chant. You will know their curse when the ground burns under your towers, and not before.",
     lesson="The inquisitors mark their spot long before the curse falls: kill them first.",
     requires=("spider_forest",),
-    life=BALANCE.location_growth ** 8,
+    life=BALANCE.location_growth ** 8 * tuning.number("campaign.life.jungle"),
 )
 
 DROWNED_CITY = Location(
@@ -499,7 +500,7 @@ DROWNED_CITY = Location(
     taunt="The Hulks were drowned men once. They do not tire, and your gates are cloth to them.",
     lesson="Frost barely slows the drowned; fire and lightning must. The gate falls fast.",
     requires=("jungle",),
-    life=BALANCE.location_growth ** 9,
+    life=BALANCE.location_growth ** 9 * tuning.number("campaign.life.drowned_city"),
 )
 
 TRAVINCAL = Location(
@@ -542,7 +543,7 @@ TRAVINCAL = Location(
     taunt="Turn back, and I will leave Tristram's lamp alone. It is a small lamp. No one would miss it.",
     lesson="Curses from every side: spread wide, and kill the elders first.",
     requires=("drowned_city",),
-    life=BALANCE.location_growth ** 10,
+    life=BALANCE.location_growth ** 10 * tuning.number("campaign.life.travincal"),
 )
 
 TEMPLE = Location(
@@ -583,7 +584,7 @@ TEMPLE = Location(
     taunt="I cannot see you in the bones. So I have come to see you myself.",
     lesson="Each curse of his that lands burns your mana for every tower it catches: spread out, and spend it first.",
     requires=("travincal",),
-    life=BALANCE.location_growth ** 11,
+    life=BALANCE.location_growth ** 11 * tuning.number("campaign.life.temple"),
 )
 
 LOCATIONS: dict[str, Location] = {loc.key: loc for loc in (
