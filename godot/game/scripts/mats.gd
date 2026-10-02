@@ -97,7 +97,139 @@ static func _make(key: String) -> Material:
 		"glow_window": return glow(Color(1.0, 0.55, 0.2), 2.0)
 		"glow_holy": return glow(Color(1.0, 0.7, 0.4), 1.6)
 		"glow_portal": return glow(Color(1.0, 0.15, 0.04), 8.0)
+	if key.begins_with("mon_"):
+		return monster(key)
 	return null
+
+
+## A generated monster's own maps (assets/textures/<kind>/: albedo, normal, orm, emission; docs/monsters.md).
+# the colour a monster's flesh shows lit from behind (the imps' thin ears and fingers glow red against a fire).
+# Screen-space subsurface scattering looked softer but cost 2 ms with a wave on screen; the backlight is free.
+const FLESH := {"mon_fallen": Color(0.55, 0.06, 0.02), "mon_shaman": Color(0.55, 0.06, 0.02),
+	"mon_shaman_crest": Color(0.5, 0.1, 0.02),
+	"mon_zombie": Color(0.16, 0.18, 0.1)}
+
+
+# fine surface for a close look, laid over a generated body's own maps as a world-scaled triplanar detail normal:
+# [library texture set, metres per repeat]
+const GRAIN := {"mon_fallen": ["demon_skin", 0.12], "mon_shaman": ["demon_skin", 0.13],
+	"mon_zombie": ["corpse_skin", 0.25], "mon_skeleton": ["bone", 0.15]}
+
+
+static func monster(kind: String) -> ORMMaterial3D:
+	var dir := TEX + kind + "/"
+	var m := ORMMaterial3D.new()
+	m.resource_name = kind
+	if GRAIN.has(kind) and OS.get_environment("HW_NOGRAIN") == "":
+		m.detail_enabled = true
+		m.detail_uv_layer = BaseMaterial3D.DETAIL_UV_2
+		m.uv2_triplanar = true
+		m.uv2_scale = Vector3.ONE / float(GRAIN[kind][1])
+		m.detail_normal = load(TEX + String(GRAIN[kind][0]) + "_normal.png")
+		m.detail_albedo = _flat_texture(Color.WHITE)   # the colour left as it is (multiplied by white)
+		m.detail_blend_mode = BaseMaterial3D.BLEND_MODE_MUL
+		# the grain under the body's own forms, not instead; a hide's wrinkles and veins show more than bone's
+		var share := 0.55 if kind in ["mon_fallen", "mon_shaman"] else 0.45
+		m.detail_mask = _flat_texture(Color(share, share, share))
+	if FLESH.has(kind):
+		m.backlight_enabled = true
+		m.backlight = FLESH[kind]
+	m.albedo_texture = load(dir + "albedo.webp")
+	m.normal_enabled = true
+	m.normal_texture = load(dir + "normal.webp")
+	m.orm_texture = load(dir + "orm.webp")
+	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+	if ResourceLoader.exists(dir + "emission.webp"):   # eyes, embers
+		m.emission_enabled = true
+		m.emission_texture = load(dir + "emission.webp")
+		m.emission_energy_multiplier = GLOW
+	return m
+
+
+const GLOW := 5.0        # a monster's eyes: bright enough to bloom a little, as they read from the battle camera
+const GLOW_OUT := 0.45   # seconds a dead monster's eyes take to go out
+
+
+## One monster's own copies of its glowing materials (all, or only the one named `only`), so their glow can
+## change on it alone: a dead body's eyes going out (`eyes_out`), a chanting Shaman's skull flaring.
+static func own(root: Node, only := "") -> Array[ORMMaterial3D]:
+	var mats: Array[ORMMaterial3D] = []
+	for node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		for i in mi.mesh.get_surface_count():
+			var m := mi.get_surface_override_material(i) as ORMMaterial3D
+			if m != null and m.resource_name.begins_with("mon_") and m.emission_enabled \
+					and (only == "" or m.resource_name == only):
+				m = m.duplicate() as ORMMaterial3D
+				mi.set_surface_override_material(i, m)
+				mats.append(m)
+	return mats
+
+
+const DEAD := Color(0.55, 0.52, 0.5)   # what a corpse's colour sinks to (a bright red dead Fallen read as alive)
+
+
+## A body `t` seconds after it died: the glow in its eyes gone after GLOW_OUT, quickest at first, and with `pale`
+## its colour sinking to DEAD over a second (not for a frozen one, whose rime is its colour).
+static func eyes_out(mats: Array[ORMMaterial3D], t: float, pale := true) -> void:
+	for m in mats:
+		m.emission_energy_multiplier = GLOW * pow(clampf(1.0 - t / GLOW_OUT, 0.0, 1.0), 2.0)
+		if pale:
+			if not m.has_meta("alive"):
+				m.set_meta("alive", m.albedo_color)
+			m.albedo_color = (m.get_meta("alive") as Color) * Color.WHITE.lerp(DEAD, clampf(t, 0.0, 1.0))
+
+
+# a pack is not cloned: each monster wears one of these tints of its kind's maps (Mats.vary)
+const VARIANTS := [Color(1.0, 1.0, 1.0), Color(0.86, 0.88, 0.92), Color(1.1, 1.02, 0.94)]
+
+
+## Give every monster material under `root` the tint of variant `n` (one of VARIANTS).
+static func vary(root: Node, n: int) -> void:
+	restyle(root, str(n), func(m: ORMMaterial3D) -> void: m.albedo_color = VARIANTS[n % VARIANTS.size()])
+
+
+## A corpse a fire killed: charred black, embers glowing in its cracks.
+static func burnt(root: Node) -> void:
+	restyle(root, "burnt", func(m: ORMMaterial3D) -> void:
+		m.albedo_color = Color(0.13, 0.1, 0.09)
+		m.roughness = 1.0
+		m.emission_enabled = true
+		m.emission = Color(1.0, 0.3, 0.05)
+		m.emission_energy_multiplier = 0.35
+		m.emission_texture = m.orm_texture)
+
+
+## A corpse the cold killed: rimed white-blue and glassy.
+static func frozen(root: Node) -> void:
+	restyle(root, "frozen", func(m: ORMMaterial3D) -> void:
+		m.albedo_color = Color(0.85, 1.0, 1.25)
+		m.roughness = 0.25
+		m.rim_enabled = true
+		m.rim = 0.8
+		m.rim_tint = 0.0)
+
+
+## Every monster material under `root` swapped for its variant `tag`, made once by `change` on a copy.
+static func restyle(root: Node, tag: String, change: Callable) -> void:
+	for node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		for i in mi.mesh.get_surface_count():
+			var m := mi.get_surface_override_material(i) as ORMMaterial3D
+			if m == null or not m.resource_name.begins_with("mon_"):
+				continue
+			var key := "%s~%s" % [m.resource_name, tag]
+			if not _cache.has(key):
+				var copy := m.duplicate() as ORMMaterial3D
+				change.call(copy)
+				_cache[key] = copy
+			mi.set_surface_override_material(i, _cache[key])
+
+
+static func _flat_texture(c: Color) -> ImageTexture:
+	var img := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+	img.fill(c)
+	return ImageTexture.create_from_image(img)
 
 
 static func _ice() -> StandardMaterial3D:
