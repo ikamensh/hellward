@@ -44,7 +44,8 @@ breaches, trophies, patterns. Life starts at 6.
 - **Income grows** about ×1.12 per location (and per wave within one). That closes the power budget against monster
   life (section 4). The scorecard prints a per-location power table: the last wave's life on the field per second
   against a reference board's damage per second.
-- **Location end:** gold carries in full. Towers are dismantled and refund the same share as selling one, 50%.
+- **Location end:** gold carries in full. Towers are dismantled for a share of their price (about 30%, its own tuning
+  value), tuned so a middling player carries about one location's stipend.
 - **Rubber band:** gold carried out of a location below a floor is topped up to it, before the merchant, so spending
   at the merchant never earns a top-up. It never helps the rich.
 - **Sinks for riches:** the merchant's relic (rising prices), clearing rock (rising prices, a few cells per map), and
@@ -124,6 +125,10 @@ Smite are learned in the Sorcery column.
   - Act II: the Spider.
   - Only empty cells are blighted, so building early protects a prime cell.
 - **Upgrades:** ranks II and III buy less damage per gold than another rank-I tower, but more per cell.
+- **Proportions and room** *(Ilya, 2026-10-02)*: a tower's reach must look generous beside its body. Towers and
+  monsters may be drawn smaller, and maps may be larger, with more ground to build on, part of it potential ground
+  the player unlocks (cleared boulders, opened plots). Scarcity is about the *prime* cells, not the total ground.
+  Stage 2 fixes the scale (section 20).
 
 ## 10. Towers *(Ilya: both charges and separate towers)*
 
@@ -210,6 +215,9 @@ step:
 
 **The pool.** At least 40 at first, growing to 60 or more through the shop; at least a quarter are enablers, since
 relics are the run's variety. Each relic's counter shows on the selected tower and in a relic bar. It holds:
+- **placement relics** *(Ilya)*: a bonus for a pattern of towers on the map, checked when the pattern stands
+  (for example, an Arrow Tower beside two different magic towers hits ×1.25). They reward where towers stand, and
+  they pull against area curses;
 - **converters** (verb → verb);
 - **counters** ("every 10th Arrow attack deals double");
 - **enablers** (use a kind you have not learned, or a charged ability without its skill);
@@ -221,8 +229,8 @@ The relics a run happens to draw push it toward a build: that is the run's varie
 
 **XP and levels.**
 - XP comes from kills and wave clears.
-- Level-ups come often: the first in Tristram's second wave, about forty by the Temple.
-- Each level gives 1 **skill point**, and every third level 1 **reskill point**.
+- Level-ups come often: the first in Tristram's second wave, then about one a wave, about fifty-five by the Temple.
+- Each level gives 1 **skill point**, and every fourth level 1 **reskill point**. A level-up refills the mana orb.
 - A level-up is an event the client celebrates: a short beat for most, the full celebration every fifth level.
 
 **Sigils.**
@@ -230,7 +238,7 @@ The relics a run happens to draw push it toward a build: that is the run's varie
 - Goals are drawn from a pool of goal types about *how* it was won: kill every Witch before she curses, let no Fallen
   through, hold with ≤ 6 towers, skip two waves, never let the gate fall.
 
-**Totals.** A perfect run earns about 40 levels plus 72 sigils, roughly 110 points; a good one about 80.
+**Totals.** A perfect run earns about 55 levels plus 72 sigils, roughly 125 points; a good one about 80.
 
 **The tree.**
 - It stays open. Each tower kind has a column:
@@ -276,8 +284,11 @@ A click ends it.
 
 ## 17. Bonus waves
 
-**How.** At a wave break the player may summon a bonus wave at stake 1, 2 or 3. It is sized and priced by the
-location, not the current wave, and summoning earlier pays a premium.
+**How.** From wave 2's break the player may summon a bonus wave at stake 1, 2 or 3. The stake is a **wager**: it
+costs gold and brings a harder pack (stake 1: the location's middle-wave pack; stake 2: ×1.5 life and an elite;
+stake 3: the last wave's pack ×1.5 with a leader), previewed exactly before the summon. The payout (the wager back
+plus a profit growing faster than the stake) comes only if none of the pack leaks. The break clock stops while it
+lives; its kills pay no bounty.
 
 **Rewards** differ in kind by stake:
 

@@ -23,6 +23,7 @@ uv run python tools/campaign_balance.py --out DIR   # the campaign's tuning tabl
 uv run python tools/margin.py veteran        # the tuning's yardstick: how much harder each location could be (slot.py)
 uv run python tools/margin.py --replay ~/.hellward/replays/F.json   # the same for a logged person's defence
 uv run python tools/sim_bench.py             # a defence per location, source against compiled: time and digests
+uv run python tools/maps.py --out DIR        # every map's cell worth, prime cells and occupied ground (R1, R5)
 uv run python tools/warden_plans.py search   # the warden's build for a location, searched on training seeds
 uv run python tools/plan_player.py plan all   # search the planned player's builds (slot.py; after a rules change)
 uv run python tools/export_audio.py --music  # render every cue and track into the client (godot/game/assets/audio)
