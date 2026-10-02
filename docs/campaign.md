@@ -191,10 +191,11 @@ and the veteran every location of Act I, each with its worst seed at a margin of
 but for the Graveyard 0.76, the Cathedral 0.61 and Hell's Gate 0.80 (where the veteran, drafting from the intro,
 lost before them; it already lost the Cathedral at 0.49 before stage 1, while the planned player holds it at 2.6),
 the Catacombs 1.5 and Kurast Docks 1.07 (where an Arrow-only build now loses and one with Ballistas for the same gold
-wins, `tools/armor_ab.py`, M9), and Travincal 0.86 (the planned player's worst seed). Margins at those factors,
-median (veteran in Act I; the better of the planned and adaptive players everywhere): Tristram 1.28 / 1.39,
-Graveyard 1.19 / 2.07, Cathedral 1.11 / 2.58, Catacombs 1.12 / 2.31, Caves 1.61 / 1.80, Hell's Gate 1.23 / 1.57;
-Docks 1.63, Spider Forest 2.26, Jungle 1.73, Drowned City 1.91, Travincal 1.17, Temple 1.43. Ballistas fill the
+wins, `tools/armor_ab.py`, M9), and Travincal 0.86 (the planned player's worst seed). Margins, median (veteran in
+Act I; the better of the planned and adaptive players everywhere, measured with the Graveyard at 0.78, Hell's Gate at
+0.82 and Travincal at 0.91, a shade harder): Tristram 1.28 / 1.39, Graveyard 1.19 / 2.07, Cathedral 1.11 / 2.58,
+Catacombs 1.12 / 2.31, Caves 1.61 / 1.80, Hell's Gate 1.23 / 1.57; Docks 1.63, Spider Forest 2.26, Jungle 1.73,
+Drowned City 1.91, Travincal 1.17 (at 0.86), Temple 1.43. Ballistas fill the
 searched builds from the Catacombs on: the armor answer is also the strongest general tower at these numbers.
 
 `tools/balance.py` compares leader policies and defenders, `tools/curse_quality.py` measures the curse planner, `tools/campaign_balance.py` follows progression, and `tools/margin.py` estimates spare difficulty. The source simulation and mypyc build should agree on events, rewards and outcomes for the same seed, including a breach and a forged loadout. Tests cover route geometry, clone determinism, rewards and replayed commands. Record each balance result with its profile and command so later curve changes remain comparable.
