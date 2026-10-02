@@ -204,10 +204,12 @@ Monsters:
 - **M9:** at the Catacombs and at one Act II location, an Arrow-only build of a given gold loses where a build with a
   Ballista of the same gold wins.
 
-**Tuning:**
-- Each location's life factor is re-tuned with `tools/margin.py`, so the strongest bot still wins every location and
-  the veteran wins Act I.
-- `tools/balance.py` and `tools/curse_quality.py`, before and after, are quoted in the commit.
+**Tuning:** a check, not a re-tune, since stage 2 replaces every factor:
+- the strongest bot still wins every location;
+- the veteran still wins Act I's first two;
+- where a location became unwinnable, its life factor moves just enough.
+
+`tools/balance.py` and `tools/curse_quality.py`, before and after, are quoted in the commit.
 
 **Ilya sees:** rendered frames of the Ballista, the Hook dragging a Flayer, the Knife Post at a gate, Hymn's aura, the
 shrine strike and the boss's return. Then the release.
