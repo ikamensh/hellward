@@ -64,6 +64,8 @@ func _ready() -> void:
 		body.rotation.y = deg_to_rad(float(_args.get("turn", "150")))   # three-quarters toward the camera
 		add_child(body)
 		for mi in body.find_children("*", "MeshInstance3D", true, false):
+			if _args.has("nolod"):
+				(mi as MeshInstance3D).lod_bias = 1000.0
 			if _args.has("noshadow"):
 				(mi as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			if flat:
@@ -76,7 +78,7 @@ func _ready() -> void:
 				overlay.shader = preload("res://shaders/overlay.gdshader")
 				overlay.set_shader_parameter("kind_rim", Monster.RIM[kind])
 				overlay.set_shader_parameter("xray", 0.0 if _args.has("noxray") else 1.0)
-				overlay.set_shader_parameter("moonrim", 0.6)
+				overlay.set_shader_parameter("moonrim", float(_args.get("moonrim", "0.12")))
 				(mi as MeshInstance3D).material_overlay = overlay
 		var player := Models.player(body)
 		var anim := Models.anim_name(player, _args.get("anim", "walk"))

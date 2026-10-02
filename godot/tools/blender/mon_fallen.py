@@ -143,7 +143,7 @@ def attack(t):
     return p
 
 
-rig.action("idle", 2.0, lambda t: imp_idle(rig, K, t), loop=True)
+rig.action("idle", 2.0, lambda t: imp_idle(rig, K, t, crouch=1.0), loop=True)
 rig.action("walk", 0.6, lambda t: imp_walk(rig, K, t, stride=0.11, crouch=1.0), loop=True)   # short quick steps
 rig.action("attack", 0.7, attack)
 rig.action("hit", 0.35, lambda t: imp_hit(rig, K, t))

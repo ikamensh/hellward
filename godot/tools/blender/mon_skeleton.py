@@ -111,6 +111,9 @@ def give(co):
     return 0.006
 
 
+# limb bones half as thick again: life-thin bones break into dotted lines from the battle camera
+LIMBS = [f"{b}.{side}" for b in ("upper_arm", "forearm", "thigh", "shin") for _, side in SIDES]
+print("thickened", sculpted.thicken(body, rig, LIMBS, 1.55, reach=0.05), "vertices")
 sculpted.skin(body, rig, sigma=give, masks={
     "tabard": lambda co, hsv, thick: 0.8 < co.z < 1.1 and abs(co.x) < 0.13 and co.y > -0.04 and red(hsv),
     "tabard2": lambda co, hsv, thick: 0.55 < co.z < 0.9 and abs(co.x) < 0.13 and co.y > -0.04 and red(hsv),

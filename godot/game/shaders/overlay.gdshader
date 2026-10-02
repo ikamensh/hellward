@@ -24,10 +24,12 @@ void fragment() {
 	float behind = seen.z / seen.w - here.z / here.w;
 	// hidden by less than a body's depth (its own other arm, its weapon, its cloth): nothing; deeper than that it is
 	// behind a tower or a house, and shows through as the x-ray
-	if (behind > 0.03 && behind <= 1.5) {
+	// the depth texture's error grows with distance (1.7 m at 48 m was measured), so the bar does too
+	float body = 1.5 + 0.05 * length(VERTEX);
+	if (behind > 0.03 && behind <= body) {
 		discard;
 	}
-	if (behind > 1.5) {
+	if (behind > body) {
 		ALBEDO = kind_rim * (0.15 + pow(edge, 2.0) * 0.6) * 0.5 * xray;
 	} else {
 		float rim = pow(edge, 2.5);

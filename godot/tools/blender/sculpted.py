@@ -255,14 +255,14 @@ def smooth_normals(obj: bpy.types.Object, radius: float = 0.035) -> None:
 
 
 def prepare(kind: str, height: float, yaw: float = 0.0, glow=None, metal=None, rough=None, colour=None,
-            faces: int | None = None, families=None, looks=None) -> bpy.types.Object:
+            faces: int | None = None, families=None, looks=None, fill: float = 0.1) -> bpy.types.Object:
     """The body stood in the model contract, its maps baked and written, its material named mon_<kind>. With
     HW_FAST=1 in the environment the maps already written are kept (fitting a rig needs no bake)."""
     import os
     obj, m = body(kind, height, yaw, faces)
     if not os.environ.get("HW_FAST"):
         write_maps(kind, obj, bake_detail(obj, kind, m), glow=glow, metal=metal, rough=rough, colour=colour,
-                   families=families, looks=looks)
+                   families=families, looks=looks, fill=fill)
     COLOURS[obj.name] = vertex_colours(obj)   # before the generator's material gives way to the library's
     name_material(obj, f"mon_{kind}")
     return obj
@@ -407,7 +407,7 @@ type="CompressedTexture2D"
 
 compress/mode=2
 compress/normal_map={normal}
-mipmaps/generate=true
+mipmaps/generate={mips}
 detect_3d/compress_to=0
 """
 
@@ -451,7 +451,8 @@ def family_weights(rgb: np.ndarray, pos: np.ndarray, families: dict, sigma: floa
 
 
 def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Image], glow=None, metal=None,
-               rough=None, colour=None, cavity: float = 0.45, families=None, looks=None) -> Path:
+               rough=None, colour=None, cavity: float = 0.45, families=None, looks=None,
+               fill: float = 0.0) -> Path:
     """game/assets/textures/mon_<kind>/: albedo.webp, normal.webp, orm.webp (occlusion, roughness, metal) and,
     given `glow`, emission.webp. Each has an .import that compresses it for the GPU with mipmaps.
 
@@ -515,12 +516,12 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
     save(normal, folder / "normal.webp", data=True, lossless=True)
     save(np.dstack([ao, rough, metal]), folder / "orm.webp", data=True)
     names = ["albedo", "normal", "orm"]
-    if glow:
+    if glow or fill:
         lit = np.zeros((h, h), np.float32)
         warm = (hue > 15) & (hue < 75)
         score = val * sat * warm
         r = glow.get("radius", 0.012)
-        for hint in glow["eyes"]:
+        for hint in (glow or {}).get("eyes", []):
             d = np.linalg.norm(pos - np.array(hint), axis=-1)
             near = d < 0.03
             best = near & (score >= np.percentile(score[near], 97)) & (score > 0.25) if near.any() else near
@@ -531,11 +532,16 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
             centre = np.median(pos[best], axis=0) if best.sum() >= 6 and glow.get("find") != "fixed" else np.array(hint)
             lit = np.maximum(lit, np.clip(1.5 - np.linalg.norm(pos - centre, axis=-1) / r, 0, 1))
             print(f"glow at {tuple(np.round(centre, 3))} ({int(best.sum())} texels found) for hint {hint}")
-        save(np.array(glow.get("colour", (1.0, 0.72, 0.15)))[None, None, :] * lit[..., None], folder / "emission.webp",
-             data=False)
+        # the glow, and a faint fill of the body's own colours: under the blue moon a red hide would go grey-black
+        # with nothing else lighting it
+        eyes = np.array((glow or {}).get("colour", (1.0, 0.72, 0.15)))[None, None, :] * lit[..., None]
+        save(np.maximum(eyes, albedo[..., :3] * fill), folder / "emission.webp", data=False)
         names.append("emission")
     for name in names:
-        (folder / f"{name}.webp.import").write_text(IMPORT.format(normal=1 if name == "normal" else 2))
+        # the glow map has no mipmaps: averaged down, an eye's few lit texels bled into the neighbouring islands of
+        # the atlas and lit a hand or a hip green at range
+        (folder / f"{name}.webp.import").write_text(
+            IMPORT.format(normal=1 if name == "normal" else 2, mips="false" if name == "emission" else "true"))
     print(f"maps {folder} ({h}² base, {size}² normal), metal on {int((metal > 0.3).sum())} texels")
     return folder
 
@@ -867,3 +873,27 @@ def corpse_colour_pos(rgb, pos):
     keep their red."""
     hue, sat, val = _hsv(rgb)
     return corpse_colour(rgb, hue, sat, val, pos)
+
+
+def thicken(obj: bpy.types.Object, rig, bones, factor: float, reach: float = 0.06) -> int:
+    """Fatten limbs for the distance they are seen from: every vertex within `reach` of one of `bones`' axes is
+    pushed out from it by `factor` (thin life-sized bones break into dotted lines at 48 m). Returns the vertices
+    moved. Run it after the rig is built (it needs the axes) and before skinning."""
+    segs = [(rig.head[b].copy(), rig.tail[b].copy()) for b in bones]
+    moved = 0
+    for v in obj.data.vertices:
+        best = None
+        for a, b in segs:
+            ab = b - a
+            u = max(0.0, min(1.0, (v.co - a).dot(ab) / max(ab.length_squared, 1e-9)))
+            c = a + ab * u
+            d = (v.co - c).length
+            if best is None or d < best[0]:
+                best = (d, c, u)
+        d, c, u = best
+        if d < reach:
+            fade = smooth((reach - d) / (reach * 0.4)) * smooth(min(u, 1 - u) / 0.08 + 0.3)
+            v.co = c + (v.co - c) * (1 + (factor - 1) * fade)
+            moved += 1
+    obj.data.update()
+    return moved

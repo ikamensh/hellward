@@ -44,7 +44,7 @@ def BELLY(p):
     if p.y < 0.0 or abs(p.x) > 0.32:
         return p
     w = sculpted.smooth(1.0 - abs(p.z - 1.1) / 0.28) * sculpted.smooth(p.y / 0.18) * sculpted.smooth(1 - abs(p.x) / 0.32)
-    return Vector((p.x, p.y + 0.09 * w, p.z - 0.04 * w))
+    return Vector((p.x * (1 + 0.18 * w), p.y + 0.11 * w, p.z - 0.05 * w))   # wider than the hips from the front
 
 
 sculpted.reshape(body, BELLY)

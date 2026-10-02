@@ -1091,9 +1091,11 @@ def imp_walk(rig: Rig, k: float, t: float, stride: float = 0.16, hold=None, crou
     return p
 
 
-def imp_idle(rig: Rig, k: float, t: float, hold=None) -> Pose:
-    """Breathing hard, glancing about, an ear flicking."""
+def imp_idle(rig: Rig, k: float, t: float, hold=None, crouch: float = 0.0) -> Pose:
+    """Breathing hard, glancing about, an ear flicking; `crouch` as in imp_walk."""
     p = imp_stance(k)
+    p.move("hips", z=-0.06 * k * crouch).rot("hips", p=-10 * crouch).rot("chest", p=-8 * crouch)
+    p.rot("neck", p=10 * crouch).rot("head", p=10 * crouch)
     p.move("hips", z=-0.006 * k * wave(t, 2))
     p.rot("chest", p=2.5 * wave(t, 2, 0.1))
     p.rot("neck", y=8 * wave(t))

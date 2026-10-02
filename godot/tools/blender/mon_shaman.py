@@ -59,8 +59,17 @@ def EARS(p):
     return Vector((root + (p.x - root) * (1 + 0.35 * k), p.y, p.z))
 
 
+def CREST(p):
+    """The 2D shaman's crest is an upright mohawk, not a wide fan: above the horns, drawn in toward the middle the
+    higher it rises, and stretched up a little."""
+    if p.z < 1.2:
+        return p
+    k = sculpted.smooth((p.z - 1.2) / 0.12)
+    return Vector((p.x * (1 - 0.45 * k), p.y, 1.2 + (p.z - 1.2) * (1 + 0.15 * k)))
+
+
 def SHAPE(p):
-    return EARS(p) * GROW
+    return CREST(EARS(p)) * GROW
 
 
 sculpted.reshape(body, SHAPE)
