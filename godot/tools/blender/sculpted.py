@@ -459,7 +459,8 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
     glow: {"eyes": [hint, ...], "colour": (r, g, b), "radius": metres, "find": mode}: each eye is found as the
     yellowest, brightest texels within 3 cm of its hint ("dark": the darkest, a socket; "bright": the palest, a
     painted milky eye; "fixed": the hint itself), and a ball of `radius` round it lights up in `colour` (eyes,
-    embers in sockets).
+    embers in sockets). "hot": {"hues": (lo, hi), "strength": k} also lights what the painting shows burning in
+    that hue range (bright and saturated: lava cracks, a glowing orb) in its own colour.
     metal: f(hue, sat, val, position) -> 0..1, where the surface is metal. The generator's own metalness is not
     trusted (it reads glossy painted skin as metal), so without it everything is a dielectric.
     rough: f(hue, sat, val, roughness, occlusion) -> roughness: a monster's own surfaces (oily hide, wet wounds,
@@ -541,7 +542,15 @@ def write_maps(kind: str, low: bpy.types.Object, baked: dict[str, bpy.types.Imag
         # the glow, and a faint fill of the body's own colours: under the blue moon a red hide would go grey-black
         # with nothing else lighting it
         eyes = np.array((glow or {}).get("colour", (1.0, 0.72, 0.15)))[None, None, :] * lit[..., None]
-        save(np.maximum(eyes, albedo[..., :3] * np.asarray(fill)), folder / "emission.webp", data=False)   # fill: a share or (r, g, b)
+        emit = np.maximum(eyes, albedo[..., :3] * np.asarray(fill))   # fill: a share or (r, g, b)
+        hot = (glow or {}).get("hot")
+        if hot:   # what the painting shows burning (lava cracks, a glowing orb): its own colour, lit
+            lo, hi = hot["hues"]
+            band = ((hue >= lo) & (hue <= hi)) if lo <= hi else ((hue >= lo) | (hue <= hi))
+            mask = band & (sat > hot.get("sat", 0.45)) & (val > hot.get("val", 0.5))
+            print(f"glow: {mask.mean() * 100:.1f}% of the texels burn")
+            emit = np.maximum(emit, albedo[..., :3] * mask[..., None] * hot.get("strength", 1.0))
+        save(emit, folder / "emission.webp", data=False)
         names.append("emission")
     for name in names:
         # the glow map has no mipmaps: averaged down, an eye's few lit texels bled into the neighbouring islands of

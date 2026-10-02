@@ -109,6 +109,7 @@ class Spec:
     joints: dict = field(default_factory=dict)   # overrides of the fitted joints, by name
     leader: bool = False                # bakes the cast: needs a staff
     out: str | None = None              # the model's name, if not mon_<kind> (a trial)
+    hot: dict | None = None             # what its painting shows burning glows (sculpted.write_maps glow["hot"])
 
 
 class Biped:
@@ -125,9 +126,9 @@ class Biped:
         self.h = fitted["height"]
         self.robe = fitted["robe"]
         print("biped", k, "robe" if self.robe else "legs", {n: tuple(round(c, 3) for c in v) for n, v in j.items()})
-        glow = None
+        glow = {"hot": spec.hot} if spec.hot else None
         if spec.eyes is not None:
-            glow = {"eyes": find_eyes(obj, j, self.h), "radius": 0.007 * self.h, "colour": spec.eyes}
+            glow = {**(glow or {}), "eyes": find_eyes(obj, j, self.h), "radius": 0.007 * self.h, "colour": spec.eyes}
         if not os.environ.get("HW_FAST"):
             grade = sculpted.grade(**spec.grade)
             sculpted.write_maps(k, obj, sculpted.bake_detail(obj, k, m), glow=glow,
