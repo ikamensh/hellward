@@ -8,7 +8,8 @@ economy, fidelity to game-design.md, feasibility in this codebase). Ilya then se
 a run is the whole campaign; sanctuary life is a run-wide pool; chant interrupts go with Cleanse; next-level attacks
 come both as charges and as separate towers; relics drop without choice plus a merchant; build variety comes from
 relics, with reskill points to unlearn slowly; elements are protected or vulnerable by 25% before armor; Skip is
-offered after the player commits to the wave. Choices marked *(Ilya)* are his.
+offered after the player commits to the wave. A second round of the same four reviews (v2) found the remaining
+problems listed under "Round 2" at the end, folded in here (v3). Choices marked *(Ilya)* are his.
 
 Today's game, for reference ([campaign.md](campaign.md), [design.md](design.md)): twelve locations in two acts as a
 persistent campaign; sigils by lives kept buy a free-respec tree; seven tower families in three ranks; four curses
@@ -17,13 +18,16 @@ breaches, trophies, patterns. Life starts at 6.
 
 ## 1. A run *(Ilya)*
 
-- A **run** walks all twelve locations in order, about an hour. Locations shorten to about five waves.
+- A **run** walks all twelve locations in order, about an hour. Locations shorten to four to six waves (about five),
+  in the first rules pass, so the bots' searched plans are redone once.
 - It starts with one random relic. Between locations is a **camp**: spend skill and reskill points, take the
   location's relic drop, visit the merchant.
 - **Carried within a run:** sanctuary life, hero level and XP, skill and reskill points, learned skills, relics,
   gold.
 - **Kept across runs:** the meta currency and its purchases, story pages seen, best results.
-- One save, overwritten at every camp and at every wave's start: a lost bonus wave cannot be reloaded.
+- One save, overwritten at every camp and at every wave's start: a lost bonus wave cannot be reloaded. A save is the
+  Kit, the order log so far and the World, tagged with the compiled build's key; when the key no longer matches, the
+  order log is replayed instead. Quitting mid-wave resumes where the log ends.
 - Everything a defence starts from is one immutable **Kit** (skills, relics and their counters, bought modes, tower
   dials, gold, life, patterns, seed). A replay is a Kit plus the order log; the run layer lives outside `sim/`.
 
@@ -41,7 +45,8 @@ breaches, trophies, patterns. Life starts at 6.
   life (section 4). The scorecard prints a per-location power table: the last wave's life on the field per second
   against a reference board's damage per second.
 - **Location end:** gold carries in full. Towers are dismantled and refund the same share as selling one, 50%.
-- **Rubber band:** each location starts with at least a floor of gold. It never helps the rich.
+- **Rubber band:** gold carried out of a location below a floor is topped up to it, before the merchant, so spending
+  at the merchant never earns a top-up. It never helps the rich.
 - **Sinks for riches:** the merchant's relic (rising prices), clearing rock (rising prices, a few cells per map), and
   bonus-wave stakes. No interest.
 
@@ -60,10 +65,14 @@ breaches, trophies, patterns. Life starts at 6.
 
 A hit resolves in four steps:
 
-1. Its **element**: a monster *protected* against it takes ×0.75; one *vulnerable* takes ×1.25.
-2. Round to a whole number.
+1. Multiply its **factors**: the element (a monster *protected* against it takes ×0.75, one *vulnerable* ×1.25), the
+   Bone Altar's amplification and the Druid Grove's aura. Their product never exceeds ×2.
+2. Round to a whole number: up when the product is above 1, down when below, so a tag always moves a hit by at least
+   one (a 2 against a protected monster is 1, against a vulnerable one 3).
 3. Subtract **armor**.
 4. The hit does at least 1.
+
+The hover on a monster shows the hit each tower would actually deal it.
 
 - Each kind carries at most two element tags.
 - **Bypasses:** damage over time (poison, burning floor) ignores armor. Holy damage (Smite) ignores armor and
@@ -78,8 +87,8 @@ The upgrade rule (section 9) is judged against each location's real armor mix.
 A monster that reaches the end of its route **strikes the shrine** and costs its lives.
 
 - An **ordinary monster** is obliterated: a strike, a holy flash, then gone.
-- A **boss** (Azazel, the Bone Priest) is **sent back to its portal** with the life it has. Its strikes cost 5, then
-  8, then 12, and a counter on the boss shows how many it has made.
+- A **boss** (Azazel, the Bone Priest) is **sent back to its portal** with the life it has, as the design says; each
+  strike costs 5 life, and a counter on the boss shows how many it has made.
 
 ## 7. Global spells *(Ilya)*
 
@@ -92,7 +101,8 @@ No Cleanse, and no spell breaks a chant: the resolute leader goes.
 | Meteor | Fire on a spot, then burning floor. |
 | Battle Hymn | One tower attacks twice as fast for 6 s. The leaders' planner sees the stronger tower, so the boost is fragile. |
 
-Mana is tuned for about one cast a wave. Spells other than Smite are learned in the Sorcery column.
+Mana is tuned for about two casts a wave, so killing a stray and boosting a tower do not compete. Spells other than
+Smite are learned in the Sorcery column.
 
 ## 8. Curses and leaders
 
@@ -140,11 +150,11 @@ Mana is tuned for about one cast a wave. Spells other than Smite are learned in 
 | Mechanics | Verb | What it does |
 |---|---|---|
 | Moon Well (water only) | charge | gives a charge to the neighbour with fewest, every 8 s |
-| Druid Grove | corpse | each corpse in reach feeds it: +1 hit damage to towers in its aura per stack (max 3), stacks fade |
+| Druid Grove | corpse | each corpse in reach feeds it a stack (max 3, fading): towers in its aura hit ×1.15 per stack |
 | Effigy | curse taken | cursed like any tower in the circle; each curse it takes gives a neighbour a charge |
-| Soul Jar | overkill | overkill from towers within 2 tiles fills it; full, it pays gold |
+| Soul Jar | overkill | overkill from towers within 2 tiles fills it; full, it pays gold (the fill grows with the location, so its yield keeps pace with income) |
 | Tolling Bell | banish | every 12 s sends the foremost walker in reach 3 tiles back; that monster comes on 25% faster for 4 s |
-| Bone Altar | debuff | amplified monsters take +1 (rank I) or +2 per hit for 2 s; an amplified death consumes the debuff |
+| Bone Altar | debuff | amplified monsters take hits ×1.25 for 2 s; an amplified death consumes the debuff |
 
 Fourteen kinds, six of them mechanics towers.
 
@@ -153,7 +163,9 @@ Fourteen kinds, six of them mechanics towers.
 **Charges.**
 - An attack tower with its charged ability holds up to **3 charges** and gains one every 15 s.
 - The charged attack has its own **cooldown** of at least 4 s, so extra charges bank rather than speed it up.
-- Every verb loop must gain less than 1 at reference rates; a content lint checks it.
+- Every verb loop must gain less than 1 at reference rates, gold counted as a node; a content lint checks it.
+- Charges and every other clock that decides a fight tick only while a wave runs. A break changes nothing the
+  prediction (section 16) depends on except what the player does.
 
 **AI dials.** Each tower has two, and a new tower takes its kind's last setting:
 
@@ -184,7 +196,9 @@ step:
 
 **What a relic is.**
 - Data: a trigger (a verb with a count or a predictable condition), an effect from a fixed list (gold, mana, a
-  charge, holy damage at the spot, a corpse, a stat change on a tower kind), and often a downside.
+  charge, holy damage at the spot, a corpse, a stat change on a tower kind), and sometimes a downside.
+- A relic the player did not choose never carries a downside: **pacts** come only from choices (the boss's 1 of 2,
+  the merchant, a stake-3 wave).
 - No relic adds a rule or uses chance. Counters show on the towers.
 
 **Where relics come from.**
@@ -192,9 +206,10 @@ step:
 - A boss offers 1 of 2.
 - A stake-3 bonus wave gives one, at most once per act.
 - The camp **merchant** sells one relic, at prices that rise with each purchase.
-- A run gathers about 12–15.
+- A rich run gathers about 18–20.
 
-**The pool.** 30 at first, growing to 50 or more. It holds:
+**The pool.** At least 40 at first, growing to 60 or more through the shop; at least a quarter are enablers, since
+relics are the run's variety. Each relic's counter shows on the selected tower and in a relic bar. It holds:
 - **converters** (verb → verb);
 - **counters** ("every 10th Arrow attack deals double");
 - **enablers** (use a kind you have not learned, or a charged ability without its skill);
@@ -208,7 +223,7 @@ The relics a run happens to draw push it toward a build: that is the run's varie
 - XP comes from kills and wave clears.
 - Level-ups come often: the first in Tristram's second wave, about forty by the Temple.
 - Each level gives 1 **skill point**, and every third level 1 **reskill point**.
-- A level-up is an event the client celebrates.
+- A level-up is an event the client celebrates: a short beat for most, the full celebration every fifth level.
 
 **Sigils.**
 - Each location gives up to 3 for lives (section 2) and 3 for its **goals**, each worth 1 skill point.
@@ -222,8 +237,9 @@ The relics a run happens to draw push it toward a build: that is the run's varie
   - base attack kinds: unlock 4 (Arrow free), rank II 3, rank III 4, charged ability 5, capstone 6;
   - great towers: unlock 10, then ranks;
   - mechanics towers: unlock 3–4.
-- Sorcery and Warding columns cover the spells and the gates.
-- The whole tree costs about 300.
+- Sorcery (the spells, about 25 points) and Warding (the gates, about 15) are priced like tower columns.
+- The whole tree costs at least 2.5 times a perfect run's points (about 280 or more); the physical family's later
+  kinds (section 21) add to it. Charged abilities cost about 6 and capstones about 8.
 - No respec. A **reskill point** unlearns one skill from the bottom of its column and refunds its points, so a
   player slowly leaves what their relics did not favour.
 
@@ -244,11 +260,14 @@ from the current state, with no player input and the real leaders.
 
 **Timing.** It starts quietly once the player has been idle for 1 s during the break, and the newest request wins.
 Its result shows only when the player **calls the wave**:
-- If the wave is predicted clean (no life lost) and the prediction is ready, the player chooses **Skip**, with a
-  10% gold bonus and the vision, or **Fight**.
-- If the prediction is not ready, the wave simply starts.
+- If the prediction is not ready, the call waits up to about 2 s behind the red dimming.
+- If the wave is predicted clean (no life lost), the game pauses and the player chooses **Skip**, with a 10% gold
+  bonus and the vision, or **Fight**. A wave that starts because its break ran out counts as a call.
+- If it is still not ready, the wave simply starts.
 
-**Applying it.** Skipping adopts the predicted world, so every counter carries over.
+**Applying it.** Skipping adopts the predicted world, so every counter carries over, plus the difference in purse
+(gold, mana) since the prediction began. Bots and tests predict inline; how often a person's call finds the
+prediction ready is measured separately, with a latency model.
 
 **The vision.** The level dims to the dark god's red, and the wave's deaths play fast at their places, for 3–6 s.
 A click ends it.
@@ -268,13 +287,15 @@ location, not the current wave, and summoning earlier pays a premium.
 | 2 | more gold and salvage |
 | 3 | a relic (at most once per act) and much gold |
 
-**Risk.** There is no hard cap, but each further bonus wave at a location grows its pack. Leaks cost pool life, and
-the wave can never be skipped. The current breaches become authored bonus waves.
+**Risk.** There is no hard cap, but each further bonus wave at a location pays about ×0.6 the one before while its
+pack grows about ×1.3, so the natural stop is two or three. Past 30 bodies a pack grows in life and elites, not
+bodies. Salvage from bonus waves is capped per location. Leaks cost pool life, and the wave can never be skipped. The
+current breaches become authored bonus waves.
 
 ## 18. Smarter monsters
 
-- In Act II, each pack chooses its route when the wave is called, by the least tower coverage without curses. Banners
-  at the forks show the choice during the break.
+- In Act II, each pack chooses its route by the least tower coverage without curses. Banners at the forks show the
+  choice during the break and update as the player builds; calling the wave fixes it.
 - Flayers sprint when hit.
 
 ## 19. Difficulty

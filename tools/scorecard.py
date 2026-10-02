@@ -101,8 +101,8 @@ def no_dispel() -> Result:
 def tower_kinds() -> list[Result]:
     mechanics = [kind.name for kind in TOWERS.values() if kind.attack not in ATTACKS]
     share = len(mechanics) / len(TOWERS)
-    return [Result("M4", "tower kinds", str(len(TOWERS)), len(TOWERS) >= 12),
-            Result("M6", "share of mechanics towers", f"{share:.0%}", share >= 0.5)]
+    return [Result("M4", "tower kinds", str(len(TOWERS)), len(TOWERS) >= 14),
+            Result("M6", "share of mechanics towers", f"{share:.0%}", share >= 0.4)]
 
 
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
@@ -110,9 +110,9 @@ CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
 )
 
 NOT_YET = (
-    "G1.1", "G1.2", "G1.3", "G1.4", "G1.5", "G2.2", "G2.5", "G2.6", "G3.1", "G3.2", "G3.3", "M1", "M2", "M3", "M5",
-    "M7", "M9", "M10", "S2", "S3", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "R1", "R2", "R4", "R5", "R6", "R7",
-    "T2",
+    "G1.1", "G1.2", "G1.3", "G1.4", "G1.5", "G1.6", "G2.2", "G2.5", "G2.6", "G3.1", "G3.2", "G3.3", "G3.4",
+    "M1", "M2", "M3", "M5", "M7", "M9", "M10", "S2", "S3", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
+    "R1", "R2", "R4", "R5", "R6", "R7", "T2", "T4",
 )
 
 
