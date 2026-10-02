@@ -6,7 +6,7 @@ from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import EVERY_TOWER, Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
 
-LIFE_FACTOR = 1.0   # this location's tuning, by simulation: every monster's life here,
+LIFE_FACTOR = 0.96   # this location's tuning, by simulation: every monster's life here,
                             # and the spells' strength, is multiplied by it (0.85-1.2)
 
 
@@ -18,27 +18,41 @@ SPIDER_FOREST = Location(
         name="The Spider Forest", width=33, height=18,
         waypoints=((9, 0), (9, 9), (22, 9), (22, 14), (32, 14)),
         doors=((9, 5),),
-        obstacles=frozenset({(3, 3), (4, 6), (17, 2), (5, 17), (29, 16)}),
-        pools=frozenset({(3, 8), (17, 3), (26, 2)}),
+        obstacles=frozenset({
+            (12, 1), (13, 1), (14, 1),                       # a collapsed wall, north-east of the gate road
+            (25, 9), (26, 8), (26, 9),                       # boulders below the breach scar
+            (16, 7), (17, 7), (18, 7), (19, 7),              # a ruined wall along the middle lane
+            (7, 3), (7, 4), (7, 5), (7, 6),                  # boulders west of the gate road
+            (4, 8), (3, 9), (3, 10), (3, 11),                # ruins where the west track bends
+        }),
+        pools=frozenset({
+            (24, 16), (25, 16), (26, 16), (27, 16),          # the merge pond, by the sanctuary fields
+            (1, 16), (2, 16), (3, 16), (4, 16), (5, 16), (6, 16), (7, 16),   # the west marsh
+            (9, 16), (10, 16), (11, 16), (12, 16),           # the still pond, south of the loop island
+            (20, 14), (20, 15), (21, 15), (21, 16), (22, 16),   # the gap pool under the descent
+            (30, 7), (31, 7), (30, 8), (31, 6),              # black water along the breach scar
+        }),
+        boulders=frozenset({(24, 9), (15, 7), (18, 13)}),
         extra_routes=(
-            Route("meander", ((9, 0), (9, 2), (14, 2), (14, 13), (18, 13), (18, 5),
-                              (25, 5), (25, 14), (32, 14))),
-            Route("side", ((0, 14), (8, 14), (21, 13), (32, 14))),
-            Route("side_detour", ((0, 14), (4, 10), (12, 10), (12, 16), (22, 16),
-                                  (25, 13), (32, 14))),
+            Route("meander", ((9, 0), (9, 3), (13, 3), (13, 9), (22, 9), (22, 14), (32, 14))),
+            Route("side", ((0, 14), (16, 14), (16, 11), (28, 11), (28, 14), (32, 14))),
+            Route("side_detour", ((0, 14), (5, 14), (5, 10), (13, 10), (13, 14), (16, 14), (16, 11),
+                                  (28, 11), (28, 14), (32, 14))),
             Route("breach", ((32, 3), (28, 6), (28, 11), (32, 14))),
         ),
     ),
     waves=waves(7,
-        (g("spider", 10, 1.0),),
-        (g("bat", 12, 0.6, route="side"), g("spider", 6, 1.0, start=4.0)),
-        (g("spider", 12, 0.8, route="side"), g("witch", 1, start=5.0)),
-        (g("flayer", 16, 0.5, route="side"), g("spider", 8, 0.8, start=3.0), g("fetish", 1, start=4.0)),
-        (g("bat", 16, 0.5, route="side"), g("spider", 12, 0.7, start=3.0), g("witch", 1, start=4.0), g("fetish", 1, start=8.0)),
-        (g("spider", 16, 0.6, route="side"), g("flayer", 20, 0.4, start=3.0), g("witch", 2, 7.0, start=3.0)),
-        (g("spider", 24, 0.45), g("bat", 20, 0.4, start=4.0, route="side"), g("witch", 1, start=3.0), g("fetish", 2, 6.0, start=6.0)),
+        (g("spider", 5, 1.2), g("spider", 3, 1.2, start=5.0, route="side")),
+        (g("spider", 6, 1.1), g("bat", 4, 0.8, start=5.0, route="side"),
+         g("spider", 2, 1.1, start=10.0)),
+        (g("spider", 7, 1.0), g("bat", 5, 0.7, start=5.0, route="side"), g("witch", 1, start=10.0)),
+        (g("spider", 5, 1.0), g("flayer", 6, 0.6, start=5.0, route="side"),
+         g("spider", 5, 1.0, start=10.0, route="side"), g("witch", 1, start=15.0)),
+        (g("spider", 6, 0.9), g("flayer", 4, 0.6, start=5.0, route="side"),
+         g("bat", 3, 0.7, start=10.0), g("witch", 1, start=15.0),
+         g("fetish", 1, start=20.0), g("spider", 2, 0.9, start=25.0, route="side")),
     ),
-    wave_names=("Webs", "Dusk Wings", "The Witch Walks", "Brood", "The Canopy Moves", "Old Growth", "The Queen's Children"),
+    wave_names=("Webs", "Dusk Wings", "The Witch Walks", "Brood", "The Queen's Children"),
     arsenal=Arsenal(EVERY_TOWER, gates=True, spells=("smite", "hymn")),
     start_gold=BALANCE.starting_gold(7),
     theme="spider_forest",
