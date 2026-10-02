@@ -11,6 +11,9 @@ on:
 env:
   GODOT_VERSION: "4.7.2"
 
+permissions:
+  contents: write   # attaching the Windows zip to the tag's release
+
 jobs:
   package:
     runs-on: windows-latest
