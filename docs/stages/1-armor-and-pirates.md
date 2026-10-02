@@ -167,20 +167,13 @@ Monsters:
 - **Hymn:**
   - a spell on the bar (key R), aimed at a tower like Cleanse was;
   - a golden aura on the tower while it lasts.
-- **Ballista:**
-  - model `tower_ballista`;
-  - a heavy bolt projectile.
-- **Hook Tower:**
-  - model `tower_hook`;
-  - on `hook`, a chain flies to the monster and drags it from the old place to the new over about 0.3 s, then the
-    monster walks on.
-- **Knife Post:**
-  - model `tower_knife`;
-  - a spinning knife projectile.
-- **Stand-ins** (`STAND_INS`) may serve until the models land:
-  - ballista: storm;
-  - hook: arrow;
-  - knife: arrow.
+- **Models,** one Blender script per kind that builds all three ranks, as `godot/tools/blender/tower_plague.py` does:
+  `tower_ballista_1..3`, `tower_hook_1..3`, `tower_knife_1..3`. Each rank carries `fx_muzzle` where its shots leave,
+  and a `turret` node if it aims. There are no stand-ins: the client tests check every kind's body and ranks.
+- **Ballista:** a heavy bolt projectile.
+- **Hook Tower:** on `hook`, a chain flies to the monster and drags it from the old place to the new over about 0.3 s;
+  then the monster walks on.
+- **Knife Post:** a spinning knife projectile.
 - **The shrine:**
   - on `leak`, the monster strikes the shrine gate, a holy flash, then it is gone;
   - on `returned`, the boss is struck back in a flash and reappears at its portal;
