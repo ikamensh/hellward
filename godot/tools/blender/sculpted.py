@@ -255,7 +255,7 @@ def smooth_normals(obj: bpy.types.Object, radius: float = 0.035) -> None:
 
 
 def prepare(kind: str, height: float, yaw: float = 0.0, glow=None, metal=None, rough=None, colour=None,
-            faces: int | None = None, families=None, looks=None, fill: float = 0.09, cavity: float = 0.45) -> bpy.types.Object:
+            faces: int | None = None, families=None, looks=None, fill: float = 0.03, cavity: float = 0.45) -> bpy.types.Object:
     """The body stood in the model contract, its maps baked and written, its material named mon_<kind>. With
     HW_FAST=1 in the environment the maps already written are kept (fitting a rig needs no bake)."""
     import os
@@ -579,6 +579,19 @@ def trim(obj: bpy.types.Object, doomed: np.ndarray) -> int:
     return len(gone)
 
 
+def fill_holes(obj: bpy.types.Object, sides: int) -> int:
+    """Close every hole in `obj`'s surface bounded by at most `sides` edges (a generated mesh's torn pinholes,
+    which let the sky through at range). Returns how many faces were added."""
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    made = bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=sides)["faces"]
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+    return len(made)
+
+
 def snap(obj: bpy.types.Object, guess, radius: float) -> Vector:
     """A joint's centre: the mean of the body's vertices within `radius` of a guess (a limb's cross-section)."""
     g = Vector(guess)
@@ -701,9 +714,9 @@ def iron(hue, sat, val, pos):
 
 # worn steel: grey, a little rust in its pits, bright where it is smooth
 # pale, worn steel, only half metal: a full metal reflects the black night sky and a blade read as a dark stick
-STEEL = {"colour": lambda rgb, pos: grade(sat=0.25, value=1.6, toward=(0.55, 0.55, 0.54), mix=0.7, mottle=0.2,
+STEEL = {"colour": lambda rgb, pos: grade(sat=0.2, value=1.8, toward=(0.6, 0.6, 0.59), mix=0.75, mottle=0.2,
                                           scale=0.02)(rgb, pos),
-         "rough": lambda ao: 0.35 + 0.4 * (1 - ao), "metal": 0.5}
+         "rough": lambda ao: 0.35 + 0.4 * (1 - ao), "metal": 0.35}
 
 
 def hide_rough(ao, rgb):
@@ -803,7 +816,7 @@ def bone_colour(rgb, hue, sat, val, pos):
     boneish = (((hue > 15) & (hue < 60)) & (sat < 0.65) & (val > 0.12))[..., None]
     g = _grey(rgb)
     # grey-ivory, not yellow: a fire turned a yellower bone traffic-cone orange beside the moonlit rest of it
-    ivory = np.clip(g * 1.5, 0.0, 0.58) * np.array([0.95, 0.93, 0.87]) * _mottle(pos, 0.12, 0.12)   # broad: no speckle
+    ivory = np.clip(g * 1.65, 0.0, 0.64) * np.array([0.97, 0.93, 0.84]) * _mottle(pos, 0.12, 0.12)   # broad: no speckle
     red = _skin_red(hue, sat)
     return np.where(red, (g + (rgb - g) * 0.7) * 0.85, np.where(boneish, ivory, rgb))
 

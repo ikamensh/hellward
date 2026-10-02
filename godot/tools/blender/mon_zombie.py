@@ -40,7 +40,7 @@ LOOKS = {
              "metal": 0.55},
 }
 body = sculpted.prepare(
-    "zombie", HEIGHT, yaw=180, faces=9000, families=FAMILIES, looks=LOOKS, fill=0.14)   # its eyes are the head's
+    "zombie", HEIGHT, yaw=180, faces=14000, families=FAMILIES, looks=LOOKS, fill=0.14)   # its eyes are the head's
 
 
 def BELLY(p):
@@ -54,6 +54,7 @@ def BELLY(p):
 def BULK(p):
     """The concept's slab of a body: the trunk and shoulders broad and deep (the generator made a gaunt old man)."""
     w = sculpted.smooth((p.z - 0.95) / 0.12) * (1 - sculpted.smooth((p.z - 1.66) / 0.06))
+    w *= 1 - sculpted.smooth((abs(p.x) - 0.2) / 0.1)   # the trunk, not the arms hanging beside it
     return Vector((p.x * (1 + 0.28 * w), -0.02 + (p.y + 0.02) * (1 + 0.18 * w), p.z))
 
 
@@ -137,8 +138,9 @@ def linen(co, thick):
 thick = sculpted.thickness(body)
 print("trimmed", sculpted.trim(body, np.array([v.co.z < 0.6 and linen(v.co, thick[v.index]) for v in body.data.vertices])),
       "linen vertices")
-print("thickened", sculpted.thicken(body, rig, ["thigh.R", "thigh.L"], 1.35, reach=0.15)
-      + sculpted.thicken(body, rig, ["shin.R", "shin.L"], 1.3, reach=0.11), "vertices")   # the concept's tree-trunk legs
+print("thickened", sculpted.thicken(body, rig, ["thigh.R", "thigh.L"], 1.5, reach=0.15)
+      + sculpted.thicken(body, rig, ["shin.R", "shin.L"], 1.45, reach=0.11), "vertices")
+print("filled", sculpted.fill_holes(body, 12), "holes")   # the torn mesh let light through at range   # the concept's tree-trunk legs
 # the generated head was a featureless sack: it is cut off at the jaw, and a head generated alone from its own
 # concept (art/gen/zombie_head: a face, milky eyes, a slack jaw, hair) is set on the neck once the rig is posed
 NECK_TOP = 1.74
@@ -162,7 +164,7 @@ rig.springs = {"cloth.F": (35.0, 0.3, 0.7), "cloth.F2": (30.0, 0.25, 0.8), "clot
 HEAD_LEN = 0.52   # stump to crown; the head itself a third of that, as big as the concept's
 hk = HEAD_LEN / 0.4   # the hints below were read off tools/blender/views.py --stand 0.4 180
 head, _ = sculpted.prop(
-    "zombie_head", HEAD_LEN, metal=None, faces=5000, fill=0.14,
+    "zombie_head", HEAD_LEN, metal=None, faces=8000, fill=0.14,
     colour=lambda rgb, hue, sat, val, pos: sculpted.grade(sat=0.75, value=1.05, mottle=0.1)(rgb, pos),
     rough=lambda hue, sat, val, rough, ao: np.where(((hue < 20) | (hue > 300)) & (sat > 0.45) & (val < 0.4), 0.25,
                                                     0.7 + 0.15 * (1 - ao)),   # a wet mouth and torn neck
@@ -188,12 +190,12 @@ def walk(t):
     settling at every footfall."""
     own = Pose().rot("jaw", p=-14 - 8 * bump(t, 0.1, 0.4)).rot("neck", p=8)
     own.rot("head", r=10 + 9 * math.sin(TAU * (t - 0.2)), p=6 + 5 * math.cos(2 * TAU * (t - 0.15)))   # lolling
-    own.rot("hips", r=5 * math.sin(TAU * t))   # the gut swung from side to side, a step at a time
-    own.rot("spine", p=-6 + 2.5 * math.cos(2 * TAU * (t - 0.1)), r=-3 * math.sin(TAU * (t - 0.1)))
+    own.rot("hips", r=9 * math.sin(TAU * t))   # the gut swung from side to side, a step at a time
+    own.rot("spine", p=-6 + 3.5 * math.cos(2 * TAU * (t - 0.1)), r=-6 * math.sin(TAU * (t - 0.1)))
     own.rot("chest", p=-6)   # the trunk leaning out over it
     for s, side in SIDES:
-        own.rot(f"upper_arm.{side}", p=9 * s * math.sin(TAU * (t - 0.12)))
-        own.rot(f"forearm.{side}", p=10 * s * math.sin(TAU * (t - 0.25)) + 10)
+        own.rot(f"upper_arm.{side}", p=20 * s * math.sin(TAU * (t - 0.12)))
+        own.rot(f"forearm.{side}", p=18 * s * math.sin(TAU * (t - 0.25)) + 10)
         own.rot(f"hand.{side}", p=12 * s * math.sin(TAU * (t - 0.35)) + 10)
     return shamble.pose(rig, t, own, arms=0.75)
 

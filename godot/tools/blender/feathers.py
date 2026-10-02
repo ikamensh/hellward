@@ -51,26 +51,24 @@ def card(bm: bmesh.types.BMesh, root: Vector, up: Vector, side: Vector, length: 
                 loop[uv].uv = (uv0 + 0.5 * (j + dj) / (ACROSS - 1), (i + di) / ALONG)
 
 
-def crest(name: str, root: Vector, length: float, width: float = 0.05) -> bpy.types.Object:
-    """A crown of feathers on the head at `root`, in the posing rest (the monster facing +Y): eight long ones
-    behind, spread side to side and leaning a little back, five shorter ones in front of them standing upright, so
-    it reads from above and in profile; the middle ones longest, crimson and gold by turns. Upright: leaning back,
-    they read from the battle camera as spines down its back."""
+def crest(name: str, root: Vector, length: float, width: float = 0.05, n: int = 11) -> bpy.types.Object:
+    """The 2D shaman's mohawk on the head at `root`, in the posing rest (the monster facing +Y): `n` feathers in a
+    ridge from the brow to the nape, each rising nearly upright, the front ones tipped a little forward and the back
+    ones swept back, the middle ones longest; crimson, every third gold. Each card is turned a little off the
+    midline, alternately left and right, so the ridge shows its feathers from the front and from the side alike."""
     bm = bmesh.new()
-    rows = ((9, 130.0, 6.0, 1.0, Vector((0, -0.03, 0))), (6, 80.0, -6.0, 0.72, Vector((0, 0.03, -0.01))))
-    k = 0
-    for n, spread, lean, size, shift in rows:
-        for i in range(n):
-            f = i / (n - 1) - 0.5                     # -0.5 (its right) .. 0.5 (its left)
-            tilt = math.radians(spread * f)
-            back = math.radians(lean + 8 * abs(f))
-            up = Vector((math.sin(tilt), -math.sin(back), math.cos(tilt) * math.cos(back)))
-            side = Vector((math.cos(tilt), 0, -math.sin(tilt)))
-            at = root + shift + Vector((0.05 * f, -0.03 * abs(f), -0.03 * (2 * f) ** 2))
-            ln = length * size * (1.0 - 0.3 * (2 * f) ** 2) * (0.9 + 0.2 * ((k * 37) % 7) / 6)
-            card(bm, at, up, side, ln, width * (0.85 + 0.3 * ((k * 53) % 5) / 4), curl=0.2 * ln, fold=0.4,
-                 gold=k % 2 == 1, seed=k)
-            k += 1
+    for i in range(n):
+        f = i / (n - 1)                                # 0 at the brow .. 1 at the nape
+        back = math.radians(-12 + 58 * f)
+        lean = math.radians(9 if i % 2 else -9)        # a little out to either side, by turns
+        up = Vector((math.sin(lean), -math.sin(back), math.cos(lean) * math.cos(back))).normalized()
+        yaw = math.radians(28 if i % 2 else -28)
+        side = Vector((math.cos(yaw), math.sin(yaw), 0))
+        side = (side - up * side.dot(up)).normalized()
+        at = root + Vector((0.012 * (1 if i % 2 else -1), 0.06 - 0.15 * f, -0.03 * (2 * f - 0.8) ** 2))
+        ln = length * (0.62 + 0.38 * math.sin(math.pi * (0.15 + 0.75 * f))) * (0.92 + 0.16 * ((i * 37) % 7) / 6)
+        card(bm, at, up, side, ln, width * (0.85 + 0.3 * ((i * 53) % 5) / 4), curl=0.15 * ln, fold=0.4,
+             gold=i % 3 == 1, seed=i)
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
     bm.free()

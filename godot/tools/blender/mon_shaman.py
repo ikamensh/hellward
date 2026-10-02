@@ -54,7 +54,7 @@ LOOKS = {
               "rough": 0.92},   # chalky
     "crest": {"colour": feather_colour, "rough": 0.8},
     # the Fallen's crimson (the generator painted the shaman browner): one family of imps
-    "skin": {"colour": sculpted.grade(sat=0.75, value=1.15, toward=(0.42, 0.04, 0.04), mix=0.5, mottle=0.16,
+    "skin": {"colour": sculpted.grade(sat=0.55, value=1.05, toward=(0.34, 0.07, 0.05), mix=0.5, mottle=0.16,
                                       grime=0.5, knee=0.45),
              "rough": sculpted.hide_rough},
     "hide": {"colour": sculpted.grade(sat=0.5, value=0.85, toward=(0.27, 0.23, 0.17), mix=0.6, mottle=0.1),
@@ -63,7 +63,7 @@ LOOKS = {
     "bone": {"colour": sculpted.grade(sat=0.4, value=0.72, toward=(0.5, 0.42, 0.32), mix=0.5, mottle=0.15), "rough": 0.75},
     "hoof": {"colour": sculpted.grade(sat=0.4, value=0.7, grime=0.4, knee=0.1), "rough": 0.55},
 }
-body = sculpted.prepare("shaman", HEIGHT, yaw=180, faces=10000, families=FAMILIES, looks=LOOKS, cavity=0.5,
+body = sculpted.prepare("shaman", HEIGHT, yaw=180, faces=16000, families=FAMILIES, looks=LOOKS, cavity=0.5,
                         glow={"eyes": [(-0.04, 0.16, 1.083), (-0.113, 0.09, 1.083)], "radius": 0.014})   # the yellow eyes glow
 
 
@@ -163,7 +163,7 @@ rig.springs["crest"] = (55.0, 0.25)   # the feather fan sways after the head
 # the head faces forward) so that it lands there on the bound body
 tuft = np.array([tuple(v.co) for v in body.data.vertices if v.co.z > 1.2 * GROW + 0.004 and abs(v.co.x) < 0.15 * GROW])
 crown = rig.unfix["crest"].inverted() @ (Vector(np.median(tuft, axis=0)) - Vector((0, 0, 0.025)))
-crest = feathers.crest("mon_shaman_crest", crown, 0.46 * GROW, width=0.05 * GROW)
+crest = feathers.crest("mon_shaman_crest", crown, 0.44 * GROW, width=0.055 * GROW)
 sculpted.attach(crest, rig, "crest")
 feathers.write_maps("shaman_crest")
 rig.springs.update({f"skirt.{p}": (45.0, 0.3, 0.7) for p in ("F", "B", "R", "L")})
@@ -171,7 +171,7 @@ rig.springs.update({f"skirt.{p}": (45.0, 0.3, 0.7) for p in ("F", "B", "R", "L")
 
 # -- the skull staff in the right fist: upright whenever the hand's turn is none (orient(hand.R, Q())), its foot a
 # little above the ground in the stance, the skull high over the crest
-STAFF = 1.55 * GROW
+STAFF = 1.32 * GROW   # the skull at about its head's height, as the 2D shaman carries it
 
 
 def staff_colour(rgb, hue, sat, val, pos):
@@ -185,16 +185,18 @@ staff, sf = sculpted.prop("skull_staff", STAFF, metal=None, colour=staff_colour,
 # the stump, the staff run up into it from below as a skull on a pole is mounted
 CUT = STAFF * 0.8
 sculpted.trim(staff, np.array([v.co.z > CUT for v in staff.data.vertices]))
+sculpted.reshape(staff, lambda q: Vector((sf["centre"].x + (q.x - sf["centre"].x) * 1.5,
+                                           sf["centre"].y + (q.y - sf["centre"].y) * 1.5, q.z)))   # a thick shaft
 GRIP = 0.36   # held a third of the way up: its foot clear of the ground, its skull high over the crest
 grip = sculpted.snap(staff, Vector((sf["centre"].x, sf["centre"].y, GRIP * STAFF)), 0.06)
 fist = rig.head["hand.R"].lerp(rig.tail["hand.R"], 0.45)
 sculpted.hold(staff, rig, "hand.R", grip, sf["axis"], sf["flat"], fist, Vector((0, 0, 1)), Vector((1, 0, 0)))
 
-SKULL = 0.26 * GROW   # tall, jaw to crown: bigger than a man's, the shaman's sign over the pack
+SKULL = 0.32 * GROW   # tall, jaw to crown: bigger than a man's, the shaman's sign over the pack
 sk = SKULL / 0.24     # the hints below were read off tools/blender/views.py --stand 0.24 180
 # the leader's sign on the model itself: the skull's sockets burn deep with the curse's violet
-skull, _ = sculpted.prop("skull", SKULL, metal=None, faces=3000, fill=(0.08, 0.03, 0.14),   # a faint violet sheen
-                         colour=lambda rgb, hue, sat, val, pos: sculpted.grade(sat=0.55, value=0.72, mottle=0.12)(rgb, pos),
+skull, _ = sculpted.prop("skull", SKULL, metal=None, faces=3000, fill=(0.03, 0.01, 0.05),   # a faint violet sheen
+                         colour=lambda rgb, hue, sat, val, pos: sculpted.grade(sat=0.4, value=1.1, mottle=0.1)(rgb, pos),   # bone white
                          glow={"eyes": [(0.033 * sk, -0.004 * sk, 0.146 * sk), (-0.033 * sk, -0.004 * sk, 0.146 * sk)],
                                "radius": 0.018 * sk, "colour": (0.7, 0.22, 1.0), "find": "fixed"})   # the sockets, burning
 MOUNT = Vector((0, -0.07, 0.035)) * sk   # under the cranium, behind the jaw
@@ -265,40 +267,31 @@ def held(base):
 
 
 def cast(t):
-    """The curse, a ritual the whole battle can read and nothing like its blow: crouched over the staff, gathering;
-    it rises with the skull hauled over its head and its free claw flung at the sky, then thrusts the skull out at
-    the cursed tower at arm's length and jabs it there, again and again, chanting, the crest flared; and sinks to
-    gather again."""
-    gather = imp_stance(K).move("hips", z=-0.05 * K).rot("hips", p=-6).rot("chest", p=-12).rot("head", p=-12)
-    gather.rot("jaw", p=-10).rot("crest", p=6)
-    gather.rot("upper_arm.L", p=30, r=20).rot("forearm.L", p=70)
-    rise = imp_stance(K).move("hips", z=0.04 * K).rot("hips", p=10).rot("spine", p=8).rot("chest", p=14)
-    rise.rot("neck", p=8).rot("head", p=24).rot("jaw", p=-36).rot("crest", p=-14)
-    rise.rot("upper_arm.L", p=150, r=-10).rot("forearm.L", p=20).rot("hand.L", p=-40)
-    thrust = imp_stance(K).move("hips", y=0.06 * K, z=-0.01 * K).rot("hips", p=-8).rot("chest", p=-10, y=12)
-    thrust.rot("head", p=4).rot("jaw", p=-38).rot("crest", p=-18)
-    thrust.rot("upper_arm.L", p=140, r=-14).rot("forearm.L", p=25).rot("hand.L", p=-30)
-    jab = thrust.copy().move("hips", y=0.06 * K, z=0.02 * K).rot("chest", p=-10, y=6).rot("head", p=8).rot("jaw", p=16)
-    jab.rot("crest", p=-10)
-    keys = [(0.0, gather, smooth), (0.14, rise, ease_out), (0.26, thrust, ease_in)]
-    for n, tk in enumerate((0.36, 0.46, 0.56, 0.66, 0.76)):
-        keys.append((tk, jab if n % 2 == 0 else thrust, ease_out if n % 2 == 0 else smooth))
-    keys += [(0.88, thrust, smooth), (1.0, gather, smooth)]
-    p = keyed(t, keys)
+    """The curse, a ritual in three beats a loop that the whole battle can read: on each it hauls the skull high
+    over its head, arched back on its toes with the free claw flung at the sky, then drives it out at the cursed
+    tower, lunging after it with the claw pointing the way; the jaw chants throughout."""
+    high = imp_stance(K).move("hips", z=0.04 * K, y=-0.02 * K).rot("hips", p=10).rot("spine", p=8).rot("chest", p=14)
+    high.rot("neck", p=8).rot("head", p=24).rot("jaw", p=-36).rot("crest", p=-14)
+    high.rot("upper_arm.L", p=150, r=-10).rot("forearm.L", p=20).rot("hand.L", p=-40)
+    out = imp_stance(K).move("hips", y=0.08 * K, z=-0.04 * K).rot("hips", p=-12).rot("chest", p=-14, y=12)
+    out.rot("head", p=-2).rot("jaw", p=-20).rot("crest", p=12)
+    out.rot("upper_arm.L", p=100, r=6).rot("forearm.L", p=6).rot("hand.L", p=10)
+    w = 0.5 - 0.5 * math.cos(3 * TAU * t)   # 0 overhead, 1 driven out
+    w = smooth(w)
+    p = mix(high, out, w)
     p.rot("jaw", p=-10 * abs(math.sin(TAU * t * 7)))   # the chant
     for s_, side in SIDES:
-        p.rot(f"ear.{side}", r=-s_ * 14 * bump(t, 0.12, 0.9))
-    low = (Vector((0.12, 0.24, 0.8)) * K, Vector((0.08, 0.45, 1)))
-    high = (Vector((0.1, 0.1, 1.42)) * K, Vector((0.0, 0.15, 1)))
-    # brandished up at the tower's top, the skull high in front, each jab a hand further out and higher
-    out = (Vector((0.06, 0.36, 1.2)) * K, Vector((0.05, 0.8, 1)))
-    stab = (Vector((0.06, 0.54, 1.3)) * K, Vector((0.05, 1, 0.8)))
-    staff = [(0.0, *low), (0.14, *high), (0.26, *out)]
-    for n, tk in enumerate((0.36, 0.46, 0.56, 0.66, 0.76)):
-        staff.append((tk, *(stab if n % 2 == 0 else out)))
-    staff += [(0.88, *out), (1.0, *low)]
-    wield(p, t, staff)
-    plant_legs(rig, p, imp_feet(rig, K))
+        p.rot(f"ear.{side}", r=-s_ * (8 + 10 * (1 - w)))
+    up = (Vector((0.1, 0.06, 1.44)) * K, Vector((0.0, 0.1, 1)))
+    at_tower = (Vector((0.06, 0.5, 1.18)) * K, Vector((0.05, 1, 0.6)))
+    q = Vector((0, 0, 1)).rotation_difference(up[1].normalized().slerp(at_tower[1].normalized(), w))
+    fist_at = rig.delta(p, "chest") @ up[0].lerp(at_tower[0], w)
+    rig.reach(p, "upper_arm.R", "forearm.R", fist_at - q @ FIST, (1, -0.3, -0.6))
+    rig.orient(p, "hand.R", q)
+    feet = imp_feet(rig, K)
+    a, pitch, yaw = feet["L"]
+    feet["L"] = (a + Vector((0, 0.1 * K * w, 0.03 * K * bump(w, 0.2, 0.8))), pitch, yaw)   # a step after the skull
+    plant_legs(rig, p, feet)
     return p
 
 

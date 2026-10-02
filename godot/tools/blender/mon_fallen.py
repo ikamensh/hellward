@@ -16,7 +16,8 @@ FAMILIES = {"sole": lambda x, y, z, lab: np.clip((0.075 - z) / 0.015, 0, 1),   #
             "strap": [(18.8, 8.1, 11.3)], "hoof": [(9.8, 9.7, 8.7)], "horn": [(58.6, 10.2, 24.6)]}
 LOOKS = {   # a dry, dusty hide, never plastic: rough all over, mud up the shins
     # oxblood crimson, the 2D Fallen's: dark (sRGB 0.17 read black under the moon, 1.35x read fire-orange)
-    "skin": {"colour": sculpted.grade(sat=0.75, value=1.15, toward=(0.42, 0.04, 0.04), mix=0.45, mottle=0.16,
+    # a brown-shaded oxblood: a saturated red went scarlet under a brazier and read as vinyl
+    "skin": {"colour": sculpted.grade(sat=0.55, value=1.05, toward=(0.34, 0.07, 0.05), mix=0.5, mottle=0.16,
                                       grime=0.45, knee=0.4),
              "rough": sculpted.hide_rough},
     "sole": {"colour": sculpted.grade(sat=0.3, value=0.6, toward=(0.08, 0.07, 0.06), mix=0.8), "rough": 0.5},
@@ -25,7 +26,7 @@ LOOKS = {   # a dry, dusty hide, never plastic: rough all over, mud up the shins
     "hoof": {"colour": sculpted.grade(sat=0.4, value=0.7, grime=0.4, knee=0.1), "rough": 0.55},
     "horn": {"colour": sculpted.grade(sat=0.55, value=0.75, mottle=0.1, scale=0.03), "rough": 0.65},
 }
-body = sculpted.prepare("fallen", HEIGHT, yaw=180, families=FAMILIES, looks=LOOKS, faces=7000, cavity=0.5,
+body = sculpted.prepare("fallen", HEIGHT, yaw=180, families=FAMILIES, looks=LOOKS, faces=12000, cavity=0.5,
                         glow={"eyes": [(0.062, 0.2, 0.955), (-0.048, 0.2, 0.955)], "radius": 0.012})   # the yellow eyes glow (found before the reshape)
 
 
@@ -134,12 +135,13 @@ fist = rig.head["hand.R"].lerp(rig.tail["hand.R"], 0.45)
 BLADE, FACE = Vector((0, 1, -0.3)).normalized(), Vector((1, 0, 0))   # in the right hand's rest frame
 sculpted.hold(knife, rig, "hand.R", grip, kf["axis"], kf["flat"], fist, BLADE, FACE)
 LIE_KNIFE = frame_turn(BLADE, FACE, Vector((0.85, 0.5, 0.02)), Vector((0, 0, 1)))   # dropped flat by the hand
+FALL_KNIFE = frame_turn(BLADE, FACE, Vector((0.6, 0.2, -0.75)), Vector((0, 0, 1)))   # falling, the point drops
 
 
 def ready(p, t, pump=0.0):
     """The knife carried low at the hip as the 2D Fallen carries it, point forward and down; `pump` swings the arm
     with the stride (the walk's own arm swing stays under it)."""
-    p.rot("upper_arm.R", p=8 + 26 * pump * math.cos(TAU * t), r=6).rot("forearm.R", p=38 + 12 * pump * math.cos(TAU * t))
+    p.rot("upper_arm.R", p=8 + 42 * pump * math.cos(TAU * t), r=6).rot("forearm.R", p=38 + 20 * pump * math.cos(TAU * t))
     rig.orient(p, "hand.R", frame_turn(BLADE, FACE, Vector((0.15, 0.85, -0.45 + 0.15 * pump * math.cos(TAU * t))),
                                        Vector((1, 0, 0))))
 
@@ -182,10 +184,10 @@ def attack(t):
 
 rig.action("idle", 2.0, lambda t: imp_idle(rig, K, t, crouch=0.7, hold=ready), loop=True)
 # short quick steps, bouncing: a scurry, not a stroll
-rig.action("walk", 0.55, lambda t: imp_walk(rig, K, t, stride=0.13, crouch=0.7, bob=0.06,
+rig.action("walk", 0.55, lambda t: imp_walk(rig, K, t, stride=0.13, crouch=0.35, bob=0.06,
                                            hold=lambda p, t: ready(p, t, pump=1.0)), loop=True)
 rig.action("attack", 0.7, attack)
-rig.action("die", 1.2, lambda t: imp_die(rig, K, t, foot_pitch=(55.0, 85.0), hand_r=LIE_KNIFE, wrist_z=0.07), ground_from=0.0, body=body)
+rig.action("die", 1.2, lambda t: imp_die(rig, K, t, foot_pitch=(55.0, 85.0), hand_r=LIE_KNIFE, hand_fall=FALL_KNIFE, wrist_z=0.07), ground_from=0.0, body=body)
 rig.action("die2", 1.3, lambda t: imp_die_forward(rig, K, t, hand_r=LIE_KNIFE), ground_from=0.0, body=body)
 rig.report(body)
 rig.extremes(body, "die")

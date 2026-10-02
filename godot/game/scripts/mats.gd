@@ -105,8 +105,8 @@ static func _make(key: String) -> Material:
 ## A generated monster's own maps (assets/textures/<kind>/: albedo, normal, orm, emission; docs/monsters.md).
 # the colour a monster's flesh shows lit from behind (the imps' thin ears and fingers glow red against a fire).
 # Screen-space subsurface scattering looked softer but cost 2 ms with a wave on screen; the backlight is free.
-const FLESH := {"mon_fallen": Color(0.55, 0.06, 0.02), "mon_shaman": Color(0.55, 0.06, 0.02),
-	"mon_shaman_crest": Color(0.5, 0.1, 0.02),
+const FLESH := {"mon_fallen": Color(0.16, 0.02, 0.01), "mon_shaman": Color(0.16, 0.02, 0.01),
+	"mon_shaman_crest": Color(0.3, 0.08, 0.02),
 	"mon_zombie": Color(0.16, 0.18, 0.1)}
 
 
@@ -138,6 +138,7 @@ static func monster(kind: String) -> ORMMaterial3D:
 	m.normal_enabled = true
 	m.normal_texture = load(dir + "normal.webp")
 	m.orm_texture = load(dir + "orm.webp")
+	m.metallic = 1.0   # the map's metal channel is multiplied by this: left at 0, no iron or steel was ever metal
 	m.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 	if ResourceLoader.exists(dir + "emission.webp"):   # eyes, embers
 		m.emission_enabled = true

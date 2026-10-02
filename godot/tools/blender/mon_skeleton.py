@@ -37,13 +37,13 @@ def _chroma(lab):
 FAMILIES = {
     # the tabard by its colour and its place: red-brown stains the generator smeared on the pelvis and thighs are bone
     "cloth": lambda x, y, z, lab: 1.0 * (lab[..., 1] > 7.0) * (lab[..., 0] < 32) * (np.abs(x) < 0.15) * (y > -0.05)
-                                  * (z > 0.55) * (z < 1.45),
+                                  * (z > 0.55) * (z < 1.12),   # it hangs from the belt
     "mail": lambda x, y, z, lab: 1.0 * (z > 0.68) * (z < 1.1) * (np.abs(x) < 0.3) * (lab[..., 0] < 20),
     "iron": lambda x, y, z, lab: 1.0 * ((z > 1.72) | ((x < -0.11) & (z > 1.34) & (z < 1.62) & (_chroma(lab) < 9))),
     "bone": "rest",
 }
 LOOKS = {
-    "cloth": {"colour": sculpted.grade(sat=0.6, value=0.7, toward=(0.26, 0.07, 0.05), mix=0.55, mottle=0.18,
+    "cloth": {"colour": sculpted.grade(sat=0.45, value=0.62, toward=(0.24, 0.1, 0.08), mix=0.6, mottle=0.18,
                                        grime=0.4, knee=1.1),
               "rough": 0.92},
     "mail": {"colour": mail, "rough": lambda ao: 0.5 + 0.3 * (1 - ao), "metal": 0.55},
@@ -53,7 +53,7 @@ LOOKS = {
                  sculpted.bone_colour(rgb, *sculpted.hue_sat_val(rgb).transpose(2, 0, 1), pos), pos),
              "rough": lambda ao: 0.72 + 0.15 * (1 - ao)},
 }
-body = sculpted.prepare("skeleton", HEIGHT, yaw=180, faces=9000, families=FAMILIES, looks=LOOKS, cavity=0.45,
+body = sculpted.prepare("skeleton", HEIGHT, yaw=180, faces=16000, families=FAMILIES, looks=LOOKS, cavity=0.45,
                         glow={"eyes": [(0.045, 0.09, 1.692), (-0.025, 0.09, 1.692)], "radius": 0.016,
                               "colour": EMBER})
 
@@ -70,12 +70,18 @@ def CHUNK(p):
     return Vector((p.x * (1 + k), -0.05 + (p.y + 0.05) * (1 + k), p.z))
 
 
-PAULDRON = sculpted.grow((-0.2, -0.08, 1.46), 1.22, 1.34, 1.4)   # the concept's one big plate, on its left
-
-
 def SHAPE(p):
-    q = HELM(CHUNK(p))
-    return PAULDRON(q) if q.x < -0.1 and q.z < 1.66 else q
+    return HELM(CHUNK(p))
+
+
+# the left pauldron pressed flat onto the shoulder: the generator made a dome that read as a second skull
+_hsv = sculpted.hue_sat_val(sculpted.COLOURS[body.name])
+_shoulder = Vector((-0.22, -0.08, 1.47))
+for _i, _v in enumerate(body.data.vertices):
+    if _v.co.x < -0.1 and 1.3 < _v.co.z < 1.66 and _hsv[_i, 2] < 0.22:
+        d = _v.co - _shoulder
+        _v.co = _shoulder + Vector((d.x * 0.85, d.y * 0.9, d.z * 0.5))
+body.data.update()
 
 
 sculpted.reshape(body, SHAPE)
@@ -208,12 +214,12 @@ def shield_colour(rgb, hue, sat, val, pos):
     plank = np.floor(x)
     seam = np.exp(-((x - np.round(x)) / 0.05) ** 2)[..., None]
     grain = 0.85 + 0.15 * np.sin(x * 60 + np.sin(pos[..., 2] * 40 + plank * 3) * 2)[..., None]
-    oak = np.array([0.44, 0.33, 0.22]) * (0.85 + 0.12 * np.sin(plank * 2.3))[..., None] * grain * (1 - 0.6 * seam)
+    oak = np.array([0.38, 0.32, 0.25]) * (0.85 + 0.12 * np.sin(plank * 2.3))[..., None] * grain * (1 - 0.6 * seam)
     g = rgb.mean(-1, keepdims=True)
     oak = oak * (0.6 + 0.8 * g / max(float(g.mean()), 1e-3) * 0.5)
     hue_, sat_, val_ = sculpted.hue_sat_val(rgb).transpose(2, 0, 1)
     paint = (((hue_ < 20) | (hue_ > 330)) & (sat_ > 0.3))[..., None]
-    wood = np.where(paint, oak * 0.6 + np.array([0.36, 0.12, 0.08]) * 0.4, oak)   # the sigil, faded into the wood
+    wood = np.where(paint, oak * 0.7 + np.array([0.3, 0.12, 0.09]) * 0.3, oak)   # the sigil, faded into the wood
     iron = np.array([0.4, 0.36, 0.32]) * (0.6 + 0.8 * g)   # a pale worn rim and boss
     return np.where((r > 0.9) | (r < 0.27), iron, wood)
 
@@ -244,10 +250,10 @@ def walk(t):
     forward and up and held there whatever the body does, the feet a stride apart, the jaw clacking."""
     c, step = math.cos(TAU * t), math.cos(2 * TAU * (t - 0.1))
     base = S0.copy().rot("jaw", p=-8 * (bump(t, 0.02, 0.18) + bump(t, 0.52, 0.68)))
-    base.rot("head", p=-4 + 6 * step)   # the skull nods with each step
-    base.rot("upper_arm.R", p=10 * c).rot("forearm.R", p=4)   # the sword shoulder swings in time
-    base.rot("upper_arm.L", p=5 * step).rot("forearm.L", p=-4 * step)   # the shield bounces on the beat
-    base.move("hips", z=-0.02 * step)   # and the whole frame drops on each footfall
+    base.rot("head", p=-4 + 9 * step, y=6 * c)   # the skull nods with each step, turning with the stride
+    base.rot("upper_arm.R", p=20 * c).rot("forearm.R", p=6 + 8 * c)   # the sword arm swings in time
+    base.rot("upper_arm.L", p=9 * step).rot("forearm.L", p=-7 * step)   # the shield bounces on the beat
+    base.move("hips", z=-0.03 * step).rot("chest", y=8 * c)   # the frame drops on each footfall, the ribs twist
     p = march.pose(rig, t, base, own=SHIELD_ARM + SWORD_ARM, apart=0.1)
     guard(p)
     return p

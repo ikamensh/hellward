@@ -642,7 +642,7 @@ def imp_die(rig: Rig, k: float, t: float, lie_z: float = 0.1, hand_r: Quaternion
     recoil = imp_stance(k).move("hips", y=-0.05 * k, z=-0.06 * k).rot("hips", p=-2)
     recoil.rot("chest", p=12, y=-16).rot("neck", p=14).rot("head", p=30, y=16).rot("jaw", p=-30)
     buckle = imp_stance(k).move("hips", y=-0.07 * k, z=-0.17 * k).rot("hips", p=4)
-    buckle.rot("chest", p=-10, y=6).rot("head", p=-10, y=10).rot("jaw", p=-14)
+    buckle.rot("chest", p=6, y=6).rot("head", p=8, y=10).rot("jaw", p=-14)   # sagging back: it falls one way
     fall = Pose().move("hips", y=-0.22 * k, z=-0.3 * k).rot("hips", p=55)
     fall.rot("chest", p=10).rot("head", p=24).rot("jaw", p=-20)
     for s, side in SIDES:
