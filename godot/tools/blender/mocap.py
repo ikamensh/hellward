@@ -271,7 +271,8 @@ class Cycle:
             rig.orient(p, f"foot.{side}", q_foot)
             # the heel, under and behind the ankle at rest, must not go through the ground at a heel strike
             foot = f"foot.{side}"
-            heel = rig.where(p, foot, Vector((rig.head[foot].x, rig.head[foot].y - 0.05, 0.005)))
+            back = getattr(rig, "heel", {}).get(side, 0.05)   # how far the heel reaches behind the ankle
+            heel = rig.where(p, foot, Vector((rig.head[foot].x, rig.head[foot].y - back, 0.005)))
             if heel.z < 0.0:
                 ankle.z -= heel.z
                 rig.reach(p, f"thigh.{side}", f"shin.{side}", ankle, pole)

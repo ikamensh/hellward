@@ -139,7 +139,12 @@ class Biped:
         sculpted.name_material(obj, f"mon_{k}")
         self.body = obj
         self.rig = self._rig(j)
-        sculpted.skin(obj, self.rig)
+        self.rig.heel = {side: j[f"ankle.{side}"].y - j[f"heel.{side}"].y for side in ("R", "L")}
+        # the heel and sole belong to the foot, not the shin: a shin's weight on them swung them under the ground as
+        # the leg pushed off
+        ankle = {side: j[f"ankle.{side}"].z for side in ("R", "L")}
+        sculpted.skin(obj, self.rig, masks={f"shin.{side}": (lambda co, hsv, thick, z=ankle[side]: co.z > 0.85 * z)
+                                            for side in ("R", "L")})
         self.rig.repose(sculpted.hang(self.rig, arm=12))
         self.H = self.h / 1.73   # the old human frame's scale: distances in the keyed poses below
         self._weapon()
@@ -246,8 +251,9 @@ class Biped:
         hz = rig.head["hips"].z
         depth = [v.co.y for v in self.body.data.vertices if abs(v.co.z - hz) < 0.04 * self.h]
         self.lie = 0.5 * (max(depth) - min(depth)) + 0.02 if depth else 0.15 * self.h
-        rig.action("idle", self.idlec.seconds, idle, loop=True)
-        rig.action("walk", self.walkc.seconds, walk, loop=True)
+        # a captured foot's pitch can tip a sole a centimetre or two under: the ground pass lifts those frames
+        rig.action("idle", self.idlec.seconds, idle, loop=True, ground_from=0.0, body=self.body)
+        rig.action("walk", self.walkc.seconds, walk, loop=True, ground_from=0.0, body=self.body)
         rig.action("attack", 0.8, self.attack, ground_from=0.0, body=self.body)
         rig.action("die", 1.3, self.die, ground_from=0.0, body=self.body)
         rig.action("die2", 1.5, self.die_down, ground_from=0.0, body=self.body)
