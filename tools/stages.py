@@ -23,7 +23,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from hellward.sim import planner  # noqa: E402
+from hellward.sim import planner, tuning  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER  # noqa: E402
 from hellward.sim.items import Loadout  # noqa: E402
 from hellward.sim.model import Refused, World  # noqa: E402
@@ -33,6 +33,7 @@ from hellward.sim.players.hands import defend  # noqa: E402
 
 SEED = 1
 BOSSES = ("azazel", "bone_priest")
+STRIKE = tuning.integer("battle.boss_strike_lives")
 
 
 class Found(Exception):
@@ -154,10 +155,11 @@ def key(e: tuple) -> Any:
 
 
 def stage(request: dict, wanted: Callable[[World, tuple], bool], *, frame: str, at: list[int],
-          view: tuple[float, float] = (40.0, 18.0), hud: bool = False, hover: str = "") -> dict:
+          view: tuple[float, ...] = (40.0, 18.0), hud: bool = False, hover: str = "") -> dict:
     """A stage: the demo's request, the event (its name and key) and its step's time, how the camera frames it (on
     the `tower`, the `monster`, both as a `pair`, or the shrine's `door`), the frames to save after it, its pitch and
-    distance, whether the HUD shows, and a monster kind to hover the mouse over."""
+    distance (and bearing, where the scenery would stand in the way), whether the HUD shows, and a monster kind to
+    hover the mouse over."""
     e, time = first(request["replay"], wanted)
     return {"request": request, "event": e[0], "key": key(e), "time": time, "frame": frame, "at": at,
             "view": list(view), "hud": hud, "hover": hover}
@@ -201,7 +203,7 @@ def knife() -> dict:
             return False
         m = world.monster(e[1].target)
         return m is not None and m.door >= 0
-    return stage({"replay": log}, at_gate, frame="pair", at=[2, 5, 8], view=(36.0, 15.0))
+    return stage({"replay": log}, at_gate, frame="pair", at=[2, 5, 8], view=(42.0, 17.0, 200.0))
 
 
 def hymn() -> dict:
@@ -211,22 +213,22 @@ def hymn() -> dict:
     log = ghost("graveyard", [[0.5, "build", "arrow", t] for t in towers]
                 + [[1.0, "call_wave"], [14.0, "hymn", towers[0]]])
     return stage({"replay": log}, lambda w, e: e[0] == "hymn", frame="tower", at=[6, 30],
-                 view=(30.0, 14.0))
+                 view=(48.0, 16.0, 200.0))
 
 
 def shrine() -> dict:
     """Tristram, undefended: the first Fallen up the steps, its blow on the shrine's gate, the light that answers."""
     log = ghost("tristram", [[1.0, "call_wave"]])
-    return stage({"replay": log}, lambda w, e: e[0] == "leak", frame="door", at=[20, 46, 52, 62],
+    return stage({"replay": log}, lambda w, e: e[0] == "leak", frame="door", at=[20, 40, 47, 56],
                  view=(30.0, 16.0))
 
 
 def returned() -> dict:
     """A boss at the shrine, cast back to its portal: a strong scripted player's defence of a boss's location, its
     towers sold the moment the boss walks alone."""
-    def alone(world: World) -> bool:
+    def alone(world: World) -> bool:   # and the shrine can take its strike: the fight goes on after it
         living = [m for m in world.monsters if m.hp > 0]
-        return len(living) == 1 and living[0].kind.key in BOSSES
+        return len(living) == 1 and living[0].kind.key in BOSSES and world.lives > STRIKE
     for location in [key for key in ORDER if {g.kind for w in LOCATIONS[key].waves for g in w.groups} & set(BOSSES)]:
         for player in ("veteran", "adaptive", "planned"):
             log, time = recorded(location, player, alone)
@@ -235,11 +237,19 @@ def returned() -> dict:
                 continue
             log["commands"] += [[world.time, "sell", list(t.tile)] for t in world.towers.values()]
             try:
-                return stage({"replay": log}, lambda w, e: e[0] == "returned", frame="door", at=[1, 8, 36, 50],
+                return stage({"replay": log}, lambda w, e: e[0] == "returned" and w.outcome is None, frame="door",
+                             at=[1, 8, 36, 50],
                              view=(30.0, 22.0))
             except LookupError:
                 continue
     raise LookupError("no scripted player's defence brings a boss to the shrine")
+
+
+def portal() -> dict:
+    """The boss after its return: out of its portal again, its strike counted over its bar."""
+    spec = returned()
+    spec.update(frame="monster", at=[50, 80], view=(46.0, 26.0))
+    return spec
 
 
 def plate() -> dict:
@@ -258,7 +268,8 @@ def plate() -> dict:
 
 
 STAGES: dict[str, Callable[[], dict]] = {"ballista": ballista, "hook": hook, "knife": knife, "hymn": hymn,
-                                         "shrine": shrine, "returned": returned, "plate": plate}
+                                         "shrine": shrine, "returned": returned, "portal": portal,
+                                         "plate": plate}
 
 
 def main() -> int:

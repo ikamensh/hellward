@@ -1153,9 +1153,8 @@ func _refresh_leader(delta: float) -> void:
 	_leader_life.set_shader_parameter("fill", best.hp / best.max_hp)
 	var what := []
 	if best.boss:
-		what.append("Boss · strikes the shrine, is cast back and comes again")
-		if best.strikes > 0:
-			what.append("%d %s so far" % [best.strikes, "strike" if best.strikes == 1 else "strikes"])
+		what.append("Boss · %d %s on the shrine" % [best.strikes, "strike" if best.strikes == 1 else "strikes"]
+			if best.strikes > 0 else "Boss · cast back from the shrine, it comes again")
 	if best.leader:
 		what.append("Leader · curses the towers that hurt its pack")
 	_leader_kind.text = " · ".join(what)

@@ -176,12 +176,12 @@ func _arrow() -> void:
 
 ## A ballista's bolt: a long heavy shaft with an iron head and wooden vanes, a dull streak behind it.
 func _ballista() -> void:
-	_head.scale = Vector3.ONE * 1.6
+	_head.scale = Vector3.ONE * 1.25
 	var shaft := MeshInstance3D.new()
 	var cm := CylinderMesh.new()
-	cm.top_radius = 0.07
-	cm.bottom_radius = 0.07
-	cm.height = 1.7
+	cm.top_radius = 0.055
+	cm.bottom_radius = 0.055
+	cm.height = 1.3
 	shaft.mesh = cm
 	shaft.rotation_degrees.x = 90
 	shaft.material_override = Mats.named("planks")
@@ -189,33 +189,33 @@ func _ballista() -> void:
 	var tip := MeshInstance3D.new()
 	var tm := CylinderMesh.new()
 	tm.top_radius = 0.0
-	tm.bottom_radius = 0.16
-	tm.height = 0.42
+	tm.bottom_radius = 0.12
+	tm.height = 0.32
 	tm.radial_segments = 4
 	tip.mesh = tm
 	tip.rotation_degrees.x = -90
-	tip.position = Vector3(0, 0, -1.05)
+	tip.position = Vector3(0, 0, -0.8)
 	tip.material_override = Mats.named("iron")
 	_head.add_child(tip)
 	for i in 3:   # three vanes at the tail
 		var vane := MeshInstance3D.new()
 		var vm := BoxMesh.new()
-		vm.size = Vector3(0.02, 0.22, 0.34)
+		vm.size = Vector3(0.015, 0.12, 0.24)
 		vane.mesh = vm
 		vane.material_override = Mats.named("planks")
-		vane.position = Vector3(0, 0, 0.7)
+		vane.position = Vector3(0, 0, 0.5)
 		vane.rotation.z = TAU * i / 3.0
-		vane.translate_object_local(Vector3(0, 0.12, 0))
+		vane.translate_object_local(Vector3(0, 0.08, 0))
 		_head.add_child(vane)
-	_glow(Color(1.2, 0.85, 0.5), 0.3).position = Vector3(0, 0, -1.05)
+	_glow(Color(1.2, 0.85, 0.5), 0.3).position = Vector3(0, 0, -0.8)
 	_streak_time = 0.08
-	_streak_width = 0.12
+	_streak_width = 0.1
 	_streak_color = Color(0.9, 0.78, 0.6, 0.55)
 
 
 ## A thrown knife: a steel blade on a dark grip, turning end over end, a thin cold glint behind it.
 func _knife() -> void:
-	_head.scale = Vector3.ONE * 1.5
+	_head.scale = Vector3.ONE * 2.1   # larger than life, so it reads from the battle camera
 	var blade := MeshInstance3D.new()
 	var bm := PrismMesh.new()
 	bm.size = Vector3(0.1, 0.42, 0.02)
@@ -237,7 +237,7 @@ func _knife() -> void:
 	guard.position = Vector3(0, -0.03, 0)
 	guard.material_override = Mats.named("iron")
 	_head.add_child(guard)
-	_glow(Color(0.9, 1.0, 1.3), 0.4)
+	_glow(Color(0.9, 1.0, 1.3), 0.5)
 	_spin = 3.2
 	_streak_time = 0.12
 	_streak_width = 0.04

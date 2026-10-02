@@ -106,10 +106,12 @@ func _frame(e: Array) -> void:
 			yaw = rad_to_deg(atan2(-d.z, d.x))
 			if cos(deg_to_rad(yaw)) < 0.0:   # from the south side, as the battle camera looks
 				yaw += 180.0
-		"door":
-			centre = _main.level.door_pos - _main.level.door_outward() * 7.0
+		"door":   # from the field, a little to one side, looking up the steps at the door
 			var out: Vector3 = _main.level.door_outward()
-			yaw = rad_to_deg(atan2(-out.z, out.x)) + 90.0 + 25.0   # beside the steps, looking up at the door
+			centre = _main.level.door_pos - out * 4.0
+			yaw = rad_to_deg(atan2(-out.x, -out.z)) + 25.0
+	if view.size() > 2:   # the stage's own bearing, where the scenery would stand in the way
+		yaw = float(view[2])
 	rig.snap(centre, yaw, float(view[0]), float(view[1]))
 
 

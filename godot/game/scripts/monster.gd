@@ -35,6 +35,7 @@ const DRAG := 0.3                    # seconds the chain drags a hooked monster 
 const STRIDE_TO_GATE := 3.0          # tiles a second a leaking monster walks the steps to the shrine's gate
 const GATE_STAND := 0.9              # tiles short of the door it stands to strike
 const BLOW := 0.35                   # seconds into its strike that the blow lands, and the light answers
+const CAST_BACK := 0.35              # seconds a boss stands in the shrine's light before it is gone to its portal
 
 var world: World
 var id := 0
@@ -81,6 +82,8 @@ var _curse_glow: Array[ORMMaterial3D] = []   # a chanting Shaman's skull, flarin
 var _drag_from := 0.0                # where a hook caught it
 var _drag_t := -1.0                  # seconds since the hook was thrown; -1: not hooked
 var _snap := false                   # cast back: the next step's place is taken as it is, not glided to
+var _cast_back := 0.0                # seconds left of a boss standing in the shrine's light, where it struck
+var _cast_from := 0.0
 var _strike_s := 0.0                 # where it walks the steps from, to strike the shrine
 var _striking := false               # at the gate, its blow coming
 var _struck := false                 # the shrine's light has answered its blow
@@ -255,7 +258,13 @@ func _process(delta: float) -> void:
 
 func _walk(delta: float) -> void:
 	var s := lerpf(_s0, _s1, world.alpha)
-	if _age < EMERGE:   # out of the portal: it comes from the portal's mouth to its place on the route
+	if _cast_back > 0.0:   # struck back: it stands in the light where it struck, then is gone to its portal
+		_cast_back -= delta
+		s = _cast_from
+		_flash = 1.0
+		if _cast_back <= 0.0:
+			_age = 0.0
+	elif _age < EMERGE:   # out of the portal: it comes from the portal's mouth to its place on the route
 		s -= Level.APPROACH / Level.TILE * pow(1.0 - _age / EMERGE, 2.0)
 	var dragged := _drag_t >= 0.0
 	if dragged:   # the hook's chain flies to it, then hauls it back from where it was caught to where it is
@@ -418,13 +427,14 @@ func returned(count: int) -> void:
 	_flash = 1.0
 	_overlay.set_shader_parameter("flash_color", Color(1.6, 1.4, 1.0))
 	_drag_t = -1.0
+	_cast_from = lerpf(_s0, _s1, world.alpha)
+	_cast_back = CAST_BACK
 	_snap = true
-	_age = 0.0
 	_resume()
 	if _strike_label == null:
 		_strike_label = Label3D.new()
 		_strike_label.font = Style.title_font()
-		_strike_label.font_size = 56
+		_strike_label.font_size = 72
 		_strike_label.pixel_size = 0.006
 		_strike_label.modulate = Color(1.0, 0.82, 0.4)
 		_strike_label.outline_modulate = Color(0.08, 0.03, 0.0)

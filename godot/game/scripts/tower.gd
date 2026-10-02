@@ -202,7 +202,24 @@ func _sing(on: bool) -> void:
 	_aura = Node3D.new()
 	add_child(_aura)
 	var top := Hud._bounds(_model).end.y
-	var motes := Fx.shed(HYMN, 60, 0.12, 1.6, -1.2)
+	var column := MeshInstance3D.new()   # a faint column of gold round it, bands of light streaming up
+	var cm := CylinderMesh.new()
+	cm.top_radius = 1.25
+	cm.bottom_radius = 1.6
+	cm.height = top + 2.0
+	cm.cap_top = false
+	cm.cap_bottom = false
+	column.mesh = cm
+	var bm := ShaderMaterial.new()
+	bm.shader = preload("res://shaders/beam.gdshader")
+	bm.set_shader_parameter("color", HYMN)
+	bm.set_shader_parameter("height", cm.height)
+	bm.set_shader_parameter("energy", 0.35)
+	column.material_override = bm
+	column.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	column.position.y = cm.height * 0.5
+	_aura.add_child(column)
+	var motes := Fx.shed(HYMN, 90, 0.2, 2.0, -1.0)
 	var pm := motes.process_material as ParticleProcessMaterial
 	pm.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
 	pm.emission_ring_axis = Vector3.UP

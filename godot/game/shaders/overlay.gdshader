@@ -39,7 +39,7 @@ void fragment() {
 		vec3 c = flash_color * flash * (0.15 + rim * 1.4);
 		c += vec3(0.25, 0.6, 1.0) * chill * (0.12 + rim * 1.2);
 		c += vec3(0.6, 0.15, 1.0) * curse * (0.08 + rim * 1.6) * pulse;
-		c += vec3(1.0, 0.72, 0.25) * hymn * (0.06 + rim * 1.4) * (0.7 + 0.3 * sin(TIME * 10.0));
+		c += vec3(1.0, 0.72, 0.25) * hymn * (0.025 + rim * 1.2) * (0.7 + 0.3 * sin(TIME * 10.0));
 		float up = clamp((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).y * 0.6 + 0.4, 0.0, 1.0);
 		c += vec3(0.32, 0.45, 0.75) * moonrim * rim * up;
 		// from the battle camera only: close up the body's own light and maps carry its colour
