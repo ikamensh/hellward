@@ -32,12 +32,10 @@ def bolt(tail, head, r: float, vanes: str = "leather", head_mat: str = "iron"):
     p = [tube([tail, head - d * hl * 0.8], r, "timber", 6, "bolt")]
     p.append(tube([head - d * (hl + r * 1.5), head - d * hl * 0.85], r * 1.45, "iron", 6, "bolt"))
     p.append(spike(head - d * hl, head, r * 1.9, head_mat, 4, "bolt"))
+    along = Matrix.Translation(tail + d * r * 0.5) @ d.to_track_quat("Y", "Z").to_matrix().to_4x4()
     for ang in (0, 120, 240):
         vane = prism([(0, 0), (r * 8, 0), (r * 6.5, r * 2.6), (r * 1.2, r * 2.8)], r * 0.35, mat=vanes, name="bolt")
-        xform(vane, Matrix.Rotation(math.radians(90), 4, "Z"))
-        xform(vane, Matrix.Rotation(math.radians(ang), 4, "Y"))
-        rot = d.to_track_quat("Y", "Z").to_matrix().to_4x4()
-        xform(vane, Matrix.Translation(tail + d * r * 0.5) @ rot)
+        xform(vane, along @ Matrix.Rotation(math.radians(ang), 4, "Y") @ Matrix.Rotation(math.radians(90), 4, "Z"))
         p.append(vane)
     return p
 

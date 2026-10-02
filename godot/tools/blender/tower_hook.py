@@ -92,7 +92,7 @@ def crane(rank: int):
     p.append(beam((0, 0, -0.2), (0, 0, zj + head), mw, mw, "timber", bev=0.03, metres=1.5, seed=3))
     for z in [0.3, zj - 0.95] + ([zj + head - 0.12] if rank >= 2 else []):
         p.append(box((mw + 0.05, mw + 0.05, 0.07), loc=(0, 0, z), mat="iron", bevel=0.01, name="band"))
-    if rank >= 2:   # the masthead's cap and a truck
+    if rank >= 2:   # an iron cap on the masthead
         p.append(lathe([(0, 0), (mw * 0.75, 0), (mw * 0.75, 0.06), (0.04, 0.16), (0, 0.16)], 8, "iron", "cap",
                        loc=(0, 0, zj + head), smooth_angle=None))
     # the jib, a little raised at its tip, iron at the joint
