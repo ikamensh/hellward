@@ -28,16 +28,17 @@ from hellward.sim import tuning  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import MONSTERS, TOWERS  # noqa: E402
 from hellward.sim.level import Level, Tile  # noqa: E402
+from hellward.sim import worth as game_worth  # noqa: E402
 
 Cell = tuple[int, int]
 
 REFERENCE_REACH = TOWERS["arrow"].levels[0].range   # the rank-I Arrow's: the tower every location offers
 # A gate's queue: walkers stand between these distances before its crossing (model.py's door stop and jostle).
-QUEUE_FRONT = tuning.number("battle.door_stop")
-QUEUE_BACK = QUEUE_FRONT + tuning.number("battle.jostle")
+QUEUE_FRONT = game_worth.QUEUE_FRONT
+QUEUE_BACK = game_worth.QUEUE_BACK
 # What reaching a gate's whole queue adds, in tiles of walk. Kept small: the planned player's searched builds
 # (players/plans/) pick cells by the walk they reach and do not favour the queue's (docs/stages/2-maps-analysis.md).
-GATE_QUEUE_TILES = 1.0
+GATE_QUEUE_TILES = game_worth.QUEUE_TILES
 # A prime cell is worth at least this share of the map's best: the planned player builds on about half the cells
 # above it, a quarter of those just below and almost none under 0.3 (docs/stages/2-maps-analysis.md).
 PRIME_SHARE = 0.6
@@ -61,42 +62,15 @@ class Traffic:
 def traffic(location: Location) -> Traffic:
     """The share of the location's waves that walks each route; a wanderer counts evenly on every route from its
     entrance, as the simulation chooses among them. Breach packs are optional and not counted."""
-    level = location.level
-    every = {route.key: 0.0 for route in level.routes}
-    ground = dict(every)
-    total = 0
-    for wave in location.waves:
-        for group in wave.groups:
-            kind = MONSTERS[group.kind]
-            routes = [group.route]
-            if kind.movement == "wander":
-                entrance = level.route(group.route).entrance
-                routes = [route.key for route in level.routes if route.entrance == entrance]
-            for key in routes:
-                every[key] += group.count / len(routes)
-                if not kind.flying:
-                    ground[key] += group.count / len(routes)
-            total += group.count
-    return Traffic({k: v / total for k, v in every.items()}, {k: v / total for k, v in ground.items()})
+    every, ground = game_worth.shares(location.level, location.waves)
+    return Traffic(every, ground)
 
 
 def cell_worth(level: Level, walkers: Traffic, cell: Cell, reach: float = REFERENCE_REACH) -> float:
-    """Tiles of the average monster's walk a tower on ``cell`` reaches: each route's length in reach, weighted by
-    the share of monsters walking it, plus the gate queues it reaches, weighted by the share a gate stops."""
-    worth = 0.0
-    for route in level.routes:
-        share, held = walkers.every[route.key], walkers.ground[route.key]
-        if not share:
-            continue
-        spans = route.coverage(cell, reach)
-        for a, b in spans:
-            worth += share * (b - a)
-        if held:
-            for _, crossing in level.crossings(route.key):
-                back, front = crossing - QUEUE_BACK, crossing - QUEUE_FRONT
-                for a, b in spans:
-                    worth += held * GATE_QUEUE_TILES * max(0.0, min(b, front) - max(a, back)) / (front - back)
-    return worth
+    """Tiles of the average monster's walk a tower on ``cell`` reaches: the simulation's reckoning, with every
+    gate built."""
+    return game_worth.cell(level, walkers.every, walkers.ground, cell, reach,
+                           built=frozenset(range(len(level.doors))))
 
 
 def worth_map(level: Level, walkers: Traffic, reach: float = REFERENCE_REACH) -> dict[Cell, float]:
@@ -200,8 +174,8 @@ def entrance_worth(location: Location, level: Level) -> dict[Cell, dict[Cell, fl
 def occupy(level: Level, rock: Iterable[Cell] = (), water: Iterable[Cell] = ()) -> Level:
     """The same map with more rock and water."""
     return Level(level.name, level.width, level.height, level.waypoints, level.doors,
-                 level.obstacles | frozenset(rock), level.pools | frozenset(water), level.extra_routes,
-                 halls=level.walkable_tiles)
+                 level.obstacles | frozenset(rock), level.pools | frozenset(water), level.boulders,
+                 level.extra_routes, halls=level.walkable_tiles)
 
 
 @dataclass(frozen=True)

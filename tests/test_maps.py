@@ -39,7 +39,7 @@ def test_a_cell_is_worth_something_exactly_when_a_walked_route_is_in_reach(key):
 
 def _without_gates(level: Level) -> Level:
     return Level(level.name, level.width, level.height, level.waypoints, (), level.obstacles, level.pools,
-                 level.extra_routes, halls=level.walkable_tiles)
+                 level.boulders, level.extra_routes, halls=level.walkable_tiles)
 
 
 @pytest.mark.parametrize("key", [key for key, location in LOCATIONS.items() if location.level.doors])

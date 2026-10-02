@@ -96,6 +96,8 @@ class Ghost:
                 world.sell(tower.id)
             elif name == "gate":
                 world.build_door(int(args[0]))
+            elif name == "clear":
+                world.clear(_tile(args[0]))
             elif name == "call_wave":
                 world.call_wave()
             elif name == "breach":

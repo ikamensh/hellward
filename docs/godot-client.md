@@ -130,10 +130,12 @@ GDScript or C#, a Windows build (the transport choice must not rule it out).
   slow planner holds the clock (at most four steps asked ahead) instead of bursting, and the client always knows
   how far between two steps it is drawing. Online play would hand the clock back to the server.
 - **Messages.** `hellward/server/protocol.py` and `service.py` list them: the battle's start (map, routes, gates,
-  waves, arsenal, tables), a frame per step (events with the newcomers' facts, purse and clocks, monsters
+  waves, arsenal, tables, per-kind cell worth with and without each gate, boulders with their would-be worth and
+  clearing prices), a frame per step (events with the newcomers' facts, purse and clocks, monsters
   `[id, s, hp, flags, chill, frozen, poison, door, moved]`, towers `[id, level, reach, curses, hymn, upgrade cost,
   needs, refund]`, gates, burning ground; the start's monster table carries each kind's armor, element tags and the
-  `hits` each tower here deals it, by the simulation's own `felt_hit`), orders answered by a frame and a reply or by a refusal with its reason, and
+  `hits` each tower here deals it, by the simulation's own `felt_hit`), orders (build, upgrade, sell, gate, clear,
+  spells, wave calls) answered by a frame and a reply or by a refusal with its reason, and
   the campaign's requests answered with finished words (a briefing's lines, a skill's tooltip, the reckoning).
 - **Measured** (`tools/protocol_bench.py`, 2026-10-01, M4, veteran player): a frame is 0.9-1.0 KB on average and
   2.2 KB at most (17-19 KB/s); the server builds and encodes one in 19-21 us; a request's round trip is 50 us

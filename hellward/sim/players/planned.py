@@ -104,7 +104,7 @@ def fingerprint(location: Location) -> str:
     level, arsenal = location.level, location.arsenal
     text = repr((level.width, level.height, level.waypoints, level.extra_routes, level.doors,
                  sorted(level.walkable_tiles), sorted(level.obstacles), sorted(level.pools),
-                 arsenal.towers, arsenal.gates, arsenal.spells,
+                 sorted(level.boulders), arsenal.towers, arsenal.gates, arsenal.spells,
                  location.waves, location.start_gold, prices, door))
     return hashlib.sha1(text.encode()).hexdigest()[:12]
 

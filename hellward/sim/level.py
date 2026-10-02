@@ -112,6 +112,7 @@ class Level:
     doors: tuple[tuple[int, int], ...]
     obstacles: frozenset[tuple[int, int]] = field(default_factory=frozenset)
     pools: frozenset[tuple[int, int]] = field(default_factory=frozenset)
+    boulders: frozenset[tuple[int, int]] = field(default_factory=frozenset)   # clearable rock, at most three
     extra_routes: tuple[Route, ...] = ()
     halls: frozenset[tuple[int, int]] | None = None  # authored monster floor; omitted for small legacy arenas
     routes: tuple[Route, ...] = field(init=False, repr=False, compare=False)
@@ -178,6 +179,13 @@ class Level:
             raise ValueError(f"hall opens through an edge wall at {min(edge)}")
         if blocked := walkable & (self.obstacles | self.pools):
             raise ValueError(f"hall crosses obstacle or pool at {min(blocked)}")
+        if len(self.boulders) > 3:
+            raise ValueError("at most three boulders a map")
+        for x, y in sorted(self.boulders):
+            if not (0 < x < self.width - 1 and 0 < y < self.height - 1):
+                raise ValueError(f"boulder {(x, y)} is not inside the map")
+            if (x, y) in walkable or (x, y) in self.pools or (x, y) in self.obstacles or (x, y) in self.doors:
+                raise ValueError(f"boulder {(x, y)} is not on the open floor")
         gate_walls = {(x + dx, y) for x, y in self.doors for dx in (-1, 1)}
         if blocked := walkable & gate_walls:
             raise ValueError(f"hall crosses gate wall {min(blocked)}")
@@ -275,6 +283,8 @@ class Level:
                     row.append(Tile.PILLAR)
                 elif (x, y) in self.pools:
                     row.append(Tile.POOL)
+                elif (x, y) in self.boulders:
+                    row.append(Tile.PILLAR)   # clearable rock reads as rock until it is cleared
                 else:
                     row.append(Tile.FLOOR)
             rows.append(tuple(row))

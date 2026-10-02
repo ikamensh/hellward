@@ -331,6 +331,7 @@ class World:
         self.lives = START_LIVES
         self.mana = min(MANA_START, perks.mana_max)
         self.towers: dict[int, Tower] = {}
+        self.cleared: set[tuple[int, int]] = set()   # boulders cleared, now open floor
         self.doors = [Door(i, tile, s) for i, (tile, s) in enumerate(zip(self.level.doors, self.level.door_s))]
         self.monsters: list[Monster] = []     # alive and on the map, nearest the sanctuary first
         self.bolts: list[Bolt] = []
@@ -372,6 +373,7 @@ class World:
         w.salvage_held, w.salvage_sold = self.salvage_held, self.salvage_sold
         w.time, w.gold, w.lives, w.mana = self.time, self.gold, self.lives, self.mana
         w.towers = {i: t.copy() for i, t in self.towers.items()}
+        w.cleared = set(self.cleared)
         w.doors = [d.copy() for d in self.doors]
         w.monsters = [m.copy() for m in self.monsters]
         w.bolts = list(self.bolts)       # bolts and meteors are never changed in place
@@ -505,13 +507,31 @@ class World:
     def cost(self, kind: str) -> int:
         return self._price(self.tower_levels[kind][0].cost)
 
+    def buildable(self, x: int, y: int) -> bool:
+        """Whether a tower can stand here now: the bare floor, or a boulder cleared this defence."""
+        return self.level.buildable(x, y) or ((x, y) in self.level.boulders and (x, y) in self.cleared)
+
+    def clear(self, tile: tuple[int, int]) -> int:
+        """Clear a boulder during a break, opening its cell: one income unit, then two, then three."""
+        if self.outcome is not None or self.break_left is None:
+            raise Refused("Boulders can be cleared only during a wave break.")
+        if tile not in self.level.boulders or tile in self.cleared:
+            raise Refused("No boulder stands there.")
+        price = BALANCE.income_unit(self.stage) * (len(self.cleared) + 1)
+        if self.gold < price:
+            raise Refused(f"Clearing costs {price} gold.")
+        self.gold -= price
+        self.cleared.add(tile)
+        self._emit("cleared_boulder", tile, price)
+        return price
+
     # -- Commands -----------------------------------------------------------------------
 
     def build(self, kind: str, tile: tuple[int, int]) -> Tower:
         tower_kind = TOWERS[kind]
         if kind not in self.location.arsenal.towers:
             raise Refused(f"No {tower_kind.name} can be raised in {self.location.called}.")
-        if not self.level.buildable(*tile):
+        if not self.buildable(*tile):
             raise Refused("Towers stand on the bare floor, not on the path, the walls or the pits.")
         if self.tower_at(tile) is not None:
             raise Refused("A tower already stands there.")

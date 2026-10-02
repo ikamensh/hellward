@@ -13,7 +13,7 @@ signal connected                      # the server answers requests
 signal failed(why: String)            # the server stopped or said something this client cannot follow
 signal frame(message: Dictionary)     # a battle step, or what an order did
 
-const PROTOCOL := 2
+const PROTOCOL := 3
 
 var is_ready := false
 var compiled := false

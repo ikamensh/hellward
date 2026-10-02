@@ -15,9 +15,11 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any
 
+from hellward.sim.balance import BALANCE
 from hellward.sim.campaign import Location
 from hellward.sim.content import CURSES, MONSTERS, SELL_REFUND, SPELLS, TOWERS, MonsterKind, felt_hit
 from hellward.sim.model import SIM_DT, Bolt, Monster, Tower, World
+from hellward.sim import worth
 
 # monster flags, one bit each
 PONDERING, CHANTING, MARKING, AMPLIFIED = 1, 2, 4, 8
@@ -152,6 +154,10 @@ def battle_start(world: World, *, demo: bool, breach_claim: str | None) -> dict:
         "arsenal": {"towers": list(location.arsenal.towers), "gates": location.arsenal.gates,
                     "spells": list(location.arsenal.spells)},
         "towers": {kind: tower_table(world, kind) for kind in location.arsenal.towers},
+        "worth": {kind: worth_table(world, kind) for kind in location.arsenal.towers},
+        "boulders": [{"tile": list(tile), "worth": {kind: _worth(world, kind, tile) for kind in location.arsenal.towers}}
+                     for tile in sorted(level.boulders)],
+        "clear": [BALANCE.income_unit(world.stage) * n for n in range(1, len(level.boulders) + 1)],
         "monsters": {kind: monster_table(world, kind) for kind in kinds},
         "curses": {c.value: {"name": s.name, "duration": s.duration, "radius": s.radius, "blurb": s.blurb}
                    for c, s in CURSES.items()},
@@ -187,6 +193,23 @@ def monster_table(world: World, kind: str) -> dict:
             "flying": m.flying, "movement": m.movement, "armor": m.armor,
             "protected": [e.value for e in m.protected], "vulnerable": [e.value for e in m.vulnerable],
             "boss": m.boss, "hits": hits(world, m), "leader": leader}
+
+
+def worth_table(world: World, kind: str) -> dict:
+    """Every buildable cell's worth to a tower kind, and every boulder's would-be worth: without gates, and
+    with each gate (every map has at most one, so that covers every state of the gates)."""
+    bare = worth.worth_map(world.level, world.waves, kind)
+    return {"reach": TOWERS[kind].levels[0].range, "bare": _cells(bare),
+            "gates": [{"door": i, "cells": _cells(worth.worth_map(world.level, world.waves, kind, built=frozenset({i})))}
+                      for i in range(len(world.level.doors))]}
+
+
+def _cells(found: dict[tuple[int, int], float]) -> dict[str, float]:
+    return {f"{x},{y}": round(v, 2) for (x, y), v in sorted(found.items())}
+
+
+def _worth(world: World, kind: str, tile: tuple[int, int]) -> float:
+    return round(worth.worth_map(world.level, world.waves, kind).get(tile, 0.0), 2)
 
 
 def hits(world: World, kind: MonsterKind) -> dict[str, list[int]]:

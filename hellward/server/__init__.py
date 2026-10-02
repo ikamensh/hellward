@@ -7,4 +7,4 @@ and its saves live here too (:mod:`hellward.server.campaign`). The client draws,
 ``docs/godot-client.md`` is the design.
 """
 
-PROTOCOL = 2   # both sides say theirs in the hello; a different number is an error, never a guess
+PROTOCOL = 3   # both sides say theirs in the hello; a different number is an error, never a guess

@@ -82,6 +82,7 @@ def corridor_level(name: str, width: int, height: int, waypoints: tuple[tuple[in
                     doors: tuple[tuple[int, int], ...], *,
                     obstacles: frozenset[tuple[int, int]] = frozenset(),
                     pools: frozenset[tuple[int, int]] = frozenset(),
+                    boulders: frozenset[tuple[int, int]] = frozenset(),
                     extra_routes: tuple[Route, ...] = ()) -> Level:
     """Carve broad monster halls around authored route loops, leaving the rest for towers."""
     routes = (Route("main", waypoints), *extra_routes)
@@ -94,7 +95,7 @@ def corridor_level(name: str, width: int, height: int, waypoints: tuple[tuple[in
              and ((0 < x + dx < width - 1 and 0 < y + dy < height - 1)
                   or (x + dx, y + dy) in portals)}
     halls.difference_update(obstacles | pools | gate_walls)
-    return Level(name, width, height, waypoints, doors, obstacles, pools, extra_routes,
+    return Level(name, width, height, waypoints, doors, obstacles, pools, boulders, extra_routes,
                  halls=frozenset(halls))
 
 def water(*blocks: tuple[int, int, int, int]) -> frozenset[tuple[int, int]]:

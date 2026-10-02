@@ -143,6 +143,10 @@ class Battle:
         self.world.build_door(int(door))
         return [int(door)]
 
+    def _clear(self, tile: list[int]) -> list:
+        self.world.clear((int(tile[0]), int(tile[1])))
+        return [[int(tile[0]), int(tile[1])]]
+
     def _call_wave(self) -> list:
         if not self.world.can_call_wave:
             raise Refused("The next wave is already coming." if self.world.wave + 1 < len(self.world.waves)
