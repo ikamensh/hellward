@@ -17,6 +17,7 @@ uv run hellward                              # play: the Godot client, which sta
 uv run pytest -q                             # the suite (simulation, server, campaign through the real server)
 godot/tools/test.sh                          # the client's headless tests against the real server
 uv run python tools/protocol_bench.py        # the protocol's cost: frame sizes, encode time, round trips
+uv run python tools/llm_play.py tristram --profile NAME  # play as text: the LLM's seat (docs/llm.md)
 uv run python tools/balance.py --location caves      # every leader policy against eight ordinary defenders
 uv run python tools/curse_quality.py --location caves  # how close the leaders' curses are to the best possible
 uv run python tools/campaign_balance.py --out DIR   # the campaign's tuning table (heavy: through ~/saga/tools/slot.py)
