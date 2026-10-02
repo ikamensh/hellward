@@ -14,6 +14,8 @@ tools/shot.sh VIEW OUT.png [FRAMES] [args] # one 1080p battle frame of a named v
 tools/gallery.sh OUT.png V1,V2,.. FRAMES demo   # several views from one run, as a contact sheet
 tools/record.sh OUT.mp4 FRAMES 1 demo film      # a video with its mixed soundtrack; OUT a dir: every Nth JPEG
 tools/showcase.sh [OUT]                    # tests, beauty stills and the filmed demo into the evidence folder
+tools/stage.sh NAME OUT_DIR                # a staged moment, framed close (../tools/stages.py --list: a hook's drag,
+                                           # a knife at a gate, Hymn, the shrine's strike, a boss's return, the plate)
 tools/preview.sh MODEL OUT.png [anim=walk]      # contact sheet of one model under game lighting
 tools/model.sh NAME...                     # build models: tools/blender/NAME.py in Blender -> game/assets/models/NAME.glb
 uv run python tools/paint.py [NAME...]     # paint images with Codex (art/painted/)
