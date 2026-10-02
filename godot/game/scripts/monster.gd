@@ -5,13 +5,15 @@ extends Node3D
 ## it moves. Its death, its leak into the sanctuary and a leader's curse come as events (World._event).
 
 # kinds with a model of their own; the others wear the nearest one, tinted and sized (`STAND_INS`) until theirs exist
-const HEIGHTS := {"fallen": 1.2, "shaman": 1.95, "zombie": 1.9, "skeleton": 1.85, "bat": 0.7, "drowned": 1.9}
+const HEIGHTS := {"fallen": 1.2, "shaman": 1.95, "zombie": 1.9, "skeleton": 1.85, "bat": 0.7, "drowned": 1.9,
+	"gargoyle": 1.7}
 const BODY := 1.3                    # bodies a size up from life, so they read from the battle camera
 # each kind's rim (and its x-ray behind a tower): Fallen ember, Shaman crimson (the leader's violet is its skull's
 # eyes and its ring, never on its hide), Zombie grave-green, Skeleton bone (dimmer: a bright rim on every thin bone
 # shimmers at range); each later kind a hue of its own
 const RIM := {"fallen": Color(1.3, 0.4, 0.12), "shaman": Color(1.25, 0.26, 0.22), "zombie": Color(0.5, 0.6, 0.38),
-	"skeleton": Color(0.72, 0.68, 0.56), "bat": Color(1.1, 0.15, 0.2), "drowned": Color(0.35, 0.7, 0.75)}
+	"skeleton": Color(0.72, 0.68, 0.56), "bat": Color(1.1, 0.15, 0.2), "drowned": Color(0.35, 0.7, 0.75),
+	"gargoyle": Color(0.5, 0.75, 0.6)}
 const KINDGLOW := 0.25              # how strongly that rim lights a living body at any distance
 # how fast each walk cycle carries the body at speed_scale 1 (m/s): the walk plays faster as the body speeds up
 # (tools/blender/audit.py measures it off the feet); a flyer's wingbeat keeps its own rate
@@ -22,7 +24,6 @@ const STAND_INS := {
 	"azazel": ["zombie", Color(0.6, 0.06, 0.05)], "priest": ["shaman", Color(0.85, 0.8, 0.65)],
 	"witch": ["shaman", Color(0.8, 0.12, 0.2)], "flayer": ["fallen", Color(0.3, 0.45, 0.2)],
 	"zealot": ["skeleton", Color(0.85, 0.7, 0.4)], "spider": ["fallen", Color(0.2, 0.18, 0.2)],
-	"gargoyle": ["skeleton", Color(0.45, 0.45, 0.5)],
 	"hulk": ["zombie", Color(0.35, 0.55, 0.2)],
 	"fetish": ["shaman", Color(0.45, 0.65, 0.25)], "inquisitor": ["shaman", Color(0.95, 0.8, 0.45)],
 	"bone_priest": ["shaman", Color(0.7, 0.55, 0.95)],
