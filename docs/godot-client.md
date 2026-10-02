@@ -1,6 +1,7 @@
 # Hellward on Godot: Python rules, Godot client
 
-Status: agreed with Ilya on 2026-10-01; steps 1-3 built on 2026-10-01/02 (see "As built" at the end). The decision
+Status: agreed with Ilya on 2026-10-01; steps 1-3 built on 2026-10-01/02 and released as 0.2.0 for Apple Silicon
+and Windows (step 5; [docs/release.md](release.md)) on https://games.tachyon-ai.eu/hellward/ (see "As built" at the end). The decision
 is [ADR 0002](adr/0002-python-server-godot-client.md). The client grew from the 3D Tristram demo, now `godot/`; why
 Godot is in [its engine notes](../godot/docs/engine.md).
 
