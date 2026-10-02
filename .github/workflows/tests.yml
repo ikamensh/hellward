@@ -22,6 +22,8 @@ jobs:
           repository: ikamensh/sagaforge
           path: sagaforge
       - uses: astral-sh/setup-uv@v6
+      - name: ffmpeg (the intro's timeline test encodes audio)
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
       - name: The environment
         working-directory: hellward
         run: uv sync --extra dev
