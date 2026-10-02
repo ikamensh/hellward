@@ -1,4 +1,4 @@
-"""The Bone Altar's amplification, Druid Grove's aura, their skills and Salvation's ward."""
+"""The Bone Altar's amplification, Druid Grove's aura and their skills."""
 
 from dataclasses import replace
 
@@ -6,9 +6,9 @@ import pytest
 
 from hellward.sim import campaign
 from hellward.sim.campaign import g
-from hellward.sim.content import TOWERS, Curse, Element, Group, Wave
+from hellward.sim.content import TOWERS, Curse, Element, Group, Wave, felt_hit
 from hellward.sim.level import Level
-from hellward.sim.model import SIM_DT, Refused, World
+from hellward.sim.model import SIM_DT, World
 from hellward.sim.skills import perks
 
 
@@ -65,18 +65,18 @@ def test_an_altar_amplifies_the_thickest_knot_and_everything_hurts_it_more():
 
 
 def test_amplification_multiplies_a_pyres_damage_but_not_after_it_lapses():
-    world = act2_world(g("fallen", 1))
+    world = act2_world(g("fallen", 1), seed=0)
+    world.waves = (replace(world.waves[0], hp=20.0),)   # it lives through both blows
     spawned(world, 1)
     m = world.monsters[0]
     m.amplified, m.amplify = 5.0, 0.3
-    blow = m.hp / 4
     hp = m.hp
-    world._hurt(m, blow, Element.FIRE)
-    assert hp - m.hp == pytest.approx(blow * 1.3)
+    world._strike(m, 4.0, Element.FIRE)
+    assert hp - m.hp == felt_hit(4.0, Element.FIRE, m.kind, 1.3) == 6   # 5.2, rounded up
     m.amplified = 0.0
     hp = m.hp
-    world._hurt(m, blow, Element.FIRE)
-    assert hp - m.hp == pytest.approx(blow)
+    world._strike(m, 4.0, Element.FIRE)
+    assert hp - m.hp == 4
 
 
 def test_amplification_does_not_stack():
@@ -96,28 +96,19 @@ def test_amplification_does_not_stack():
     assert b.amplified == pytest.approx(altar.stats.lasting - SIM_DT)
 
 
-def test_an_immune_monster_stays_immune_amplified():
-    world = act2_world(g("skeleton", 1))
-    spawned(world, 1)
-    m = world.monsters[0]
-    m.amplified, m.amplify = 5.0, 0.5
-    hp = m.hp
-    world._hurt(m, 40.0, Element.POISON)   # skeletons do not feel venom
-    assert m.hp == hp
-
-
 def test_a_grove_next_to_a_pyre_makes_its_bolt_hit_harder():
     world = act2_world(g("fallen", 1))
     pyre = world.build("pyre", (4, 3))
     grove = world.build("grove", (5, 3))
-    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage * (1 + grove.stats.damage))
+    bolt = first_bolt(world)
+    assert bolt.damage == pyre.stats.damage and bolt.factor == pytest.approx(1 + grove.stats.damage)
 
 
 def test_a_grove_three_tiles_away_lends_nothing():
     world = act2_world(g("fallen", 1))
-    pyre = world.build("pyre", (4, 3))
+    world.build("pyre", (4, 3))
     world.build("grove", (7, 3))
-    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage)
+    assert first_bolt(world).factor == 1.0
 
 
 def test_two_groves_do_not_stack():
@@ -125,7 +116,7 @@ def test_two_groves_do_not_stack():
     pyre = world.build("pyre", (4, 3))
     grove = world.build("grove", (5, 3))
     world.build("grove", (3, 3))
-    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage * (1 + grove.stats.damage))
+    assert first_bolt(world).factor == pytest.approx(1 + grove.stats.damage)
 
 
 def test_a_weakened_grove_lends_a_third_and_a_caged_one_nothing():
@@ -133,13 +124,13 @@ def test_a_weakened_grove_lends_a_third_and_a_caged_one_nothing():
     pyre = world.build("pyre", (4, 3))
     grove = world.build("grove", (5, 3))
     grove.curses[Curse.WEAKEN] = 5.0
-    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage * (1 + grove.stats.damage * grove.damage_mult()))
+    assert first_bolt(world).factor == pytest.approx(1 + grove.stats.damage * grove.damage_mult())
 
     world = act2_world(g("fallen", 1))
     pyre = world.build("pyre", (4, 3))
     grove = world.build("grove", (5, 3))
     grove.curses[Curse.BONE_PRISON] = 5.0   # caged: the aura is switched off
-    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage)
+    assert first_bolt(world).factor == 1.0
 
 
 def test_dim_vision_does_nothing_to_an_aura():
@@ -147,7 +138,7 @@ def test_dim_vision_does_nothing_to_an_aura():
     pyre = world.build("pyre", (4, 3))
     grove = world.build("grove", (5, 3))
     grove.curses[Curse.DIM_VISION] = 5.0
-    assert first_bolt(world).damage == pytest.approx(pyre.stats.damage * (1 + grove.stats.damage))
+    assert first_bolt(world).factor == pytest.approx(1 + grove.stats.damage)
 
 
 def test_corpse_explosion_bursts_once_and_does_not_chain():
@@ -210,21 +201,6 @@ def test_twister_roots_the_front_walker_but_not_an_overlord_or_a_gargoyle():
     assert by_kind["overlord"].frozen == 0
     run(world, 4.0)
     assert len([e for e in world.events if e[0] == "twister"]) >= 2
-
-
-def test_salvation_wards_an_uncursed_tower_and_otherwise_it_stays_refused():
-    world = act2_world(g("fallen", 1), learned=("holy_shield", "salvation"))
-    pyre = world.build("pyre", (4, 3))
-    world.mana = 100.0
-    world.cleanse(pyre.id)
-    assert pyre.ward == pytest.approx(8.0)
-    assert world.mana == pytest.approx(75.0)
-
-    plain = act2_world(g("fallen", 1))
-    pyre = plain.build("pyre", (4, 3))
-    plain.mana = 100.0
-    with pytest.raises(Refused):
-        plain.cleanse(pyre.id)
 
 
 def test_the_new_towers_fit_the_price_scale_and_keep_rank_skills():

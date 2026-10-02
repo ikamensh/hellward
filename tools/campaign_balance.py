@@ -22,8 +22,8 @@ machine's slot queue, as above.
   share of the lives lost to smart.
 
 The other columns: wins of N and the median and fewest lives kept; curse-seconds held on towers per leader
-spawned; chants broken, the share of all the chants the leaders began that a spell broke (a broken pondering is
-not a chant); spells cast per defence (C Cleanse, S Smite, M Meteor, O Frozen Orb); seconds per defence the mana
+spawned; boss strikes, the times a boss struck the shrine and walked again, per defence; spells cast per defence
+(S Smite, H Battle Hymn, M Meteor, O Frozen Orb); seconds per defence the mana
 orb sat full; the 95th percentile of the leaders' decision time. Under the table every target of the design is
 PASS, FAIL or open (nothing failed, something unmeasured).
 ``--out DIR`` keeps the table as ``table.md`` and every defence as a JSON line in ``runs.jsonl``.
@@ -69,9 +69,9 @@ MARGIN_STEP = 1.02
 LEADERS = {"smart": lambda seed: planner.smart, "random": planner.RandomLeaders}
 EASY = ("tristram", "graveyard")       # they teach, and may be easy
 BELOW = ("catacombs", "caves", "hells_gate")   # the ordinary defender loses at least one of these
-SPELL_LETTERS = {"cleanse": "C", "smite": "S", "meteor": "M", "orb": "O"}
+SPELL_LETTERS = {"smite": "S", "hymn": "H", "meteor": "M", "orb": "O"}
 COLUMNS = ("location", "player", "sigils", "wins/N", "median lives", "fewest", "M", "leader impact",
-           "curse-s/leader", "chants broken", "spells", "mana capped s", "decision p95 ms",
+           "curse-s/leader", "boss strikes", "spells", "mana capped s", "decision p95 ms",
            "towers/curse")
 
 STRONG = ("warden", "adaptive")   # who B* is drawn from: the planned player's searched builds are the ceiling
@@ -123,8 +123,8 @@ def play(player: str, location: str, seed: int, sigils: int, *, leaders: str = "
         "waves": world.wave + 1, "game_seconds": round(world.time, 2),
         "leaks": [record.leaks[w] for w in range(len(place.waves))],
         "spells": dict(record.spells), "mana_capped": round(record.mana_capped, 2),
-        "chants": record.chants, "broken": record.broken, "broken_chants": record.broken_chants,
-        "landed": record.landed, "warded": record.warded, "fizzled": record.fizzled,
+        "chants": record.chants, "landed": record.landed, "fizzled": record.fizzled, "strikes": record.strikes,
+        "hooked": record.hooked,
         "curse_seconds": round(record.curse_seconds, 2), "leaders_spawned": leaders_spawned(world),
         "towers_per_curse": round(sum(caught) / len(caught), 2) if caught else None,
         "decide_ms": [round(ms, 3) for ms in policy.ms], "cpu_seconds": round(time.process_time() - started, 3),
@@ -286,7 +286,7 @@ def rows(stages: list[Stage], players: list[str]) -> list[dict]:
                 "M": statistics.median(s.margins) if mine and s.margins else None,
                 "impact": impact(s) if mine and s.uncapped else None,
                 "curse_per_leader": ratio(held, sum(r["leaders_spawned"] for r in runs)),
-                "broken_share": ratio(sum(r["broken_chants"] for r in runs), sum(r["chants"] for r in runs)),
+                "strikes": statistics.mean(r["strikes"] for r in runs),
                 "spells": {k: sum(r["spells"].get(k, 0) for r in runs) / len(runs) for k in SPELL_LETTERS},
                 "mana_capped": statistics.mean(r["mana_capped"] for r in runs),
                 "p95_ms": p95([ms for r in runs for ms in r["decide_ms"]]),
@@ -335,7 +335,7 @@ def cells(row: dict) -> list[str]:
     return [
         row["location"], row["player"] + (" B*" if row["best"] else ""), str(row["sigils"]),
         f"{row['wins']}/{row['n']}", f"{row['median']:g}", str(row["fewest"]), show_margin(row["M"]),
-        show_impact(row["impact"]), number(row["curse_per_leader"]), percent(row["broken_share"]),
+        show_impact(row["impact"]), number(row["curse_per_leader"]), number(row["strikes"]),
         spells or "—", number(row["mana_capped"], 0), number(row["p95_ms"], 0), towers_curse,
     ]
 
@@ -481,7 +481,8 @@ def main(argv: list[str] | None = None) -> None:
         "B* has the best median lives. M: median over the first 8 seeds of the largest life factor B* still wins at "
         "(the spells do not grow with it). "
         "Leader impact: lives lost to smart minus random leaders, uncapped, and its share of those lost to smart. "
-        "Chants broken: of all the chants begun. Spells per defence: C Cleanse, S Smite, M Meteor, O Frozen Orb.", "",
+        "Boss strikes: a boss's strikes at the shrine per defence. Spells per defence: S Smite, H Battle Hymn, "
+        "M Meteor, O Frozen Orb.", "",
         "## Targets", "",
         *markdown(["target", "result", "detail"], targets(table)),
     ]

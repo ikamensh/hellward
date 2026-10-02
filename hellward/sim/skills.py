@@ -1,7 +1,9 @@
-"""The skill tree: tower columns of four skills and two columns of three, bought with sigils.
+"""The skill tree: tower columns of four skills, Steel's two rank skills, Warding's two and Sorcery's three, bought
+with sigils.
 
-A skill needs the one above it in its column; the tower columns cost 1, 2, 2 and 3 sigils top to
-bottom, Warding and Sorcery 1, 2 and 3. :func:`perks` turns a set of learned skills into
+A skill needs the one above it in its column; the tower columns cost 1, 2, 2 and 3 sigils top to bottom, Steel 2
+and 3, Warding 1 and 3, Sorcery 1, 2 and 3. Steel's rank skills raise every physical tower (Arrow, Ballista, Hook
+Tower, Knife Post). :func:`perks` turns a set of learned skills into
 :class:`Perks`, every number and rule they change, which a :class:`~hellward.sim.model.World` reads
 when a defence begins (:func:`tower_levels` bakes the tower modifiers into each kind's ranks once).
 The second and third ranks of a tower are learned here: :attr:`Perks.ranks` holds, per tower kind,
@@ -14,7 +16,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import Final
 
-from hellward.sim.content import DOOR, MANA_MAX, MANA_REGEN, SPELLS, TOWERS, TowerLevel
+from hellward.sim.content import DOOR, MANA_MAX, MANA_REGEN, TOWERS, TowerLevel
 from hellward.sim.items import EMPTY_LOADOUT, Loadout
 from hellward.sim.sums import int_sum
 
@@ -31,12 +33,16 @@ class Skill:
     first_location: int = 0        # zero-based campaign stage; learned only when this location opens
 
 
-COLUMNS: dict[str, str] = {"arrow": "Arrow", "fire": "Fire", "lightning": "Lightning", "cold": "Cold",
+PHYSICAL: Final = ("arrow", "ballista", "hook", "knife")   # the towers whose ranks Steel teaches
+
+COLUMNS: dict[str, str] = {"arrow": "Steel", "fire": "Fire", "lightning": "Lightning", "cold": "Cold",
                            "poison": "Poison", "bone": "Bone", "nature": "Nature", "warding": "Warding", "sorcery": "Sorcery"}
 
 SKILLS: dict[str, Skill] = {s.key: s for s in (
-    Skill("adept_arrow", "Adept of Arrows", "arrow", 1, 2, "Arrow Towers can be raised to the second rank.", ("arrow",)),
-    Skill("master_arrow", "Master of Arrows", "arrow", 2, 3, "Arrow Towers can be raised to the third rank.", ("arrow",)),
+    Skill("adept_arrow", "Adept of Steel", "arrow", 1, 2,
+          "Physical towers (Arrow, Ballista, Hook, Knife Post) can be raised to the second rank.", PHYSICAL),
+    Skill("master_arrow", "Master of Steel", "arrow", 2, 3,
+          "Physical towers (Arrow, Ballista, Hook, Knife Post) can be raised to the third rank.", PHYSICAL),
     Skill("adept_fire", "Adept of Fire", "fire", 1, 1, "Pyres can be raised to the second rank.", ("pyre",)),
     Skill("master_fire", "Master of Fire", "fire", 2, 2, "Pyres can be raised to the third rank.", ("pyre",)),
     Skill("fire_ball", "Fire Ball", "fire", 3, 2, "Pyre bolts burst into fireballs. Unlocked in the Jungle.", ("pyre",), 8),
@@ -51,7 +57,7 @@ SKILLS: dict[str, Skill] = {s.key: s for s in (
     Skill("shatter", "Shatter", "cold", 4, 3, "Frost bolts burst near their target. A chilled death shatters nearby foes. Unlocked in the Jungle.", ("frost",), 8),
     Skill("adept_poison", "Adept of Poison", "poison", 1, 1, "Plague Totems can be raised to the second rank.", ("plague",)),
     Skill("master_poison", "Master of Poison", "poison", 2, 2, "Plague Totems can be raised to the third rank.", ("plague",)),
-    Skill("lower_resist", "Lower Resist", "poison", 3, 2, "A poisoned monster resists everything 25 points less. Immunities hold.", ("plague",)),
+    Skill("lower_resist", "Lower Resist", "poison", 3, 2, "A poisoned monster loses its protections: every element hits it whole, or harder.", ("plague",)),
     Skill("contagion", "Contagion", "poison", 4, 3, "When a poisoned monster dies, its venom leaps to the nearest monster.", ("plague",), 8),
     Skill("adept_bone", "Adept of Bone", "bone", 1, 1, "Bone Altars can be raised to the second rank.", ("altar",)),
     Skill("master_bone", "Master of Bone", "bone", 2, 2, "Bone Altars can be raised to the third rank.", ("altar",)),
@@ -62,11 +68,10 @@ SKILLS: dict[str, Skill] = {s.key: s for s in (
     Skill("master_nature", "Master of Nature", "nature", 3, 2, "Druid Groves can be raised to the third rank.", ("grove",)),
     Skill("twister", "Twister", "nature", 4, 3, "Every 4 s a grove roots the foremost walker near it for 1.5 s.", ("grove",)),
     Skill("holy_shield", "Holy Shield", "warding", 1, 1, "Warded gates have 50% more life and mend fully between waves.", ("gate",)),
-    Skill("salvation", "Salvation", "warding", 2, 2, "Cleanse costs 25 mana and wards the tower against curses for 8 seconds.", ("cleanse",)),
-    Skill("thorns", "Thorns", "warding", 3, 3, "A gate returns half of each blow to the monster that strikes it, frost or no frost.", ("gate",)),
+    Skill("thorns", "Thorns", "warding", 2, 3, "A gate returns half of each blow to the monster that strikes it, frost or no frost.", ("gate",)),
     Skill("warmth", "Warmth", "sorcery", 1, 1, "Mana flows 40% faster, and the orb holds 25 more."),
     Skill("soul_harvest", "Soul Harvest", "sorcery", 2, 2, "Every slain leader gives 10 mana."),
-    Skill("spell_mastery", "Spell Mastery", "sorcery", 3, 3, "Smite, Meteor and Frozen Orb cost 25% less and strike 30% harder.", ("smite", "meteor", "orb")),
+    Skill("spell_mastery", "Spell Mastery", "sorcery", 3, 3, "Every spell costs 25% less; Smite, Meteor and Frozen Orb strike 30% harder.", ("smite", "hymn", "meteor", "orb")),
 )}
 
 TREE_COST = int_sum(s.cost for s in SKILLS.values())
@@ -113,6 +118,9 @@ def check(learned: frozenset[str]) -> None:
 
 RANK_SKILL: Final[dict[str, tuple[str, str]]] = {
     "arrow": ("adept_arrow", "master_arrow"),
+    "ballista": ("adept_arrow", "master_arrow"),
+    "hook": ("adept_arrow", "master_arrow"),
+    "knife": ("adept_arrow", "master_arrow"),
     "pyre": ("adept_fire", "master_fire"),
     "storm": ("adept_lightning", "master_lightning"),
     "frost": ("adept_cold", "master_cold"),
@@ -148,13 +156,11 @@ class Perks:
     twister: bool = False
     gate_life: float = DOOR.hp
     gate_mend: float = DOOR.repair
-    cleanse_cost: float = SPELLS["cleanse"].mana
-    salvation: bool = False
     thorns: bool = False
     mana_max: float = MANA_MAX
     mana_regen: float = MANA_REGEN
     soul_harvest: bool = False
-    spell_cost: float = 1.0      # Smite, Meteor and Frozen Orb
+    spell_cost: float = 1.0      # every spell's mana
     spell_power: float = 1.0
 
     def top(self, kind: str) -> int:
@@ -209,8 +215,6 @@ def perks(learned: Iterable[str], stage: int | None = None) -> Perks:
         p = replace(p, twister=True)
     if "holy_shield" in chosen:
         p = replace(p, gate_life=DOOR.hp * 1.5, gate_mend=1.0)
-    if "salvation" in chosen:
-        p = replace(p, cleanse_cost=25.0, salvation=True)
     if "thorns" in chosen:
         p = replace(p, thorns=True)
     if "warmth" in chosen:
@@ -238,7 +242,7 @@ def baked(p: Perks, loadout: Loadout = EMPTY_LOADOUT) -> dict[str, tuple[TowerLe
 def tower_levels(kind: str, p: Perks, loadout: Loadout = EMPTY_LOADOUT) -> tuple[TowerLevel, ...]:
     """A tower kind's ranks with the perks baked in."""
     ranks = TOWERS[kind].levels
-    if kind == "arrow":
+    if kind in PHYSICAL:
         trained = tuple(ranks)
     elif kind == "pyre":
         splash = [0.8, ranks[1].splash + 0.3, ranks[2].splash + 0.3] if p.fire_ball else [r.splash for r in ranks]

@@ -1,9 +1,8 @@
 {
- "skills": ["adept_fire", "warmth", "soul_harvest", "adept_lightning", "adept_arrow", "master_arrow", "holy_shield", "adept_bone", "master_bone", "fire_ball", "life_tap", "salvation", "thorns", "chain_lightning", "adept_cold", "master_nature", "adept_poison", "adept_nature", "master_fire", "master_lightning", "glacial_spike", "master_poison", "hurricane", "static_field", "spell_mastery", "master_cold", "lower_resist", "blaze", "shatter", "contagion", "corpse_explosion", "twister"],
+ "skills": ["adept_fire", "warmth", "soul_harvest", "adept_lightning", "adept_arrow", "master_arrow", "holy_shield", "adept_bone", "master_bone", "fire_ball", "life_tap", "thorns", "chain_lightning", "adept_cold", "master_nature", "adept_poison", "adept_nature", "master_fire", "master_lightning", "glacial_spike", "master_poison", "hurricane", "static_field", "spell_mastery", "master_cold", "lower_resist", "blaze", "shatter", "contagion", "corpse_explosion", "twister"],
  "calls": [100.0, 70.0, 50.0, 0.0, 70.0, 125.0, 70.0],
  "rebuild": "break",
  "smite_worth": 40.0,
- "cleanse_worth": 27.0,
  "meteor_worth": 3.75,
  "orb_worth": 3.0,
  "reserve": 30.0,

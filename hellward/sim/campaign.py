@@ -73,8 +73,8 @@ def sigils(outcome: str | None, lives: int) -> int:
     return int_sum(1 for need in SIGIL_LIVES if lives >= need)
 
 
-ALL_TOWERS = ("arrow", "pyre", "storm", "frost", "plague")
-ALL_SPELLS = ("cleanse", "smite", "meteor", "orb")
+ALL_TOWERS = ("arrow", "pyre", "storm", "frost", "plague", "ballista")
+ALL_SPELLS = ("smite", "hymn", "meteor", "orb")
 
 
 def _waves(stage: int, *rows: tuple[Group, ...]) -> tuple[Wave, ...]:
@@ -133,7 +133,7 @@ TRISTRAM = Location(
         (g("fallen", 22, 0.5), g("zombie", 6, 1.8, start=4.0), g("shaman", 3, 5.0, start=2.0)),
     ),
     wave_names=("The Fallen Swarm", "The Village Dead", "The Shaman Sings", "Red Knives", "The Burning of Tristram"),
-    arsenal=Arsenal(("arrow",), gates=False, spells=("cleanse",)),
+    arsenal=Arsenal(("arrow",), gates=False, spells=("smite",)),
     start_gold=BALANCE.starting_gold(0),
     theme="village",
     blurb="The village under the cathedral burns. The Fallen swarm through its lanes, the village dead walk behind "
@@ -170,14 +170,14 @@ GRAVEYARD = Location(
     ),
     wave_names=("Rattling Bones", "The Hungry Dead", "The Priest Walks", "Open Graves", "The Charnel March",
                 "All Souls' Night"),
-    arsenal=Arsenal(("arrow",), gates=True, spells=("cleanse", "smite")),
+    arsenal=Arsenal(("arrow",), gates=True, spells=("smite", "hymn")),
     start_gold=BALANCE.starting_gold(1),
     theme="graveyard",
     blurb="The dead of Tristram's churchyard have left their graves. Two grave roads meet near the crypt arch, "
           "if someone wards it.",
     taunt="I buried every one of them, and they still come when I call. Build your gate. My acolytes will smother "
           "your arrows behind it.",
-    lesson="A gate holds the dead in a queue. Smite on the sign stops a curse, but that leader's next one lands.",
+    lesson="A gate holds the dead in a queue. A hymned tower fires twice as fast, and the acolytes curse it first.",
     requires=("tristram",),
     life=BALANCE.location_growth ** 1,
 )
@@ -208,7 +208,7 @@ CATHEDRAL = Location(
     ),
     wave_names=("The Nave Fills", "Horns in the Aisle", "The Warband", "The Blood Witch", "Vespers",
                 "The Choir of Curses", "The Lamp Gutters"),
-    arsenal=Arsenal(("arrow", "pyre"), gates=True, spells=("cleanse", "smite")),
+    arsenal=Arsenal(("arrow", "pyre"), gates=True, spells=("smite", "hymn")),
     start_gold=BALANCE.starting_gold(2),
     theme="cathedral",
     blurb="The nave where the lamp hangs. Two open aisles lead from separate doors toward one sanctuary arch.",
@@ -249,13 +249,13 @@ CATACOMBS = Location(
     ),
     wave_names=("The Bone Halls", "Doorbreaker", "The Ossuary", "Rot Below", "The Overlords' Tread",
                 "Iron and Bone", "The Deep Charnel"),
-    arsenal=Arsenal(("arrow", "pyre", "frost"), gates=True, spells=("cleanse", "smite")),
+    arsenal=Arsenal(("arrow", "pyre", "frost", "ballista"), gates=True, spells=("smite", "hymn")),
     start_gold=BALANCE.starting_gold(3),
     theme="catacombs",
     blurb="Under the nave, two bone halls cross an open ossuary. Overlords break gates for a living.",
     taunt="One gate between you and the dark. I have watched the Overlords break it. Why are you "
           "still here?",
-    lesson="Overlords break the gate in seconds; frost weakens their blows while arrows keep working.",
+    lesson="An Overlord's armor takes half an arrow's hit and little of a Ballista's bolt; frost weakens its blows.",
     requires=("cathedral",),
     life=BALANCE.location_growth ** 3,
 )
@@ -288,7 +288,7 @@ CAVES = Location(
     ),
     wave_names=("The Goatman Clans", "Wings in the Dark", "The Den", "The Roost", "Lava Light", "The Stampede",
                 "The Burning Vault"),
-    arsenal=Arsenal(("arrow", "pyre", "frost", "plague"), gates=True, spells=("cleanse", "smite")),
+    arsenal=Arsenal(("arrow", "pyre", "frost", "plague", "ballista"), gates=True, spells=("smite", "hymn")),
     start_gold=BALANCE.starting_gold(4),
     theme="caves",
     blurb="Below the catacombs the caves open onto lava. Gargoyles nest in the vault and fly where they please.",
@@ -330,12 +330,12 @@ HELLS_GATE = Location(
     ),
     wave_names=("The Gate Opens", "The Council Gathers", "Wings and Iron", "The Horde", "The Siege",
                 "The Choir of Hell", "The Last Night", "Azazel the Flayer"),
-    arsenal=Arsenal(ALL_TOWERS, gates=True, spells=("cleanse", "smite")),
+    arsenal=Arsenal(ALL_TOWERS, gates=True, spells=("smite", "hymn")),
     start_gold=BALANCE.starting_gold(5),
     theme="hell",
     blurb="The door your saints built the cathedral on. Azazel the Flayer waits behind it with the council of curses.",
     taunt="In every night I have seen, the lamp goes out. I have begun to wonder what I have not seen.",
-    lesson="Every curse at once, and Azazel will not burn.",
+    lesson="Every curse at once, and Azazel: no element bites him, and the shrine only sends him back to walk again.",
     requires=("caves",),
     life=BALANCE.location_growth ** 5,
 )
@@ -346,8 +346,8 @@ def _water(*blocks: tuple[int, int, int, int]) -> frozenset[tuple[int, int]]:
     return frozenset((x, y) for x0, y0, x1, y1 in blocks for x in range(x0, x1 + 1) for y in range(y0, y1 + 1))
 
 
-ALL_TOWERS_II = ("arrow", "pyre", "storm", "frost", "plague", "altar")
-EVERY_TOWER = ("arrow", "pyre", "storm", "frost", "plague", "altar", "grove")
+ALL_TOWERS_II = ("arrow", "pyre", "storm", "frost", "plague", "ballista", "altar", "hook", "knife")
+EVERY_TOWER = ("arrow", "pyre", "storm", "frost", "plague", "ballista", "altar", "hook", "knife", "grove")
 
 
 DOCKS = Location(
@@ -375,12 +375,12 @@ DOCKS = Location(
         (g("zealot", 14, 0.8, route="side"), g("flayer", 30, 0.35, start=2.0), g("fetish", 2, 7.0, start=4.0)),
     ),
     wave_names=("The Piers", "Zealots Ashore", "The Shaman's Song", "Faith and Knives", "Low Tide", "The Harbour Burns"),
-    arsenal=Arsenal(ALL_TOWERS_II, gates=True, spells=("cleanse", "smite")),
+    arsenal=Arsenal(ALL_TOWERS_II, gates=True, spells=("smite", "hymn")),
     start_gold=BALANCE.starting_gold(6),
     theme="docks",
     blurb="Kurast's harbour: rotting piers over black water, and the Flayers waiting along them.",
     taunt="You crossed a sea for a lamp that is not yours. My shaman will raise every Flayer you leave whole.",
-    lesson="Amplify where your towers' reaches cross; kill the shaman before it raises the dead.",
+    lesson="Hooks drag Flayers back under your towers, knives make the gate a kill zone; kill the shaman before it raises the dead.",
     requires=("hells_gate",),
     life=BALANCE.location_growth ** 6,
 )
@@ -414,7 +414,7 @@ SPIDER_FOREST = Location(
         (g("spider", 24, 0.45), g("bat", 20, 0.4, start=4.0, route="side"), g("witch", 1, start=3.0), g("fetish", 2, 6.0, start=6.0)),
     ),
     wave_names=("Webs", "Dusk Wings", "The Witch Walks", "Brood", "The Canopy Moves", "Old Growth", "The Queen's Children"),
-    arsenal=Arsenal(EVERY_TOWER, gates=True, spells=("cleanse", "smite")),
+    arsenal=Arsenal(EVERY_TOWER, gates=True, spells=("smite", "hymn")),
     start_gold=BALANCE.starting_gold(7),
     theme="spider_forest",
     blurb="The road to the temples, through a forest the spiders own. In a clearing, the druids' ring of oaks.",
@@ -452,12 +452,12 @@ JUNGLE = Location(
         (g("zealot", 18, 0.6, route="side"), g("flayer", 24, 0.4, start=2.0), g("inquisitor", 2, 6.0, start=3.0), g("fetish", 2, 7.0, start=5.0)),
     ),
     wave_names=("Green Gloom", "White and Gold", "The Hunt", "Inquisition", "Blood Sport", "The March", "No Prayer"),
-    arsenal=Arsenal(EVERY_TOWER, gates=True, spells=("cleanse", "smite", "orb")),
+    arsenal=Arsenal(EVERY_TOWER, gates=True, spells=("smite", "hymn", "orb")),
     start_gold=BALANCE.starting_gold(8),
     theme="jungle",
     blurb="The jungle closes over two entrances, and the zealots of the fallen church run between the trees.",
     taunt="My inquisitors do not chant. You will know their curse when the ground burns under your towers, and not before.",
-    lesson="The inquisitors curse without a chant: ward the marked towers, and kill them first.",
+    lesson="The inquisitors mark their spot long before the curse falls: kill them first.",
     requires=("spider_forest",),
     life=BALANCE.location_growth ** 8,
 )
@@ -492,7 +492,7 @@ DROWNED_CITY = Location(
     ),
     wave_names=("Black Water", "Wings over the Canals", "The First Hulk", "Tide of the Dead", "Thorns", "The Flood",
                 "What the Swamp Keeps"),
-    arsenal=Arsenal(EVERY_TOWER, gates=True, spells=("cleanse", "smite", "orb")),
+    arsenal=Arsenal(EVERY_TOWER, gates=True, spells=("smite", "hymn", "orb")),
     start_gold=BALANCE.starting_gold(9),
     theme="drowned_city",
     blurb="Half of Kurast has sunk into the swamp: its streets are canals, and the Hulks walk them.",
@@ -540,7 +540,7 @@ TRAVINCAL = Location(
     theme="travincal",
     blurb="The temple terrace where the High Council meets, under the mother lamp. Every elder curses.",
     taunt="Turn back, and I will leave Tristram's lamp alone. It is a small lamp. No one would miss it.",
-    lesson="Curses from every side: spread wide, ward what matters, and kill the elders first.",
+    lesson="Curses from every side: spread wide, and kill the elders first.",
     requires=("drowned_city",),
     life=BALANCE.location_growth ** 10,
 )
@@ -581,7 +581,7 @@ TEMPLE = Location(
     theme="temple",
     blurb="The Temple of Light, where the mother lamp hangs dim over the altar and the Bone Priest waits beneath it.",
     taunt="I cannot see you in the bones. So I have come to see you myself.",
-    lesson="Each curse of his that lands burns your mana for every tower it catches: spread out, and smite his chant.",
+    lesson="Each curse of his that lands burns your mana for every tower it catches: spread out, and spend it first.",
     requires=("travincal",),
     life=BALANCE.location_growth ** 11,
 )

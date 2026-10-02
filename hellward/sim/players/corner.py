@@ -4,8 +4,8 @@
 - Other offered damage towers packed on free tiles closest to each bend plot
 - Spend every coin as it comes: build the plan, upgrade where the tree allows, then pack another round
 - Gates in every arch when offered
-- Smite on a chanting leader's sign when it has the mana
-- Cleanse the most valuable cursed tower
+- Smite on a chanting leader one Smite kills
+- Battle Hymn on the dearest tower with work to do
 - Skills: adept/master of cold and of each offered tower, in that order
 """
 
@@ -15,7 +15,7 @@ import math
 from dataclasses import dataclass, field
 
 from hellward.sim.campaign import ORDER, Location
-from hellward.sim.content import TOWERS
+from hellward.sim.content import SPELLS, TOWERS, felt_hit
 from hellward.sim.model import Refused, World
 from hellward.sim.players.hands import Hands, ready
 from hellward.sim.skills import SKILLS, can_learn, column_of
@@ -91,7 +91,7 @@ class Corner:
         order = [key for kind in kinds for key in sorted((k for k, skill in SKILLS.items() if skill.column == column_of(kind)),
                                                          key=lambda k: SKILLS[k].tier)]
         if arsenal.gates:
-            order += ["holy_shield", "salvation", "thorns"]
+            order += ["holy_shield", "thorns"]
         order += ["warmth", "soul_harvest", "spell_mastery"]
         learned: frozenset[str] = frozenset()
         for key in [*order, *(k for k in SKILLS if k not in order)]:
@@ -145,34 +145,30 @@ class Corner:
 
     def _spells(self, hands: Hands) -> None:
         world = hands.world
-        if "cleanse" in world.location.arsenal.spells:
-            self._cleanse(hands)
+        self._hymn(hands)
         if world.time - self._last_aim < self.aim_gap - 1e-9:
             return
-        if "smite" in world.location.arsenal.spells:
-            threats = hands.threats()
-            for sign in threats:
-                if sign.kind == "chant" and ready(world, "smite"):
+        if ready(world, "smite"):
+            blow = SPELLS["smite"].damage * world.power()
+            for sign in hands.threats():
+                leader = world.monster(sign.leader)
+                if sign.kind == "chant" and leader is not None and leader.hp <= felt_hit(blow, None, leader.kind):
                     hands.smite(sign.leader)
                     self._last_aim = world.time
                     return
 
-    def _cleanse(self, hands: Hands) -> None:
+    def _hymn(self, hands: Hands) -> None:
         world = hands.world
-        if world.mana < world.spell_cost("cleanse"):
+        if not ready(world, "hymn"):
             return
         best, best_value = None, 0.0
         for t in world.towers.values():
-            if not t.curses:
+            if t.kind.attack in ("aura", "amplify") or t.silenced:
                 continue
-            left = max(t.curses.values())
-            if left < 2.0:
-                continue
-            value = t.spent * left
-            if value > best_value:
-                best, best_value = t, value
+            if any(world.in_reach(t, m.s, m.route) for m in world.monsters) and t.spent > best_value:
+                best, best_value = t, float(t.spent)
         if best is not None:
-            hands.cleanse(best.id)
+            hands.hymn(best.id)
 
     def _gates(self, world: World) -> None:
         if not world.location.arsenal.gates or world.gold < world.door_cost:

@@ -29,8 +29,8 @@ from hellward.sim.campaign import CATHEDRAL, ORDER, Location
 from hellward.sim.content import (
     BURN_RADIUS, CONTAGION_REACH, CORPSE_RADIUS, CORPSE_SHARE, CURSES, DOOR, EARLY_CALL_GOLD, HURRICANE_RADIUS,
     HURRICANE_SLOW, MANA_START, MAX_POISON_STACKS, MONSTERS, SELL_REFUND, SHATTER_RADIUS, SHATTER_SHARE, SOUL, SPELLS,
-    START_LIVES, THORNS, TOWERS, TWISTER_HELD, TWISTER_PERIOD, TWISTER_RADIUS, WARD, WAVE_BREAK, Curse, Element,
-    MonsterKind, TowerKind, TowerLevel,
+    START_LIVES, THORNS, TOWERS, TWISTER_HELD, TWISTER_PERIOD, TWISTER_RADIUS, WAVE_BREAK, Curse, Element,
+    MonsterKind, TowerKind, TowerLevel, felt_hit, felt_over_time,
 )
 from hellward.sim.items import EMPTY_LOADOUT, Loadout, PATTERNS
 from hellward.sim.level import Level
@@ -49,6 +49,12 @@ CAST_SLACK: Final = tuning.number("battle.cast_slack")
 FIRST_WAVE_BREAK: Final = tuning.number("battle.first_wave_break")
 LEAK_WEIGHT: Final = tuning.number("battle.leak_weight")
 BLAZE_TIME: Final = tuning.number("battle.skills.blaze_time")
+SPLASH_SHARE: Final = tuning.number("battle.splash_share")
+KNIFE_STANDING: Final = tuning.number("battle.knife_standing")
+HOOK_PULL: Final = tuning.number("battle.hook_pull")
+HOOK_PAST: Final = tuning.number("battle.hook_past")
+HYMN_RATE: Final = SPELLS["hymn"].rate
+HOOK: Final = 1                 # the Hook's bit in Monster.moved: each mover kind moves a monster back once
 
 
 class Refused(Exception):
@@ -59,7 +65,7 @@ class Monster:
     __slots__ = ("id", "kind", "hp", "max_hp", "s", "route", "bounty", "salvage", "breach", "elite_name", "speed_factor",
                  "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
                  "cooldown", "asking", "ask_left", "chant_curse", "chant_spot", "chant_left", "door",
-                 "amplified", "amplify", "risen", "marking", "resolute")
+                 "amplified", "amplify", "risen", "marking", "moved", "strikes")
 
     def __init__(self, id: int, kind: MonsterKind, wave: int, lane: float, jostle: float, hp: float, cooldown: float,
                  route: str = "main", bounty: int | None = None, salvage: int = 0, breach: bool = False,
@@ -93,7 +99,8 @@ class Monster:
         self.amplify = 0.0                    # the fraction it takes extra (0.3 = 30% more damage)
         self.risen = False                    # has this monster been raised once already
         self.marking = False                  # is this leader currently marking (instead of chanting)
-        self.resolute = False                 # broken once: its next curse cannot be broken
+        self.moved = 0                        # a bit per mover kind that has moved it back (HOOK)
+        self.strikes = 0                      # a boss's strikes at the shrine
 
     def copy(self) -> Monster:
         """Everything but a leader's pending question to its planner."""
@@ -103,7 +110,7 @@ class Monster:
         m.poison = [stack[:] for stack in self.poison]
         m.chant_curse, m.chant_spot, m.chant_left, m.door = self.chant_curse, self.chant_spot, self.chant_left, self.door
         m.amplified, m.amplify = self.amplified, self.amplify
-        m.risen, m.marking, m.resolute = self.risen, self.marking, self.resolute
+        m.risen, m.marking, m.moved, m.strikes = self.risen, self.marking, self.moved, self.strikes
         return m
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -123,7 +130,7 @@ class Monster:
 
 
 class Tower:
-    __slots__ = ("id", "kind", "levels", "level", "tile", "cooldown", "curses", "ward", "spent", "spans", "spans_reach",
+    __slots__ = ("id", "kind", "levels", "level", "tile", "cooldown", "curses", "hymn", "spent", "spans", "spans_reach",
                  "timer")
 
     def __init__(self, id: int, kind: TowerKind, levels: tuple[TowerLevel, ...], tile: tuple[int, int]) -> None:
@@ -134,7 +141,7 @@ class Tower:
         self.tile = tile
         self.cooldown = 0.0
         self.curses: dict[Curse, float] = {}
-        self.ward = 0.0                       # seconds no curse can land on it (Salvation)
+        self.hymn = 0.0                       # seconds of Battle Hymn left: it attacks HYMN_RATE times as fast
         self.spent = levels[0].cost
         self.spans: tuple[tuple[float, float], ...] = ()   # the path it reaches, for the reach it had last
         self.spans_reach = -1.0
@@ -143,7 +150,7 @@ class Tower:
     def copy(self) -> Tower:
         t = Tower(self.id, self.kind, self.levels, self.tile)
         t.level, t.cooldown, t.curses = self.level, self.cooldown, dict(self.curses)
-        t.ward, t.spent, t.spans, t.spans_reach = self.ward, self.spent, self.spans, self.spans_reach
+        t.hymn, t.spent, t.spans, t.spans_reach = self.hymn, self.spent, self.spans, self.spans_reach
         t.timer = self.timer
         return t
 
@@ -165,7 +172,8 @@ class Tower:
         return value
 
     def rate_mult(self) -> float:
-        value = 1.0
+        """What its curses and a Battle Hymn make of its attacks per second."""
+        value = HYMN_RATE if self.hymn > 0 else 1.0
         for curse in self.curses:
             value *= CURSES[curse].rate
         return value
@@ -209,19 +217,20 @@ class Door:
 
 
 class Bolt:
-    """A firebolt or a venom dart in flight; it lands on its monster, or where that monster fell.
+    """A firebolt, a venom dart, a bolt or a knife in flight; it lands on its monster, or where that monster fell.
+    ``damage`` is the hit, ``factor`` the aura it was loosed under (a factor of the damage pipeline).
 
     A bolt is never changed: each step makes a flying bolt anew, so clones and the view keep the ones they were
     given. It is a class of its own rather than a dataclass, whose ``__init__`` runs interpreted when compiled."""
 
     __slots__ = ("id", "tower", "kind", "target", "left", "damage", "element", "splash", "poison", "poison_time",
-                 "chill", "chill_time", "leader_bonus",
+                 "chill", "chill_time", "leader_bonus", "factor",
                  "origin", "last")
 
     def __init__(self, id: int, tower: int, kind: str, target: int, left: float, damage: float, element: Element,
                  splash: float, poison: float, poison_time: float, origin: tuple[float, float],
                  last: tuple[float, float], chill: float = 0.0, chill_time: float = 0.0,
-                 leader_bonus: float = 0.0) -> None:
+                 leader_bonus: float = 0.0, factor: float = 1.0) -> None:
         self.id = id
         self.tower = tower
         self.kind = kind                # the tower kind's key
@@ -235,13 +244,14 @@ class Bolt:
         self.chill = chill
         self.chill_time = chill_time
         self.leader_bonus = leader_bonus
+        self.factor = factor
         self.origin = origin
         self.last = last                # the target's last known position
 
     def __reduce__(self) -> tuple[Any, ...]:
         return Bolt, (self.id, self.tower, self.kind, self.target, self.left, self.damage, self.element, self.splash,
                       self.poison, self.poison_time, self.origin, self.last, self.chill, self.chill_time,
-                      self.leader_bonus)
+                      self.leader_bonus, self.factor)
 
 
 @dataclass(frozen=True)
@@ -345,9 +355,7 @@ class World:
         self.outcome: str | None = None       # "victory" or "defeat"
         self.kills = 0
         self.curses_landed = 0
-        self.cleanses = 0
         self.spells_cast = 0
-        self.chants_broken = 0
         self.recharge: dict[str, float] = {}  # seconds each spell still gathers itself after a cast
         self._next_id = 1
 
@@ -376,7 +384,7 @@ class World:
         w.breach_failed, w.breach_cleared = self.breach_failed, self.breach_cleared
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
         w.leaked_life, w.forced, w.outcome, w.kills, w._next_id = self.leaked_life, [], self.outcome, self.kills, self._next_id
-        w.curses_landed, w.cleanses, w.spells_cast, w.chants_broken = self.curses_landed, self.cleanses, self.spells_cast, self.chants_broken
+        w.curses_landed, w.spells_cast = self.curses_landed, self.spells_cast
         return w
 
     def _id(self) -> int:
@@ -487,8 +495,6 @@ class World:
         return self._price(DOOR.cost)
 
     def spell_cost(self, key: str) -> float:
-        if key == "cleanse":
-            return self.perks.cleanse_cost
         return SPELLS[key].mana * self.perks.spell_cost
 
     def power(self) -> float:
@@ -607,23 +613,14 @@ class World:
         if SPELLS[key].recharge > 0:
             self.recharge[key] = SPELLS[key].recharge
 
-    def cleanse(self, tower_id: int) -> None:
-        tower = self.towers[tower_id]
-        if not tower.curses:
-            if not self.perks.salvation:
-                raise Refused("That tower carries no curse.")
-            self._spend("cleanse")
-            self.cleanses += 1
-            tower.ward = WARD
-            self._emit("cleansed", tower.id, [])
-            return
-        self._spend("cleanse")
-        self.cleanses += 1
-        lifted = sorted(tower.curses)
-        tower.curses.clear()
-        if self.perks.salvation:
-            tower.ward = WARD
-        self._emit("cleansed", tower.id, lifted)
+    def hymn(self, tower_id: int) -> None:
+        """Battle Hymn: the tower attacks HYMN_RATE times as fast while it lasts."""
+        tower = self.towers.get(tower_id)
+        if tower is None:
+            raise Refused("No tower stands there to hear the hymn.")
+        self._spend("hymn")
+        tower.hymn = SPELLS["hymn"].lasting
+        self._emit("hymn", tower.id)
 
     def smite(self, monster_id: int) -> None:
         m = self.monster(monster_id)
@@ -631,9 +628,7 @@ class World:
             raise Refused("There is nothing there to smite.")
         self._spend("smite")
         self._emit("smite", m.id, self.position(m))
-        if m.chant_curse is not None or m.asking is not None:
-            self._break(m)
-        self._hurt(m, SPELLS["smite"].damage * self.power(), None)
+        self._hurt(m, felt_hit(SPELLS["smite"].damage * self.power(), None, m.kind), None)
         self._bury()   # cast between steps: what it killed must not walk on into the next one
 
     def meteor(self, x: float, y: float) -> None:
@@ -654,10 +649,8 @@ class World:
         for m in struck:
             m.frozen = max(m.frozen, spec.lasting)
             m.door = -1
-            if m.chant_curse is not None or m.asking is not None:
-                self._break(m)
         for m in struck:
-            self._hurt(m, damage, Element.COLD)
+            self._strike(m, damage, Element.COLD)
         self._bury()
 
     def _inside_map(self, x: float, y: float) -> None:
@@ -812,44 +805,24 @@ class World:
                     decision: Decision = m.asking.result()
                     m.asking = None
                     self._emit("plan", m.id, decision)
-                    if m.frozen > 0:
-                        m.cooldown = HOLD_RETRY   # frozen while it made up its mind: it cannot chant
-                    elif decision.cast is None:
+                    if decision.cast is None:
                         m.cooldown = decision.retry
+                    elif spec.mark > 0:   # a mark burns on its spot, longer, before it lands
+                        m.chant_curse, m.chant_spot, m.chant_left = decision.cast.curse, decision.cast.spot, spec.mark
+                        m.marking = True
+                        m.cooldown = spec.cooldown
+                        self._emit("mark", m.id, decision.cast.curse, decision.cast.spot)
                     else:
-                        if spec.mark > 0 or m.resolute:   # a resolute curse is voiced like a mark: nothing breaks it
-                            m.chant_curse, m.chant_spot = decision.cast.curse, decision.cast.spot
-                            m.chant_left = spec.mark if spec.mark > 0 else spec.channel
-                            m.marking, m.resolute = True, False
-                            m.cooldown = spec.cooldown
-                            self._emit("mark", m.id, decision.cast.curse, decision.cast.spot)
-                        else:
-                            m.chant_curse, m.chant_spot, m.chant_left = decision.cast.curse, decision.cast.spot, spec.channel
-                            m.marking = False
-                            m.cooldown = spec.cooldown
-                            self._emit("chant", m.id, decision.cast.curse, decision.cast.spot)
+                        m.chant_curse, m.chant_spot, m.chant_left = decision.cast.curse, decision.cast.spot, spec.channel
+                        m.marking = False
+                        m.cooldown = spec.cooldown
+                        self._emit("chant", m.id, decision.cast.curse, decision.cast.spot)
                 continue
             m.cooldown -= dt
-            if m.cooldown <= 0 and self.planner is not None and self.towers and m.frozen <= 0:
+            if m.cooldown <= 0 and self.planner is not None and self.towers:
                 m.asking = _ASK
                 m.ask_left = DECIDE_DELAY
                 self._emit("ponder", m.id)
-
-    def _break(self, m: Monster) -> None:
-        """A leader's pondering or chant broken by a spell: the curse never comes, its whole cooldown starts again, and
-        it grows resolute: its next curse, pondering and all, cannot be broken. Nor can a mark: Smite and Frozen Orb on
-        a marking or resolute leader damage and freeze it, and the curse still comes."""
-        if m.marking or m.resolute:
-            return
-        spot = m.chant_spot
-        m.chant_curse, m.chant_spot, m.chant_left = None, (-1, -1), 0.0
-        m.asking, m.ask_left = None, 0.0
-        spec = m.kind.leader
-        if spec is not None:
-            m.cooldown = spec.cooldown
-        m.resolute = True
-        self.chants_broken += 1
-        self._emit("broken", m.id, spot)
 
     def _land(self, leader_id: int, curse: Curse, spot: tuple[int, int]) -> None:
         leader = self.monster(leader_id)
@@ -862,14 +835,10 @@ class World:
         if spec is None or _hypot(cx - x, cy - y) > spec.cast_range + CAST_SLACK:
             self._emit("fizzle", leader_id, spot)
             return
-        caught = self.caught(spot, curse_radius(curse, leader.kind, self.curse_scale))
         cursed: list[int] = []
-        for tower in caught:
-            if tower.ward > 0:
-                self._emit("ward_holds", leader_id, tower.id, curse)
-            else:
-                tower.curses[curse] = CURSES[curse].duration
-                cursed.append(tower.id)
+        for tower in self.caught(spot, curse_radius(curse, leader.kind, self.curse_scale)):
+            tower.curses[curse] = CURSES[curse].duration
+            cursed.append(tower.id)
         if cursed:
             self.curses_landed += 1
             self._emit("cursed", leader_id, spot, curse, tuple(cursed))
@@ -879,7 +848,7 @@ class World:
                     burned = min(self.mana, amount)
                     self.mana -= burned
                     self._emit("burned", leader_id, burned)
-        elif not any(t.ward > 0 for t in caught):
+        else:
             self._emit("fizzle", leader_id, spot)
         leader.marking = False
 
@@ -927,9 +896,15 @@ class World:
                                 m.door = d.index
                             break
                 m.s = s
-                if s >= route.length:
+                if s >= route.length:   # it strikes the shrine
                     self.lives -= m.kind.lives
                     self.leaked_life += m.max_hp * LEAK_WEIGHT
+                    if m.kind.boss:   # struck back to its portal, with its life and afflictions, to walk again
+                        m.s, m.door = 0.0, -1
+                        m.strikes += 1
+                        self._emit("returned", m.id, m.kind.key, m.kind.lives, m.strikes)
+                        ordered = False
+                        continue
                     self._count_off(m)
                     self._emit("leak", m.id, m.kind.key, m.kind.lives)
                     leaked = True
@@ -954,13 +929,13 @@ class World:
                 if m.chill_left > 0:
                     blow *= 1.0 - m.chill
                 d.hp -= blow
-                if thorns:
+                if thorns:   # holy, like Smite: no factor, no armor
                     self._hurt(m, m.kind.door_dps * dt * THORNS, None, quiet=True)
                 if d.hp <= 0 and d.built:
                     d.built, d.hp, d.rubble = False, 0.0, True
                     self._emit("door_broken", d.index)
 
-    def _aura_mult(self, tower: Tower) -> float:
+    def aura_mult(self, tower: Tower) -> float:
         """How much harder a tower strikes under the groves: 1 plus the best aura on it.
 
         Worked out when the damage is dealt, never kept on the world, so a clone never shares it.
@@ -1054,7 +1029,7 @@ class World:
                 if m.amplified < lasting:
                     m.amplified = lasting
                 hit.append(m.id)
-        rate = stats.rate * (t.rate_mult() if t.curses else 1.0)
+        rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0)
         t.cooldown += 1.0 / rate
         self._emit("amplify", t.id, (best_x, best_y), tuple(hit))
 
@@ -1100,15 +1075,28 @@ class World:
                         break
                     if m.hp > 0 and self._tower_covers(t, m, spans, reach):
                         hit.append(m)
-            elif attack == "venom":   # the strongest it can poison
+            elif attack == "venom":   # the strongest in reach
                 best = None
                 for m in monsters:
                     if single_route and m.s < near:
                         break
-                    if (m.hp > 0 and (best is None or m.hp > best.hp) and m.kind.taken(Element.POISON) > 0
-                            and self._tower_covers(t, m, spans, reach)):
+                    if m.hp > 0 and (best is None or m.hp > best.hp) and self._tower_covers(t, m, spans, reach):
                         best = m
                 hit = [best] if best is not None else []
+            elif attack == "hook":
+                hooked = self._hook_target(t, spans, reach, near, single_route)
+                hit = [hooked] if hooked is not None else []
+            elif t.kind.key == "knife":   # a standing small monster first, else the foremost
+                hit = []
+                for m in monsters:
+                    if single_route and m.s < near:
+                        break
+                    if m.hp > 0 and self._tower_covers(t, m, spans, reach):
+                        if _standing(m):
+                            hit = [m]
+                            break
+                        if not hit:
+                            hit = [m]
             else:
                 hit = []
                 for m in monsters:
@@ -1125,21 +1113,23 @@ class World:
             if not hit:
                 t.cooldown = 0.0
                 continue
-            aura = self._aura_mult(t)
-            damage = stats.damage * (t.damage_mult() if t.curses else 1.0) * aura
-            rate = stats.rate * (t.rate_mult() if t.curses else 1.0)
+            aura = self.aura_mult(t)
+            damage = stats.damage * (t.damage_mult() if t.curses else 1.0)   # the hit; the aura is a factor
+            rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0)
             t.cooldown += 1.0 / rate
             if attack == "nova":
                 self._emit("nova", t.id)
                 for m in hit:
-                    chill = stats.chill * m.kind.taken(Element.COLD)   # the slow follows cold resistance
+                    chill = stats.chill * m.kind.taken(Element.COLD)   # the slow follows the cold's factor
                     if chill > 0.0:
                         if chill >= m.chill or m.chill_left <= 0:
                             m.chill = chill
                         m.chill_left = max(m.chill_left, stats.chill_time)
-                    self._hurt(m, damage, t.kind.element)
+                    self._strike(m, damage, t.kind.element, aura)
             elif attack == "chain":
-                self._chain(t, hit[0], damage, stats.chains)
+                self._chain(t, hit[0], damage, aura, stats.chains)
+            elif attack == "hook":
+                self._hook(t, hit[0], damage, aura)
             else:
                 target = hit[0]
                 origin = t.centre
@@ -1147,11 +1137,43 @@ class World:
                 distance = _hypot(last[0] - origin[0], last[1] - origin[1])
                 bolt = Bolt(self._id(), t.id, t.kind.key, target.id, distance / t.kind.bolt_speed, damage, t.kind.element,
                             stats.splash, stats.poison * aura, stats.poison_time, origin, last, stats.chill, stats.chill_time,
-                            stats.leader_bonus)
+                            stats.leader_bonus, aura)
                 self.bolts.append(bolt)
                 self._emit("bolt", bolt)
 
-    def _chain(self, tower: Tower, first: Monster, damage: float, jumps: int) -> None:
+    def _hook_target(self, t: Tower, spans: tuple[tuple[float, float], ...], reach: float, near: float,
+                     single_route: bool) -> Monster | None:
+        """The foremost small monster in reach at least HOOK_PAST beyond its route's spot (the route's point nearest the
+        hook), not at a gate and never hooked before."""
+        level = self.level
+        for m in self.monsters:
+            if single_route and m.s < near:
+                break
+            if (m.hp > 0 and m.door < 0 and not m.moved & HOOK and m.kind.small
+                    and m.s >= level.nearest(m.route, t.tile) + HOOK_PAST and self._tower_covers(t, m, spans, reach)):
+                return m
+        return None
+
+    def _hook(self, t: Tower, m: Monster, damage: float, aura: float) -> None:
+        """The pull: HOOK_PULL tiles (times Weaken's damage share) back toward the hook's spot, never past it; a walker
+        pulled into a standing gate's arch stops at its queue. Then the hit."""
+        level = self.level
+        spot = level.nearest(m.route, t.tile)
+        pull = HOOK_PULL * (t.damage_mult() if t.curses else 1.0)
+        to = max(spot, m.s - pull)
+        if not m.kind.flying:
+            for door_index, crossing in level.crossings(m.route):
+                stop = crossing - DOOR_STOP - m.jostle
+                if self.doors[door_index].built and stop < to <= crossing:
+                    to = stop
+        before = m.s
+        m.s = to
+        m.moved |= HOOK
+        self._emit("hook", t.id, m.id, before, to)
+        _furthest_first(self.monsters, level)
+        self._strike(m, damage, t.kind.element, aura)
+
+    def _chain(self, tower: Tower, first: Monster, damage: float, aura: float, jumps: int) -> None:
         static = self.perks.static_field
         struck = [first]
         struck_ids = {first.id}
@@ -1181,7 +1203,7 @@ class World:
         self._emit("chain", tower.id, [m.id for m in struck], where)
         keeps = self.perks.leap_keeps
         for i, m in enumerate(struck):
-            self._hurt(m, damage * keeps ** i, Element.LIGHTNING)
+            self._strike(m, damage, Element.LIGHTNING, aura * keeps ** i)
 
     def _bolts(self, dt: float) -> None:
         if not self.bolts:
@@ -1195,13 +1217,13 @@ class World:
             left = b.left - dt
             if left > 0:
                 flying.append(Bolt(b.id, b.tower, b.kind, b.target, left, b.damage, b.element, b.splash, b.poison,
-                                   b.poison_time, b.origin, last, b.chill, b.chill_time, b.leader_bonus))
+                                   b.poison_time, b.origin, last, b.chill, b.chill_time, b.leader_bonus, b.factor))
                 continue
             struck: list[Monster] = []
             if b.splash > 0:
                 struck = self._around(last[0], last[1], b.splash, flyers=True)
                 if self.perks.blaze and b.kind == "pyre":
-                    self.hazards.append(Hazard(last[0], last[1], b.splash, b.damage / 3.0, BLAZE_TIME))
+                    self.hazards.append(Hazard(last[0], last[1], b.splash, b.damage * b.factor / 3.0, BLAZE_TIME))
             elif target is not None:
                 struck.append(target)
             self._emit("impact", b, last, [m.id for m in struck])
@@ -1210,14 +1232,18 @@ class World:
                     self._poison(m, b.poison, b.poison_time)
                 if b.chill > 0:
                     chill = b.chill * m.kind.taken(Element.COLD)
-                    if chill > 0:
-                        if chill >= m.chill or m.chill_left <= 0:
-                            m.chill = chill
-                        m.chill_left = max(m.chill_left, b.chill_time)
-                blow = b.damage if m is target or b.splash <= 0 else b.damage * 0.6
+                    if chill >= m.chill or m.chill_left <= 0:
+                        m.chill = chill
+                    m.chill_left = max(m.chill_left, b.chill_time)
+                factor = b.factor
+                if m is not target and b.splash > 0:
+                    factor *= SPLASH_SHARE   # a splash's lesser blow
+                elif b.kind == "knife" and _standing(m):
+                    factor *= KNIFE_STANDING
+                hit = b.damage
                 if m.kind.leader is not None:
-                    blow *= 1.0 + b.leader_bonus
-                self._hurt(m, blow, b.element)
+                    hit *= 1.0 + b.leader_bonus   # a forged pattern's hit on a leader, before the factors
+                self._strike(m, hit, b.element, factor)
         self.bolts = flying
 
     def _meteors(self) -> None:
@@ -1232,12 +1258,10 @@ class World:
             struck = self._around(mt.x, mt.y, spec.radius, flyers=True)
             self._emit("meteor", mt.x, mt.y, [m.id for m in struck])
             for m in struck:
-                self._hurt(m, mt.damage, Element.FIRE)
+                self._strike(m, mt.damage, Element.FIRE)
             self.hazards.append(Hazard(mt.x, mt.y, BURN_RADIUS, mt.burn, spec.lasting))
 
     def _poison(self, m: Monster, dps: float, seconds: float) -> None:
-        if m.kind.taken(Element.POISON) <= 0:
-            return
         if len(m.poison) >= MAX_POISON_STACKS:
             m.poison.sort(key=lambda stack: stack[1])
             m.poison.pop(0)
@@ -1252,13 +1276,13 @@ class World:
                 span = min(dt, stack[1])
                 total += stack[0] * span
                 stack[1] -= dt
+            if total > 0:   # felt while the venom is still in it: Lower Resist reads that
+                self._wither(m, total, Element.POISON)
             m.poison = [stack for stack in m.poison if stack[1] > 0]
-            if total > 0:
-                self._hurt(m, total, Element.POISON, quiet=True)
         if self.hazards:
             for h in self.hazards:
                 for m in self._around(h.x, h.y, h.radius, flyers=False):
-                    self._hurt(m, h.dps * min(dt, h.left), Element.FIRE, quiet=True)
+                    self._wither(m, h.dps * min(dt, h.left), Element.FIRE)
                 h.left -= dt
             self.hazards = [h for h in self.hazards if h.left > 0]
         for m in self.monsters:
@@ -1267,22 +1291,37 @@ class World:
         if any(m.hp <= 0 for m in self.monsters):
             self._bury()
 
+    def _exposed(self, m: Monster) -> bool:
+        """Lower Resist: a poisoned monster is protected against nothing."""
+        return self.perks.lower_resist and bool(m.poison)
+
     def taken(self, m: Monster, element: Element | None) -> float:
-        """The share of a blow of this element that the monster feels; holy damage (None) is felt whole."""
+        """The element's factor on a blow to this monster, Lower Resist included; holy damage (None) takes none."""
         if element is None:
             return 1.0
-        resist = m.kind.resist.get(element, 0.0)
-        if resist < 1.0 and self.perks.lower_resist and m.poison:
-            resist -= 0.25
-        return 1.0 - resist
+        return m.kind.taken(element, self._exposed(m))
 
-    def _hurt(self, m: Monster, amount: float, element: Element | None, *, quiet: bool = False, bursts: bool = True) -> None:
+    def _strike(self, m: Monster, hit: float, element: Element, factor: float = 1.0) -> None:
+        """A hit, through the damage pipeline (:func:`~hellward.sim.content.felt_hit`): ``factor`` and the
+        monster's amplification join the element's factor."""
         if m.hp <= 0:
             return
-        taken = self.taken(m, element)
-        if taken > 0 and m.amplified > 0:
-            taken *= 1.0 + m.amplify   # an immunity (taken 0) stays 0
-        m.hp -= amount * taken
+        if m.amplified > 0:
+            factor *= 1.0 + m.amplify
+        self._hurt(m, felt_hit(hit, element, m.kind, factor, exposed=self._exposed(m)), element)
+
+    def _wither(self, m: Monster, amount: float, element: Element) -> None:
+        """Damage over time: the element's factor and the amplification, no armor, no rounding."""
+        if m.hp <= 0:
+            return
+        factor = 1.0 + m.amplify if m.amplified > 0 else 1.0
+        self._hurt(m, felt_over_time(amount, element, m.kind, factor, exposed=self._exposed(m)), element, quiet=True)
+
+    def _hurt(self, m: Monster, amount: float, element: Element | None, *, quiet: bool = False, bursts: bool = True) -> None:
+        """Damage as it is felt (the pipeline's, or holy damage's whole amount)."""
+        if m.hp <= 0:
+            return
+        m.hp -= amount
         if not quiet:
             self._emit("hit", m.id, element)
         if m.hp <= 0:
@@ -1331,7 +1370,7 @@ class World:
         if bursts and self.perks.shatter and m.chill_left > 0:
             around = [o for o in self._around(where[0], where[1], SHATTER_RADIUS, flyers=True) if o is not m]
             self._emit("shatter", m.id, where)
-            for o in around:   # a monster a burst kills does not burst in turn
+            for o in around:   # a death burst takes no factor and no armor; a monster it kills does not burst in turn
                 self._hurt(o, m.max_hp * SHATTER_SHARE, Element.COLD, quiet=True, bursts=False)
         if bursts and self.perks.corpse_explosion and amplified:
             around = [o for o in self._around(where[0], where[1], CORPSE_RADIUS, flyers=True) if o is not m]
@@ -1343,7 +1382,7 @@ class World:
         """Contagion: a dead monster's venom goes to the nearest living monster it can poison."""
         best, best_d = None, CONTAGION_REACH * CONTAGION_REACH
         for o in self.monsters:
-            if o is m or o.hp <= 0 or o.kind.taken(Element.POISON) <= 0:
+            if o is m or o.hp <= 0:
                 continue
             x, y = self.position(o)
             d = (x - where[0]) ** 2 + (y - where[1]) ** 2
@@ -1382,8 +1421,8 @@ class World:
         if any(m.hp <= 0 for m in self.monsters):
             self._bury()
         for t in self.towers.values():
-            if t.ward > 0:
-                t.ward = max(0.0, t.ward - dt)
+            if t.hymn > 0:   # whole steps: a hymn of 6 s lasts 120 of them
+                t.hymn = t.hymn - dt if t.hymn - dt > 1e-9 else 0.0
             if not t.curses:
                 continue
             for curse in list(t.curses):
@@ -1431,6 +1470,11 @@ def _furthest_first(monsters: list[Monster], level: Level) -> None:
             monsters[j + 1] = monsters[j]
             j -= 1
         monsters[j + 1] = m
+
+
+def _standing(m: Monster) -> bool:
+    """A small monster standing still for a knife: battering a gate, or held (frozen)."""
+    return m.kind.small and (m.door >= 0 or m.frozen > 0)
 
 
 def _inside(s: float, spans: tuple[tuple[float, float], ...]) -> bool:

@@ -1,20 +1,21 @@
 """The warden: a veteran's defence, played the way a person who has held each location many times plays it.
 
-It reads the location's intro first: which monsters come, what they resist, which of them fly, and what the
-location offers. From that it learns its skills and drafts a build: gates in every arch, fire and frost on the
-queues behind them, lightning where the flyers pass and venom for the biggest walkers, each element weighed by
-how much of the host's life it can hurt. A location it has replayed has its build and skills as data
+It reads the location's intro first: which monsters come, what they are protected against and vulnerable to, how
+much armor they wear, which of them fly, and what the location offers. From that it learns its skills and drafts a
+build: gates in every arch, fire and frost on the queues behind them, knives at the queues too, lightning where the
+flyers pass, venom for the biggest walkers, ballistas against armor and a hook where small monsters run, each kind
+weighed by how much of the host's life its hits can hurt (as the rules feel them). A location it has replayed has its build and skills as data
 (``plans/warden.json``, searched by ``tools/warden_plans.py`` on training seeds); elsewhere the draft is the build.
 
 The build is a list of steps (a gate, a tower, a rank) taken in order as the gold comes. A gate that breaks is
 set again as soon as the arch is clear. With the list done, the gold goes to the tower that has had the most
 to shoot at.
 
-In the fight it watches the leaders: a chant against a tower that matters is smitten, or frozen with the crowd
-around it; a curse that lands on a busy tower is cleansed; a gate about to break under a crowd gets a Frozen
-Orb; a dense queue gets a Meteor; a monster about to reach the sanctuary with little life left is smitten, and
-one worth many lives there (Azazel) draws every Smite a chant can spare. Mana is never left to sit at the top
-of the orb: a full orb goes on a lesser crowd or the monster a Smite hurts most.
+In the fight it watches the leaders: a chanting leader one Smite kills is smitten, its curse dying with it; the
+tower with the most work to do is hymned while a Smite stays in hand; a gate about to break under a crowd gets a
+Frozen Orb; a dense queue gets a Meteor; a monster about to reach the sanctuary with little life left is smitten, and
+a boss draws every Smite a leader can spare. Mana is never left to sit at the top of the orb: a full orb goes on a
+lesser crowd or the monster a Smite hurts most.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from hellward.sim.campaign import ORDER, Location
-from hellward.sim.content import CURSES, MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Curse, Element
+from hellward.sim.content import MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Element, felt_hit
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.players.spacing import score_with_spacing
@@ -34,13 +35,9 @@ from hellward.sim.skills import SKILLS, can_learn, kept, perks, tower_levels
 PLANS = Path(__file__).parent / "plans" / "warden.json"
 THINK = 0.25          # seconds between two looks at the gold
 ARRIVING = 3.0        # tiles of path before a tower's reach whose monsters count as its work to come
-SEVERITY = {Curse.WEAKEN: 0.65, Curse.DECREPIFY: 0.6, Curse.DIM_VISION: 0.5, Curse.BONE_PRISON: 1.0}
-CLEANSE_BAR = 500.0   # damage a cleanse must win back with the orb empty (nothing when it is full)
 METEOR_BITE = 3.0     # a Meteor must take this many of its blows' worth of life
-ORB_CROWD = 400.0     # life (at a wave's life of one) an orb on a chanting leader must also catch
 GATE_CROWD = 600.0    # life a queue must hold for an orb to keep its breaking gate standing
 LEAK_SMITE = 2.5      # seconds from the sanctuary a monster one Smite kills is smitten
-BOSS = 5              # lives a monster costs at the sanctuary for every spare Smite to go to it (Azazel)
 FULL = 8.0            # mana short of the orb's top at which it is spent on lesser targets rather than wasted
 FULL_BITE = 1.5       # the Meteor's bar then
 QUEUE_FALLOFF = 0.5   # each arch further along the path counts this much less: the first queue fights most
@@ -120,13 +117,27 @@ def host(location: Location) -> dict[str, float]:
 
 
 def worth(location: Location, kind: str) -> float:
-    """How much of the host's life a tower kind can hurt, resistances and immunities weighed."""
-    element = TOWERS[kind].element
-    return sum(share * max(0.0, MONSTERS[key].taken(element)) for key, share in host(location).items())
+    """How much of the host's life a tower kind's rank-I hit can hurt: each kind's share of the life weighed by the
+    share of the hit it feels (its protections, vulnerabilities and armor, as the rules feel them)."""
+    tower = TOWERS[kind]
+    hit = tower.levels[0].damage
+    if tower.attack in ("aura", "amplify"):
+        return sum(share * MONSTERS[key].taken(tower.element) for key, share in host(location).items())
+    return sum(share * felt_hit(hit, tower.element, MONSTERS[key]) / hit for key, share in host(location).items())
 
 
 def flyers(location: Location) -> float:
     return sum(share for key, share in host(location).items() if MONSTERS[key].flying)
+
+
+def armored(location: Location) -> float:
+    """The share of the host's life that wears armor."""
+    return sum(share for key, share in host(location).items() if MONSTERS[key].armor > 0)
+
+
+def small(location: Location) -> float:
+    """The share of the host's life in small monsters, the ones a hook drags back."""
+    return sum(share for key, share in host(location).items() if MONSTERS[key].small)
 
 
 def draft_skills(location: Location, sigils: int) -> frozenset[str]:
@@ -141,8 +152,8 @@ def draft_skills(location: Location, sigils: int) -> frozenset[str]:
         wanted += ["warmth"]
     if "storm" in arsenal.towers and flyers(location) > 0.1:
         wanted += ["adept_lightning", "chain_lightning"]
-    if "cleanse" in arsenal.spells and arsenal.gates:
-        wanted += ["salvation"]
+    if "ballista" in arsenal.towers and armored(location) > 0.1:
+        wanted += ["adept_arrow"]
     if "frost" in arsenal.towers:
         wanted += ["adept_cold"]
     if "pyre" in arsenal.towers:
@@ -191,6 +202,10 @@ def tile_value(location: Location, kind: str, tile: tuple[int, int], reach: floa
                       if _inside(s - DOOR_STOP - JOSTLE / 2, spans))
     if kind == "frost":
         return 10.0 * queues + (0.6 if not location.level.doors else 0.2) * length
+    if kind == "knife":
+        return 8.0 * queues + 0.4 * length
+    if kind == "hook":   # it hooks nothing at a gate: open path is its work
+        return length + queues
     if kind == "plague":
         return length + 3.0 * queues
     if kind == "altar":
@@ -224,6 +239,12 @@ def draft_build(location: Location, learned: frozenset[str], towers: int = 14) -
         share["altar"] *= 0.5
     if "grove" in share:
         share["grove"] *= 0.4
+    if "ballista" in share:
+        share["ballista"] *= 2.0 * armored(location)
+    if "hook" in share:
+        share["hook"] *= 0.3 * small(location)
+    if "knife" in share:
+        share["knife"] *= 0.4 if location.level.doors else 0.1
     total = sum(share.values())
     tiles = [(x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y)]
     chosen: list[tuple[str, tuple[int, int]]] = []
@@ -304,7 +325,7 @@ class Warden:
             busy = 0.0
             for m in world.monsters:
                 if world.in_reach(t, m.s, m.route):
-                    busy += max(0.0, m.kind.taken(element))
+                    busy += m.kind.taken(element)
             self.work[t.id] = self.work.get(t.id, 0.0) + busy * THINK
 
     def _gates(self, world: World) -> None:
@@ -386,13 +407,13 @@ class Warden:
         if not world.monsters:
             return
         spells = world.location.arsenal.spells
-        if "cleanse" in spells:
-            self._cleanse(hands)
+        if "hymn" in spells:
+            self._hymn(hands)
         if world.time - self.last_aim < self.aim_gap - 1e-9:
             return
         if "smite" in spells and self._smite_leaker(hands):
             return
-        if ("smite" in spells or "orb" in spells) and self._break_chant(hands):
+        if "smite" in spells and self._kill_chanter(hands):
             return
         if "smite" in spells and self._smite_boss(hands):
             return
@@ -417,56 +438,34 @@ class Warden:
         hands.smite(target.id)
         self.last_aim = world.time
 
-    def _cleanse(self, hands: Hands) -> None:
+    def _hymn(self, hands: Hands) -> None:
+        """The tower with the most work in hand or coming, while a Smite stays in hand for a leader."""
         world = hands.world
-        if world.mana < world.spell_cost("cleanse"):
+        keep = world.spell_cost("smite") if "smite" in world.location.arsenal.spells and world.leaders() else 0.0
+        if not ready(world, "hymn", spare=keep):
             return
         best, best_value = None, 0.0
         for t in world.towers.values():
-            if not t.curses:
+            if t.kind.attack in ("aura", "amplify") or t.silenced:
                 continue
-            left = max(t.curses.values())
-            if left < 2.0:
-                continue
-            value = _tower_value(world, t) * left * max(SEVERITY[c] for c in t.curses)
+            value = _tower_value(world, t)
             if value > best_value:
                 best, best_value = t, value
-        full = world.mana / world.mana_max
-        if best is not None and best_value >= CLEANSE_BAR * (1.0 - full) + 20.0:
-            hands.cleanse(best.id)
+        if best is not None:
+            hands.hymn(best.id)
 
-    def _break_chant(self, hands: Hands) -> bool:
-        """Smite the leader whose chant would cost the most, or freeze it when other chants or a crowd stand by."""
+    def _kill_chanter(self, hands: Hands) -> bool:
+        """A leader whose sign is up that one Smite kills: its curse dies with it."""
         world = hands.world
-        chanting: list[Monster] = []
-        best, best_value, seen = None, 0.0, (0.0, 0.0)
+        if not ready(world, "smite"):
+            return False
+        blow = SPELLS["smite"].damage * world.power()
         for sign in hands.threats():
             leader = world.monster(sign.leader)
-            if leader is None:
-                continue
-            chanting.append(leader)
-            if sign.kind == "chant" and sign.curse is not None:
-                caught = [t for t in world.caught(sign.spot, sign.radius) if t.ward <= 0]
-                if not caught:
-                    continue
-                value = sum(_tower_value(world, t) for t in caught) * CURSES[sign.curse].duration * SEVERITY[sign.curse]
-            else:
-                value = max((_tower_value(world, t) for t in world.towers.values()), default=0.0) * 4.0
-            if value > best_value:
-                best, best_value, seen = leader, value, sign.at
-        if best is None:
-            return False
-        if ready(world, "orb"):
-            x, y = seen   # where the leader stood when its sign appeared: a person aims where they saw it
-            nearby: list[Monster] = _near(world, x, y, SPELLS["orb"].radius)
-            if sum(1 for m in nearby if m in chanting) >= 2 or sum(m.hp for m in nearby) >= ORB_CROWD * world.power():
-                hands.orb(x, y)
+            if leader is not None and leader.hp <= felt_hit(blow, None, leader.kind):
+                hands.smite(leader.id)
                 self.last_aim = world.time
                 return True
-        if ready(world, "smite"):
-            hands.smite(best.id)
-            self.last_aim = world.time
-            return True
         return False
 
     def _smite_leaker(self, hands: Hands) -> bool:
@@ -478,18 +477,18 @@ class Warden:
         for m in sorted(world.monsters, key=world.remaining):
             if world.remaining(m) > LEAK_SMITE * m.kind.speed:
                 continue
-            if m.hp <= damage:
+            if m.hp <= felt_hit(damage, None, m.kind):
                 hands.smite(m.id)
                 self.last_aim = world.time
                 return True
         return False
 
     def _smite_boss(self, hands: Hands) -> bool:
-        """A monster that would cost many lives at the sanctuary: every Smite not kept for a chant goes to it."""
+        """A boss, which strikes the shrine again and again: every Smite not kept for a leader goes to it."""
         world = hands.world
         if not ready(world, "smite", spare=world.spell_cost("smite")):
             return False
-        bosses = [m for m in world.monsters if m.kind.lives >= BOSS]
+        bosses = [m for m in world.monsters if m.kind.boss]
         if not bosses:
             return False
         hands.smite(min(bosses, key=world.remaining).id)
@@ -537,7 +536,7 @@ class Warden:
             value = 0.0
             for m, (mx, my) in points:
                 if (mx - cx) ** 2 + (my - cy) ** 2 <= r2:
-                    value += min(m.hp, damage * max(0.0, m.kind.taken(Element.FIRE)))
+                    value += min(m.hp, felt_hit(damage, Element.FIRE, m.kind))
             if value > best_value:
                 best, best_value = (cx, cy), value
         if best is None or best_value < bite * damage:
@@ -555,7 +554,7 @@ def _tower_value(world: World, tower: Tower) -> float:
     for m in world.monsters:
         spans = world.level.route(m.route).coverage(tower.tile, stats.range)
         if _inside(m.s, tuple((a - ARRIVING, b) for a, b in spans)):
-            load += max(0.0, m.kind.taken(element))
+            load += felt_hit(stats.damage, element, m.kind) / stats.damage if stats.damage > 0 else 1.0
     attack = tower.kind.attack
     if attack == "nova":
         cap = 8.0
@@ -574,15 +573,6 @@ def _clear(world: World, index: int) -> bool:
     cx, cy = x + 0.5, y + 0.5
     return not any(not m.kind.flying and (world.position(m)[0] - cx) ** 2
                    + (world.position(m)[1] - cy) ** 2 < 0.6 ** 2 for m in world.monsters)
-
-
-def _near(world: World, x: float, y: float, radius: float) -> list[Monster]:
-    found: list[Monster] = []
-    for m in world.monsters:
-        mx, my = world.position(m)
-        if (mx - x) ** 2 + (my - y) ** 2 <= radius * radius:
-            found.append(m)
-    return found
 
 
 def _ahead(world: World, m: Monster, seconds: float) -> tuple[float, float]:

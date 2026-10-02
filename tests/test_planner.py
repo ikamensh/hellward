@@ -1,4 +1,5 @@
-"""The leaders' choice of curse: it reads resistances, stays in reach and beats the naive policies."""
+"""The leaders' choice of curse: it reads how its pack feels each tower's hits, stays in reach and beats the naive
+policies."""
 
 import statistics
 from dataclasses import replace
@@ -13,7 +14,7 @@ from tools.curse_quality import moments
 
 
 def skeleton_pack() -> World:
-    """A focused curse arena with an immune pack passing a plague totem and a Pyre."""
+    """A focused curse arena with a venom-protected pack passing a plague totem and a Pyre."""
     pack = Wave((Group("skeleton", 6, 0.6), Group("shaman", 1, 1, start=3.0)), 10)
     level = Level("curse arena", 25, 14,
                   ((0, 2), (8, 2), (8, 6), (3, 6), (3, 11), (12, 11), (12, 4), (18, 4), (18, 10), (24, 10)),
@@ -35,7 +36,7 @@ def shaman(world: World) -> int:
     return next(m.id for m in world.monsters if m.kind.key == "shaman")
 
 
-def test_a_leader_leaves_alone_a_tower_its_pack_is_immune_to():
+def test_a_leader_leaves_alone_a_tower_its_pack_shrugs_off():
     world = skeleton_pack()
     plague = next(t.tile for t in world.towers.values() if t.kind.key == "plague")
     pyre = next(t.tile for t in world.towers.values() if t.kind.key == "pyre")
@@ -122,3 +123,31 @@ def test_smart_tristram_curses_keep_most_of_the_best_gain():
         shares.append(max(0.0, gains[picked.curse, picked.spot]) / best)
     assert shares
     assert statistics.mean(shares) >= 0.85
+
+
+def hymn_field(hymned: int) -> tuple[World, int, list[tuple[int, int]]]:
+    """Two arrows facing each other across a straight hall, the same to the leader but for the hymn on one."""
+    pack = Wave((Group("fallen", 8, 0.5), Group("shaman", 1, 1, start=2.0)), 10)
+    arsenal = replace(campaign.CATHEDRAL.arsenal, towers=("arrow",), spells=("smite", "hymn"))
+    location = replace(campaign.CATHEDRAL, level=Level("hymn field", 18, 9, ((0, 4), (17, 4)), ()), arsenal=arsenal,
+                       waves=(pack,), wave_names=("pack",), life=1.0)
+    world = World(location, hardness=10.0)
+    world.gold = 1000
+    tiles = [(7, 2), (7, 6)]
+    towers = [world.build("arrow", tile) for tile in tiles]
+    world.call_wave()
+    while not any(m.kind.leader is not None and m.s > 1.0 for m in world.monsters):
+        world.step()
+    world.mana = 100
+    world.hymn(towers[hymned].id)
+    return world, next(m.id for m in world.monsters if m.kind.leader is not None), tiles
+
+
+def test_a_leader_curses_the_hymned_tower_over_its_unhymned_twin():
+    """S3: the boost is fragile. Whichever of the two the hymn falls on, the leader's curse goes there."""
+    for hymned in (0, 1):
+        world, leader, tiles = hymn_field(hymned)
+        decision = planner.decide(world, leader, timing=False)
+        assert decision.cast is not None and decision.cast.spot == tiles[hymned]
+        unhymned = next(o for o in decision.options if o.spot != tiles[hymned])
+        assert decision.cast.estimate > unhymned.estimate and decision.cast.gain > unhymned.gain

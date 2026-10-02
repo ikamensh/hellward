@@ -66,6 +66,33 @@ def test_an_unopposed_monster_walks_the_path_and_costs_its_lives():
     assert world.lives == START_LIVES - MONSTERS["overlord"].lives
 
 
+def test_an_ordinary_monster_strikes_the_shrine_and_is_gone():
+    world = started(World(wave_of("zombie")))
+    run(world, ARENA.length / MONSTERS["zombie"].speed + 2)
+    leaks = [e for e in world.events if e[0] == "leak"]
+    assert len(leaks) == 1 and leaks[0][2:] == ("zombie", 1)
+    assert not world.monsters and world.lives == START_LIVES - 1
+
+
+def test_a_boss_strikes_for_five_and_walks_again_from_its_portal_with_its_life():
+    world = started(World(wave_of("azazel"), hardness=50.0))   # nothing here kills him
+    world.gold = 1000
+    world.build("arrow", (4, 3))
+    walk = ARENA.length / MONSTERS["azazel"].speed
+    run(world, walk + 2)
+    azazel = world.monsters[0]
+    assert azazel.kind.boss and azazel.strikes == 1 and azazel.s < 3
+    assert [e for e in world.events if e[0] == "returned"] == [("returned", azazel.id, "azazel", 5, 1)]
+    assert not [e for e in world.events if e[0] == "leak"]
+    assert world.lives == START_LIVES - 5
+    hurt = azazel.hp
+    assert hurt < azazel.max_hp   # the arrows' work stays on him
+    run(world, walk)
+    assert azazel.strikes == 2 and world.lives == START_LIVES - 10 and azazel.hp <= hurt
+    run(world, 2 * walk)
+    assert world.outcome == "defeat"   # four strikes: 20 lives
+
+
 def test_a_gate_holds_walkers_until_they_break_it():
     world = World(wave_of("zombie", count=3))
     world.gold = 1000
@@ -112,22 +139,18 @@ def test_every_curse_but_none_slows_a_kill():
         assert kill_time(curse) > plain, curse
 
 
-def test_bone_prison_silences_and_cleanse_lifts_it():
+def test_bone_prison_silences_until_it_lapses():
     world = World(wave_of("zombie"))
     world.gold = 1000
     tower = world.build("pyre", (4, 4))
-    tower.curses[Curse.BONE_PRISON] = 1000.0   # held open while the zombie walks into reach
+    tower.curses[Curse.BONE_PRISON] = 6.0   # held while the zombie walks into reach
     started(world)
-    run(world, 6)   # well inside the pyre's reach by now
+    run(world, 6 - SIM_DT)   # well inside the pyre's reach by now
     zombie = world.monsters[0]
     assert zombie.hp == pytest.approx(zombie.max_hp)
-    world.mana = SPELLS["cleanse"].mana
-    world.cleanse(tower.id)
-    assert world.mana == 0 and not tower.curses
     run(world, 3)
+    assert not tower.curses
     assert zombie.hp < zombie.max_hp
-    with pytest.raises(Refused):
-        world.cleanse(tower.id)
 
 
 def test_commands_refuse_what_the_rules_forbid():

@@ -2,8 +2,10 @@
 
 When a leader's curse is ready it considers every tower it could reach and every curse it knows. A cheap
 estimate (:func:`candidates`) says how much damage the curse would stop that tower dealing while it lasts,
-from where each monster will walk and what it resists. A curse falls on a spot, so each candidate is a
-(curse, spot) pair priced by every unwarded tower its circle catches. The best few go to **rollouts**: the world is cloned
+from where each monster will walk and how each hit is felt there (the rules' own :func:`~hellward.sim.content.felt_hit`:
+protections, armor, auras, a knife at a gate), a hook's pulls priced by the time they give the other towers, and a
+hymned tower at its hymned rate. A curse falls on a spot, so each candidate is a
+(curse, spot) pair priced by every tower its circle catches. The best few go to **rollouts**: the world is cloned
 and played forward a little past the curse's end at the game's step, once with nothing cast and once per
 option, and each option's *gain* is how much more life the pack keeps (the life of the monsters still
 standing, monsters that reached the sanctuary at twice their life, and the life knocked off doors).
@@ -24,11 +26,14 @@ from dataclasses import dataclass, field
 from typing import Final
 
 from hellward.sim import tuning
-from hellward.sim.content import CURSES, Curse, CurseSpec, LeaderSpec
-from hellward.sim.model import (
-    CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, SIM_DT, ForcedCurse, Monster, Tower, World, curse_radius,
+from hellward.sim.content import (
+    CURSES, MAX_POISON_STACKS, Curse, CurseSpec, LeaderSpec, felt_hit, felt_over_time,
 )
-from hellward.sim.sums import add, float_sum, settle
+from hellward.sim.model import (
+    CAST_SLACK, DECIDE_DELAY, DOOR_STOP, HOLD_RETRY, HOOK, HOOK_PAST, HOOK_PULL, KNIFE_STANDING, SIM_DT, SPLASH_SHARE,
+    ForcedCurse, Monster, Tower, World, curse_radius,
+)
+from hellward.sim.sums import add, float_sum, int_sum, settle
 
 ROLLOUT_DT: Final = SIM_DT
 HORIZON_PAD: Final = tuning.number("planner.horizon_pad")
@@ -99,8 +104,7 @@ def _spec(leader: Monster) -> LeaderSpec:
 
 
 def reachable(world: World, leader: Monster, delay: float = 0.0) -> list[Tower]:
-    """Towers the leader will still reach when its chant ends, assuming it keeps walking, and that no ward will
-    protect then."""
+    """Towers the leader will still reach when its chant ends, assuming it keeps walking."""
     spec = _spec(leader)
     lands = DECIDE_DELAY + _voiced(spec) + delay
     s = leader.s + leader.speed * lands
@@ -108,16 +112,15 @@ def reachable(world: World, leader: Monster, delay: float = 0.0) -> list[Tower]:
     limit = spec.cast_range + CAST_SLACK * 0.5
     found = []
     for t in world.towers.values():
-        if t.ward > lands:
-            continue   # warded until after the curse would land
         cx, cy = t.centre
         if (cx - x) ** 2 + (cy - y) ** 2 <= limit * limit:
             found.append(t)
     return found
 
 
-def _trajectory(world: World, m: Monster, times: list[float]) -> list[float]:
-    """Where a monster will be at each time, walking at its current pace and stopping at standing doors."""
+def _trajectory(world: World, m: Monster, times: list[float]) -> tuple[list[float], list[bool]]:
+    """Where a monster will be at each time, walking at its current pace and stopping at standing doors, and whether
+    it stands still there (frozen, or queued at a door)."""
     stop = None
     if not m.kind.flying:
         for door_index, s in world.level.crossings(m.route):
@@ -125,51 +128,108 @@ def _trajectory(world: World, m: Monster, times: list[float]) -> list[float]:
                 stop = s - DOOR_STOP - m.jostle
                 break
     speed = m.kind.speed * (1.0 - m.chill) if m.chill_left > 0 else m.kind.speed
-    out = []
+    where: list[float] = []
+    standing: list[bool] = []
     for t in times:
-        s = m.s + speed * max(0.0, t - m.frozen)
+        walked = t - m.frozen
+        s = m.s + speed * max(0.0, walked)
+        held = walked <= 0
         if stop is not None and s > stop:
             s = max(stop, m.s)
-        out.append(s)
-    return out
+            held = True
+        where.append(s)
+        standing.append(held)
+    return where, standing
 
 
-def _damage_in(tower: Tower, reach: float, world: World, tracks: list[tuple[Monster, list[float]]], index: int,
-               allowed: dict[str, tuple[tuple[float, float], ...]] | None = None) -> float:
-    """Damage per second a tower would deal, at one sample, to the monsters within ``reach``; with ``allowed``, only
-    to those also on those stretches of the path (an altar's reach, whose amplification it lends to)."""
-    spans = {route.key: (world.level.coverage(tower.tile, reach) if route.key == "main"
-                         else route.coverage(tower.tile, reach)) for route in world.level.routes}
-    element = tower.kind.element
-    taken = []
-    for m, track in tracks:
+def _spans(world: World, tower: Tower, reach: float) -> dict[str, tuple[tuple[float, float], ...]]:
+    return {route.key: (world.level.coverage(tower.tile, reach) if route.key == "main" else route.coverage(tower.tile, reach))
+            for route in world.level.routes}
+
+
+def _damage_in(tower: Tower, reach: float, world: World, tracks: list[tuple[Monster, list[float], list[bool]]],
+               index: int, allowed: dict[str, tuple[tuple[float, float], ...]] | None = None, share: float = 1.0,
+               rate: float = 1.0) -> float:
+    """Damage per second a tower would deal, at one sample, to the monsters within ``reach``: each hit felt as the
+    rules feel it (:func:`~hellward.sim.content.felt_hit`: protections, armor, the aura, a knife on a standing
+    monster), at ``share`` of its hit and ``rate`` times its attacks (a curse's, a hymn's); with ``allowed``, only to
+    those also on those stretches of the path (an altar's reach, whose amplification it lends to). A hook's is its hit
+    and its pull: the damage the other towers deal the monster in the time it gives them back."""
+    spans = _spans(world, tower, reach)
+    in_reach: list[tuple[Monster, float, bool]] = []   # nearest the sanctuary first, as the world keeps them
+    for m, track, standing in tracks:
         s = track[index]
         if allowed is not None and not any(a <= s <= b for a, b in allowed[m.route]):
             continue
         for a, b in spans[m.route]:
             if a <= s <= b:
-                if tower.kind.attack != "venom" or m.kind.taken(element) > 0:   # venom seeks only what it can poison
-                    taken.append(m.kind.taken(element))
+                in_reach.append((m, s, standing[index]))
                 break
-    if not taken:
+    if not in_reach:
         return 0.0
     stats = tower.stats
-    dps = stats.damage * stats.rate
     attack = tower.kind.attack
+    element = tower.kind.element
+    hit = stats.damage * share
+    aura = world.aura_mult(tower)
+    per_second = stats.rate * rate
+    if attack == "hook":
+        return per_second * _hooked(tower, world, in_reach, hit, aura, share)
+    if attack == "venom":   # the strongest in reach
+        strongest = in_reach[0][0]
+        for m, _, _ in in_reach:
+            if m.hp > strongest.hp:
+                strongest = m
+        stacks = min(float(MAX_POISON_STACKS), stats.poison_time * per_second)
+        return (per_second * felt_hit(hit, element, strongest.kind, aura)
+                + felt_over_time(stats.poison * aura * stacks, element, strongest.kind))
     if attack == "nova":
-        return dps * float_sum(taken)
-    taken.sort(reverse=True)
+        return per_second * int_sum(felt_hit(hit, element, m.kind, aura) for m, _, _ in in_reach)
+    if tower.kind.key == "knife":
+        for m, _, held in in_reach:
+            if held and m.kind.small:
+                return per_second * felt_hit(hit, element, m.kind, aura * KNIFE_STANDING)
+    ordered = sorted(in_reach, key=lambda e: -felt_hit(hit, element, e[0].kind, aura))   # the hardest-hit first
     if attack == "chain":
         keeps = world.perks.leap_keeps
-        return dps * float_sum(v * keeps ** i for i, v in enumerate(taken[: 1 + stats.chains]))
-    if attack == "venom":
-        return (dps + stats.poison * min(4, stats.poison_time * stats.rate)) * taken[0]
-    splash = 1.0 + 0.6 * min(3, len(taken) - 1) if stats.splash > 0 else 1.0
-    return dps * taken[0] * splash
+        return per_second * int_sum(felt_hit(hit, element, ordered[i][0].kind, aura * keeps ** i)
+                                    for i in range(min(len(ordered), 1 + stats.chains)))
+    total = felt_hit(hit, element, ordered[0][0].kind, aura)
+    if stats.splash > 0:   # a fireball's lesser blows on up to three around its target
+        total += int_sum(felt_hit(hit, element, ordered[i][0].kind, aura * SPLASH_SHARE)
+                         for i in range(1, min(len(ordered), 4)))
+    return per_second * total
+
+
+def _hooked(tower: Tower, world: World, in_reach: list[tuple[Monster, float, bool]], hit: float, aura: float,
+            share: float) -> float:
+    """What one hook is worth at a sample: its hit on the monster it would hook (the foremost small one past its spot,
+    never hooked, not standing), and the damage the other towers covering the dragged stretch deal that monster in
+    the seconds the pull gives them (HOOK_PULL tiles, times Weaken's share, at its pace)."""
+    level = world.level
+    for m, s, held in in_reach:
+        if held or not m.kind.small or m.moved & HOOK:
+            continue
+        spot = level.nearest(m.route, tower.tile)
+        if s < spot + HOOK_PAST:
+            continue
+        pull = min(HOOK_PULL * share, s - spot)
+        middle = s - pull * 0.5
+        route = level.route(m.route)
+        others = 0.0
+        for u in world.towers.values():
+            if u is tower or u.silenced or u.kind.attack in ("aura", "amplify", "hook"):
+                continue
+            covered = level.coverage(u.tile, u.reach) if m.route == "main" else route.coverage(u.tile, u.reach)
+            if any(a <= middle <= b for a, b in covered):
+                others += (felt_hit(u.stats.damage * u.damage_mult(), u.kind.element, m.kind, world.aura_mult(u))
+                           * u.stats.rate * u.rate_mult())
+        return felt_hit(hit, tower.kind.element, m.kind, aura) + others * pull / m.kind.speed
+    return 0.0
 
 
 def _priced(tower: Tower, curse: Curse, world: World, start: float, times: list[float],
-            tracks: list[tuple[Monster, list[float]]]) -> float:
+            tracks: list[tuple[Monster, list[float], list[bool]]]) -> float:
     """Damage the curse would stop one tower dealing, over the shared tracks at ``times``."""
     spec = CURSES[curse]
     left = tower.curses.get(curse, 0.0)
@@ -179,27 +239,28 @@ def _priced(tower: Tower, curse: Curse, world: World, start: float, times: list[
         return _lent(tower, curse, world, start, left, times, tracks)
     begin, end = start + left, start + spec.duration
     full = tower.stats.range * tower.range_mult()
-    now = tower.damage_mult() * tower.rate_mult()
+    share, rate = tower.damage_mult(), tower.rate_mult()   # a hymn is in the rate: the leaders see the boost
     total, error = 0.0, 0.0
     for i in range(len(times)):
         moment = times[i]
         if moment < begin or moment >= end:
             continue
-        before = _damage_in(tower, full, world, tracks, i) * now
+        before = _damage_in(tower, full, world, tracks, i, share=share, rate=rate)
         if before <= 0:
             continue
         if spec.silenced or tower.silenced:
             after = 0.0
-        elif spec.range != 1.0:
-            after = _damage_in(tower, full * spec.range, world, tracks, i) * now
+        elif spec.damage == 1.0 and spec.range == 1.0:
+            after = before * spec.rate   # fewer attacks deal proportionally less
         else:
-            after = before * spec.damage * spec.rate
+            after = _damage_in(tower, full * spec.range, world, tracks, i, share=share * spec.damage,
+                               rate=rate * spec.rate)
         total, error = add(total, error, (before - after) * SAMPLE)
     return settle(total, error)
 
 
 def _lent(tower: Tower, curse: Curse, world: World, start: float, left: float, times: list[float],
-          tracks: list[tuple[Monster, list[float]]]) -> float:
+          tracks: list[tuple[Monster, list[float], list[bool]]]) -> float:
     """What a curse on a support tower stops it lending: a grove's bonus on the towers under its aura,
     or an altar's amplification on the damage the other towers deal to the monsters in its reach."""
     spec = CURSES[curse]
@@ -216,7 +277,7 @@ def _helpers(world: World) -> list[Tower]:
 
 
 def _lent_grove(tower: Tower, spec: CurseSpec, world: World, start: float, left: float, times: list[float],
-                tracks: list[tuple[Monster, list[float]]]) -> float:
+                tracks: list[tuple[Monster, list[float], list[bool]]]) -> float:
     stats = tower.stats
     if spec.silenced:
         after_share = 0.0
@@ -242,8 +303,7 @@ def _lent_grove(tower: Tower, spec: CurseSpec, world: World, start: float, left:
             if u.silenced:
                 continue
             full = u.stats.range * u.range_mult()
-            now = u.damage_mult() * u.rate_mult()
-            dealt = _damage_in(u, full, world, tracks, i) * now
+            dealt = _damage_in(u, full, world, tracks, i, share=u.damage_mult(), rate=u.rate_mult())
             if dealt > 0:
                 total, error = add(total, error, dealt * SAMPLE)
     dealt_total = settle(total, error)
@@ -251,7 +311,7 @@ def _lent_grove(tower: Tower, spec: CurseSpec, world: World, start: float, left:
 
 
 def _lent_altar(tower: Tower, spec: CurseSpec, world: World, start: float, left: float, times: list[float],
-                tracks: list[tuple[Monster, list[float]]]) -> float:
+                tracks: list[tuple[Monster, list[float], list[bool]]]) -> float:
     stats = tower.stats
     full = stats.range * tower.range_mult()
     before = stats.damage * tower.damage_mult()
@@ -264,18 +324,15 @@ def _lent_altar(tower: Tower, spec: CurseSpec, world: World, start: float, left:
     return _altar_damage(tower, world, times, tracks, start, left, spec, full, after_reach, before, after, False)
 
 
-def _altar_damage(tower: Tower, world: World, times: list[float], tracks: list[tuple[Monster, list[float]]],
+def _altar_damage(tower: Tower, world: World, times: list[float], tracks: list[tuple[Monster, list[float], list[bool]]],
                   start: float, left: float, spec: CurseSpec, full: float, after_reach: float,
                   before: float, after: float, silenced: bool) -> float:
     others = _helpers(world)
     if not others:
         return 0.0
     begin, end = start + left, start + spec.duration
-    near_spans = {route.key: (world.level.coverage(tower.tile, full) if route.key == "main"
-                              else route.coverage(tower.tile, full)) for route in world.level.routes}
-    far_spans = ({route.key: (world.level.coverage(tower.tile, after_reach) if route.key == "main"
-                              else route.coverage(tower.tile, after_reach)) for route in world.level.routes}
-                 if after_reach != full else near_spans)
+    near_spans = _spans(world, tower, full)
+    far_spans = _spans(world, tower, after_reach) if after_reach != full else near_spans
     lent, lent_error = 0.0, 0.0
     kept, kept_error = 0.0, 0.0
     for i in range(len(times)):
@@ -286,20 +343,20 @@ def _altar_damage(tower: Tower, world: World, times: list[float], tracks: list[t
             if u.silenced:
                 continue
             reach = u.stats.range * u.range_mult()
-            now = u.damage_mult() * u.rate_mult()
-            dealt = _damage_in(u, reach, world, tracks, i, near_spans) * now
+            share, rate = u.damage_mult(), u.rate_mult()
+            dealt = _damage_in(u, reach, world, tracks, i, near_spans, share, rate)
             if dealt > 0:
                 lent, lent_error = add(lent, lent_error, dealt * SAMPLE * before)
             if not silenced and after > 0:
-                dealt = _damage_in(u, reach, world, tracks, i, far_spans) * now
+                dealt = _damage_in(u, reach, world, tracks, i, far_spans, share, rate)
                 if dealt > 0:
                     kept, kept_error = add(kept, kept_error, dealt * SAMPLE * after)
     return settle(lent, lent_error) - settle(kept, kept_error)
 
 
 def candidates(world: World, leader: Monster, delay: float = 0.0) -> list[Option]:
-    """One (curse, spot) pair per tower in reach: the tower's tile, priced by the unwarded towers the circle
-    catches. Spots catching the same towers with the same curse are one candidate."""
+    """One (curse, spot) pair per tower in reach: the tower's tile, priced by the towers the circle catches. Spots
+    catching the same towers with the same curse are one candidate."""
     towers = reachable(world, leader, delay)
     if not towers:
         return []
@@ -314,18 +371,19 @@ def candidates(world: World, leader: Monster, delay: float = 0.0) -> list[Option
         t += SAMPLE
     if not times:
         return []
-    tracks = [(m, _trajectory(world, m, times)) for m in world.monsters]
+    tracks: list[tuple[Monster, list[float], list[bool]]] = []
+    for m in world.monsters:
+        where, standing = _trajectory(world, m, times)
+        tracks.append((m, where, standing))
     loss: dict[tuple[int, Curse], float] = {}
     for tower in world.towers.values():
-        if tower.ward > start:
-            continue   # warded until after the curse would land
         for curse in curses:
             loss[(tower.id, curse)] = _priced(tower, curse, world, start, times, tracks)
     out = []
     seen: set[tuple[Curse, tuple[int, ...]]] = set()
     for spot in sorted({t.tile for t in towers}):
         for curse in curses:
-            caught = tuple(t.id for t in world.caught(spot, curse_radius(curse, leader.kind, world.curse_scale)) if t.ward <= start)
+            caught = tuple(t.id for t in world.caught(spot, curse_radius(curse, leader.kind, world.curse_scale)))
             key = (curse, caught)
             if key in seen:
                 continue

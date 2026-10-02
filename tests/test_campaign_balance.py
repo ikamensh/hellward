@@ -27,7 +27,7 @@ def test_two_defences_make_table_rows_with_every_column_and_the_second_has_the_s
     assert run["outcome"] in ("victory", "defeat")
     assert run["lives"] + run["lost"] == 20
     assert run["chants"] >= run["landed"] > 0 and run["decide_ms"]
-    assert run["chants"] >= run["broken_chants"] and run["broken"] >= run["broken_chants"]
+    assert run["strikes"] == 0   # no boss here
     assert len(run["leaks"]) == 5 and sum(run["leaks"]) >= run["lost"]
     assert graveyard[:3] == ["graveyard", "ordinary B*", str(run["earned"])]
     assert runs[1]["sigils"] == run["earned"]
@@ -44,7 +44,7 @@ def fake_run(player, location, seed, sigils, **_):
     earned = {1: 1, 2: 2, 3: 3, 4: 9}[seed] if player == "a" else 3
     return {"player": player, "location": location, "seed": seed, "sigils": sigils,
             "outcome": "victory", "lives": 20 if player == "a" else 10, "earned": earned,
-            "chants": 4, "broken": 3, "broken_chants": 1, "leaders_spawned": 2, "curse_seconds": 5.0,
+            "chants": 4, "strikes": seed % 2, "leaders_spawned": 2, "curse_seconds": 5.0,
             "spells": {}, "mana_capped": 0.0, "decide_ms": [1.0]}
 
 
@@ -66,11 +66,11 @@ def test_each_stage_gets_the_sum_of_b_stars_median_low_sigils_before_it(monkeypa
     assert [s.sigils for s in fixed] == [7, 7, 7]
 
 
-def test_chants_broken_are_the_broken_chants_among_all_chants_begun_not_the_broken_ponderings(monkeypatch):
+def test_boss_strikes_are_counted_per_defence(monkeypatch):
     monkeypatch.setattr(campaign_balance, "play", fake_run)
     stages = campaign_balance.play_campaign(InProcess(), ["a"], campaign_balance.campaign_order()[:1], [1, 2], None)
     (row,) = campaign_balance.rows(stages, ["a"])
-    assert row["broken_share"] == 0.25
+    assert row["strikes"] == 0.5
     assert row["curse_per_leader"] == 2.5
 
 

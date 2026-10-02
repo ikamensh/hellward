@@ -1,7 +1,8 @@
 """The apprentice: a thoughtful human on a first play, and the balance tools' yardstick.
 
-It plays exactly like the ordinary defender (its towers, gates, upgrades and Cleanse), and it has
-started to learn the tree and two aimed spells: Smite at the leaders' signs, and Meteor on a thick
+It plays like the ordinary defender (its towers, gates, upgrades and Battle Hymn, though it keeps a
+Smite in hand while a leader walks), and it has started to learn the tree and two aimed spells: Smite on
+a leader one Smite kills, else on a monster close to the sanctuary one Smite kills, and Meteor on a thick
 crowd while keeping mana for Smite. Frozen Orb it never touches: it has not learned to time it.
 """
 
@@ -10,14 +11,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from hellward.sim.campaign import ORDER, Location, idle
-from hellward.sim.model import Refused
-from hellward.sim.players.hands import Hands
+from hellward.sim.content import SPELLS, felt_hit
+from hellward.sim.model import Monster, Refused, World
+from hellward.sim.players.hands import Hands, ready
 from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.skills import SKILLS, can_learn
 
 FIRST = ("adept_fire", "warmth", "adept_cold", "adept_lightning", "holy_shield", "fire_ball",
-         "adept_poison", "salvation", "glacial_spike", "chain_lightning", "soul_harvest",
-         "contagion", "master_fire", "master_cold", "master_lightning", "master_poison",
+         "adept_poison", "adept_arrow", "glacial_spike", "chain_lightning", "soul_harvest",
+         "contagion", "master_fire", "master_cold", "master_lightning", "master_poison", "master_arrow",
          "blaze", "shatter", "static_field", "lower_resist", "thorns", "spell_mastery",
          "adept_bone", "corpse_explosion", "master_bone", "life_tap",
          "adept_nature", "hurricane", "master_nature", "twister")
@@ -25,6 +27,7 @@ FIRST = ("adept_fire", "warmth", "adept_cold", "adept_lightning", "holy_shield",
 METEOR_CROWD = 4     # others within METEOR_REACH of the aimed monster that make a Meteor worth it
 METEOR_REACH = 1.4   # tiles around the aimed monster
 METEOR_SPARE = 95.0  # a Meteor (60) only when a Smite (35) stays in hand
+CLOSE = 3.0          # tiles from the sanctuary at which a monster one Smite kills is smitten
 
 
 @dataclass
@@ -48,10 +51,11 @@ class Apprentice(Ordinary):
         if self.clock == clock:
             return   # the ordinary defender thought nothing this step, neither does the apprentice
         world = hands.world
-        if "smite" in world.location.arsenal.spells and world.mana >= world.spell_cost("smite"):
-            if hands.threats():
+        if ready(world, "smite"):
+            target = self._smitten(world)
+            if target is not None:
                 try:
-                    hands.smite_threat()
+                    hands.smite(target.id)
                 except Refused:
                     pass
                 return
@@ -63,6 +67,25 @@ class Apprentice(Ordinary):
                     hands.meteor(*at)
                 except Refused:
                     pass
+
+    def _hymn(self, hands: Hands) -> None:
+        world = hands.world
+        keep = world.spell_cost("smite") if "smite" in world.location.arsenal.spells and world.leaders() else 0.0
+        if world.mana - keep >= world.spell_cost("hymn"):
+            super()._hymn(hands)
+
+    def _smitten(self, world: World) -> Monster | None:
+        """A leader one Smite kills (its curse dies with it), else a monster close to the sanctuary one Smite kills."""
+        blow = SPELLS["smite"].damage * world.power()
+        for m in world.leaders():
+            if m.hp <= felt_hit(blow, None, m.kind):
+                return m
+        for m in world.monsters:   # nearest the sanctuary first
+            if world.remaining(m) > CLOSE:
+                break
+            if m.hp <= felt_hit(blow, None, m.kind):
+                return m
+        return None
 
     def _crowd(self, hands: Hands) -> tuple[float, float] | None:
         """The first monster with at least four others within reach, aimed at its own spot."""

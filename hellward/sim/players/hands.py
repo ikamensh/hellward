@@ -7,8 +7,8 @@ shows each sign only :attr:`Hands.react` seconds of game time after it appears, 
 it appeared: a person aims there, not where the leader has walked since. A player never reads a leader's
 mind: not its planner, its cooldown or its chant's clock; it does not clone the live world to see the future, and
 it never pauses (``tests/test_players.py`` holds every player's source to this). Its aimed spells (Smite, Meteor,
-Frozen Orb) come at most one each :data:`AIM_GAP` seconds. Everything else it does through the world's own
-commands, as the panel does.
+Frozen Orb) come at most one each :data:`AIM_GAP` seconds; Battle Hymn, aimed at a tower, is a click on the panel.
+Everything else it does through the world's own commands, as the panel does.
 
 :func:`defend` plays one defence from its start and returns the world and a :class:`Record` of what happened,
 for the balance tools.
@@ -62,10 +62,7 @@ class Record:
     """What happened in a defence, counted from its events."""
 
     chants: int = 0               # curses the leaders began to chant
-    broken: int = 0               # ponderings and chants a spell broke
-    broken_chants: int = 0        # of those, the chants
     landed: int = 0
-    warded: int = 0               # curses that broke on a ward
     fizzled: int = 0              # chants that ended with their tower gone or their leader out of reach
     curse_seconds: float = 0.0    # seconds of curses held on towers, summed over towers
     mana_capped: float = 0.0      # seconds the mana orb sat full
@@ -75,6 +72,8 @@ class Record:
     towers_caught: list[int] = field(default_factory=list)  # number of towers caught per landed curse
     raised: int = 0               # monsters raised by a leader
     burned: float = 0.0           # mana burned by curses
+    strikes: int = 0              # a boss's strikes at the shrine
+    hooked: int = 0               # monsters a hook dragged back
 
 
 def ready(world: World, spell: str, spare: float = 0.0) -> bool:
@@ -95,7 +94,6 @@ class Hands:
         self.aim_gap = aim_gap
         self.record = Record()
         self._signs: dict[int, Sign] = {}
-        self._resolute: set[int] = set()   # leaders broken once, their ember halo showing: the next curse holds
         self._last_aim = -1e9
 
     def observe(self, events: list[tuple], dt: float = SIM_DT) -> None:
@@ -113,30 +111,24 @@ class Hands:
                 record.chants += 1
             elif kind == "mark":
                 self._sign(e[1], "mark", e[3], e[2])  # a mark is a sign like a chant
-                self._resolute.discard(e[1])          # a resolute leader's curse is voiced as a mark
                 record.chants += 1
-            elif kind == "broken":
-                self._signs.pop(e[1], None)
-                self._resolute.add(e[1])
-                record.broken += 1
-                record.broken_chants += e[2] != (-1, -1)   # a broken pondering marked no spot yet
             elif kind == "cursed":
                 self._signs.pop(e[1], None)
                 record.landed += 1
                 record.towers_caught.append(len(e[4]))
-            elif kind == "ward_holds":
-                self._signs.pop(e[1], None)
-                record.warded += 1
             elif kind == "fizzle":
                 self._signs.pop(e[1], None)
                 record.fizzled += 1
             elif kind == "death":
                 self._signs.pop(e[1], None)
-                self._resolute.discard(e[1])
             elif kind == "leak":
                 self._signs.pop(e[1], None)
-                self._resolute.discard(e[1])
                 record.leaks[world.wave] += e[3]
+            elif kind == "returned":
+                record.leaks[world.wave] += e[3]
+                record.strikes += 1
+            elif kind == "hook":
+                record.hooked += 1
             elif kind == "raised":
                 record.raised += 1
             elif kind == "burned":
@@ -156,13 +148,6 @@ class Hands:
         seen = [s for s in self._signs.values() if s.since + self.react <= self.world.time + 1e-9]
         return sorted(seen, key=lambda s: (s.kind not in ("chant", "mark"), s.since, s.leader))
 
-    def _breakable_threats(self) -> list[Sign]:
-        """Threats that can be broken by Smite or Frozen Orb: pondering and chanting, but not marking, and nothing
-        from a resolute leader."""
-        seen = [s for s in self._signs.values() if s.since + self.react <= self.world.time + 1e-9
-                and s.kind in ("ponder", "chant") and s.leader not in self._resolute]
-        return sorted(seen, key=lambda s: (s.kind != "chant", s.since, s.leader))
-
     # -- Spells ------------------------------------------------------------------------------------
 
     def _aimed(self) -> None:
@@ -174,15 +159,6 @@ class Hands:
         self.world.smite(monster_id)
         self._cast("smite")
 
-    def smite_threat(self) -> bool:
-        """The panel's Q with a leader pondering or chanting: smite the one closest to cursing. Whether it cast.
-        Does not target marking or resolute leaders: their curse cannot be broken."""
-        threats = self._breakable_threats()
-        if not threats:
-            return False
-        self.smite(threats[0].leader)
-        return True
-
     def meteor(self, x: float, y: float) -> None:
         self._aimed()
         self.world.meteor(x, y)
@@ -193,9 +169,9 @@ class Hands:
         self.world.orb(x, y)
         self._cast("orb")
 
-    def cleanse(self, tower_id: int) -> None:
-        self.world.cleanse(tower_id)
-        self.record.spells["cleanse"] += 1
+    def hymn(self, tower_id: int) -> None:
+        self.world.hymn(tower_id)
+        self.record.spells["hymn"] += 1
 
     def _cast(self, spell: str) -> None:
         self._last_aim = self.world.time

@@ -1,28 +1,18 @@
-# The player's spells. damage_hits and burn_hits are in economy.arrow_hit and grow with the monsters' life.
-
-[cleanse]
-name = "Cleanse"
-mana = 35.0
-aim = "tower"
-blurb = "Burns every curse off one tower."
-damage_hits = 0.0
-radius = 0.0
-delay = 0.0
-lasting = 0.0
-burn_hits = 0.0
-recharge = 0.0
+# The player's spells. damage_hits and burn_hits are in economy.arrow_hit and grow with the monsters' life; rate
+# multiplies the attacks per second of the tower a spell is aimed at, while it lasts.
 
 [smite]
 name = "Smite"
 mana = 35.0
 aim = "monster"
-blurb = "Holy lightning strikes one monster, and no resistance softens it. A leader it strikes while pondering or chanting loses its curse, but its next curse cannot be broken."
+blurb = "Holy lightning strikes one monster: neither armor nor protection softens it."
 damage_hits = 3.0
 radius = 0.0
 delay = 0.0
 lasting = 0.0
 burn_hits = 0.0
 recharge = 8.0
+rate = 1.0
 
 [meteor]
 name = "Meteor"
@@ -35,15 +25,30 @@ delay = 1.2
 lasting = 3.0
 burn_hits = 1.0
 recharge = 10.0
+rate = 1.0
 
 [orb]
 name = "Frozen Orb"
 mana = 50.0
 aim = "floor"
-blurb = "Freezes everything near it: no walking, no battering, and a leader's curse breaks (its next one cannot)."
+blurb = "Freezes everything near it: no walking, no battering."
 damage_hits = 2.0
 radius = 1.8
 delay = 0.0
 lasting = 2.5
 burn_hits = 0.0
 recharge = 12.0
+rate = 1.0
+
+[hymn]
+name = "Battle Hymn"
+mana = 40.0
+aim = "tower"
+blurb = "One tower attacks twice as fast for 6 seconds. The leaders see the stronger tower too."
+damage_hits = 0.0
+radius = 0.0
+delay = 0.0
+lasting = 6.0
+burn_hits = 0.0
+recharge = 15.0
+rate = 2.0

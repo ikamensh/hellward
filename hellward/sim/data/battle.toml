@@ -16,6 +16,17 @@ cast_slack = 1.0              # a curse lands if its leader is within cast range
 decide_delay = 0.5            # a leader ponders this long between asking its planner and starting to chant
 hold_retry = 1.0              # a leader that holds its curse thinks again after this long
 leak_weight = 2.0             # to the planner, a monster through the sanctuary gate is worth this many times its life
+boss_strike_lives = 5         # a boss reaching the shrine costs this many lives, and is sent back to its portal
+
+# The damage pipeline (hellward.sim.content.felt_hit): a hit's factors multiply, are capped, the hit is rounded to a
+# whole number (up above 1, down below, half up at 1), the monster's armor is taken off, and at least 1 is dealt.
+protected = 0.75              # the element's factor on a monster protected against it
+vulnerable = 1.25             # ... and on one vulnerable to it
+factor_cap = 2.0              # a hit's factors (element, amplification, aura, knife, leap, splash) multiply to at most this
+splash_share = 0.6            # a fireball's lesser blow on the monsters around its target
+knife_standing = 2.0          # a knife's factor on a small monster standing at a gate or held
+hook_pull = 2.0               # tiles a hook drags a small monster back toward its spot (times Weaken's damage share)
+hook_past = 1.0               # a hook takes only a monster at least this far past its spot, the route's point nearest it
 
 [gate]
 cost_units = 1.0              # a warded gate's price, in gold units
@@ -30,7 +41,6 @@ shatter_share = 0.1           # of a shattered monster's full life
 contagion_reach = 1.5
 thorns = 0.5                  # a gate under Thorns returns this share of each blow, as it would land unchilled
 soul = 10.0                   # mana a slain leader gives under Soul Harvest
-ward = 8.0                    # seconds a cleansed tower is warded under Salvation
 corpse_share = 0.15           # share of an amplified monster's full life its burst deals
 corpse_radius = 1.2           # how far a corpse explosion reaches
 hurricane_radius = 2.5        # how far a grove's slowing reaches
