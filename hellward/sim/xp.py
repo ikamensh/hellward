@@ -1,8 +1,8 @@
 """Experience: the Diablo bar across a run, counted by the simulation.
 
 A kill gives its monster's felled life divided by ``run.xp_life``; a cleared wave gives ``run.xp_clear`` times
-its number. The threshold from one level to the next is a base plus a little more every level
-(``run.xp_next_base``, ``run.xp_next_growth``). The world counts into :attr:`World.xp
+its number. The threshold from one level to the next is a base plus growth times the square of the levels past
+the first (``run.xp_next_base``, ``run.xp_next_growth``). The world counts into :attr:`World.xp
 <hellward.sim.model.World>`; :mod:`hellward.run` settles it into the run.
 """
 
@@ -29,5 +29,6 @@ def clear_xp(number: int) -> float:
 
 
 def xp_next(level: int) -> float:
-    """The XP from this level to the next: a base, then a little more every level."""
-    return XP_NEXT_BASE + XP_NEXT_GROWTH * (level - 1)
+    """The XP from this level to the next: a base, then quadratically more — quick early levels, slow late
+    ones. Levels are skill points, so the curve is what keeps the tree too dear to open (M4)."""
+    return XP_NEXT_BASE + XP_NEXT_GROWTH * (level - 1) * (level - 1)
