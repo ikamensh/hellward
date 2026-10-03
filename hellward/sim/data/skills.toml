@@ -1,0 +1,423 @@
+# The skill tree's content: every skill by key. A tower kind is locked until its
+# `unlock_` skill is learned (the Arrow is free); ranks and specials chain by tier.
+# Conventions `hellward.sim.skills` derives (no extra fields): `unlock_<kind>`
+# opens a tower kind, `unlock_<spell>` a spell, `adept_*` is rank II, `master_*`
+# rank III. Tiers run 1 to 5; a skill needs the one above it in its column.
+
+[columns]
+arrow = "Arrow"
+ballista = "Ballista"
+hook = "Hook"
+knife = "Knife"
+fire = "Fire"
+lightning = "Lightning"
+cold = "Cold"
+poison = "Poison"
+bone = "Bone"
+nature = "Nature"
+warding = "Warding"
+sorcery = "Sorcery"
+spells = "Battle Magic"
+
+[skills.adept_arrow]
+name = "Adept of Arrows"
+column = "arrow"
+tier = 1
+cost = 2
+blurb = "Arrows can be raised to the second rank."
+needs = ["arrow"]
+
+[skills.master_arrow]
+name = "Master of Arrows"
+column = "arrow"
+tier = 2
+cost = 4
+blurb = "Arrows can be raised to the third rank."
+needs = ["arrow"]
+
+[skills.unlock_ballista]
+name = "Unlock Ballista"
+column = "ballista"
+tier = 1
+cost = 4
+blurb = "Ballistas can be raised: slow heavy bolts for armored monsters."
+needs = ["ballista"]
+first_location = 3
+
+[skills.adept_ballista]
+name = "Adept of Ballistas"
+column = "ballista"
+tier = 2
+cost = 2
+blurb = "Ballistas can be raised to the second rank."
+needs = ["ballista"]
+
+[skills.master_ballista]
+name = "Master of Ballistas"
+column = "ballista"
+tier = 3
+cost = 4
+blurb = "Ballistas can be raised to the third rank."
+needs = ["ballista"]
+
+[skills.unlock_hook]
+name = "Unlock Hook Tower"
+column = "hook"
+tier = 1
+cost = 4
+blurb = "Hook Towers can be raised: they drag small monsters back."
+needs = ["hook"]
+first_location = 6
+
+[skills.adept_hook]
+name = "Adept of Hooks"
+column = "hook"
+tier = 2
+cost = 2
+blurb = "Hook Towers can be raised to the second rank."
+needs = ["hook"]
+
+[skills.master_hook]
+name = "Master of Hooks"
+column = "hook"
+tier = 3
+cost = 4
+blurb = "Hook Towers can be raised to the third rank."
+needs = ["hook"]
+
+[skills.unlock_knife]
+name = "Unlock Knife Post"
+column = "knife"
+tier = 1
+cost = 4
+blurb = "Knife Posts can be raised: twice as hard at held monsters."
+needs = ["knife"]
+first_location = 6
+
+[skills.adept_knife]
+name = "Adept of Knives"
+column = "knife"
+tier = 2
+cost = 2
+blurb = "Knife Posts can be raised to the second rank."
+needs = ["knife"]
+
+[skills.master_knife]
+name = "Master of Knives"
+column = "knife"
+tier = 3
+cost = 4
+blurb = "Knife Posts can be raised to the third rank."
+needs = ["knife"]
+
+[skills.unlock_pyre]
+name = "Unlock Pyre"
+column = "fire"
+tier = 1
+cost = 3
+blurb = "Pyres can be raised: bolts that burst into flame."
+needs = ["pyre"]
+first_location = 2
+
+[skills.adept_fire]
+name = "Adept of Fire"
+column = "fire"
+tier = 2
+cost = 2
+blurb = "Pyres can be raised to the second rank."
+needs = ["pyre"]
+
+[skills.master_fire]
+name = "Master of Fire"
+column = "fire"
+tier = 3
+cost = 4
+blurb = "Pyres can be raised to the third rank."
+needs = ["pyre"]
+
+[skills.fire_ball]
+name = "Fire Ball"
+column = "fire"
+tier = 4
+cost = 5
+blurb = "Pyre bolts burst into fireballs."
+needs = ["pyre"]
+first_location = 8
+
+[skills.blaze]
+name = "Blaze"
+column = "fire"
+tier = 5
+cost = 6
+blurb = "Fireballs leave the floor burning for 2 seconds."
+needs = ["pyre"]
+first_location = 8
+
+[skills.unlock_storm]
+name = "Unlock Storm Obelisk"
+column = "lightning"
+tier = 1
+cost = 3
+blurb = "Storm Obelisks can be raised: lightning that leaps."
+needs = ["storm"]
+first_location = 5
+
+[skills.adept_lightning]
+name = "Adept of Storms"
+column = "lightning"
+tier = 2
+cost = 2
+blurb = "Storm Obelisks can be raised to the second rank."
+needs = ["storm"]
+
+[skills.master_lightning]
+name = "Master of Storms"
+column = "lightning"
+tier = 3
+cost = 4
+blurb = "Storm Obelisks can be raised to the third rank."
+needs = ["storm"]
+
+[skills.static_field]
+name = "Static Field"
+column = "lightning"
+tier = 4
+cost = 5
+blurb = "Lightning strikes a leader in reach first, and leaps to leaders first."
+needs = ["storm"]
+
+[skills.chain_lightning]
+name = "Chain Lightning"
+column = "lightning"
+tier = 5
+cost = 6
+blurb = "Storm bolts gain one leap."
+needs = ["storm"]
+first_location = 9
+
+[skills.unlock_frost]
+name = "Unlock Frost Shrine"
+column = "cold"
+tier = 1
+cost = 3
+blurb = "Frost Shrines can be raised: chilling bolts."
+needs = ["frost"]
+first_location = 3
+
+[skills.adept_cold]
+name = "Adept of Cold"
+column = "cold"
+tier = 2
+cost = 2
+blurb = "Frost Shrines can be raised to the second rank."
+needs = ["frost"]
+
+[skills.master_cold]
+name = "Master of Cold"
+column = "cold"
+tier = 3
+cost = 4
+blurb = "Frost Shrines can be raised to the third rank."
+needs = ["frost"]
+
+[skills.glacial_spike]
+name = "Glacial Spike"
+column = "cold"
+tier = 4
+cost = 5
+blurb = "Frost bolts reach 0.4 further and hit 50% harder."
+needs = ["frost"]
+
+[skills.shatter]
+name = "Shatter"
+column = "cold"
+tier = 5
+cost = 6
+blurb = "Frost bolts splash. Chilled deaths shatter onto nearby foes."
+needs = ["frost"]
+first_location = 8
+
+[skills.unlock_plague]
+name = "Unlock Plague Totem"
+column = "poison"
+tier = 1
+cost = 3
+blurb = "Plague Totems can be raised: stacking venom."
+needs = ["plague"]
+first_location = 4
+
+[skills.adept_poison]
+name = "Adept of Poison"
+column = "poison"
+tier = 2
+cost = 2
+blurb = "Plague Totems can be raised to the second rank."
+needs = ["plague"]
+
+[skills.master_poison]
+name = "Master of Poison"
+column = "poison"
+tier = 3
+cost = 4
+blurb = "Plague Totems can be raised to the third rank."
+needs = ["plague"]
+
+[skills.lower_resist]
+name = "Lower Resist"
+column = "poison"
+tier = 4
+cost = 5
+blurb = "Poisoned monsters lose protections: all elements hit whole."
+needs = ["plague"]
+
+[skills.contagion]
+name = "Contagion"
+column = "poison"
+tier = 5
+cost = 6
+blurb = "When a poisoned monster dies, its venom leaps to the nearest monster."
+needs = ["plague"]
+first_location = 8
+
+[skills.unlock_altar]
+name = "Unlock Bone Altar"
+column = "bone"
+tier = 1
+cost = 3
+blurb = "Bone Altars can be raised: amplifying knots of enemies."
+needs = ["altar"]
+first_location = 6
+
+[skills.adept_bone]
+name = "Adept of Bone"
+column = "bone"
+tier = 2
+cost = 2
+blurb = "Bone Altars can be raised to the second rank."
+needs = ["altar"]
+
+[skills.master_bone]
+name = "Master of Bone"
+column = "bone"
+tier = 3
+cost = 4
+blurb = "Bone Altars can be raised to the third rank."
+needs = ["altar"]
+
+[skills.life_tap]
+name = "Life Tap"
+column = "bone"
+tier = 4
+cost = 5
+blurb = "A monster that dies amplified gives a fifth of its bounty in mana."
+needs = ["altar"]
+
+[skills.corpse_explosion]
+name = "Corpse Explosion"
+column = "bone"
+tier = 5
+cost = 6
+blurb = "Amplified deaths burst 15% of life, unresisted, within 1.2."
+needs = ["altar"]
+first_location = 9
+
+[skills.unlock_grove]
+name = "Unlock Druid Grove"
+column = "nature"
+tier = 1
+cost = 3
+blurb = "Druid Groves can be raised: lending damage to nearby towers."
+needs = ["grove"]
+first_location = 7
+
+[skills.adept_nature]
+name = "Adept of Nature"
+column = "nature"
+tier = 2
+cost = 2
+blurb = "Druid Groves can be raised to the second rank."
+needs = ["grove"]
+
+[skills.master_nature]
+name = "Master of Nature"
+column = "nature"
+tier = 3
+cost = 4
+blurb = "Druid Groves can be raised to the third rank."
+needs = ["grove"]
+
+[skills.hurricane]
+name = "Hurricane"
+column = "nature"
+tier = 4
+cost = 5
+blurb = "Walkers within 2.5 tiles of a grove move 20% slower."
+needs = ["grove"]
+
+[skills.twister]
+name = "Twister"
+column = "nature"
+tier = 5
+cost = 6
+blurb = "Every 4 s a grove roots the foremost walker near it for 1.5 s."
+needs = ["grove"]
+
+[skills.holy_shield]
+name = "Holy Shield"
+column = "warding"
+tier = 1
+cost = 2
+blurb = "Warded gates have 50% more life and mend fully between waves."
+needs = ["gate"]
+first_location = 1
+
+[skills.thorns]
+name = "Thorns"
+column = "warding"
+tier = 2
+cost = 3
+blurb = "Gates return half of each blow as holy damage."
+needs = ["gate"]
+first_location = 1
+
+[skills.warmth]
+name = "Warmth"
+column = "sorcery"
+tier = 1
+cost = 3
+blurb = "+40% mana flow, +25 orb. Slain leaders give 10 mana."
+
+[skills.spell_mastery]
+name = "Spell Mastery"
+column = "sorcery"
+tier = 2
+cost = 4
+blurb = "Spells cost 25% less; Smite, Meteor, Orb strike 30% harder."
+needs = ["smite", "hymn", "meteor", "orb"]
+
+[skills.unlock_hymn]
+name = "Unlock Battle Hymn"
+column = "spells"
+tier = 1
+cost = 2
+blurb = "Battle Hymn can be sung: one tower attacks twice as fast for 6 seconds."
+needs = ["hymn"]
+first_location = 1
+
+[skills.unlock_orb]
+name = "Unlock Frozen Orb"
+column = "spells"
+tier = 2
+cost = 3
+blurb = "Frozen Orb can be cast: a burst of cold where it opens."
+needs = ["orb"]
+first_location = 8
+
+[skills.unlock_meteor]
+name = "Unlock Meteor"
+column = "spells"
+tier = 3
+cost = 4
+blurb = "Meteors can be called down on thick crowds."
+needs = ["meteor"]
+first_location = 10

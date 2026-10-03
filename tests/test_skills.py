@@ -9,11 +9,11 @@ from hellward.sim.players.ordinary import tile_scores
 from hellward.sim.campaign import g
 from hellward.sim.content import SOUL, MONSTERS, Element, Wave
 from hellward.sim.model import Monster, Refused, SIM_DT, World
-from hellward.sim.skills import COLUMNS, SKILLS, TREE_COST, can_learn, check, perks
+from hellward.sim.skills import COLUMNS, SKILLS, TREE_COST, can_learn, check, perks, unlocked
 
 
 def world_of(*groups, learned=(), **kwargs) -> World:
-    location = replace(campaign.CATACOMBS, waves=(Wave(tuple(groups), 10),), wave_names=("test",), life=1.0,
+    location = replace(campaign.CATACOMBS, waves=(Wave(tuple(groups), 10),), wave_names=("test",),
                        arsenal=campaign.TEMPLE.arsenal)   # full catalog's rules, not this stage's unlocks
     world = World(location, perks=perks(learned), **kwargs)
     world.gold = 5000
@@ -32,34 +32,53 @@ def run(world: World, seconds: float) -> None:
 
 
 def test_a_skill_needs_the_one_above_it_and_enough_sigils():
-    assert can_learn(frozenset(), "adept_fire", 1)
-    assert not can_learn(frozenset(), "fire_ball", 10)
-    assert not can_learn(frozenset({"adept_fire"}), "fire_ball", 2)
-    assert can_learn(frozenset({"adept_fire"}), "master_fire", 3)
-    assert not can_learn(frozenset({"adept_fire", "master_fire"}), "fire_ball", 5, stage=7)
-    assert can_learn(frozenset({"adept_fire", "master_fire"}), "fire_ball", 5, stage=8)
+    assert can_learn(frozenset(), "unlock_pyre", 4)
+    assert not can_learn(frozenset(), "adept_fire", 10)
+    assert not can_learn(frozenset(), "fire_ball", 16)
+    assert can_learn(frozenset({"unlock_pyre"}), "adept_fire", 7)
+    assert not can_learn(frozenset({"unlock_pyre", "adept_fire"}), "fire_ball", 16)
+    assert can_learn(frozenset({"unlock_pyre", "adept_fire"}), "master_fire", 11)
+    chain = frozenset({"unlock_pyre", "adept_fire", "master_fire"})
+    assert not can_learn(chain, "fire_ball", 16, stage=7)
+    assert can_learn(chain, "fire_ball", 16, stage=8)
     with pytest.raises(ValueError):
         check(frozenset({"blaze", "adept_fire"}))
 
 
-def test_the_tree_costs_sixty_three_with_a_small_steel_column():
-    assert TREE_COST == 63
-    assert COLUMNS["arrow"] == "Steel"
-    assert sum(s.cost for s in SKILLS.values() if s.column == "arrow") == 5
+def test_a_kind_is_locked_until_its_unlock_is_learned():
+    assert unlocked("arrow", frozenset())
+    assert not unlocked("pyre", frozenset())
+    assert unlocked("pyre", frozenset({"unlock_pyre"}))
+    assert not can_learn(frozenset(), "adept_ballista", 10)
+    assert can_learn(frozenset(), "unlock_ballista", 5)
+    assert can_learn(frozenset({"unlock_ballista"}), "adept_ballista", 8)
+
+
+def test_the_tree_costs_one_hundred_seventy_seven_with_a_column_per_kind():
+    assert TREE_COST == 177
+    assert len(SKILLS) == 48
+    assert COLUMNS["arrow"] == "Arrow"
+    assert sum(s.cost for s in SKILLS.values() if s.column == "arrow") == 6
+    for column in ("ballista", "hook", "knife"):
+        assert sum(s.cost for s in SKILLS.values() if s.column == column) == 10
     for column in ("fire", "lightning", "cold", "poison", "bone", "nature"):
-        assert sum(s.cost for s in SKILLS.values() if s.column == column) == 8
-    assert sum(s.cost for s in SKILLS.values() if s.column == "warding") == 4
-    assert sum(s.cost for s in SKILLS.values() if s.column == "sorcery") == 6
-    assert COLUMNS.keys() >= {"fire", "lightning", "cold", "poison", "bone", "nature", "warding", "sorcery"}
+        assert sum(s.cost for s in SKILLS.values() if s.column == column) == 20
+    assert sum(s.cost for s in SKILLS.values() if s.column == "warding") == 5
+    assert sum(s.cost for s in SKILLS.values() if s.column == "sorcery") == 7
+    assert sum(s.cost for s in SKILLS.values() if s.column == "spells") == 9
+    assert set(COLUMNS) == {"arrow", "ballista", "hook", "knife", "fire", "lightning", "cold",
+                            "poison", "bone", "nature", "warding", "sorcery", "spells"}
+    for skill in SKILLS.values():
+        assert 1 <= skill.tier <= 5
 
 
 def test_a_pyre_needs_its_adept_and_master_for_the_second_and_third_ranks():
-    world = world_of(learned=())
+    world = world_of(learned=("unlock_pyre",))
     pyre = world.build("pyre", best(world, 1)[0])
     assert world.rank_needs(pyre) == "adept_fire"
     with pytest.raises(Refused, match="Learn Adept of Fire in the skill tree"):
         world.upgrade(pyre.id)
-    second = world_of(learned=("adept_fire",))
+    second = world_of(learned=("unlock_pyre", "adept_fire"))
     pyre = second.build("pyre", best(second, 1)[0])
     assert second.rank_needs(pyre) is None
     second.upgrade(pyre.id)
@@ -67,7 +86,7 @@ def test_a_pyre_needs_its_adept_and_master_for_the_second_and_third_ranks():
     assert second.rank_needs(pyre) == "master_fire"
     with pytest.raises(Refused, match="Learn Master of Fire in the skill tree"):
         second.upgrade(pyre.id)
-    third = world_of(learned=("adept_fire", "master_fire"))
+    third = world_of(learned=("unlock_pyre", "adept_fire", "master_fire"))
     pyre = third.build("pyre", best(third, 1)[0])
     third.upgrade(pyre.id)
     third.upgrade(pyre.id)
@@ -77,16 +96,16 @@ def test_a_pyre_needs_its_adept_and_master_for_the_second_and_third_ranks():
 
 
 def test_fire_ball_cannot_be_learned_without_master_fire():
-    assert not can_learn(frozenset({"adept_fire"}), "fire_ball", 10)
+    assert not can_learn(frozenset({"unlock_pyre", "adept_fire"}), "fire_ball", 10)
     with pytest.raises(ValueError):
-        check(frozenset({"adept_fire", "fire_ball"}))
-    assert can_learn(frozenset({"adept_fire", "master_fire"}), "fire_ball", 5)
+        check(frozenset({"unlock_pyre", "adept_fire", "fire_ball"}))
+    assert can_learn(frozenset({"unlock_pyre", "adept_fire", "master_fire"}), "fire_ball", 16)
 
 
-@pytest.mark.parametrize("kind,learned", [("pyre", ("adept_fire", "master_fire", "fire_ball")),
-                                          ("storm", ("adept_lightning", "master_lightning", "static_field", "chain_lightning")),
-                                          ("frost", ("adept_cold", "glacial_spike")),
-                                          ("plague", ("adept_poison", "master_poison", "lower_resist"))])
+@pytest.mark.parametrize("kind,learned", [("pyre", ("unlock_pyre", "adept_fire", "master_fire", "fire_ball")),
+                                          ("storm", ("unlock_storm", "adept_lightning", "master_lightning", "static_field", "chain_lightning")),
+                                          ("frost", ("unlock_frost", "adept_cold", "master_cold", "glacial_spike")),
+                                          ("plague", ("unlock_plague", "adept_poison", "master_poison", "lower_resist"))])
 def test_combat_skills_hurt_a_cluster_more(kind, learned):
     """A tough cluster in reach shows extra damage before kills or leaks hide it."""
     plain = world_of()
@@ -107,7 +126,7 @@ def test_combat_skills_hurt_a_cluster_more(kind, learned):
         run(world, 2)
         return sum(monster.hp for monster in world.monsters)
 
-    assert remaining_hp(learned) < remaining_hp(())
+    assert remaining_hp(learned) < remaining_hp(learned[:1])   # the unlock alone: the buildable baseline
 
 
 def test_holy_shield_and_thorns_make_a_gate_hold_more_life_and_hurt_its_batterers():
@@ -143,8 +162,8 @@ def test_static_field_draws_the_lightning_to_a_leader():
         world.monsters = [skeleton, priest]
         world.step()
         return priest.hp
-    full = ("adept_lightning", "master_lightning", "static_field")
-    partial = ("adept_lightning", "master_lightning")
+    full = ("unlock_storm", "adept_lightning", "master_lightning", "static_field")
+    partial = ("unlock_storm", "adept_lightning", "master_lightning")
     assert leader_hp(full) < leader_hp(partial)
 
 
@@ -158,17 +177,18 @@ def test_shatter_hurts_the_neighbours_of_a_monster_that_dies_chilled():
         world.monsters = [first, second]
         world._hurt(first, 101.0, Element.FIRE)
         return second.hp, sum(1 for e in world.events if e[0] == "shatter")
-    chilled = hurt_around(("adept_cold", "glacial_spike", "master_cold", "shatter"))
-    plain = hurt_around(("adept_cold", "glacial_spike", "master_cold"))
+    chilled = hurt_around(("unlock_frost", "adept_cold", "master_cold", "glacial_spike", "shatter"))
+    plain = hurt_around(("unlock_frost", "adept_cold", "master_cold", "glacial_spike"))
     assert chilled[0] < plain[0] and chilled[1] == 1 and plain[1] == 0
 
 
 def test_contagion_carries_venom_to_the_next_monster_and_lower_resist_strips_its_protections():
-    learned = ("adept_poison", "master_poison", "lower_resist", "contagion")
+    learned = ("unlock_plague", "adept_poison", "master_poison", "lower_resist", "contagion", "unlock_pyre")
     world = world_of(g("fallen", 6, 0.2), learned=learned)
-    plague, pyre = best(world, 2)
-    world.build("plague", plague)
-    world.build("pyre", pyre)   # kills them while the venom is in them
+    # Explicit tiles, not best(): the test needs venom and its kill side by side (the venom lasts 4 s),
+    # wherever the map's scoring puts the top tiles.
+    world.build("plague", (8, 12))
+    world.build("pyre", (12, 8))   # kills them while the venom is in them
     world.call_wave()
     run(world, 25)
     assert any(e[0] == "contagion" for e in world.events)
@@ -192,13 +212,13 @@ def test_sorcery_fills_the_orb_faster_and_cheapens_the_spells():
         w.mana = 0
         run(w, 10)
     assert warm.mana > plain.mana
-    mastered = world_of(g("fallen", 1), learned=("warmth", "soul_harvest", "spell_mastery"))
+    mastered = world_of(g("fallen", 1), learned=("warmth", "spell_mastery"))
     for spell in ("smite", "hymn", "meteor", "orb"):
         assert mastered.spell_cost(spell) < plain.spell_cost(spell)
 
 
-def test_soul_harvest_pays_mana_for_a_slain_leader():
-    world = world_of(g("shaman", 1), learned=("warmth", "soul_harvest"))
+def test_warmth_pays_mana_for_a_slain_leader():
+    world = world_of(g("shaman", 1), learned=("warmth",))
     world.call_wave()
     run(world, 1)
     world.mana = world.spell_cost("smite")

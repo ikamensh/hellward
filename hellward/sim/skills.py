@@ -1,9 +1,11 @@
-"""The skill tree: tower columns of four skills, Steel's two rank skills, Warding's two and Sorcery's three, bought
-with sigils.
+"""The skill tree, read from ``data/skills.toml``: a column per tower kind plus Warding, Sorcery and Battle
+Magic, bought with sigils.
 
-A skill needs the one above it in its column; the tower columns cost 1, 2, 2 and 3 sigils top to bottom, Steel 2
-and 3, Warding 1 and 3, Sorcery 1, 2 and 3. Steel's rank skills raise every physical tower (Arrow, Ballista, Hook
-Tower, Knife Post). :func:`perks` turns a set of learned skills into
+A skill needs the one above it in its column. Every tower kind but the Arrow is locked until its `unlock_`
+skill is learned; each kind then teaches its own second and third ranks (`adept_*`, `master_*`) and, for the
+six elemental kinds, two specials. Battle Magic unlocks the Hymn, the Orb and the Meteor in turn (Smite is
+free); Sorcery holds mana and spell mastery; Warding the gate skills. :func:`perks` turns a set of learned
+skills into
 :class:`Perks`, every number and rule they change, which a :class:`~hellward.sim.model.World` reads
 when a defence begins (:func:`tower_levels` bakes the tower modifiers into each kind's ranks once).
 The second and third ranks of a tower are learned here: :attr:`Perks.ranks` holds, per tower kind,
@@ -16,7 +18,8 @@ from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from typing import Final
 
-from hellward.sim.content import DOOR, MANA_MAX, MANA_REGEN, TOWERS, TowerLevel
+from hellward.sim import tuning
+from hellward.sim.content import DOOR, MANA_MAX, MANA_REGEN, SPELLS, TOWERS, TowerLevel
 from hellward.sim.items import EMPTY_LOADOUT, Loadout
 from hellward.sim.sums import int_sum
 
@@ -26,55 +29,83 @@ class Skill:
     key: str
     name: str
     column: str
-    tier: int            # 1 to 4, top to bottom; the price in sigils is `cost`
+    tier: int            # 1 to 5, top to bottom; the price in sigils is `cost`
     cost: int
     blurb: str
     needs: tuple[str, ...] = ()   # what it works on (a tower kind, "gate" or a spell): it does nothing where none is offered
     first_location: int = 0        # zero-based campaign stage; learned only when this location opens
 
 
-PHYSICAL: Final = ("arrow", "ballista", "hook", "knife")   # the towers whose ranks Steel teaches
+PHYSICAL: Final = ("arrow", "ballista", "hook", "knife")   # the towers of no element, which armor checks
 
-COLUMNS: dict[str, str] = {"arrow": "Steel", "fire": "Fire", "lightning": "Lightning", "cold": "Cold",
-                           "poison": "Poison", "bone": "Bone", "nature": "Nature", "warding": "Warding", "sorcery": "Sorcery"}
+COLUMNS: Final[dict[str, str]] = dict(tuning.table("skills.columns"))
 
-SKILLS: dict[str, Skill] = {s.key: s for s in (
-    Skill("adept_arrow", "Adept of Steel", "arrow", 1, 2,
-          "Physical towers (Arrow, Ballista, Hook, Knife Post) can be raised to the second rank.", PHYSICAL),
-    Skill("master_arrow", "Master of Steel", "arrow", 2, 3,
-          "Physical towers (Arrow, Ballista, Hook, Knife Post) can be raised to the third rank.", PHYSICAL),
-    Skill("adept_fire", "Adept of Fire", "fire", 1, 1, "Pyres can be raised to the second rank.", ("pyre",)),
-    Skill("master_fire", "Master of Fire", "fire", 2, 2, "Pyres can be raised to the third rank.", ("pyre",)),
-    Skill("fire_ball", "Fire Ball", "fire", 3, 2, "Pyre bolts burst into fireballs. Unlocked in the Jungle.", ("pyre",), 8),
-    Skill("blaze", "Blaze", "fire", 4, 3, "Fireballs leave the floor burning for 2 seconds.", ("pyre",), 8),
-    Skill("adept_lightning", "Adept of Storms", "lightning", 1, 1, "Storm Obelisks can be raised to the second rank.", ("storm",)),
-    Skill("master_lightning", "Master of Storms", "lightning", 2, 2, "Storm Obelisks can be raised to the third rank.", ("storm",)),
-    Skill("static_field", "Static Field", "lightning", 3, 2, "Lightning strikes a leader in reach first, and leaps to leaders first.", ("storm",)),
-    Skill("chain_lightning", "Chain Lightning", "lightning", 4, 3, "Storm bolts gain one leap. Unlocked in the Drowned City.", ("storm",), 9),
-    Skill("adept_cold", "Adept of Cold", "cold", 1, 1, "Frost Shrines can be raised to the second rank.", ("frost",)),
-    Skill("glacial_spike", "Glacial Spike", "cold", 2, 2, "Frost bolts reach 0.4 further and hit 50% harder.", ("frost",)),
-    Skill("master_cold", "Master of Cold", "cold", 3, 2, "Frost Shrines can be raised to the third rank.", ("frost",)),
-    Skill("shatter", "Shatter", "cold", 4, 3, "Frost bolts burst near their target. A chilled death shatters nearby foes. Unlocked in the Jungle.", ("frost",), 8),
-    Skill("adept_poison", "Adept of Poison", "poison", 1, 1, "Plague Totems can be raised to the second rank.", ("plague",)),
-    Skill("master_poison", "Master of Poison", "poison", 2, 2, "Plague Totems can be raised to the third rank.", ("plague",)),
-    Skill("lower_resist", "Lower Resist", "poison", 3, 2, "A poisoned monster loses its protections: every element hits it whole, or harder.", ("plague",)),
-    Skill("contagion", "Contagion", "poison", 4, 3, "When a poisoned monster dies, its venom leaps to the nearest monster.", ("plague",), 8),
-    Skill("adept_bone", "Adept of Bone", "bone", 1, 1, "Bone Altars can be raised to the second rank.", ("altar",)),
-    Skill("master_bone", "Master of Bone", "bone", 2, 2, "Bone Altars can be raised to the third rank.", ("altar",)),
-    Skill("life_tap", "Life Tap", "bone", 3, 2, "A monster that dies amplified gives a fifth of its bounty in mana.", ("altar",)),
-    Skill("corpse_explosion", "Corpse Explosion", "bone", 4, 3, "A monster that dies amplified bursts for 15% of its life, unresisted, within 1.2.", ("altar",), 9),
-    Skill("adept_nature", "Adept of Nature", "nature", 1, 1, "Druid Groves can be raised to the second rank.", ("grove",)),
-    Skill("hurricane", "Hurricane", "nature", 2, 2, "Walkers within 2.5 tiles of a grove move 20% slower.", ("grove",)),
-    Skill("master_nature", "Master of Nature", "nature", 3, 2, "Druid Groves can be raised to the third rank.", ("grove",)),
-    Skill("twister", "Twister", "nature", 4, 3, "Every 4 s a grove roots the foremost walker near it for 1.5 s.", ("grove",)),
-    Skill("holy_shield", "Holy Shield", "warding", 1, 1, "Warded gates have 50% more life and mend fully between waves.", ("gate",)),
-    Skill("thorns", "Thorns", "warding", 2, 3, "A gate returns half of each blow to the monster that strikes it, frost or no frost.", ("gate",)),
-    Skill("warmth", "Warmth", "sorcery", 1, 1, "Mana flows 40% faster, and the orb holds 25 more."),
-    Skill("soul_harvest", "Soul Harvest", "sorcery", 2, 2, "Every slain leader gives 10 mana."),
-    Skill("spell_mastery", "Spell Mastery", "sorcery", 3, 3, "Every spell costs 25% less; Smite, Meteor and Frozen Orb strike 30% harder.", ("smite", "hymn", "meteor", "orb")),
-)}
+
+def _load() -> dict[str, Skill]:
+    """Every skill in ``skills.toml``, validated: each names its column, tier, cost and words."""
+    found: dict[str, Skill] = {}
+    for key, row in tuning.table("skills.skills").items():
+        try:
+            needs = tuple(row.get("needs", ()))
+            found[key] = Skill(key, row["name"], row["column"], int(row["tier"]), int(row["cost"]),
+                               row["blurb"], needs, int(row.get("first_location", 0)))
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValueError(f"skills.toml [{key}]: {e}")
+        if found[key].column not in COLUMNS:
+            raise ValueError(f"skills.toml [{key}]: unknown column {found[key].column!r}")
+    return found
+
+
+SKILLS: Final[dict[str, Skill]] = _load()
 
 TREE_COST = int_sum(s.cost for s in SKILLS.values())
+
+
+def _ranks() -> dict[str, tuple[str, str]]:
+    """Each tower kind's rank skills: the column's `adept_*` (rank II) and `master_*` (rank III)."""
+    found: dict[str, tuple[str, str]] = {}
+    for kind in TOWERS:
+        adept = [k for k, s in SKILLS.items() if k.startswith("adept_") and kind in s.needs]
+        master = [k for k, s in SKILLS.items() if k.startswith("master_") and kind in s.needs]
+        assert len(adept) == len(master) == 1, kind
+        found[kind] = (adept[0], master[0])
+    return found
+
+
+RANK_SKILL: Final[dict[str, tuple[str, str]]] = _ranks()
+
+
+def _unlocks() -> dict[str, str | None]:
+    """Each tower kind's `unlock_` skill, if it has one: the Arrow is free."""
+    found: dict[str, str | None] = {}
+    for kind in TOWERS:
+        keys = [k for k, s in SKILLS.items() if k.startswith("unlock_") and kind in s.needs]
+        assert len(keys) <= 1, kind
+        found[kind] = keys[0] if keys else None
+    return found
+
+
+UNLOCK: Final[dict[str, str | None]] = _unlocks()
+
+
+def unlocked(kind: str, learned: frozenset[str] | set[str]) -> bool:
+    """Whether the kind can be raised: free, or its unlock skill learned."""
+    key = UNLOCK[kind]
+    return key is None or key in learned
+
+
+def _spell_unlocks() -> dict[str, str]:
+    """Each gated spell's `unlock_` skill: Smite and Cleanse are free."""
+    found: dict[str, str] = {}
+    for spell in SPELLS:
+        keys = [k for k, s in SKILLS.items() if k.startswith("unlock_") and spell in s.needs]
+        assert len(keys) <= 1, spell
+        if keys:
+            found[spell] = keys[0]
+    return found
+
+
+SPELL_UNLOCK: Final[dict[str, str]] = _spell_unlocks()
 
 
 def above(skill: Skill) -> Skill | None:
@@ -99,10 +130,12 @@ def can_learn(learned: frozenset[str], key: str, sigils: int, stage: int | None 
 def kept(learned: Iterable[str], sigils: int, stage: int | None = None) -> frozenset[str]:
     """The learned skills a save from an older tree keeps: those the tree still has, each with every skill above it
     in its column learned too (a skill the tree lost, or moved above one learned, takes those below it along), top
-    tier first while the sigils pay for them (a skill whose price rose is unlearned rather than owed)."""
+    tier first while the sigils pay for them (a skill whose price rose is unlearned rather than owed); the unlocks
+    of a tier before the rest, so a tight purse never locks a kind to keep a bonus."""
     have = {key for key in learned if key in SKILLS}
     out: frozenset[str] = frozenset()
-    for skill in sorted((SKILLS[key] for key in have), key=lambda s: (s.tier, s.key)):
+    for skill in sorted((SKILLS[key] for key in have),
+                       key=lambda s: (s.tier, 0 if s.key.startswith("unlock_") else 1, s.key)):
         if can_learn(out, skill.key, sigils, stage):
             out |= {skill.key}
     return out
@@ -114,20 +147,6 @@ def check(learned: frozenset[str]) -> None:
         needed = above(SKILLS[key])
         if needed is not None and needed.key not in learned:
             raise ValueError(f"{SKILLS[key].name} needs {needed.name}")
-
-
-RANK_SKILL: Final[dict[str, tuple[str, str]]] = {
-    "arrow": ("adept_arrow", "master_arrow"),
-    "ballista": ("adept_arrow", "master_arrow"),
-    "hook": ("adept_arrow", "master_arrow"),
-    "knife": ("adept_arrow", "master_arrow"),
-    "pyre": ("adept_fire", "master_fire"),
-    "storm": ("adept_lightning", "master_lightning"),
-    "frost": ("adept_cold", "master_cold"),
-    "plague": ("adept_poison", "master_poison"),
-    "altar": ("adept_bone", "master_bone"),
-    "grove": ("adept_nature", "master_nature"),
-}
 
 
 def column_of(kind: str) -> str:
@@ -162,6 +181,7 @@ class Perks:
     soul_harvest: bool = False
     spell_cost: float = 1.0      # every spell's mana
     spell_power: float = 1.0
+    locked: frozenset[str] = frozenset()   # tower kinds and spells whose unlock is not learned
 
     def top(self, kind: str) -> int:
         """The highest rank index of this tower kind that may be bought (0 = only the first rank)."""
@@ -178,9 +198,12 @@ def perks(learned: Iterable[str], stage: int | None = None) -> Perks:
     chosen = frozenset(learned)
     check(chosen)
     if stage is not None:
-        chosen = frozenset(key for key in chosen if SKILLS[key].first_location <= stage)
-        check(chosen)
+        chosen = kept(chosen, cost(chosen), stage)
     p = NO_PERKS
+    shut = frozenset([k for k in TOWERS if not unlocked(k, chosen)]
+                     + [s for s, key in SPELL_UNLOCK.items() if key not in chosen])
+    if shut:
+        p = replace(p, locked=shut)
     tops: dict[str, int] = {}
     for kind, (adept, master) in RANK_SKILL.items():
         if adept in chosen:
@@ -218,9 +241,7 @@ def perks(learned: Iterable[str], stage: int | None = None) -> Perks:
     if "thorns" in chosen:
         p = replace(p, thorns=True)
     if "warmth" in chosen:
-        p = replace(p, mana_max=MANA_MAX + 25, mana_regen=MANA_REGEN * 1.4)
-    if "soul_harvest" in chosen:
-        p = replace(p, soul_harvest=True)
+        p = replace(p, mana_max=MANA_MAX + 25, mana_regen=MANA_REGEN * 1.4, soul_harvest=True)
     if "spell_mastery" in chosen:
         p = replace(p, spell_cost=0.75, spell_power=1.3)
     return p
