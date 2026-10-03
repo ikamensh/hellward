@@ -7,7 +7,7 @@ extends CanvasLayer
 ## element tags and the hit each of the player's towers deals it (`hover`).
 
 signal slot_pressed(kind: String)     # a tower kind, "gate", or "spell:<key>"
-signal order(name: String)            # "wave", "upgrade", "sell", "pace", "salvage", "breach:<mode>", "menu"
+signal order(name: String)            # "wave", "skip", "upgrade", "sell", "pace", "salvage", "breach:<mode>", "menu"
 
 const SPELLS := {"smite": "Z", "meteor": "X", "orb": "C", "hymn": "R"}
 const SPELL_TONES := {"smite": Color(1.0, 0.95, 0.7), "meteor": Color(1.0, 0.45, 0.12), "orb": Color(0.45, 0.7, 1.0),
@@ -55,6 +55,7 @@ var _wave_name: Label
 var _progress: ShaderMaterial
 var _progress_text: Label
 var _call: Button
+var _skip: Button                   # the grind's offer, while a wave is surely clean
 var _pace: Button
 var _slots := {}
 var _slot_pics := {}
@@ -539,6 +540,10 @@ func _build_info() -> void:
 	_call.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_call.pressed.connect(func(): order.emit("wave"))
 	row.add_child(_call)
+	_skip = _button("")
+	_skip.custom_minimum_size = Vector2(150, 0)
+	_skip.pressed.connect(func(): order.emit("skip"))
+	row.add_child(_skip)
 	_pace = _button("")
 	_pace.custom_minimum_size = Vector2(118, 0)
 	_pace.pressed.connect(func(): order.emit("pace"))
@@ -1090,6 +1095,11 @@ func refresh() -> void:
 	_call.disabled = not world.can_call() or world.demo
 	var bonus := int(world.state["early_bonus"])
 	_call.text = "Summon · Space" + ("  +%d" % bonus if bonus > 0 else "")
+	var offer = world.state.get("skip_offer")
+	_skip.visible = offer is Dictionary and not (offer as Dictionary).is_empty() and not world.demo \
+		and world.outcome == ""
+	if _skip.visible:
+		_skip.text = "Skip · G  +%d" % int((offer as Dictionary)["bonus"])
 	for kind in _slot_keys:
 		var cost := int(world.state["door_cost"]) if kind == "gate" else world.tower_cost(kind)
 		_costs[kind].text = str(cost)

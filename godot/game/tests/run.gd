@@ -22,7 +22,7 @@ func _ready() -> void:
 			test_defeat_ends_the_battle_and_its_music,
 			test_the_watched_defence_holds_and_ends_with_victory, test_a_campaign_walk_through_every_screen,
 			test_a_run_from_the_long_night_to_its_laying_down, test_the_camp_offers_relics_and_one_is_taken,
-			test_every_location_lays_out_and_plays]:
+			test_the_bar_offers_the_grind_and_g_skips_it, test_every_location_lays_out_and_plays]:
 		if only != "" and only not in t.get_method():
 			continue
 		_main = null
@@ -546,6 +546,23 @@ func test_the_camp_offers_relics_and_one_is_taken() -> void:
 			break
 	check(held == 1, "the first key takes one into the run")
 	await Net.ask("switch_profile", {"name": "main"}).done
+
+
+## The grind's skip on the bar: no button without the server's offer, the button with its bonus with one,
+## and G sends the skip as an order (refused here: the offer is this test's, not a live wave's).
+func test_the_bar_offers_the_grind_and_g_skips_it() -> void:
+	var m := await start()
+	m.rig.user_control = false
+	var w: World = m.world
+	check(not m.hud._skip.visible, "no offer on the break: no button")
+	w.state["skip_offer"] = {"wave": 0, "bonus": 12}
+	m.hud.refresh()
+	check(m.hud._skip.visible and "+12" in m.hud._skip.text, "the button shows the offer's bonus")
+	var why := []
+	w.refused.connect(func(text: String): why.append(text))
+	press(m.get_viewport(), KEY_G)
+	check(await until(func(): return not why.is_empty(), 3.0), "G sends the skip as an order")
+	check(why.size() > 0 and "surely clean" in why[0], "refused: no live wave is surely clean (%s)" % [why])
 
 
 ## Every location of both acts lays out (its scenery, its arsenal on the bar) and its battle runs a few seconds,

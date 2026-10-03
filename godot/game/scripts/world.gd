@@ -432,6 +432,9 @@ func _event(e: Array) -> void:
 		"relic":
 			announce.emit(String(e[2]), "A relic fires.")
 			Sfx.play("upgrade")
+		"skipped":
+			announce.emit("The grind is skipped", "The vision showed it clean: +%d gold." % int(e[2]))
+			Sfx.play("gold")
 		_:
 			push_warning("an event this client does not show: %s" % kind)
 	happened.emit(e)

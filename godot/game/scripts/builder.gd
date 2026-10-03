@@ -4,7 +4,8 @@ extends Node3D
 ## then U upgrades, Delete (or Backspace) sells. Z, X and C pick Smite, Meteor and Frozen Orb, aimed with a
 ## click; R sings Battle Hymn over the chosen tower, or with none chosen picks it to aim at one. Hold the gate
 ## and click an arch to ward it. Space summons a wave, F doubles the pace, V sells a salvage drop, H hides the
-## HUD, Esc lets go. WASD, Q and E are the camera's (CameraRig). Keys are read by their place on the keyboard, as
+## HUD, G skips a surely clean wave for its bonus, Esc lets go. WASD, Q and E are the camera's (CameraRig).
+## Keys are read by their place on the keyboard, as
 ## the camera reads its own (the labels name a QWERTY keyboard's letters): any layout, Cyrillic too, gives the
 ## same keys. The monster under the mouse shows its plate (Hud.hover).
 ## Everything is an order to the server; the ghost and the marks are only this side's guesses.
@@ -219,6 +220,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_U: _order("upgrade")
 			KEY_DELETE, KEY_BACKSPACE: _order("sell")
 			KEY_V: _order("salvage")
+			KEY_G: _order("skip")
 			KEY_SPACE: _order("wave")
 			KEY_F: _order("pace")
 			KEY_H: hud.toggle()
@@ -305,6 +307,7 @@ func _cast(key: String, p: Vector3, shift: bool) -> void:
 func _order(name: String) -> void:
 	match name:
 		"wave": world.order("call_wave")
+		"skip": world.order("skip_grind")
 		"pace":
 			Engine.time_scale = 1.0 if Engine.time_scale > 1.0 else 2.0
 			hud.set_pace(Engine.time_scale > 1.0)
