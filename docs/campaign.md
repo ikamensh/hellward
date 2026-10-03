@@ -29,9 +29,9 @@ Offering a tower does not grant its upgrades. A learned rank still costs battle 
 
 ## The common combat scale and gold
 
-`sim/balance.py` is the starting point for global tuning. Every hit is a whole number: it goes through the damage pipeline of [one defence](design.md) (factors capped at ×2, rounded toward them, less armor, at least 1), so a tag always moves a hit by at least one and armor makes heavy hits count. Base enemy life is 10, multiplied by its role, `1.16 ^ location_index`, `1.05 ^ wave_index`, and any exceptional encounter factor; base hits and life round half up. The first Fallen has 10 life and a rank-I Arrow hits for 2. Arrow ranks hit for 2, 3 and 4. A rank-I Arrow costs 12 everywhere: prices do not grow with depth. Starting gold is three units in Tristram (36 gold) and grows 16% per location, with the monsters' life. A wave's kills and clear bonus together pay `1 + 0.5 × wave_index` income units, starting at one unit; the income unit grows 12% per location. The authored wave counts are the counts.
+`sim/balance.py` is the starting point for global tuning. Every hit is a whole number: it goes through the damage pipeline of [one defence](design.md) (factors capped at ×2, rounded toward them, less armor, at least 1), so a tag always moves a hit by at least one and armor makes heavy hits count. A monster's life is its own, the same at every location; base hits and life round half up. The first Fallen has 10 life and a rank-I Arrow hits for 2. Arrow ranks hit for 2, 3 and 4. A rank-I Arrow costs 12 everywhere: prices do not grow with depth. Starting gold is three units everywhere (36 gold). A wave's kills and clear bonus together pay `1 + 0.5 × wave_index` income units, starting at one unit; the income unit is the gold unit at every location. The authored wave counts are the counts.
 
-A wave has one gold budget, with a share divided across its monsters and the rest paid on clearing it. Enemy type weights affect each kill's share, but adding bodies does not multiply total income. Leaked monsters forfeit their kill gold. Tower prices are role ratios of the local unit. At the Tristram price scale, rank-I values are 12 for Arrow and Knife Post, 18 for Pyre, Plague, Ballista and Hook Tower, 17 for Frost, 20 for Storm, and 19 for either support tower; later locations actually offer those other families. Upgrading buys less felt damage per gold than another rank-I tower at every location's armor and element mix, but more per cell (`tools/scorecard.py`, R3): Pyre ranks hit 3/4/5, Storm 3/4/6 at 1.2/1.3/1.3 a second, the Frost Shrine's ranks deepen its chill rather than its hit of 1, and the Plague Totem's venom grows 1/1.5/2 a second a stack. The Hook Tower's ranks buy pulls, not damage. Rank prices follow the same three-rank profile and rise with location. A gate starts at the local Arrow price and base 70 life before local and skill scaling.
+A wave has one gold budget, with a share divided across its monsters and the rest paid on clearing it. Enemy type weights affect each kill's share, but adding bodies does not multiply total income. Leaked monsters forfeit their kill gold. Tower prices are role ratios of the gold unit. Rank-I values are 12 for Arrow and Knife Post, 18 for Pyre, Plague, Ballista and Hook Tower, 17 for Frost, 20 for Storm, and 19 for either support tower; later locations actually offer those other families. Upgrading buys less felt damage per gold than another rank-I tower at every location's armor and element mix, but more per cell (`tools/scorecard.py`, R3): Pyre ranks hit 3/4/5, Storm 3/4/6 at 1.2/1.3/1.3 a second, the Frost Shrine's ranks deepen its chill rather than its hit of 1, and the Plague Totem's venom grows 1/1.5/2 a second a stack. The Hook Tower's ranks buy pulls, not damage. Rank prices follow the same three-rank profile everywhere. A gate costs one gold unit and has 100 life before skill scaling.
 
 Smite deals six base holy damage, scaling with location life, through any armor or protection: enough to finish a stray, or a leader before its curse lands. It costs 35 mana and needs time before another cast. Battle Hymn, from the Graveyard, costs 40 mana and makes one tower attack twice as fast for 6 seconds; it gathers itself for 15. Frozen Orb, at 50 mana, opens in the Jungle; Meteor, at 60, opens in Travincal. No spell lifts a curse or breaks a chant. Mana starts at 60, holds 100, and regenerates at 1.5 per second before skills.
 
@@ -101,7 +101,7 @@ The Bone Altar amplifies the thickest knot of enemies in reach without dealing d
 
 The Druid Grove gives nearby towers the best available aura, without stacking. Its ranks lend +10%, +15% and +20% damage within 1.5, 1.5 and 2.3 tiles. Weaken lowers that bonus and Bone Prison disables it. Its pull toward clustering competes with area curses.
 
-Ordinary Act II roles keep different defenses and movement on the smaller scale. Multiply each role factor below by the profile's `base_hp`, then by location and wave growth; gold bounty in a battle comes from the wave budget, not a fixed per-species price.
+Ordinary Act II roles keep different defenses and movement on the smaller scale. Each role's life below is absolute, the same at every location it visits; gold bounty in a battle comes from the wave budget, not a fixed per-species price.
 
 | Enemy | Life factor | Pace | Role |
 |---|---:|---:|---|
@@ -112,7 +112,7 @@ Ordinary Act II roles keep different defenses and movement on the smaller scale.
 | Thorned Hulk | 2.6 | 0.55 | Wandering gatebreaker, two sanctuary lives, armor 3, protected against poison, vulnerable to fire |
 | Drowned | 2.0 | 0.7 | Wanders, protected against cold, vulnerable to lightning |
 
-A Fetish Shaman raises a nearby dead Flayer once unless a burst leaves nothing to raise. An Inquisitor's curse arrives as a visible mark, burning on its spot longer than a chant. The Bone Priest is the Temple's boss: life factor 12 (120 before location and wave growth at the current profile), armor 3 and protected against every element, 5 lives a strike at the shrine, after which he is struck back to his portal to walk again, four curses with wider reach, and mana burn per caught tower.
+A Fetish Shaman raises a nearby dead Flayer once unless a burst leaves nothing to raise. An Inquisitor's curse arrives as a visible mark, burning on its spot longer than a chant. The Bone Priest is the Temple's boss: life 120, armor 3 and protected against every element, 5 lives a strike at the shrine, after which he is struck back to his portal to walk again, four curses with wider reach, and mana burn per caught tower.
 
 ## Locations
 
@@ -183,24 +183,11 @@ The screen after a story page ignores keys pressed before it opened, so a held E
 
 ## Tuning and verification
 
-The earlier six-location and twelve-location tuning tables were measured before this low-number, branching-hall economy. Their life factors, bot margins, planner gains and timing figures no longer describe the current rules. The common profile supplies the starting curve; authored roles, wave compositions, entrances and optional packs were checked with an eight-seed earned-sigil campaign after the corridor revision. The [redesign notes](redesign.md#earned-sigil-campaign-on-the-corridor-maps) summarize that result, including the tight Temple finale and the current planner-latency limit.
-
-Each location's life is its growth times a factor in `hellward/sim/data/campaign.toml`, tuned with `tools/margin.py`
-after stage 1's rules (2026-10-02, evaluation seeds 1000-1007, smart leaders): the strongest bot wins every location
-and the veteran every location of Act I, each with its worst seed at a margin of at least 1.0. The factors are 1.0
-but for the Graveyard 0.76, the Cathedral 0.61 and Hell's Gate 0.80 (where the veteran, drafting from the intro,
-lost before them; it already lost the Cathedral at 0.49 before stage 1, while the planned player holds it at 2.6),
-the Catacombs 1.5 and Kurast Docks 1.07 (where an Arrow-only build now loses and one with Ballistas for the same gold
-wins, `tools/armor_ab.py`, M9), and Travincal 0.86 (the planned player's worst seed). Margins, median (veteran in
-Act I; the better of the planned and adaptive players everywhere, measured with the Graveyard at 0.78, Hell's Gate at
-0.82 and Travincal at 0.91, a shade harder): Tristram 1.28 / 1.39, Graveyard 1.19 / 2.07, Cathedral 1.11 / 2.58,
-Catacombs 1.12 / 2.31, Caves 1.61 / 1.80, Hell's Gate 1.23 / 1.57; Docks 1.63, Spider Forest 2.26, Jungle 1.73,
-Drowned City 1.91, Travincal 1.17 (at 0.86), Temple 1.43. Ballistas fill the
-searched builds from the Catacombs on: the armor answer is also the strongest general tower at these numbers.
+The earlier six-location and twelve-location tuning tables were measured before this flat-life, branching-hall economy. Their growth curves, life factors, bot margins, planner gains and timing figures no longer describe the current rules. There is no life knob anymore: a location's difficulty is authored into its waves (which kinds, how many, how spaced), its map and its arsenal, and tuned with `tools/margin.py` (evaluation seeds 1000-1007, smart leaders), which bisects how much more monster life each scripted player can still beat. The bar is that the planned and warden players (replayed, matchup-knowing builds) win every location with worst-seed margin at least 1.0; the veteran (a decent player drafting from the intro) wins the opening locations through the Cathedral, and its deeper margins are reported, not required: the game is meant to be hard. The per-location margins are re-measured as each location's waves land; the scorecard's G3.4 row checks the reference board covers every last wave.
 
 `tools/balance.py` compares leader policies and defenders, `tools/curse_quality.py` measures the curse planner, `tools/campaign_balance.py` follows progression, and `tools/margin.py` estimates spare difficulty. The source simulation and mypyc build should agree on events, rewards and outcomes for the same seed, including a breach and a forged loadout. Tests cover route geometry, clone determinism, rewards and replayed commands. Record each balance result with its profile and command so later curve changes remain comparable.
 
-The original tuning still taught useful rules: a broken gate remains rubble until a break; a spell recharges after casting; and spells grow with location and wave, rather than an arbitrary hardship multiplier. These mechanics remain in the game. Stage 1 ([its spec](stages/1-armor-and-pirates.md)) took Cleanse, wards, Salvation and chant interrupts out: no spell lifts, prevents or breaks a curse.
+The original tuning still taught useful rules: a broken gate remains rubble until a break; a spell recharges after casting; and spell damage is absolute, rather than an arbitrary hardship multiplier. These mechanics remain in the game. Stage 1 ([its spec](stages/1-armor-and-pirates.md)) took Cleanse, wards, Salvation and chant interrupts out: no spell lifts, prevents or breaks a curse.
 
 ## Screens
 

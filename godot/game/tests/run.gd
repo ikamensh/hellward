@@ -195,7 +195,7 @@ func test_the_server_refuses_a_tower_on_the_lane() -> void:
 	var w: World = m.world
 	var why := []
 	w.refused.connect(func(text: String): why.append(text))
-	var lane := Vector2i(10, 8)
+	var lane := Vector2i(16, 9)
 	check(m.level.cell(lane) == "P", "the test tile is a lane")
 	press(m.get_viewport(), KEY_1)
 	await frames(2)
