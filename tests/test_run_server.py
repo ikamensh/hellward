@@ -212,6 +212,60 @@ def test_the_save_mid_defence_holds_the_kit_and_the_log(tmp_path):
     assert saved["state"]["log"]["marks"]
 
 
+def _snapshot(world):
+    """The defence's state, rounded past float dust: a resume must match it exactly."""
+    return {
+        "time": round(world.time, 6), "gold": world.gold, "lives": world.lives, "kills": world.kills,
+        "wave": world.wave, "mana": round(world.mana, 3), "xp": round(world.xp_total, 3),
+        "towers": sorted((t.kind.key, t.tile, t.level, round(t.cooldown, 3), t.spent)
+                         for t in world.towers.values()),
+        "monsters": sorted((m.kind.key, round(m.hp, 2), round(m.s, 3), m.route,
+                            round(m.cooldown, 3)) for m in world.monsters),
+    }
+
+
+def test_a_saves_resume_replays_the_log_exactly_mid_wave_included(tmp_path):
+    from hellward.server.saves import Saves
+    data = tmp_path / "data"
+    first = campaign_at(data)
+    first.start_run(seed=11)
+    battle = first.defend("tristram")
+    level = battle.location.level
+    tiles = [(x, y) for y in range(level.height) for x in range(level.width) if level.buildable(x, y)]
+    assert battle.order("build", {"kind": "arrow", "tile": list(tiles[0])})[0] is None
+    assert battle.order("build", {"kind": "arrow", "tile": list(tiles[1])})[0] is None
+    assert battle.order("call_wave", {})[0] is None
+    battle.advance(200)   # ten seconds in, mid first wave
+    assert battle.world.wave == 0 and battle.world.monsters
+    before = _snapshot(battle.world)
+    saved = Saves(data / "saves").load("run")
+    assert saved is not None and saved["state"]["log"]["marks"]
+
+    second = campaign_at(data)
+    assert second.battle is None and second.run is not None
+    started = second.resume()
+    assert started["run"] is True
+    resumed = second.battle
+    assert resumed is not None
+    assert _snapshot(resumed.world) == before
+    assert resumed.log["decisions"] == saved["state"]["log"]["decisions"]
+    battle.advance(100)
+    resumed.advance(100)
+    assert _snapshot(resumed.world) == _snapshot(battle.world)
+
+
+def test_resume_refuses_without_a_run_a_defence_or_a_quiet_battle(tmp_path):
+    campaign = campaign_at(tmp_path / "data")
+    with pytest.raises(Refusal, match="No run"):
+        campaign.resume()
+    campaign.start_run(seed=11)
+    with pytest.raises(Refusal, match="No defence"):
+        campaign.resume()
+    campaign.defend("tristram")
+    with pytest.raises(Refusal, match="already being fought"):
+        campaign.resume()
+
+
 def test_the_worst_case_counts_the_roster_and_a_bosss_strikes():
     assert worst_line(LOCATIONS["tristram"], 30).startswith("Worst case: ")
     assert "strikes at 5" in worst_line(LOCATIONS["temple"], 30)

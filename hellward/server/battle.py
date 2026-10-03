@@ -27,14 +27,42 @@ from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
 from hellward.sim.bonus import draw as draw_pack
 from hellward.sim.campaign import ORDER, Location, first_offering, offers
-from hellward.sim.content import SPELLS
+from hellward.sim.content import SPELLS, Curse
 from hellward.sim.items import EMPTY_LOADOUT, Loadout
 from hellward.sim.kit import Kit
 from hellward.sim.model import SIM_DT, Planner, Refused, World
+from hellward.sim.planner import Decision, Option
+from hellward.sim.players.ghost import issue as replay_command
 from hellward.sim.players.hands import AIM_GAP, REACT, Hands, Player, react_for
 from hellward.sim.skills import perks
 
 PERSON_REACT = 0.6   # the person's hands: only their record of the leaders' signs uses it
+
+
+class _LoggedDecision:
+    """One logged decision, answered as the planner's handle would answer it."""
+
+    def __init__(self, logged: dict) -> None:
+        self.logged = logged
+
+    def result(self) -> Decision:
+        cast = self.logged["cast"]
+        return Decision(leader=0, cast=None if cast is None else Option(Curse(cast[0]), tuple(cast[1])),
+                        retry=float(self.logged["retry"]))
+
+
+class _ReplayPlanner:
+    """The resume's planner: the logged decisions, in order, per leader. No rollouts, no processes, and an
+    empty queue is a bug: the replayed world asks exactly what the played world asked."""
+
+    def __init__(self, decisions: dict) -> None:
+        self.queues = {int(leader): list(queue) for leader, queue in decisions.items()}
+
+    def __call__(self, world: World, leader: int):
+        queue = self.queues.get(leader)
+        if not queue:
+            raise RuntimeError(f"the log holds no more decisions for leader {leader}")
+        return _LoggedDecision(queue.pop(0))
 
 
 class Battle:
@@ -163,6 +191,30 @@ class Battle:
             self.on_save()
             self._dirty = False
         return message
+
+    def resume_from(self, log: dict, planner: Planner | None) -> None:
+        """Replay the save's log on to its last mark: its commands through the hands, its leaders' decisions
+        from the log instead of a live planner. Quitting never rewinds more than a second: whatever came
+        after the last mark is let go. The live planner takes over from the mark."""
+        assert self.kit is not None
+        self.log = {"commands": [list(entry) for entry in log["commands"]], "decisions": {}, "marks": []}
+        self.commands = self.log["commands"]
+        saved, self.on_save = self.on_save, None   # the replay regrows the log; it writes nothing
+        self.world.planner = _ReplayPlanner(log["decisions"])
+        try:
+            end = log["marks"][-1] if log["marks"] else 0.0
+            pending = sorted(self.log["commands"], key=lambda entry: entry[0])
+            while self.world.time < end - 1e-9 and self.world.outcome is None:
+                while pending and pending[0][0] <= self.world.time + 1e-9:
+                    _, name, *rest = pending.pop(0)
+                    if name == "summon":
+                        self._summon(int(rest[0]))
+                    elif not replay_command(self.world, self.hands, name, tuple(rest)):
+                        raise RuntimeError(f"the replayed {name} was refused")
+                self.advance(1)
+        finally:
+            self.world.planner = planner
+            self.on_save = saved
 
     # -- Orders ---------------------------------------------------------------------------------
 

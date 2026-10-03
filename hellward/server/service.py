@@ -25,7 +25,7 @@ from hellward.server.campaign import Campaign, Refusal
 
 REQUESTS = ("profiles", "create_profile", "switch_profile", "campaign", "seen", "chronicle", "briefing", "skills",
             "learn", "unlearn", "unlearn_all", "forge_view", "forge", "leave", "start_run", "camp", "abandon",
-            "summon_preview")
+            "summon_preview", "resume")
 
 
 class Service:

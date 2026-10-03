@@ -28,6 +28,65 @@ def _tile(value: Any) -> tuple[int, int]:
     return (int(value[0]), int(value[1]))
 
 
+def issue(world: World, hands: Hands, name: str, args: tuple[Any, ...]) -> bool:
+    """Give one logged command, through the hands. Whether it took effect (a refusal is retried later)."""
+    try:
+        if name == "build":
+            world.build(str(args[0]), _tile(args[1]))
+        elif name == "upgrade":
+            tower = world.tower_at(_tile(args[0]))
+            if tower is None:
+                raise Refused("No tower stands there yet.")
+            world.upgrade(tower.id)
+        elif name == "sell":
+            tower = world.tower_at(_tile(args[0]))
+            if tower is None:
+                raise Refused("No tower stands there yet.")
+            world.sell(tower.id)
+        elif name == "gate":
+            world.build_door(int(args[0]))
+        elif name == "clear":
+            world.clear(_tile(args[0]))
+        elif name == "call_wave":
+            world.call_wave()
+        elif name == "breach":
+            world.choose_breach(str(args[0]))
+        elif name == "sell_salvage":
+            world.sell_salvage(int(args[0]))
+        elif name == "hymn":
+            tower = world.tower_at(_tile(args[0]))
+            if tower is None:
+                raise Refused("No tower stands there yet.")
+            hands.hymn(tower.id)
+        elif name == "smite":
+            target = _nearest(world, float(args[0]), float(args[1]))
+            if target is None:
+                raise Refused("No monster walks there yet.")
+            hands.smite(target)
+        elif name == "meteor":
+            hands.meteor(float(args[0]), float(args[1]))
+        elif name == "orb":
+            hands.orb(float(args[0]), float(args[1]))
+        else:
+            raise ValueError(f"unknown replay command {name!r}")
+    except Refused:
+        return False
+    return True
+
+
+def _nearest(world: World, x: float, y: float) -> int | None:
+    """The monster nearest a logged point, as a person clicking there would strike it: any monster on the
+    map, the closest first, the earliest raised breaking a tie."""
+    best: int | None = None
+    best_d = 0.0
+    for m in world.monsters:
+        mx, my = world.position(m)
+        d = (mx - x) * (mx - x) + (my - y) * (my - y)
+        if best is None or d < best_d:
+            best, best_d = m.id, d
+    return best
+
+
 class Ghost:
     """Replays the defence in a battle scene's log (its path, or the log itself)."""
 
@@ -79,60 +138,4 @@ class Ghost:
 
     def _issue(self, hands: Hands, command: tuple[str, tuple[Any, ...]]) -> bool:
         """Give one logged command, through the hands. Whether it took effect (a refusal is retried later)."""
-        world = hands.world
-        name, args = command
-        try:
-            if name == "build":
-                world.build(str(args[0]), _tile(args[1]))
-            elif name == "upgrade":
-                tower = world.tower_at(_tile(args[0]))
-                if tower is None:
-                    raise Refused("No tower stands there yet.")
-                world.upgrade(tower.id)
-            elif name == "sell":
-                tower = world.tower_at(_tile(args[0]))
-                if tower is None:
-                    raise Refused("No tower stands there yet.")
-                world.sell(tower.id)
-            elif name == "gate":
-                world.build_door(int(args[0]))
-            elif name == "clear":
-                world.clear(_tile(args[0]))
-            elif name == "call_wave":
-                world.call_wave()
-            elif name == "breach":
-                world.choose_breach(str(args[0]))
-            elif name == "sell_salvage":
-                world.sell_salvage(int(args[0]))
-            elif name == "hymn":
-                tower = world.tower_at(_tile(args[0]))
-                if tower is None:
-                    raise Refused("No tower stands there yet.")
-                hands.hymn(tower.id)
-            elif name == "smite":
-                target = self._nearest(world, float(args[0]), float(args[1]))
-                if target is None:
-                    raise Refused("No monster walks there yet.")
-                hands.smite(target)
-            elif name == "meteor":
-                hands.meteor(float(args[0]), float(args[1]))
-            elif name == "orb":
-                hands.orb(float(args[0]), float(args[1]))
-            else:
-                raise ValueError(f"unknown replay command {name!r}")
-        except Refused:
-            return False
-        return True
-
-    @staticmethod
-    def _nearest(world: World, x: float, y: float) -> int | None:
-        """The monster nearest a logged point, as a person clicking there would strike it: any monster on the
-        map, the closest first, the earliest raised breaking a tie."""
-        best: int | None = None
-        best_d = 0.0
-        for m in world.monsters:
-            mx, my = world.position(m)
-            d = (mx - x) * (mx - x) + (my - y) * (my - y)
-            if best is None or d < best_d:
-                best, best_d = m.id, d
-        return best
+        return issue(hands.world, hands, command[0], command[1])

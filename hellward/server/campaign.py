@@ -30,6 +30,7 @@ from hellward.sim.campaign import (
 )
 from hellward.sim.content import CURSES, MONSTERS, SPELLS, START_LIVES, TOWERS, Curse, Element, MonsterKind, felt_hit
 from hellward.sim.items import PATTERNS
+from hellward.sim.kit import Kit
 from hellward.sim.model import Planner, World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.ghost import Ghost
@@ -476,12 +477,13 @@ class Campaign:
             if loc.key != run.location.key:
                 raise Refusal(f"The run is at {run.location.called}.")
             dealt = kit(run)
-            self.battle = Battle(loc, seed=dealt.seed, planner=self.planner,
-                                 player=PLAYERS[player](dealt.seed) if player is not None else None,
+            scripted = PLAYERS[player](dealt.seed) if player is not None else None
+            self.battle = Battle(loc, seed=dealt.seed, planner=self.planner, player=scripted,
                                  replays=self.data / "replays", on_outcome=self._keep_run, kit=dealt,
                                  run_seed=run.seed, run_index=run.index, drawn=run.drawn,
-                                 on_save=self._save_battle)
-            self._save_battle()
+                                 on_save=None if scripted is not None else self._save_battle)
+            if scripted is None:   # a scripted defence leaves no log: only a person's resumes
+                self._save_battle()
             return self.battle
         if not self.progress.opened(loc):
             raise Refusal(f"The way to {loc.called} is not open yet.")
@@ -498,6 +500,24 @@ class Campaign:
         self.saves.save(slot_for_run(self.progress.profile),
                         {"run": to_json(self.run), "kit": self.battle.kit.to_json(), "log": self.battle.log},
                         "Run", summary={"at": self.run.location.key, "pool": self.run.pool})
+
+    def resume(self) -> dict:
+        """Resume the run's interrupted defence: the save's Kit and log replay on to the last mark, then the
+        fight is live again under the leaders' own planner."""
+        if self.battle is not None:
+            raise Refusal("A defence is already being fought.")
+        if self.run is None:
+            raise Refusal("No run is going.")
+        saved = self.saves.load(slot_for_run(self.progress.profile))
+        if saved is None or saved["state"]["kit"] is None or saved["state"]["log"] is None:
+            raise Refusal("No defence to resume.")
+        dealt = Kit.from_json(saved["state"]["kit"])
+        self.battle = Battle(dealt.location, seed=dealt.seed, planner=self.planner,
+                             replays=self.data / "replays", on_outcome=self._keep_run, kit=dealt,
+                             run_seed=self.run.seed, run_index=self.run.index, drawn=self.run.drawn,
+                             on_save=self._save_battle)
+        self.battle.resume_from(saved["state"]["log"], self.planner)
+        return self.battle.start()
 
     def summon_preview(self) -> dict:
         """Every stake's bonus wave on the table now: its pack, its wager, and what a clean clear pays."""
