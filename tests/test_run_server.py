@@ -266,6 +266,16 @@ def test_resume_refuses_without_a_run_a_defence_or_a_quiet_battle(tmp_path):
         campaign.resume()
 
 
+def test_the_threats_label_names_armor_flyers_tags_boss_and_curses():
+    from hellward.server.campaign import threats
+    assert threats(LOCATIONS["tristram"])["boss"] is None
+    assert threats(LOCATIONS["hells_gate"])["boss"] == "Azazel the Flayer"
+    assert threats(LOCATIONS["catacombs"])["armor"] == 2
+    assert "Gargoyle" in threats(LOCATIONS["caves"])["flyers"]
+    assert threats(LOCATIONS["cathedral"])["weaknesses"] == []
+    assert threats(LOCATIONS["tristram"])["curses"]
+
+
 def test_the_worst_case_counts_the_roster_and_a_bosss_strikes():
     assert worst_line(LOCATIONS["tristram"], 30).startswith("Worst case: ")
     assert "strikes at 5" in worst_line(LOCATIONS["temple"], 30)

@@ -175,7 +175,8 @@ class Campaign:
                 else:
                     tip = f"{loc.name}\nThe way opens when {LOCATIONS[loc.requires[0]].called} holds."
                 places.append({"key": key, "name": loc.name, "number": i + 1, "opened": opened, "held": p.held(key),
-                               "best": p.best(key), "tip": tip, "next": nxt is not None and nxt.key == key})
+                               "best": p.best(key), "tip": tip, "next": nxt is not None and nxt.key == key,
+                               "threats": threats(loc)})
             won = sum(p.best(k) for k in keys)
             acts.append({"act": act, "name": ACT_NAMES[act], "places": places, "won": won, "total": 3 * len(keys),
                          "open": act == 1 or p.held(ACT_ENDS[act - 1]),
@@ -183,7 +184,8 @@ class Campaign:
         due = self.due()
         return {"profile": p.profile, "sigils": p.sigils, "free": p.free, "at": p.at,
                 "act": LOCATIONS[p.at].act, "acts": acts, "due": None if due is None else story(STORIES[due]),
-                "prologue": "prologue" not in p.seen, "salvage": p.salvage, "trophies": len(p.trophies)}
+                "prologue": "prologue" not in p.seen, "salvage": p.salvage, "trophies": len(p.trophies),
+                "runs_won": p.runs_won, "runs_lost": p.runs_lost, "run": self.run_view()}
 
     def due(self) -> str | None:
         """The story a map opening owes the player, if any: an act's ending once its last location is held, else the
@@ -717,6 +719,23 @@ def answers_line(location: Location, learned: frozenset[str]) -> str | None:
 def _plural(name: str) -> str:
     """The camp's plural: Witches and Zealots, not Witchs."""
     return name + ("es" if name.endswith(("s", "x", "z", "ch", "sh")) else "s")
+
+
+def threats(location: Location) -> dict:
+    """The run map's label for a place: the roster's thickest armor, its flyers, the elements it shrugs off
+    and the ones that bite, its boss, and the curses its leaders lay."""
+    kinds = [MONSTERS[key] for key in location.monsters]
+    curses: list[str] = []
+    for kind in kinds:
+        if kind.leader is not None:
+            curses += [c.value for c in kind.leader.curses if c.value not in curses]
+    bosses = sorted({kind.name for kind in kinds if kind.boss})
+    return {"armor": max(kind.armor for kind in kinds),
+            "flyers": sorted({kind.name for kind in kinds if kind.flying}),
+            "protections": sorted({e.value for kind in kinds for e in kind.protected}),
+            "weaknesses": sorted({e.value for kind in kinds for e in kind.vulnerable}),
+            "boss": bosses[0] if bosses else None,
+            "curses": curses}
 
 
 def story(tale: Story) -> dict:

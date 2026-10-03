@@ -56,6 +56,6 @@ SPIDER_FOREST = Location(
     theme="spider_forest",
     blurb="The road to the temples, through a forest the spiders own. In a clearing, the druids' ring of oaks.",
     taunt="The old trees have taken your side. Stand close to them, then. One curse will find you all.",
-    lesson="Venom barely bites the spiders here. A grove makes a bunch worth its risk.",
+    lesson="Blood Bats fly over the gate, and venom barely bites the spiders.",
     requires=("docks",),
 )

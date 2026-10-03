@@ -57,6 +57,6 @@ CATHEDRAL = Location(
     blurb="The nave where the lamp hangs. Two open aisles lead from separate portals toward the sanctuary, where your lantern burns.",
     taunt="Two nights you have kept my lamp. It changes nothing. The witch will make your towers old, and the "
           "goatmen will take both aisles.",
-    lesson="Two aisles split the host: place arrows where they cover both before spending on fire.",
+    lesson="Four elements find shrugs here and none finds weakness: arrows and ballistae must.",
     requires=("graveyard",),
 )

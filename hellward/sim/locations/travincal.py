@@ -71,6 +71,6 @@ TRAVINCAL = Location(
     theme="travincal",
     blurb="The temple terrace where the High Council meets, under the mother lamp. Every elder curses.",
     taunt="Turn back, keeper. The mother's oil is all but spent — go home and keep your own lamp through its last night.",
-    lesson="Curses from every side: spread wide, and kill the elders first.",
+    lesson="Thorned Hulks wear armor 3, and curses come from every side: spread wide, and kill the elders first.",
     requires=("drowned_city",),
 )

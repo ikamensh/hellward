@@ -55,6 +55,6 @@ CAVES = Location(
     theme="caves",
     blurb="Below the catacombs the caves open onto lava. Gargoyles nest in the vault and fly where they please.",
     taunt="Walls mean nothing to wings. Look up. And tell me, keeper: why do my bones never show your face?",
-    lesson="Wings ignore the gate, and the lava leaves fewer places to build.",
+    lesson="Gargoyles fly over the gate, and fire, cold and lightning all find shrugs.",
     requires=("catacombs",),
 )
