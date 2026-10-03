@@ -59,3 +59,11 @@ raises = ""                   # the monster kind it raises
 raise_reach = 3.0             # tile-centre distance within which it raises
 mark = 0.0                    # seconds a marked curse burns on its spot before it lands; 0 = chanted
 burn = 0.0                    # mana burned per tower the curse catches
+
+[blight_defaults]             # a blighter's numbers unless its monster entry says otherwise
+verb = "blight"               # what it does to the cell: the spider webs, the shaman desecrates
+past = "blighted"             # what the cell is then called
+reach = 4.0                   # tile-centre distance within which it takes an empty cell
+delay = 6.0                   # seconds after it appears before it marks, once a wave
+telegraph = 2.0               # the visible mark between the choice and the cell taken (R6: at least 1.5)
+waves = 2                     # cleared waves the cell stays taken

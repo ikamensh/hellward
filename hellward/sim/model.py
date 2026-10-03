@@ -50,6 +50,7 @@ from hellward.sim.relics import (
     TRANCE_TIME,
 )
 from hellward.sim.skills import NO_PERKS, RANK_SKILL, SKILLS, SPELL_UNLOCK, UNLOCK, Perks, baked
+from hellward.sim import worth as cell_worth
 from hellward.sim.xp import clear_xp, kill_xp, xp_next
 
 if TYPE_CHECKING:
@@ -78,6 +79,9 @@ HOOK_PULL: Final = tuning.number("battle.hook_pull")
 HOOK_PAST: Final = tuning.number("battle.hook_past")
 HYMN_RATE: Final = SPELLS["hymn"].rate
 HOOK: Final = 1                 # the Hook's bit in Monster.moved: each mover kind moves a monster back once
+BLIGHT_MAX: Final = 5         # blighted and marked cells at once
+BLIGHT_CELLS: Final = 5       # cells a defence takes in all: R6 wants one to five a location that has blight
+BLIGHT_RETRY: Final = 2.0     # seconds before a blighter without a cell looks again
 
 
 class Refused(Exception):
@@ -88,6 +92,7 @@ class Monster:
     __slots__ = ("id", "kind", "hp", "max_hp", "s", "route", "bounty", "salvage", "breach", "elite_name", "speed_factor",
                  "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
                  "cooldown", "asking", "ask_left", "chant_curse", "chant_spot", "chant_left", "door",
+                 "blight_cd", "blight_cell", "blight_left", "blight_wave",
                  "amplified", "amplify", "risen", "marking", "moved", "strikes", "bonus")
 
     def __init__(self, id: int, kind: MonsterKind, wave: int, lane: float, jostle: float, hp: float, cooldown: float,
@@ -118,6 +123,10 @@ class Monster:
         self.chant_spot: tuple[int, int] = (-1, -1)
         self.chant_left = 0.0
         self.door = -1                        # the door socket it is battering, or -1
+        self.blight_cd = kind.blight.delay if kind.blight is not None else 0.0
+        self.blight_cell: tuple[int, int] = (-1, -1)   # the cell its mark burns on, while it marks
+        self.blight_left = 0.0
+        self.blight_wave = -1                 # the wave it marked in last: once a wave
         self.amplified = 0.0                  # seconds of Amplify Damage left
         self.amplify = 0.0                    # the fraction it takes extra (0.3 = 30% more damage)
         self.risen = False                    # has this monster been raised once already
@@ -133,6 +142,8 @@ class Monster:
         m.max_hp, m.s, m.chill, m.chill_left, m.frozen = self.max_hp, self.s, self.chill, self.chill_left, self.frozen
         m.poison = [stack[:] for stack in self.poison]
         m.chant_curse, m.chant_spot, m.chant_left, m.door = self.chant_curse, self.chant_spot, self.chant_left, self.door
+        m.blight_cd, m.blight_cell, m.blight_left, m.blight_wave = (self.blight_cd, self.blight_cell, self.blight_left,
+                                                                   self.blight_wave)
         m.amplified, m.amplify = self.amplified, self.amplify
         m.risen, m.marking, m.moved, m.strikes = self.risen, self.marking, self.moved, self.strikes
         return m
@@ -396,6 +407,9 @@ class World:
         self.kills = 0
         self.curses_landed = 0
         self.spells_cast = 0
+        self.blighted: dict[tuple[int, int], tuple[int, str]] = {}   # taken cells: cleared waves left, what it is
+        self.blights = 0                  # cells taken this defence, for the run's settling
+        self.blighted_cells: set[tuple[int, int]] = set()   # every cell taken this defence
         self.builds = 0       # the verbs, counted where they happen: towers raised, ranks bought,
         self.upgrades = 0     # spells cast (spells_cast), curses landing (curses_landed) and leaks
         self.leaks = 0
@@ -434,6 +448,7 @@ class World:
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
         w.leaked_life, w.forced, w.outcome, w.kills, w._next_id = self.leaked_life, [], self.outcome, self.kills, self._next_id
         w.curses_landed, w.spells_cast = self.curses_landed, self.spells_cast
+        w.blighted, w.blights, w.blighted_cells = dict(self.blighted), self.blights, set(self.blighted_cells)
         w.relics = self.relics
         w.progress = dict(self.progress)
         w.builds, w.upgrades, w.leaks, w.fervor = self.builds, self.upgrades, self.leaks, self.fervor
@@ -639,6 +654,9 @@ class World:
             raise Refused("Towers stand on the bare floor, not on the path, the walls or the pits.")
         if self.tower_at(tile) is not None:
             raise Refused("A tower already stands there.")
+        if tile in self.blighted:
+            waves, verb = self.blighted[tile]
+            raise Refused(f"That cell is {verb} for {waves} more wave{'s' if waves != 1 else ''}.")
         levels = self.tower_levels[kind]
         cost = self.cost(kind)
         if self.gold < cost:
@@ -933,6 +951,7 @@ class World:
                     self.recharge[key] = left
         self._spawn(dt)
         self._leaders(dt)
+        self._blight(dt)
         self._move(dt)
         self._towers(dt)
         self._bolts(dt)
@@ -1058,6 +1077,68 @@ class World:
         else:
             self._emit("fizzle", leader_id, spot)
         leader.marking = False
+
+    def _blight(self, dt: float) -> None:
+        for m in self.monsters:
+            spec = m.kind.blight
+            if spec is None or m.hp <= 0:
+                continue
+            if m.blight_cell != (-1, -1):
+                m.blight_left -= dt
+                if m.blight_left <= 0:
+                    self._land_blight(m)
+                continue
+            if m.blight_wave == self.wave:
+                continue
+            m.blight_cd -= dt
+            if m.blight_cd > 0:
+                continue
+            cell = self._blight_target(m)
+            if cell is None:
+                m.blight_cd = BLIGHT_RETRY
+                continue
+            m.blight_cell, m.blight_left, m.blight_wave = cell, spec.telegraph, self.wave
+            self._emit("blight_mark", m.id, cell, spec.telegraph, spec.past)
+
+    def _blight_target(self, m: Monster) -> tuple[int, int] | None:
+        """The best empty cell in the blighter's reach: worth what a tower there would reach, the simulation's own
+        reckoning. Nothing worthless, nothing taken or already marked, nothing past the fifth cell at once."""
+        spec = m.kind.blight
+        assert spec is not None
+        marked = {o.blight_cell for o in self.monsters if o.blight_cell != (-1, -1)}
+        if len(self.blighted) + len(marked) >= BLIGHT_MAX or len(self.blighted_cells) >= BLIGHT_CELLS:
+            return None
+        x, y = self.position(m)
+        every, ground = cell_worth.shares(self.level, self.waves)
+        built = frozenset(d.index for d in self.doors if d.built)
+        reach = TOWERS["arrow"].levels[0].range
+        best: tuple[int, int] | None = None
+        most = 0.0
+        for cy in range(max(0, int(y - spec.reach)), min(self.level.height, int(y + spec.reach) + 2)):
+            for cx in range(max(0, int(x - spec.reach)), min(self.level.width, int(x + spec.reach) + 2)):
+                cell = (cx, cy)
+                if ((cell in marked or cell in self.blighted or self.tower_at(cell) is not None
+                        or not self.buildable(cx, cy))
+                        or _hypot(cx + 0.5 - x, cy + 0.5 - y) > spec.reach):
+                    continue
+                worth = cell_worth.cell(self.level, every, ground, cell, reach, built=built)
+                if worth > most:
+                    best, most = cell, worth
+        return best
+
+    def _land_blight(self, m: Monster) -> None:
+        spec = m.kind.blight
+        cell = m.blight_cell
+        m.blight_cell, m.blight_left = (-1, -1), 0.0
+        assert spec is not None
+        if (cell in self.blighted or self.tower_at(cell) is not None or not self.buildable(*cell)
+                or (cell not in self.blighted_cells and len(self.blighted_cells) >= BLIGHT_CELLS)):
+            self._emit("blight_fizzle", m.id, cell)   # a tower raced the mark and won, the fifth cell went first
+            return
+        self.blighted[cell] = (spec.waves, spec.past)
+        self.blights += 1
+        self.blighted_cells.add(cell)
+        self._emit("blight", m.id, cell, spec.waves, spec.past)
 
     def _move(self, dt: float) -> None:
         level = self.level
@@ -1792,6 +1873,13 @@ class World:
                 bonus = self.waves[w].bonus
                 self.gold += bonus
                 self._earn(clear_xp(w + 1))
+                for cell in sorted(self.blighted):   # a cleared wave lifts every taken cell one wave nearer open
+                    left, past = self.blighted[cell]
+                    if left - 1 <= 0:
+                        del self.blighted[cell]
+                        self._emit("blight_clear", cell)
+                    else:
+                        self.blighted[cell] = (left - 1, past)
                 for d in self.doors:
                     if d.built:
                         d.hp += (self.gate_life - d.hp) * self.perks.gate_mend

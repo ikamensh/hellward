@@ -66,6 +66,16 @@ class LeaderSpec:
     burn: float = 0.0         # mana burned per tower the curse catches
 
 
+@dataclass(frozen=True)
+class BlightSpec:
+    verb: str                 # what it does to the cell: "web", "desecrate"
+    past: str = "blighted"    # what the cell is then called
+    reach: float = 4.0        # tile-centre distance within which it takes an empty cell
+    delay: float = 6.0        # seconds after it appears before it marks, once a wave
+    telegraph: float = 2.0    # the visible mark between the choice and the cell taken (R6: at least 1.5)
+    waves: int = 2            # cleared waves the cell stays taken
+
+
 PROTECTED: Final = tuning.number("battle.protected")
 VULNERABLE: Final = tuning.number("battle.vulnerable")
 FACTOR_CAP: Final = tuning.number("battle.factor_cap")
@@ -88,6 +98,7 @@ class MonsterKind:
     boss: bool = False        # struck back to its portal from the shrine instead of obliterated
     flying: bool = False
     leader: LeaderSpec | None = None
+    blight: BlightSpec | None = None
     size: float = 0.6        # drawn height in tiles, for the view and the hit radius
     movement: str = "direct"  # "wander" takes a seeded detour; "direct" runs the shortest route
 
@@ -163,8 +174,19 @@ def _leader(row: dict[str, Any]) -> LeaderSpec:
                       raise_reach=float(spec["raise_reach"]), mark=float(spec["mark"]), burn=float(spec["burn"]))
 
 
+def _blight(row: dict[str, Any]) -> BlightSpec:
+    spec = dict(tuning.table("battle.blight_defaults"))
+    for key, value in row.items():
+        if key not in spec:
+            raise KeyError(f"unknown blight value {key}")
+        spec[key] = value
+    return BlightSpec(verb=str(spec["verb"]), past=str(spec["past"]), reach=float(spec["reach"]),
+                      delay=float(spec["delay"]), telegraph=float(spec["telegraph"]), waves=int(spec["waves"]))
+
+
 def _monster(key: str, row: dict[str, Any]) -> MonsterKind:
     leader = row.get("leader")
+    blight = row.get("blight")
     boss = bool(row["boss"])
     if boss == ("lives" in row):
         raise ValueError(f"{key}: a boss's strike costs battle.boss_strike_lives, any other monster its own lives")
@@ -174,6 +196,7 @@ def _monster(key: str, row: dict[str, Any]) -> MonsterKind:
                        protected=tuple(Element(e) for e in row["protected"]),
                        vulnerable=tuple(Element(e) for e in row["vulnerable"]), armor=int(row["armor"]), boss=boss,
                        flying=bool(row["flying"]), leader=None if leader is None else _leader(leader),
+                       blight=None if blight is None else _blight(blight),
                        size=float(row["size"]), movement=row["movement"])
 
 
