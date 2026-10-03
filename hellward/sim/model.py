@@ -315,16 +315,17 @@ class Meteor:
 class Hazard:
     """Burning floor: every walker on it takes fire damage each second (flyers pass over)."""
 
-    __slots__ = ("x", "y", "radius", "dps", "left")
+    __slots__ = ("x", "y", "radius", "dps", "left", "spell")
 
-    def __init__(self, x: float, y: float, radius: float, dps: float, left: float) -> None:
+    def __init__(self, x: float, y: float, radius: float, dps: float, left: float, spell: bool = False) -> None:
         self.x, self.y, self.radius, self.dps, self.left = x, y, radius, dps, left
+        self.spell = spell   # a meteor's burning floor (a pyre's is its tower's)
 
     def copy(self) -> Hazard:
-        return Hazard(self.x, self.y, self.radius, self.dps, self.left)
+        return Hazard(self.x, self.y, self.radius, self.dps, self.left, self.spell)
 
     def __reduce__(self) -> tuple[Any, ...]:
-        return Hazard, (self.x, self.y, self.radius, self.dps, self.left)
+        return Hazard, (self.x, self.y, self.radius, self.dps, self.left, self.spell)
 
 
 @dataclass
@@ -416,6 +417,8 @@ class World:
         self.kills = 0
         self.curses_landed = 0
         self.spells_cast = 0
+        self.spell_kills = 0   # kills whose finishing blow was a cast: a player's, the idol's or a relic's
+        self.player_casts = 0   # casts by the player's own hand (S2 counts these a wave)
         self.wasted_charges = 0   # empowered shots a plain one would have killed with
         self.foresight = foresight   # the forge's teaching: spend a charge only where it kills
         self.blighted: dict[tuple[int, int], tuple[int, str]] = {}   # taken cells: cleared waves left, what it is
@@ -459,6 +462,8 @@ class World:
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
         w.leaked_life, w.forced, w.outcome, w.kills, w._next_id = self.leaked_life, [], self.outcome, self.kills, self._next_id
         w.curses_landed, w.spells_cast = self.curses_landed, self.spells_cast
+        w.spell_kills = self.spell_kills
+        w.player_casts = self.player_casts
         w.wasted_charges, w.foresight = self.wasted_charges, self.foresight
         w.blighted, w.blights, w.blighted_cells = dict(self.blighted), self.blights, set(self.blighted_cells)
         w.relics = self.relics
@@ -657,7 +662,7 @@ class World:
         walk no further this step (every phase skips hp <= 0, like the censer's dead) and the step's end
         buries them — burying here would mutate the monster list the caller walks."""
         self._emit("smite", monster.id, self.position(monster))
-        self._hurt(monster, felt_hit(SPELLS["smite"].damage * self.power(), None, monster.kind), None)
+        self._hurt(monster, felt_hit(SPELLS["smite"].damage * self.power(), None, monster.kind), None, spell=True)
         self.spells_cast += 1
         self._relic("cast", 0.0)
 
@@ -816,6 +821,7 @@ class World:
             raise Refused(f"{SPELLS[key].name} takes {cost:.0f} mana.")
         self.mana -= cost
         self.spells_cast += 1
+        self.player_casts += 1   # the player's own hand: the idol's rites and a relic's answers are not it
         self._relic("cast", cost)
         if SPELLS[key].recharge > 0:
             self.recharge[key] = SPELLS[key].recharge
@@ -835,7 +841,7 @@ class World:
             raise Refused("There is nothing there to smite.")
         self._spend("smite")
         self._emit("smite", m.id, self.position(m))
-        self._hurt(m, felt_hit(SPELLS["smite"].damage * self.power(), None, m.kind), None)
+        self._hurt(m, felt_hit(SPELLS["smite"].damage * self.power(), None, m.kind), None, spell=True)
         self._bury()   # cast between steps: what it killed must not walk on into the next one
 
     def meteor(self, x: float, y: float) -> None:
@@ -857,7 +863,7 @@ class World:
             m.frozen = max(m.frozen, spec.lasting)
             m.door = -1
         for m in struck:
-            self._strike(m, damage, Element.COLD)
+            self._strike(m, damage, Element.COLD, spell=True)
         self._bury()
 
     def _inside_map(self, x: float, y: float) -> None:
@@ -1374,7 +1380,7 @@ class World:
             return
         t.timer -= IDOL_EVERY[t.level]
         self._emit("smite", best.id, self.position(best))
-        self._hurt(best, felt_hit(SPELLS["smite"].damage * self.power(), None, best.kind), None)
+        self._hurt(best, felt_hit(SPELLS["smite"].damage * self.power(), None, best.kind), None, spell=True)
         self.spells_cast += 1
         self._relic("cast", 0.0)
         self._bury()   # what it killed must not walk on into the rest of this step
@@ -1784,8 +1790,8 @@ class World:
             struck = self._around(mt.x, mt.y, spec.radius, flyers=True)
             self._emit("meteor", mt.x, mt.y, [m.id for m in struck])
             for m in struck:
-                self._strike(m, mt.damage, Element.FIRE)
-            self.hazards.append(Hazard(mt.x, mt.y, BURN_RADIUS, mt.burn, spec.lasting))
+                self._strike(m, mt.damage, Element.FIRE, spell=True)
+            self.hazards.append(Hazard(mt.x, mt.y, BURN_RADIUS, mt.burn, spec.lasting, spell=True))
 
     def _poison(self, m: Monster, dps: float, seconds: float) -> None:
         if len(m.poison) >= MAX_POISON_STACKS:
@@ -1808,7 +1814,7 @@ class World:
         if self.hazards:
             for h in self.hazards:
                 for m in self._around(h.x, h.y, h.radius, flyers=False):
-                    self._wither(m, h.dps * min(dt, h.left), Element.FIRE)
+                    self._wither(m, h.dps * min(dt, h.left), Element.FIRE, spell=h.spell)
                 h.left -= dt
             self.hazards = [h for h in self.hazards if h.left > 0]
         for m in self.monsters:
@@ -1827,23 +1833,26 @@ class World:
             return 1.0
         return m.kind.taken(element, self._exposed(m))
 
-    def _strike(self, m: Monster, hit: float, element: Element, factor: float = 1.0) -> None:
+    def _strike(self, m: Monster, hit: float, element: Element, factor: float = 1.0,
+                  *, spell: bool = False) -> None:
         """A hit, through the damage pipeline (:func:`~hellward.sim.content.felt_hit`): ``factor`` and the
         monster's amplification join the element's factor."""
         if m.hp <= 0:
             return
         if m.amplified > 0:
             factor *= 1.0 + m.amplify
-        self._hurt(m, felt_hit(hit, element, m.kind, factor, exposed=self._exposed(m)), element)
+        self._hurt(m, felt_hit(hit, element, m.kind, factor, exposed=self._exposed(m)), element, spell=spell)
 
-    def _wither(self, m: Monster, amount: float, element: Element) -> None:
+    def _wither(self, m: Monster, amount: float, element: Element, *, spell: bool = False) -> None:
         """Damage over time: the element's factor and the amplification, no armor, no rounding."""
         if m.hp <= 0:
             return
         factor = 1.0 + m.amplify if m.amplified > 0 else 1.0
-        self._hurt(m, felt_over_time(amount, element, m.kind, factor, exposed=self._exposed(m)), element, quiet=True)
+        self._hurt(m, felt_over_time(amount, element, m.kind, factor, exposed=self._exposed(m)), element,
+                   quiet=True, spell=spell)
 
-    def _hurt(self, m: Monster, amount: float, element: Element | None, *, quiet: bool = False, bursts: bool = True) -> None:
+    def _hurt(self, m: Monster, amount: float, element: Element | None, *, quiet: bool = False, bursts: bool = True,
+              spell: bool = False) -> None:
         """Damage as it is felt (the pipeline's, or holy damage's whole amount)."""
         if m.hp <= 0:
             return
@@ -1851,9 +1860,9 @@ class World:
         if not quiet:
             self._emit("hit", m.id, element)
         if m.hp <= 0:
-            self._died(m, element, bursts)
+            self._died(m, element, bursts, spell)
 
-    def _died(self, m: Monster, element: Element | None, bursts: bool) -> None:
+    def _died(self, m: Monster, element: Element | None, bursts: bool, spell: bool) -> None:
         # A monster its kind's shaman stands near rises once, unless a burst tore it apart: one killed it (bursts is
         # False), or its own death bursts (Shatter, Corpse Explosion), which leaves nothing to raise
         bursting = bursts and ((self.perks.shatter and m.chill_left > 0) or (self.perks.corpse_explosion and m.amplified > 0))
@@ -1881,6 +1890,8 @@ class World:
 
         self.gold += m.bounty
         self.kills += 1
+        if spell:
+            self.spell_kills += 1
         if not m.bonus:   # a bonus kill pays no bounty and no XP: the clean clear pays instead
             self._earn(kill_xp(m.max_hp))
         where = self.position(m)

@@ -280,8 +280,9 @@ def play_run(seed: int, bot: str, locations: tuple[str, ...], immortal: bool,
 
         dealt = reference_kit(played.location, player.draft(played.location, _sigils(bot, run, key, stored)),
                               played.seed, relics=run.relics, counters=run.counters)
-        world, _ = defend(dealt, player, planner=planner.smart,
-                          lives=IMMORTAL_LIVES if immortal else run.pool, watch=watch)
+        world, record = defend(dealt, player, planner=planner.smart,
+                              lives=IMMORTAL_LIVES if immortal else run.pool, watch=watch)
+        strikes = sum(n for key, n in record.spells.items() if key != "hymn")
         world.events = events
         lives = IMMORTAL_LIVES if immortal else None
         result = observe_world(played, world, run.drawn, lives=lives)
@@ -302,7 +303,10 @@ def play_run(seed: int, bot: str, locations: tuple[str, ...], immortal: bool,
                                      "curses": len(catches),
                                      "caught": round(sum(catches) / len(catches), 2) if catches else 0.0,
                                      "blights": world.blights,
-                                     "blight_cells": len(world.blighted_cells)}
+                                     "blight_cells": len(world.blighted_cells),
+                                     "spells": world.spells_cast, "spell_kills": world.spell_kills,
+                                     "casts": world.player_casts, "strikes": strikes,
+                                     "kills": world.kills, "waves": max(1, world.wave + 1)}
         for goal, verdict in run.records[-1].goals:
             met, pursued = summary["goals"].get(goal.key, (0, 0))
             if goal.key == "family" and not player.pursued_family:
@@ -430,6 +434,15 @@ def _report(summaries: list[dict], immortal: bool) -> list[str]:
         counts = [c for _, c in cells]
         lines.append(f"blighted cells a location that has blight: {min(counts)}-{max(counts)} "
                      f"(R6: 1-5, {len(cells)} defences)")
+    casts = sum(p["casts"] for p in places)
+    strikes = sum(p["strikes"] for p in places)
+    waves = sum(p["waves"] for p in places)
+    kills = sum(p["kills"] for p in places)
+    by_spell = sum(p["spell_kills"] for p in places)
+    lines.append(f"spells a wave: {casts / waves:.2f} ({strikes / waves:.2f} striking, no hymn) "
+                 f"over {waves} waves (S2: about two)")
+    lines.append(f"spells' share of the kills: {by_spell / kills:.1%} over {kills} kills (S2: at most 15%)"
+                 if kills else "no kills")
     minutes = sum(s["sim_seconds"] for s in summaries) / len(summaries) / 60
     lines.append(f"mean run: {minutes:.1f} sim-minutes")
     return lines

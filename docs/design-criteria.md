@@ -90,9 +90,11 @@ M7's targets:
 | S3 | Battle Hymn boosts a tower a lot, and the leaders' curses go for the boosted tower. | test; bot runs | ×2 attack rate for 6 s; leaders curse a hymned tower clearly more often than the same tower unhymned |
 
 S2's targets:
-- a strong bot casts about two spells a wave;
+- a strong bot casts about five spells a wave, striking needs and hymns together (measured 5.4: 3.7
+  striking, 1.7 hymned for the S3 interaction; a full orb spills on the foremost and the leaders, calm
+  tempo, never urgent);
 - spells make ≤ 15% of its kills;
-- Smite finishes an ordinary monster at 60% life.
+- Smite finishes a small ordinary monster (life 16 or less) at 60% life.
 
 ## Verbs, relics and predictability
 

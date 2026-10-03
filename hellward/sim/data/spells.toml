@@ -5,8 +5,8 @@
 name = "Smite"
 mana = 35.0
 aim = "monster"
-blurb = "Holy lightning strikes one monster: neither armor nor protection softens it."
-damage_hits = 3.0
+blurb = "Holy lightning strikes one monster: neither armor nor protection softens it. Finishes a small stray at three fifths life."
+damage_hits = 5.0
 radius = 0.0
 delay = 0.0
 lasting = 0.0
