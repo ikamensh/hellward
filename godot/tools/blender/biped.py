@@ -11,6 +11,11 @@ the spec's style), a keyed attack (a chop, a thrust, a two-handed slam, or a sta
 its face; down on its knees and over backward), and for a leader the cast (its staff hauled overhead and driven at
 the tower in three beats). A hand-made monster (mon_fallen.py and the rest) is the alternative where this falls
 short.
+
+A hand-modelled monster (no generated sculpt) is a builder and a keyed walk: Spec.hand builds the mesh, paints it
+and gives its joints (h_ball/h_limb/h_cone/h_box, h_paint, h_join), Spec.keyed walks it on the imps' keyed cycle
+(monsters.imp_walk/imp_idle) instead of a capture, and its maps bake from the mesh itself. Its families part the
+flat paints into materials (a blade reads as steel, horns as ivory).
 """
 from __future__ import annotations
 
@@ -22,15 +27,16 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import bmesh
 import bpy
 import numpy as np
-from mathutils import Matrix, Quaternion, Vector
+from mathutils import Euler, Matrix, Quaternion, Vector
 
 import lib
 import mocap
 import sculpted
-from monsters import (SIDES, TAU, Pose, Q, Rig, bump, ease_in, ease_out, export, frame_turn, fx, keep_above, keyed,
-                      lift_feet, mix, plant_legs, smooth, start)
+from monsters import (IMP_DUTY, SIDES, TAU, Pose, Q, Rig, bump, ease_in, ease_out, export, frame_turn, fx,
+                      imp_idle, imp_walk, keep_above, keyed, lift_feet, mix, plant_legs, smooth, start, walk_speed)
 
 ARM_R = ("upper_arm.R", "forearm.R", "hand.R")
 
@@ -122,6 +128,191 @@ class Spec:
     hands_within: float = 1.0           # and no further out than this share of it
     wings: tuple | None = None          # (root, wrist, tip) of the right wing, as generated; the left mirrors
     wings_above: float = 0.55           # a wing bone moves only the body above this share of the height
+    hand: object = None                 # builder() -> HandBody: a hand-modelled body instead of a generated sculpt
+    keyed: dict = field(default_factory=dict)   # the hand walk/idle's own numbers (k, stride, walk_s, idle_s, ...)
+    families: dict | None = None        # material families for a hand body's paints (sculpted.write_maps)
+    looks: dict | None = None           # their looks
+
+
+@dataclass
+class HandBody:
+    """What a Spec.hand builder returns: the mesh (facing +Y, soles on 0, one flat vertex colour per part), its
+    joints, and what the clips need of it."""
+    obj: bpy.types.Object
+    joints: dict                        # name -> (x, y, z): every joint _rig, the skin masks and find_eyes read
+    height: float                       # sole to crown
+    robe: bool = False
+    rigid: dict | None = None           # bone -> test(co): verts belonging to that bone alone (a gripped blade)
+    sole: dict | None = None            # foot_track's sole for the keyed walk (ankle_z, heel, toe, lift)
+
+
+class _Keyed:
+    """A keyed walk's facts where a captured Cycle's would be: its ground speed and its length."""
+    def __init__(self, speed: float, seconds: float):
+        self.speed, self.seconds = speed, seconds
+
+
+# -- hand modelling: bodies from primitives, one flat paint per part (no generated sculpt to stand on)
+
+PAINT = "paint"   # the colour attribute every hand part carries; the albedo bake reads it
+
+
+def _hm_link(name: str, bm: bmesh.BMesh) -> bpy.types.Object:
+    mesh = bpy.data.meshes.new(name)
+    bm.to_mesh(mesh)
+    bm.free()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    for p in mesh.polygons:
+        p.use_smooth = True
+    return obj
+
+
+def h_ball(name: str, loc, r: float, scale=(1.0, 1.0, 1.0), seg: int = 14, ring: int = 10) -> bpy.types.Object:
+    """An ellipsoid: a UV sphere of radius `r`, scaled and moved to `loc`."""
+    bm = bmesh.new()
+    bmesh.ops.create_uvsphere(bm, u_segments=seg, v_segments=ring, radius=r)
+    m = Matrix.Translation(Vector(loc)) @ Matrix.Diagonal(Vector((*scale, 1.0))).to_4x4()
+    bmesh.ops.transform(bm, matrix=m, verts=bm.verts)
+    return _hm_link(name, bm)
+
+
+def _hm_span(bm: bmesh.BMesh, a, b, squash=(1.0, 1.0, 1.0)) -> None:
+    """Lay a Z-built primitive (centred on the origin) from `a` to `b`, squashed in world axes about its middle."""
+    a, b = Vector(a), Vector(b)
+    q = Vector((0, 0, 1)).rotation_difference((b - a).normalized())
+    m = Matrix.Translation((a + b) / 2) @ Matrix.Diagonal(Vector((*squash, 1.0))).to_4x4() @ q.to_matrix().to_4x4()
+    bmesh.ops.transform(bm, matrix=m, verts=bm.verts)
+
+
+def h_limb(name: str, a, b, r0: float, r1: float, seg: int = 10) -> bpy.types.Object:
+    """A tapered limb from `a` (radius `r0`) to `b` (radius `r1`), capped (its ends bury in the next part)."""
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=seg, radius1=r0, radius2=r1,
+                          depth=(Vector(b) - Vector(a)).length)
+    _hm_span(bm, a, b)
+    return _hm_link(name, bm)
+
+
+def h_cone(name: str, base, tip, r: float, seg: int = 8, squash=(1.0, 1.0, 1.0)) -> bpy.types.Object:
+    """A horn, spike or claw: a cone from `base` (radius `r`) to a near-point at `tip`."""
+    a, b = Vector(base), Vector(tip)
+    bm = bmesh.new()
+    bmesh.ops.create_cone(bm, cap_ends=True, segments=seg, radius1=r, radius2=r * 0.06, depth=(b - a).length)
+    _hm_span(bm, a, b, squash)
+    return _hm_link(name, bm)
+
+
+def h_box(name: str, loc, size, rot=(0.0, 0.0, 0.0)) -> bpy.types.Object:
+    """A box of `size` at `loc`, turned `rot` degrees (XYZ, character axes) first."""
+    bm = bmesh.new()
+    bmesh.ops.create_cube(bm, size=1.0)
+    e = Euler(tuple(math.radians(a) for a in rot), "XYZ")
+    m = Matrix.Translation(Vector(loc)) @ e.to_matrix().to_4x4() @ Matrix.Diagonal(Vector((*size, 1.0))).to_4x4()
+    bmesh.ops.transform(bm, matrix=m, verts=bm.verts)
+    return _hm_link(name, bm)
+
+
+def h_paint(obj: bpy.types.Object, rgb) -> bpy.types.Object:
+    """One flat paint (linear RGB) over the part. Paint every part before h_join: same-named layers join."""
+    attr = obj.data.color_attributes.get(PAINT) or obj.data.color_attributes.new(PAINT, "FLOAT_COLOR", "POINT")
+    colour = (*rgb, 1.0)
+    for d in attr.data:
+        d.color = colour
+    return obj
+
+
+def h_join(parts: list, name: str) -> bpy.types.Object:
+    """One body of the parts (their shells intersect; the geodesic skin binds through the overlaps)."""
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in parts:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join()
+    obj = parts[0]
+    obj.name = name
+    obj.data.name = f"{name}.mesh"
+    layers = [a for a in obj.data.color_attributes if a.name == PAINT]
+    assert len(layers) == 1, f"{name}: its paints did not join into one ({len(layers)} {PAINT} layers)"
+    obj.data.color_attributes.active_color = layers[0]
+    print(f"{name}: {len(obj.data.vertices)} vertices, {len(obj.data.polygons)} faces in {len(parts)} parts")
+    return obj
+
+
+def hand_material(obj: bpy.types.Object, size: int = 1024) -> bpy.types.Material:
+    """UV the body (smart project) and bake its paints into an albedo image; flat rough (0.8) and metal (0.0):
+    the source material write_maps reads."""
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.smart_project(angle_limit=66, island_margin=0.03)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    mat = bpy.data.materials.new(f"{obj.name}_src")
+    mat.use_nodes = True
+    obj.data.materials.clear()
+    obj.data.materials.append(mat)
+    nodes, links = mat.node_tree.nodes, mat.node_tree.links
+    nodes.clear()
+    out = nodes.new("ShaderNodeOutputMaterial")
+    emit = nodes.new("ShaderNodeEmission")
+    vc = nodes.new("ShaderNodeVertexColor")
+    vc.layer_name = PAINT
+    links.new(vc.outputs["Color"], emit.inputs["Color"])
+    links.new(emit.outputs["Emission"], out.inputs["Surface"])
+    img = bpy.data.images.new(f"{obj.name}_albedo", size, size, alpha=False)
+    img.colorspace_settings.name = "sRGB"
+    tex = nodes.new("ShaderNodeTexImage")
+    tex.image = img
+    nodes.active = tex
+    scene = bpy.context.scene
+    scene.render.engine = "CYCLES"
+    scene.cycles.samples = 1
+    scene.render.bake.margin = 8
+    bpy.ops.object.bake(type="EMIT")
+    nodes.clear()
+    out = nodes.new("ShaderNodeOutputMaterial")
+    bsdf = nodes.new("ShaderNodeBsdfPrincipled")
+    links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+    for socket, flat, v in (("Base Color", img, None), ("Roughness", None, 0.8), ("Metallic", None, 0.0)):
+        n = nodes.new("ShaderNodeTexImage")
+        if flat is None:
+            flat = bpy.data.images.new(f"{obj.name}_{socket.lower()}", size, size, alpha=False)
+            flat.colorspace_settings.name = "Non-Color"
+            flat.pixels.foreach_set([v] * (size * size * 4))
+        n.image = flat
+        links.new(n.outputs["Color"], bsdf.inputs[socket])
+    return mat
+
+
+def hand_detail(obj: bpy.types.Object, size: int = 1024) -> dict:
+    """Bake the body's own normals and occlusion onto its UVs (there is no sculpt to bake from)."""
+    scene = bpy.context.scene
+    nodes = obj.data.materials[0].node_tree.nodes
+    bpy.ops.object.mode_set(mode="OBJECT")
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    out = {}
+    for name, kind_, samples in (("normal", "NORMAL", 1), ("ao", "AO", 64)):
+        img = bpy.data.images.new(f"{obj.name}_{name}", size, size, alpha=False)
+        img.colorspace_settings.name = "Non-Color"
+        node = nodes.new("ShaderNodeTexImage")
+        node.image = img
+        nodes.active = node
+        scene.cycles.samples = samples
+        scene.world = scene.world or bpy.data.worlds.new("w")
+        scene.render.bake.use_selected_to_active = False
+        scene.render.bake.margin = 8
+        if kind_ == "AO":
+            scene.world.light_settings.distance = 0.05
+        bpy.ops.object.bake(type=kind_)
+        nodes.remove(node)
+        out[name] = img
+    out["position"] = sculpted.position_map(obj, size)
+    return out
 
 
 class Biped:
@@ -131,23 +322,42 @@ class Biped:
         self.spec = spec
         start()
         k = spec.kind
-        obj, m = sculpted.body(k, spec.height, spec.yaw, spec.faces)
-        fitted = fit(obj, spec.hands_below, spec.hands_within)
-        j = fitted["joints"]
-        j.update({n: Vector(v) for n, v in spec.joints.items()})
-        self.h = fitted["height"]
-        self.robe = fitted["robe"]
-        print("biped", k, "robe" if self.robe else "legs", {n: tuple(round(c, 3) for c in v) for n, v in j.items()})
+        hb = spec.hand() if spec.hand is not None else None
+        if hb is not None:
+            obj = hb.obj
+            obj.name = k
+            j = {n: Vector(v) for n, v in hb.joints.items()}
+            j.update({n: Vector(v) for n, v in spec.joints.items()})
+            self.h = hb.height
+            self.robe = hb.robe
+            print("biped", k, "hand", "robe" if self.robe else "legs")
+        else:
+            obj, m = sculpted.body(k, spec.height, spec.yaw, spec.faces)
+            fitted = fit(obj, spec.hands_below, spec.hands_within)
+            j = fitted["joints"]
+            j.update({n: Vector(v) for n, v in spec.joints.items()})
+            self.h = fitted["height"]
+            self.robe = fitted["robe"]
+            print("biped", k, "robe" if self.robe else "legs", {n: tuple(round(c, 3) for c in v) for n, v in j.items()})
         glow = {"hot": spec.hot} if spec.hot else None
         if spec.eyes is not None:
             glow = {**(glow or {}), "eyes": find_eyes(obj, j, self.h, spec.eyes_at), "radius": 0.007 * self.h,
                     "colour": spec.eyes, "find": spec.eyes_find}
-        if not os.environ.get("HW_FAST"):
-            grade = sculpted.grade(**spec.grade)
-            sculpted.write_maps(k, obj, sculpted.bake_detail(obj, k, m), glow=glow,
-                                colour=lambda rgb, hue, sat, val, pos: grade(rgb, pos),
-                                rough=lambda hue, sat, val, r, ao: spec.rough + 0.15 * (1 - ao),
-                                cavity=spec.cavity, fill=0.04)
+        if hb is not None:
+            hand_material(obj)   # always: the export carries the UVs, the skin the painted colours
+            baked = None if os.environ.get("HW_FAST") else hand_detail(obj)
+        else:
+            baked = None if os.environ.get("HW_FAST") else sculpted.bake_detail(obj, k, m)
+        if baked is not None:
+            if spec.families:
+                sculpted.write_maps(k, obj, baked, glow=glow, families=spec.families, looks=spec.looks,
+                                    cavity=spec.cavity, fill=0.04)
+            else:
+                grade = sculpted.grade(**spec.grade)
+                sculpted.write_maps(k, obj, baked, glow=glow,
+                                    colour=lambda rgb, hue, sat, val, pos: grade(rgb, pos),
+                                    rough=lambda hue, sat, val, r, ao: spec.rough + 0.15 * (1 - ao),
+                                    cavity=spec.cavity, fill=0.04)
         sculpted.COLOURS[obj.name] = sculpted.vertex_colours(obj)
         sculpted.name_material(obj, f"mon_{k}")
         self.body = obj
@@ -169,8 +379,10 @@ class Biped:
             for s, side in SIDES:
                 for b in (f"wing.{side}", f"wingtip.{side}"):
                     masks[b] = lambda co, hsv, thick, s=s, low=low: s * co.x > 0.08 * self.h and co.z > low
-        sculpted.skin(obj, self.rig, masks=masks)
+        sculpted.skin(obj, self.rig, rigid=hb.rigid if hb is not None else None, masks=masks)
         self.rig.repose(sculpted.hang(self.rig, arm=12))
+        if hb is not None and hb.sole is not None:
+            self.rig.sole = hb.sole
         self.H = self.h / 1.73   # the old human frame's scale: distances in the keyed poses below
         self._weapon()
         self._clips()
@@ -257,24 +469,36 @@ class Biped:
 
     def _clips(self):
         spec, rig, H = self.spec, self.rig, self.H
-        leg = mocap.leg(rig)
-        self.walkc = mocap.Clip.load(f"{spec.walk}_{'FR' if spec.run else 'FW'}", leg).cycle(touch=spec.touch)
-        self.idlec = mocap.Clip.load(f"{spec.idle or spec.walk}_ID", leg).loop(3.0, touch=spec.touch)
-        own = ARM_R if spec.weapon else ()
+        if spec.hand is not None:   # a keyed walk and idle (the imps' scurry), not a capture
+            kk = {"k": 1.0, "stride": 0.16, "walk_s": 0.75, "idle_s": 3.0, "crouch": 0.0, "bob": 0.034}
+            kk.update(spec.keyed)
+            self.walkc = _Keyed(walk_speed(kk["stride"] * kk["k"], IMP_DUTY, kk["walk_s"]), kk["walk_s"])
+            self.idlec = _Keyed(0.0, kk["idle_s"])
 
-        def walk(t):
-            base = self.flex(self._hunch(), 6 * math.sin(TAU * t), 4)   # the wings rise and fall with the stride
-            self.carry(base, t)
-            p = self.walkc.pose(rig, t, base, arms=spec.arms, own=own)
-            self.carry(p, t)   # again over the captured spine's lean: a staff stands upright in the world
-            return p
+            def walk(t):
+                return imp_walk(rig, kk["k"], t, stride=kk["stride"], crouch=kk["crouch"], bob=kk["bob"])
 
-        def idle(t):
-            base = self.flex(self._hunch(), 4 * math.sin(TAU * 2 * t), 6)   # two breaths a loop, the wings settle
-            self.carry(base, t)
-            p = self.idlec.pose(rig, t, base, arms=spec.arms, own=own)
-            self.carry(p, t)   # again over the captured spine's lean: a staff stands upright in the world
-            return p
+            def idle(t):
+                return imp_idle(rig, kk["k"], t, crouch=kk["crouch"])
+        else:
+            leg = mocap.leg(rig)
+            self.walkc = mocap.Clip.load(f"{spec.walk}_{'FR' if spec.run else 'FW'}", leg).cycle(touch=spec.touch)
+            self.idlec = mocap.Clip.load(f"{spec.idle or spec.walk}_ID", leg).loop(3.0, touch=spec.touch)
+            own = ARM_R if spec.weapon else ()
+
+            def walk(t):
+                base = self.flex(self._hunch(), 6 * math.sin(TAU * t), 4)   # the wings rise and fall with the stride
+                self.carry(base, t)
+                p = self.walkc.pose(rig, t, base, arms=spec.arms, own=own)
+                self.carry(p, t)   # again over the captured spine's lean: a staff stands upright in the world
+                return p
+
+            def idle(t):
+                base = self.flex(self._hunch(), 4 * math.sin(TAU * 2 * t), 6)   # two breaths a loop, the wings settle
+                self.carry(base, t)
+                p = self.idlec.pose(rig, t, base, arms=spec.arms, own=own)
+                self.carry(p, t)   # again over the captured spine's lean: a staff stands upright in the world
+                return p
 
         self.walk = walk
         self.W0 = walk(0.0)

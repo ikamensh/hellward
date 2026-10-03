@@ -119,6 +119,9 @@ var _hover_grid: GridContainer
 var _hovered: Monster
 var _hover_shown: Array = []          # the monster, strikes and movers the plate was filled for
 
+var _held := ""                       # what the hand holds: a tower kind, "gate", "spell:<key>" or ""
+var _hint: PanelContainer             # a tag by the cursor while aiming: what the held thing wants, or why not here
+var _hint_text: Label
 var _goals_box: VBoxContainer         # the run's wager: each goal with its verdict's color
 var _strikes: Label                   # while a boss walks: how many more strikes end the run
 var _xp_bar: ShaderMaterial           # the level's gauge, a thin strip above the bar
@@ -164,6 +167,18 @@ func slots() -> Array:
 	return _slot_keys
 
 
+## What the hand holds (a tower kind, "gate", "spell:<key>" or ""): its slot lights up.
+func set_held(what: String) -> void:
+	_held = what
+	if world != null:
+		refresh()
+
+
+## What the hand holds, as `set_held` last heard it.
+func held() -> String:
+	return _held
+
+
 func _reveal(on: bool, seconds: float) -> void:
 	_shown = on
 	if _show_tween:
@@ -202,6 +217,7 @@ func _build() -> void:
 	_build_leader(top)
 	_build_run(top)
 	_build_hover()
+	_build_hint()
 	_chronicle = VBoxContainer.new()
 	_pin(_chronicle, 1.0, 0.0, Rect2(-620, 22, 596, 0))
 	_chronicle.add_theme_constant_override("separation", 4)
@@ -885,6 +901,44 @@ func _build_hover() -> void:
 	col.add_child(_hover_grid)
 
 
+# a tag by the cursor while aiming: what the held thing wants, or why not here
+func _build_hint() -> void:
+	_hint = PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.03, 0.025, 0.03, 0.92)
+	sb.border_color = Style.BRONZE
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(2)
+	sb.content_margin_left = 10
+	sb.content_margin_right = 10
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 5
+	_hint.add_theme_stylebox_override("panel", sb)
+	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hint.visible = false
+	_root.add_child(_hint)
+	_hint_text = _label(Style.text_font(), 19, Style.BONE)
+	_hint.add_child(_hint_text)
+
+
+## A tag by the cursor at `at` (viewport pixels): what the held thing wants there, or why not (`bad`); "" hides it.
+func build_hint(text: String, at: Vector2, bad: bool) -> void:
+	if text == "":
+		_hint.visible = false
+		return
+	_hint_text.text = text
+	_hint_text.add_theme_color_override("font_color", Color(1.0, 0.6, 0.45) if bad else Style.PALE_GOLD)
+	_hint.visible = true
+	_hint.reset_size()
+	var view := get_viewport().get_visible_rect().size
+	var size := _hint.get_combined_minimum_size()
+	var pos := at + Vector2(24, -size.y - 18)
+	if pos.x + size.x > view.x - 8:
+		pos.x = at.x - 24 - size.x
+	pos.y = clampf(pos.y, 8, view.y - size.y - 8)
+	_hint.position = pos
+
+
 ## The monster under the mouse at `at` (viewport pixels), or null: its plate shows by the cursor, its life kept
 ## current. The hits are the server's (the battle's `hits` table): what each rank of each tower here deals it.
 func hover(m: Monster, at := Vector2.ZERO) -> void:
@@ -1119,6 +1173,8 @@ func refresh() -> void:
 		var poor: bool = world.gold < cost
 		_costs[kind].add_theme_color_override("font_color", Color(0.9, 0.2, 0.12) if poor else Style.GOLD)
 		_slot_pics[_slots[kind]].modulate = Color(0.62, 0.58, 0.58) if poor else Color.WHITE
+		if kind == _held:
+			_slot_pics[_slots[kind]].modulate = Color(1.4, 1.3, 1.05)
 	_refresh_choices()
 	_refresh_card()
 	_refresh_run()
@@ -1218,6 +1274,8 @@ func _process(delta: float) -> void:
 		var left := world.recharge(key)
 		var ready: bool = world.mana >= world.spell_cost(key) and left <= 0.0 and not world.paused
 		_slot_pics[parts[0]].modulate = Color.WHITE if ready else Color(0.5, 0.48, 0.55)
+		if "spell:" + key == _held:
+			_slot_pics[parts[0]].modulate = Color(1.4, 1.3, 1.05)
 		parts[1].text = str(ceili(left)) if left > 0.0 else ""
 	if _selected and is_instance_valid(_selected):
 		_refresh_card()
