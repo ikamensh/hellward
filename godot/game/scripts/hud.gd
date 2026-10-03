@@ -30,6 +30,7 @@ const ELEMENT_TONES := {"physical": Color(0.82, 0.76, 0.66), "fire": Color(1.0, 
 const TOWER_HUES := {"arrow": Color(0.55, 0.32, 0.14), "pyre": Color(0.7, 0.26, 0.08),   # a portrait's halo, per kind
 	"frost": Color(0.16, 0.32, 0.6), "storm": Color(0.32, 0.22, 0.62), "plague": Color(0.24, 0.5, 0.14),
 	"altar": Color(0.55, 0.5, 0.38), "grove": Color(0.2, 0.48, 0.18),
+	"idol": Color(0.75, 0.82, 0.9), "censer": Color(0.85, 0.35, 0.2),
 	"ballista": Color(0.5, 0.36, 0.2), "hook": Color(0.36, 0.38, 0.42), "knife": Color(0.42, 0.44, 0.5)}
 const TONES := {"wave": Color(0.95, 0.76, 0.4), "curse": Color(0.76, 0.42, 1.0),
 	"won": Color(0.86, 0.9, 0.55), "lost": Color(0.88, 0.12, 0.07)}

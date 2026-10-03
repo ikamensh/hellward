@@ -1,6 +1,6 @@
 class_name SkillsScreen
 extends Screen
-## The skill tree, over the map or a location's intro: thirteen columns (ten tower kinds, Warding, Sorcery,
+## The skill tree, over the map or a location's intro: fifteen columns (twelve tower kinds, Warding, Sorcery,
 ## Battle Magic) of up to five skills, each needing the one above it, bought with sigils. The server's `skills`
 ## view is what it shows; a click on a skill asks to learn it and the reply is the new view. Opened from an
 ## intro (`location`), the skills that do nothing there are greyed. Unlearn all (U) gives every sigil back; Close (Esc).

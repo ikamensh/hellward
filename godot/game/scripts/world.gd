@@ -441,6 +441,8 @@ func _event(e: Array) -> void:
 				taught.mode = String(e[2])
 		"attuned", "spent":
 			pass   # the frames carry the charges; the empowered shot's flash is still to paint
+		"immolated":
+			announce.emit("The censer answers", "A leak near it immolates the field.")
 		_:
 			push_warning("an event this client does not show: %s" % kind)
 	happened.emit(e)
