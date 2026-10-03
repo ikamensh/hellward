@@ -21,7 +21,7 @@ func _ready() -> void:
 			test_a_monster_at_the_shrine_strikes_it_and_is_gone, test_the_plate_of_a_monster_under_the_mouse,
 			test_defeat_ends_the_battle_and_its_music,
 			test_the_watched_defence_holds_and_ends_with_victory, test_a_campaign_walk_through_every_screen,
-			test_every_location_lays_out_and_plays]:
+			test_a_run_from_the_long_night_to_its_laying_down, test_every_location_lays_out_and_plays]:
 		if only != "" and only not in t.get_method():
 			continue
 		_main = null
@@ -462,6 +462,59 @@ func test_a_campaign_walk_through_every_screen() -> void:
 	check(await until(func(): return _showing(seen, "TitleScreen"), 5.0), "and Esc goes back to the title (%s)" % [seen])
 	var view = await game.ask("campaign")
 	check(view["profile"] == "walker" and int(view["sigils"]) == 0, "the walker's campaign holds no sigils after a fall")
+
+
+## A run end to end: R on the title begins the Long Night at the camp, Continue walks into the wagered intro,
+## Defend starts the battle (the run's goals stand over it), an undefended Tristram falls to a reckoning that
+## names the goals met and missed, and Onward lays the lost run down at its summary, back to the title.
+func test_a_run_from_the_long_night_to_its_laying_down() -> void:
+	var game: Game = load("res://scenes/game.tscn").instantiate()
+	_main = game
+	var seen: Array = []
+	var faced := [null]
+	game.shown.connect(func(s: Screen):
+		seen.append(s.get_script().get_global_name())
+		faced[0] = s)
+	add_child(game)
+	var made = await game.ask("create_profile", {"name": "runner"})
+	check(made != null and made["current"] == "runner", "a runner's profile is made and chosen")
+	var vp := game.get_viewport()
+	check(await until(func(): return _showing(seen, "TitleScreen"), 10.0), "the title shows (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_R)
+	check(await until(func(): return _showing(seen, "CampScreen"), 10.0), "R begins the Long Night at the camp (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ENTER)
+	check(await until(func(): return _showing(seen, "StoryScreen"), 10.0), "Continue walks into the place's before page (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ESCAPE)
+	check(await until(func(): return _showing(seen, "BriefingScreen"), 5.0), "then its intro (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ENTER)
+	check(await until(func(): return game.battle != null and game.battle.world != null, 10.0), "Defend starts the battle")
+	if game.battle == null:
+		return
+	var w: World = game.battle.world
+	check(not w.goals.is_empty(), "the run's goals are wagered on the battle (%d)" % w.goals.size())
+	await frames(2)
+	check(game.battle.hud._goals_box.visible, "and their lines stand over it")
+	Engine.time_scale = 8.0
+	check(await until(func():
+		if w.can_call():
+			w.order("call_wave")
+		return _showing(seen, "ReckoningScreen"), 600.0), "an undefended Tristram falls to the reckoning (%s)" % [seen])
+	Engine.time_scale = 1.0
+	check(faced[0] != null and (faced[0] as Screen).data.has("run"), "the reckoning carries the run")
+	await frames(40)
+	press(vp, KEY_ENTER)
+	check(await until(func(): return _showing(seen, "SummaryScreen") or _showing(seen, "CampScreen"), 10.0),
+		"Onward lays the run down (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ENTER)
+	check(await until(func(): return _showing(seen, "TitleScreen"), 10.0), "and it ends back at the title (%s)" % [seen])
+	var view = await game.ask("campaign")
+	check(view != null and int(view["runs_lost"]) >= 1, "the runner's campaign counts the lost run")
+	await Net.ask("switch_profile", {"name": "main"}).done
 
 
 ## Every location of both acts lays out (its scenery, its arsenal on the bar) and its battle runs a few seconds,
