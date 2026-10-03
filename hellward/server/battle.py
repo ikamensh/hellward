@@ -31,7 +31,7 @@ from hellward.sim.content import SPELLS, Curse
 from hellward.sim.items import EMPTY_LOADOUT, Loadout
 from hellward.sim.modes import MODES
 from hellward.sim.kit import Kit
-from hellward.sim.model import SIM_DT, Planner, Refused, World
+from hellward.sim.model import ATTUNE_GOLD, SIM_DT, Planner, Refused, World
 from hellward.sim.planner import Decision, Option
 from hellward.sim.players.ghost import issue as replay_command
 from hellward.sim.players.hands import AIM_GAP, REACT, Hands, Player, react_for
@@ -73,13 +73,14 @@ class Battle:
                  on_outcome: Callable[[World], dict] | None = None, kit: Kit | None = None,
                  run_seed: int | None = None, run_index: int | None = None,
                  drawn: tuple[Drawn, ...] = (), on_save: Callable[[], None] | None = None,
-                 modes: frozenset[str] = frozenset()) -> None:
+                 modes: frozenset[str] = frozenset(), attune_unlocked: bool = False) -> None:
         if kit is not None:   # a run's defence: the Kit deals everything, down to the pool as its lives
             location, learned, loadout, seed = kit.location, kit.learned, kit.loadout, kit.seed
         self.location = location
         self.kit = kit
         self.player = player
         self.modes = modes | {"first"}   # the profile's taught strategies, foremost always among them
+        self.attune_unlocked = attune_unlocked
         if player is not None:
             learned = player.draft(location, 3 * ORDER.index(location.key))
             loadout = getattr(player, "loadout", EMPTY_LOADOUT)
@@ -133,6 +134,7 @@ class Battle:
                             for goal, fold in zip(self.drawn, self.folds)]
         message["modes"] = [{"key": key, "name": MODES[key].name, "words": MODES[key].words}
                             for key in MODES if key in self.modes]
+        message["attune"] = {"unlocked": self.attune_unlocked, "gold": ATTUNE_GOLD}
         return message
 
     # -- The clock ------------------------------------------------------------------------------
@@ -353,6 +355,14 @@ class Battle:
         self.world.summon(pack)
         self.repeats += 1
         return [int(stake)]
+
+    def _attune(self, tower: int) -> list:
+        """Attune a tower: it holds charges for empowered shots from here on."""
+        if not self.attune_unlocked:
+            raise Refused("Attunement is not taught: learn it in the forge.")
+        t = self._tower(tower)
+        self.world.attune(t.id)
+        return [list(t.tile)]
 
     def _set_mode(self, tower: int, mode: str) -> list:
         """Teach a tower its strategy for this defence; untaught strategies are refused."""

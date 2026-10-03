@@ -32,7 +32,7 @@ from hellward.sim.campaign import (
 )
 from hellward.sim.content import CURSES, MONSTERS, SPELLS, START_LIVES, TOWERS, Curse, Element, MonsterKind, felt_hit
 from hellward.sim.items import PATTERNS
-from hellward.sim.modes import MODES
+from hellward.sim.modes import ATTUNE, MODES
 from hellward.sim.kit import Kit
 from hellward.sim.model import Planner, World
 from hellward.sim.players import PLAYERS
@@ -468,17 +468,16 @@ class Campaign:
                           "label": label, "why": why})
         trophies = len(p.trophies)
         strategies = []
-        for key, mode in MODES.items():
-            if key == "first":
-                continue
-            owned = key in p.modes
+        teachings = [(key, mode, key in p.modes) for key, mode in MODES.items() if key != "first"]
+        teachings.append((ATTUNE.key, ATTUNE, p.attune))
+        for key, mode, owned in teachings:
             affordable = p.salvage >= mode.salvage_cost
             if owned:
-                label, why = "Taught", "Every tower may aim this way, in every defence."
+                label, why = "Taught", "Every tower may use it, in every defence."
             elif not affordable:
                 label, why = "Need more salvage", "Hold locations and bank their salvage."
             else:
-                label, why = "Teach", "Spend the salvage once: every tower may aim this way."
+                label, why = "Teach", "Spend the salvage once: every tower may use it."
             strategies.append({"key": key, "name": mode.name, "words": mode.words,
                                "price": f"{mode.salvage_cost} salvage", "owned": owned,
                                "enabled": owned or affordable, "label": label, "why": why})
@@ -487,10 +486,10 @@ class Campaign:
                 "cards": cards, "strategies": strategies}
 
     def forge(self, key: str) -> dict:
-        """A card's one button: forge and equip, equip, or unequip; a strategy's: teach it."""
+        """A card's one button: forge and equip, equip, or unequip; a teaching's: teach it."""
         p = self.progress
         try:
-            if key in MODES:
+            if key in MODES or key == ATTUNE.key:
                 p.teach(key)
                 return self.forge_view()
             pattern = PATTERNS[key]
@@ -529,7 +528,8 @@ class Campaign:
                                  replays=self.data / "replays", on_outcome=self._keep_run, kit=dealt,
                                  run_seed=run.seed, run_index=run.index, drawn=run.drawn,
                                  on_save=None if scripted is not None else self._save_battle,
-                                 modes=self.progress.modes)
+                                 modes=self.progress.modes,
+                                 attune_unlocked=self.progress.attune)
             if scripted is None:   # a scripted defence leaves no log: only a person's resumes
                 self._save_battle()
             return self.battle
@@ -539,7 +539,8 @@ class Campaign:
         self.battle = Battle(loc, learned=p.learned, loadout=p.loadout, seed=self.seed, planner=self.planner,
                              player=PLAYERS[player](self.seed) if player is not None else None,
                              breach_claim=p.breach_claims.get(loc.key), replays=self.data / "replays",
-                             on_outcome=self._keep, modes=p.modes)
+                             on_outcome=self._keep, modes=p.modes,
+                             attune_unlocked=p.attune)
         return self.battle
 
     def _save_battle(self) -> None:
@@ -567,7 +568,8 @@ class Campaign:
         self.battle = Battle(dealt.location, seed=dealt.seed, planner=self.planner,
                              replays=self.data / "replays", on_outcome=self._keep_run, kit=dealt,
                              run_seed=self.run.seed, run_index=self.run.index, drawn=self.run.drawn,
-                             on_save=self._save_battle, modes=self.progress.modes)
+                             on_save=self._save_battle, modes=self.progress.modes,
+                             attune_unlocked=self.progress.attune)
         self.battle.resume_from(saved["state"]["log"], self.planner)
         return self.battle
 

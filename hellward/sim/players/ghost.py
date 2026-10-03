@@ -74,6 +74,11 @@ def issue(world: World, hands: Hands, name: str, args: tuple[Any, ...]) -> bool:
             if tower is None:
                 raise Refused("No tower stands there yet.")
             world.set_mode(tower.id, str(args[1]))
+        elif name == "attune":
+            tower = world.tower_at(_tile(args[0]))
+            if tower is None:
+                raise Refused("No tower stands there yet.")
+            world.attune(tower.id)
         else:
             raise ValueError(f"unknown replay command {name!r}")
     except Refused:

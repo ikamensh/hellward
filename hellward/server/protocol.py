@@ -84,11 +84,12 @@ def monsters(world: World) -> list[list]:
 
 def towers(world: World) -> list[list]:
     """Every tower: [id, level, reach, curses {curse: seconds left}, Battle Hymn's seconds left, upgrade cost or None,
-    what the next rank needs or None, refund]."""
+    what the next rank needs or None, refund, attuned, charges]."""
     out = []
     for t in world.towers.values():
         out.append([t.id, t.level, round(t.reach, 3), {c.value: round(left, 2) for c, left in t.curses.items()},
-                    round(t.hymn, 2), world.upgrade_cost(t), world.rank_needs(t), refund(t)])
+                    round(t.hymn, 2), world.upgrade_cost(t), world.rank_needs(t), refund(t), t.attuned,
+                    round(t.charges, 2)])
     return out
 
 
