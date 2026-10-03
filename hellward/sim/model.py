@@ -44,6 +44,9 @@ from hellward.sim.relics import (
     BLOOD_GOLD,
     BLOOD_LIVES,
     CANTICLE_WELL,
+    CHARNEL_GOLD,
+    CHARNEL_SHARE,
+    HOAR_MANA,
     HOARD_REACH,
     MARTYR_GOLD,
     MASTERWORK_MANA,
@@ -52,6 +55,7 @@ from hellward.sim.relics import (
     SPITE_MANA,
     TRANCE_RATE,
     TRANCE_TIME,
+    VERBS,
 )
 from hellward.sim.skills import NO_PERKS, RANK_SKILL, SKILLS, SPELL_UNLOCK, UNLOCK, Perks, baked
 from hellward.sim import worth as cell_worth
@@ -71,6 +75,8 @@ EMPOWER: Final = 3.0            # an empowered shot's damage
 IDOL_EVERY = (45.0, 32.0, 22.0)   # the idol's rite, seconds per rank: a free smite. Not Final:
 CENSER_HURT = (30.0, 60.0, 100.0)   # the immolation's damage, per rank. mypyc miscompiles a Final tuple read by a
 WELL_EVERY = (20.0, 15.0, 11.0)   # the well's watering, seconds per rank: a charge given. variable subscript.
+OVERLOAD: Final = 1.5   # a venom-overload burst's poison damage per stack consumed
+VENOM_RADIUS: Final = 1.5   # the burst's circle
 DOOR_STOP: Final = tuning.number("battle.door_stop")
 JOSTLE: Final = tuning.number("battle.jostle")
 CHAIN_JUMP: Final = tuning.number("battle.chain_jump")
@@ -359,6 +365,7 @@ class World:
         self.arsenal = location.arsenal if arsenal is None else arsenal
         self.relics = relics   # the run's relics, won a location at a time
         self.progress = {key: n for key, n in counters if key in relics}   # each relic's count toward its firing
+        self.verb_count: dict[str, int] = {}   # each verb's happenings this defence, for the per-wave count
         self.stage = ORDER.index(location.key)
         self.level = location.level
         self.waves = location.waves
@@ -468,6 +475,7 @@ class World:
         w.blighted, w.blights, w.blighted_cells = dict(self.blighted), self.blights, set(self.blighted_cells)
         w.relics = self.relics
         w.progress = dict(self.progress)
+        w.verb_count = dict(self.verb_count)
         w.builds, w.upgrades, w.leaks, w.fervor = self.builds, self.upgrades, self.leaks, self.fervor
         return w
 
@@ -602,6 +610,8 @@ class World:
     def _relic(self, verb: str, amount: float = 0.0, who: Monster | Tower | None = None) -> None:
         """A verb happened: every held relic that reads it counts one, and fires on its count. `who` is the verb's
         subject where it has one: the tower raised or ranked, the leader whose curse landed."""
+        if verb in VERBS:
+            self.verb_count[verb] = self.verb_count.get(verb, 0) + 1
         for key in self.relics:
             spec = RELICS[key]
             if spec.verb != verb:
@@ -655,6 +665,10 @@ class World:
                 for tower in self.towers.values():
                     if tower.attuned:
                         tower.charges = min(CHARGES_MAX, tower.charges + 1.0)
+            elif key == "charnel":
+                self.gold += CHARNEL_GOLD
+            elif key == "hoarfrost":
+                self.mana = min(self.mana_max, self.mana + HOAR_MANA)
             self._emit("relic", key, spec.name)
 
     def _answer(self, monster: Monster) -> None:
@@ -1134,7 +1148,8 @@ class World:
                 cursed.append(tower.id)
         if cursed:
             self.curses_landed += 1
-            self._relic("curse", 0.0, leader)
+            for _ in cursed:   # each tower taken counts: clumping feeds the curse relics, and eats the curse
+                self._relic("curse", 0.0, leader)
             self._emit("cursed", leader_id, spot, curse, tuple(cursed))
             if spec is not None and spec.burn > 0:
                 amount = spec.burn * len(cursed)
@@ -1795,8 +1810,15 @@ class World:
 
     def _poison(self, m: Monster, dps: float, seconds: float) -> None:
         if len(m.poison) >= MAX_POISON_STACKS:
-            m.poison.sort(key=lambda stack: stack[1])
-            m.poison.pop(0)
+            stacks = len(m.poison) + 1
+            m.poison = []
+            where = self.position(m)
+            around = [o for o in self._around(where[0], where[1], VENOM_RADIUS, flyers=True) if o is not m]
+            self._emit("overload", m.id, stacks)
+            self._relic("debuff", float(stacks))
+            for o in around:   # a monster a burst kills does not burst in turn
+                self._hurt(o, stacks * OVERLOAD, Element.POISON, quiet=True, bursts=False)
+            return
         m.poison.append([dps, seconds])
 
     def _afflictions(self, dt: float) -> None:
@@ -1865,7 +1887,8 @@ class World:
     def _died(self, m: Monster, element: Element | None, bursts: bool, spell: bool) -> None:
         # A monster its kind's shaman stands near rises once, unless a burst tore it apart: one killed it (bursts is
         # False), or its own death bursts (Shatter, Corpse Explosion), which leaves nothing to raise
-        bursting = bursts and ((self.perks.shatter and m.chill_left > 0) or (self.perks.corpse_explosion and m.amplified > 0))
+        chilled = m.chill_left > 0 and (self.perks.shatter or "charnel" in self.relics)
+        bursting = bursts and (chilled or (self.perks.corpse_explosion and m.amplified > 0))
         if bursts and not bursting and not m.risen and m.kind.leader is None:
             raise_kind = m.kind.key
             for leader in self.monsters:
@@ -1906,16 +1929,21 @@ class World:
             self.mana = min(self.mana_max, self.mana + SOUL)
         if self.perks.contagion and m.poison:
             self._spread(m, where)
-        if bursts and self.perks.shatter and m.chill_left > 0:
+        if bursts and chilled:
             around = [o for o in self._around(where[0], where[1], SHATTER_RADIUS, flyers=True) if o is not m]
             self._emit("shatter", m.id, where)
+            self._relic("corpse")
+            self._relic("debuff", 1.0)
+            share = SHATTER_SHARE if self.perks.shatter else CHARNEL_SHARE
             for o in around:   # a death burst takes no factor and no armor; a monster it kills does not burst in turn
-                self._hurt(o, m.max_hp * SHATTER_SHARE, Element.COLD, quiet=True, bursts=False)
+                self._hurt(o, m.max_hp * share, Element.COLD, quiet=True, bursts=False)
         if bursts and self.perks.corpse_explosion and amplified:
             around = [o for o in self._around(where[0], where[1], CORPSE_RADIUS, flyers=True) if o is not m]
             self._emit("corpse_explosion", where[0], where[1])
+            self._relic("corpse")
             for o in around:   # a monster a burst kills does not burst in turn
                 self._hurt(o, m.max_hp * CORPSE_SHARE, None, quiet=True, bursts=False)
+        # Venom dies with its monster; overloads burst while it lives, shatters on its chill.
 
     def _spread(self, m: Monster, where: tuple[float, float]) -> None:
         """Contagion: a dead monster's venom goes to the nearest living monster it can poison."""

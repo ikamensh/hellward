@@ -42,7 +42,7 @@ rate = 1.0
 
 [hymn]
 name = "Battle Hymn"
-mana = 40.0
+mana = 15.0          # cheap enough to sing often: hymns are the cast verb's engine beside idols
 aim = "tower"
 blurb = "One tower attacks twice as fast for 6 seconds. The leaders see the stronger tower too."
 damage_hits = 0.0

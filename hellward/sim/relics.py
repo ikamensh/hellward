@@ -1,10 +1,14 @@
 """The run's relics, won a location at a time, and the verbs they read.
 
-A verb is an event in the player's own engine — a tower raised, a rank bought, a spell cast, a curse
-landing, a monster reaching the shrine. Each happens a handful to a few dozen times a wave, every
-occurrence visible on the field, and the player sets how often through the build and where towers stand.
-Most relics read one verb and write another: a count fires them (no chance), and leaning into the verb
-costs something the relic turns into the payoff.
+A verb is an event in the player's own engine — a spell cast, a charge spent or given, a corpse
+consumed, a curse landing, a debuff consumed, a monster reaching the shrine. Most happen a handful
+to a few dozen times
+a wave, every occurrence visible on the field, and the player sets how often through the build and
+where towers stand. Curses are the pulse: the leaders pace them about once a wave, no build makes
+them flow, so the curse relics pay in spikes, not in drips. Most relics read one verb and write
+another: a count fires them (no chance), and leaning into the verb costs something the relic turns
+into the payoff. A relic can also read a slower count — a tower raised, a rank bought — which fires
+a few times a defence, not a few times a wave.
 """
 
 from __future__ import annotations
@@ -13,7 +17,7 @@ import random
 from dataclasses import dataclass
 from typing import Final
 
-VERBS: Final = ("build", "upgrade", "cast", "curse", "leak", "charge")
+VERBS: Final = ("cast", "charge", "corpse", "curse", "debuff", "leak")
 
 
 @dataclass(frozen=True)
@@ -21,7 +25,7 @@ class Relic:
     key: str
     name: str
     words: str        # the camp's offer and the held relic's line, written out
-    verb: str         # the verb read, or "" for the still ones (Canticle, Hoarder's Seal)
+    verb: str         # the verb (or slower count) read, or "" for the still ones (Canticle, Hoarder's Seal)
     every: int        # the count that fires it
     writes: str       # the verb the firing feeds, through gold, mana or directly; "" for none
 
@@ -34,8 +38,8 @@ RELICS: Final[dict[str, Relic]] = {
         "masterwork": ("The Masterwork", "Every 3rd rank wells 25 mana.", "upgrade", 3, "cast"),
         "trance": ("The Battle Trance", "Each cast quickens every tower for 6 s.", "cast", 1, ""),
         "deep_well": ("The Deep Well", "Every 2nd cast costs half its mana.", "cast", 2, "cast"),
-        "spite": ("The Spite", "Every 2nd curse landing wells 15 mana.", "curse", 2, "cast"),
-        "martyr": ("The Martyr", "Every 3rd curse landing pays 30 gold.", "curse", 3, "build"),
+        "spite": ("The Spite", "Every 2nd tower cursed wells 40 mana.", "curse", 2, "cast"),
+        "martyr": ("The Martyr", "Every 3rd tower cursed pays 80 gold.", "curse", 3, "build"),
         "blood_money": ("The Blood Money", "Each leak pays 12 gold a life — and costs 1 life more.",
                         "leak", 1, "build"),
         "canticle": ("The Canticle", "Battle Hymn may be sung every defence; the well holds 10 less.",
@@ -44,7 +48,7 @@ RELICS: Final[dict[str, Relic]] = {
                  " loses 15 mana.", "leak", 1, "charge"),
         "hoard": ("The Hoarder's Seal", "An attuned tower with full charges reaches 1 further.",
                   "", 0, ""),
-        "candle": ("The Martyr's Candle", "Every 3rd curse landing answers its caster with a smite.",
+        "candle": ("The Martyr's Candle", "Every 3rd tower cursed answers its caster with a smite.",
                    "curse", 3, "cast"),
         "volatile": ("The Volatile", "Every 6th charge spent or given casts a smite on the foremost.",
                      "charge", 6, "cast"),
@@ -56,6 +60,10 @@ RELICS: Final[dict[str, Relic]] = {
                       "charge"),
         "stormglass": ("The Stormglass", "Every 5th cast gives every attuned tower a charge.",
                        "cast", 5, "charge"),
+        "charnel": ("The Charnel Pyre", "Chilled deaths burst for 6% of life and count consumed;"
+                   " every 10th corpse pays 12 gold.", "corpse", 10, "build"),
+        "hoarfrost": ("The Hoarfrost", "Every 10th debuff consumed wells 10 mana.", "debuff", 10,
+                      "cast"),
     }.items()
 }
 
@@ -69,9 +77,9 @@ TRANCE_RATE: Final = 1.25
 TRANCE_TIME: Final = 6.0
 DEEP_WELL_EVERY: Final = 2
 SPITE_EVERY: Final = 2
-SPITE_MANA: Final = 15.0
+SPITE_MANA: Final = 40.0
 MARTYR_EVERY: Final = 3
-MARTYR_GOLD: Final = 30
+MARTYR_GOLD: Final = 80
 BLOOD_GOLD: Final = 12
 BLOOD_LIVES: Final = 1
 CANTICLE_WELL: Final = 10.0
@@ -85,6 +93,11 @@ BELLOWS_MANA: Final = 20.0
 BELLOWS_WELL: Final = 10.0
 LODESTONE_EVERY: Final = 4
 STORMGLASS_EVERY: Final = 5
+CHARNEL_SHARE: Final = 0.06
+CHARNEL_EVERY: Final = 10
+CHARNEL_GOLD: Final = 12
+HOAR_EVERY: Final = 10
+HOAR_MANA: Final = 10.0
 OFFER_N: Final = 3   # the camp's choice after a held location
 
 

@@ -110,8 +110,8 @@ reach when the leaders chant it is unmeasurable (spider_forest: 2% in-reach base
 
 | ID | Criterion | Judge | Target |
 |---|---|---|---|
-| V1 | Six verbs, each an event in the player's own engine, counted per wave: charge, corpse, curse taken, overkill, banish, debuff consumed. | test; scorecard (bot runs) | each 3–40 a wave in a build that leans into it |
-| V2 | The player sets a verb's frequency through build and placement. | bot A/B | leaning in ≥ 2× the count of a build that does not |
+| V1 | Six verbs, each an event in the player's own engine, counted per wave: cast, charge, corpse, curse, debuff, leak. (Overkill and banish were sketched and never built; cast and leak are the live engines.) | test; scorecard (bot runs) | each 3–40 a wave in a build that leans into it; leak 2.5–40 (twenty lives over five waves cap a winning porous defence at ~3); curse stays the pulse at ≤ 3 (the leaders pace it, no build makes it flow) |
+| V2 | The player sets a verb's frequency through build and placement. | bot A/B | leaning in ≥ 2× the count of a build that does not; curse: the clump catches ≥ 2× the spread build a landing |
 | V3 | Leaning into a verb costs something, and some relic turns that cost into payoff. | content lint | every verb |
 | V4 | Each mechanics tower produces or consumes one verb. | content lint | all |
 | V5 | Most relics read one verb and write another. | content lint | ≥ 60% |

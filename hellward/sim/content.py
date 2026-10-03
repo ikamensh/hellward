@@ -228,6 +228,8 @@ class TowerKind:
     levels: tuple[TowerLevel, ...]
     blurb: str
     bolt_speed: float = 9.0   # tiles per second; a nova and a chain strike at once
+    verb: str = ""            # the verb a mechanics tower produces or consumes, or "" for a damage tower
+    verb_role: str = ""       # "produce" or "consume" where a verb is named
 
 
 def _ranks(row: dict[str, Any], name: str) -> tuple[float, ...]:
@@ -257,7 +259,8 @@ def _tower(key: str, row: dict[str, Any]) -> TowerKind:
                               poison_time=poison_time[rank], lasting=lasting[rank])
                    for rank in range(3))
     return TowerKind(key, row["name"], Element(row["element"]), row["attack"], levels, row["blurb"],
-                     bolt_speed=float(row["bolt_speed"]))
+                     bolt_speed=float(row["bolt_speed"]), verb=str(row.get("verb", "")),
+                     verb_role=str(row.get("verb_role", "")))
 
 
 TOWERS: Final[dict[str, TowerKind]] = {key: _tower(key, row) for key, row in tuning.table("towers").items()}

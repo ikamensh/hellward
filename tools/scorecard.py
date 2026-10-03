@@ -21,8 +21,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim.balance import BALANCE  # noqa: E402
 from hellward.sim.campaign import ACTS, LOCATIONS, ORDER, Location  # noqa: E402
-from hellward.sim.content import MAX_POISON_STACKS, MONSTERS, SPELLS, TOWERS, TowerKind, felt_hit  # noqa: E402
-from hellward.sim.model import World  # noqa: E402
+from hellward.sim.content import CURSES, MAX_POISON_STACKS, MONSTERS, SPELLS, START_LIVES, TOWERS, TowerKind, felt_hit  # noqa: E402
+from hellward.sim.model import ATTUNE_GOLD, World  # noqa: E402
+from hellward.sim.relics import RELICS, VERBS  # noqa: E402
 from tools.maps import (LEAST_CLUSTERED, LEAST_OCCUPIED, MOST_PRIME, REFERENCE_REACH, survey, traffic,  # noqa: E402
                         worth_map)
 
@@ -165,6 +166,84 @@ def armor_duels() -> list[Result]:
         Result("M9", "caves control: light holds unarmored at 108 gold", " ".join(caves_light),
                caves_cost == 108 and all(o.startswith("v") for o in caves_light)),
     ]
+
+
+def verb_rates() -> list[Result]:
+    """V1/V2: each verb earns 3-40 a wave in a build that leans into it (tools/verbs.py), at least
+    twice what the same plan earns without the lean. Leak's ceiling is the lives themselves: twenty
+    over five waves, so its tripwire sits at 2.5. Curse is the pulse (about one landing a wave,
+    whatever stands): its check is the clump's catch over the spread build's."""
+    from tools.verbs import ab
+    rows = []
+    for verb in ("cast", "leak", "charge", "debuff", "corpse"):
+        leans, plains, outcomes, _, _ = ab(verb, [0, 1])
+        lean = sum(leans) / len(leans)
+        plain = sum(plains) / len(plains)
+        floor = 2.5 if verb == "leak" else 3.0
+        won = all(o.startswith("v") for o in outcomes)
+        rows.append(Result("V1", f"{verb}: the lean earns {floor:g}-40 a wave",
+                           f"{lean:.1f}/wave ({' '.join(outcomes)})", won and floor <= lean <= 40))
+        ratio = lean / plain if plain > 0 else float("inf")
+        rows.append(Result("V2", f"{verb}: the lean earns 2x the plain build",
+                           f"{lean:.1f} vs {plain:.1f}" if plain > 0 else f"{lean:.1f} vs none",
+                           won and (plain <= 0 or ratio >= 2.0)))
+    leans, _, outcomes, took_lean, took_plain = ab("curse", [0, 1])
+    lean = sum(leans) / len(leans)
+    catch_lean = sum(took_lean) / len(took_lean) if took_lean else 0.0
+    catch_plain = sum(took_plain) / len(took_plain) if took_plain else 0.0
+    won = all(o.startswith("v") for o in outcomes)
+    rows.append(Result("V1", "curse stays the pulse: the lean takes 3 or fewer a wave",
+                       f"{lean:.1f}/wave ({' '.join(outcomes)})", won and lean <= 3.0))
+    rows.append(Result("V2", "curse: the clump catches 2x the spread build a landing",
+                       f"{catch_lean:.1f} vs {catch_plain:.1f} towers",
+                       won and catch_plain > 0 and catch_lean >= 2.0 * catch_plain))
+    return rows
+
+
+COSTS: tuple[tuple[str, str, Callable[[], bool]], ...] = (
+    ("cast", "idols and hymns cost gold and mana",
+     lambda: TOWERS["idol"].levels[0].cost > 0 and SPELLS["hymn"].mana > 0),
+    ("charge", "attunement costs battle gold", lambda: ATTUNE_GOLD > 0),
+    ("corpse", "frost towers cost gold", lambda: TOWERS["frost"].levels[0].cost > 0),
+    ("curse", "a curse lasts on the tower it takes",
+     lambda: all(spec.duration > 0 for spec in CURSES.values())),
+    ("debuff", "plague towers cost gold, and venom overflows past its maximum",
+     lambda: TOWERS["plague"].levels[0].cost > 0 and MAX_POISON_STACKS >= 1),
+    ("leak", "a leak costs sanctuary lives", lambda: START_LIVES > 0),
+)
+
+
+def verb_costs() -> list[Result]:
+    """V3: leaning into a verb costs something real, and some relic turns that cost into payoff."""
+    return [Result("V3", f"{verb}: {words}; read by {reader}",
+                   f"{words}; read by {reader}",
+                   backed and reader != "no relic")
+            for verb, words, backed_fn in COSTS
+            for backed in [backed_fn()]
+            for reader in [", ".join(key for key, spec in RELICS.items()
+                                      if spec.verb == verb and spec.writes) or "no relic"]]
+
+
+def tower_verbs() -> Result:
+    """V4: each mechanics tower (no damage of its own) produces or consumes one verb."""
+    mechanics = sorted(key for key, kind in TOWERS.items() if kind.attack not in ATTACKS)
+    tagged = sorted(key for key in mechanics
+                    if TOWERS[key].verb in VERBS and TOWERS[key].verb_role in ("produce", "consume"))
+    bare = [key for key in mechanics if key not in tagged]
+    value = ", ".join(tagged) + (f" (bare: {', '.join(bare)})" if bare else "")
+    return Result("V4", "mechanics towers with one verb", value or "none",
+                  not bare and bool(tagged))
+
+
+def verb_set() -> list[Result]:
+    """V6: consuming a debuff is a verb; V8: every relic's counter rides in the client state."""
+    from hellward.server.protocol import state
+    world = World(LOCATIONS["tristram"], seed=3, relics=("spite",))
+    world.progress["spite"] = 1
+    counters = state(world)["relic_counters"]
+    return [Result("V6", "debuff consumed is a verb", ", ".join(VERBS), "debuff" in VERBS),
+            Result("V8", "relic counters in the client state", json.dumps(counters),
+                   counters == {"spite": 1})]
 
 
 def tower_kinds() -> list[Result]:
@@ -390,7 +469,7 @@ def _union_length(spans: list[tuple[float, float]]) -> float:
 
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
     bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, hymn_seeks, tower_kinds, real_estate,
-    worth_and_cells, blight_kinds, power_table, armor_duels,
+    worth_and_cells, blight_kinds, power_table, armor_duels, verb_rates, verb_costs, tower_verbs, verb_set,
 )
 
 NOT_YET = (

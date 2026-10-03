@@ -1,6 +1,8 @@
 """The run's relics: each fires on its verb's count, and the run carries the counts on."""
 
+import ast
 from dataclasses import replace
+from pathlib import Path
 
 from hellward.run import camp, finish, from_json, kit, observe_world, start, take_relic, to_json
 from hellward.sim import campaign
@@ -118,8 +120,8 @@ def test_curses_landing_well_mana_and_pay_gold():
     for _ in range(3):
         world._land(lid, Curse.WEAKEN, spot)
     assert world.curses_landed == 3
-    assert world.mana == 15.0
-    assert world.gold == gold + 30
+    assert world.mana == 40.0
+    assert world.gold == gold + 80
 
 
 def test_each_leak_pays_gold_and_costs_a_life_more():
@@ -280,7 +282,7 @@ def test_full_charges_reach_one_further_with_the_seal():
 def test_every_third_curse_answers_its_caster():
     from hellward.sim.content import Curse
     world = arena("shaman", relics=("candle",))
-    tiles = floor(world, 9)
+    tiles = floor(world, 1)
     for tile in tiles:
         world.build("arrow", tile)
     world.call_wave()
@@ -412,3 +414,18 @@ def test_downsides_come_only_with_a_chosen_relic_and_say_so():
         words = RELICS[key].words
         assert "loses" in words or "less" in words or "costs" in words, key
     assert downsides <= set(RELICS)   # every one of them a camp's offer away, never forced
+
+
+def test_no_relic_firing_touches_the_random_stream():
+    root = Path(__file__).resolve().parents[1] / "hellward" / "sim" / "model.py"
+    tree = ast.parse(root.read_text())
+    firing = [node for node in ast.walk(tree)
+              if isinstance(node, ast.FunctionDef) and node.name in ("_relic", "_answer")]
+    assert len(firing) == 2
+    touched = set()
+    for node in firing:
+        touched |= {kid.id for kid in ast.walk(node) if isinstance(kid, ast.Name)
+                    if kid.id in ("random", "rng", "route_rng")}
+        touched |= {kid.attr for kid in ast.walk(node) if isinstance(kid, ast.Attribute)
+                    if kid.attr in ("rng", "route_rng", "Random", "choice", "randint", "sample")}
+    assert not touched   # counts fire relics; the camp's offer alone is drawn, and drawn seeded
