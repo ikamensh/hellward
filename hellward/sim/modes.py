@@ -28,3 +28,6 @@ MODES: Final[Mapping[str, Mode]] = MappingProxyType({m.key: m for m in (
     Mode("fast", "Swiftest", "Strike the fastest monster in reach.", 6),
     Mode("last", "Rearmost", "Strike the monster nearest the portal.", 6),
 )})
+
+ATTUNE: Final = Mode("attune", "Attunement",
+                     "Towers may hold 3 charges: empowered shots, spent where they kill.", 8)

@@ -95,7 +95,7 @@ def test_an_unknown_strategy_is_refused_and_a_taught_one_announced():
 def test_strategies_are_taught_for_salvage_and_kept(tmp_path):
     camp = campaign_at(tmp_path / "data")
     view = camp.forge_view()
-    assert [s["key"] for s in view["strategies"]] == ["strong", "weak", "fast", "last"]
+    assert [s["key"] for s in view["strategies"]] == ["strong", "weak", "fast", "last", "attune"]
     assert all(s["label"] == "Need more salvage" for s in view["strategies"])
     with pytest.raises(Refusal, match="salvage"):
         camp.forge("strong")

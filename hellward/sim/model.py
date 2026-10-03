@@ -57,6 +57,10 @@ if TYPE_CHECKING:
 
 SIM_DT: Final = 0.05            # the clock's step: not a tuning value (replays and the protocol count steps)
 SKIP_STEPS: Final = 3600        # a grind prediction's and a skip's longest look: three sim-minutes
+ATTUNE_GOLD: Final = 25         # an attunement's price in battle gold, per tower
+CHARGES_MAX: Final = 3.0        # the charges an attuned tower holds
+CHARGE_EVERY: Final = 15.0      # seconds per charge regained
+EMPOWER: Final = 3.0            # an empowered shot's damage
 DOOR_STOP: Final = tuning.number("battle.door_stop")
 JOSTLE: Final = tuning.number("battle.jostle")
 CHAIN_JUMP: Final = tuning.number("battle.chain_jump")
@@ -150,7 +154,7 @@ class Monster:
 
 class Tower:
     __slots__ = ("id", "kind", "levels", "level", "tile", "cooldown", "curses", "hymn", "spent", "spans", "spans_reach",
-                 "timer", "mode")
+                 "timer", "mode", "attuned", "charges")
 
     def __init__(self, id: int, kind: TowerKind, levels: tuple[TowerLevel, ...], tile: tuple[int, int]) -> None:
         self.id = id
@@ -166,12 +170,15 @@ class Tower:
         self.spans_reach = -1.0
         self.timer = 0.0                      # a grove's twister clock
         self.mode = "first"                   # its strategy: foremost until taught otherwise
+        self.attuned = False                  # whether it holds charges for empowered shots
+        self.charges = 0.0                    # charges held, to CHARGES_MAX, one per CHARGE_EVERY seconds
 
     def copy(self) -> Tower:
         t = Tower(self.id, self.kind, self.levels, self.tile)
         t.level, t.cooldown, t.curses = self.level, self.cooldown, dict(self.curses)
         t.hymn, t.spent, t.spans, t.spans_reach = self.hymn, self.spent, self.spans, self.spans_reach
         t.timer, t.mode = self.timer, self.mode
+        t.attuned, t.charges = self.attuned, self.charges
         return t
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -1242,11 +1249,15 @@ class World:
         if not monsters:
             for t in self.towers.values():
                 t.cooldown = max(0.0, t.cooldown - dt)
+                if t.attuned and t.charges < CHARGES_MAX:
+                    t.charges = min(CHARGES_MAX, t.charges + dt / CHARGE_EVERY)
             return
         level = self.level
         single_route = len(level.routes) == 1
         static = self.perks.static_field
         for t in self.towers.values():
+            if t.attuned and t.charges < CHARGES_MAX:
+                t.charges = min(CHARGES_MAX, t.charges + dt / CHARGE_EVERY)
             if t.cooldown > 0:
                 t.cooldown -= dt
                 if t.cooldown > 0:
@@ -1309,6 +1320,11 @@ class World:
                 continue
             aura = self.aura_mult(t)
             damage = stats.damage * (t.damage_mult() if t.curses else 1.0)   # the hit; the aura is a factor
+            if attack in ("bolt", "chain", "venom") and t.attuned and t.charges >= 1.0 \
+                    and self._worth_charge(t, hit[0], spans, reach, stats, damage * aura):
+                damage *= EMPOWER
+                t.charges -= 1.0
+                self._emit("spent", t.id, hit[0].id)
             rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0) * self._fervor()
             t.cooldown += 1.0 / rate
             if attack == "nova":
@@ -1373,6 +1389,36 @@ class World:
             return
         tower.mode = mode
         self._emit("mode", tower.id, mode)
+
+    def attune(self, tower_id: int) -> None:
+        """Attune a tower: it holds charges for empowered shots, starting full."""
+        tower = self.towers[tower_id]
+        if tower.attuned:
+            raise Refused(f"{tower.kind.name} is already attuned.")
+        if self.gold < ATTUNE_GOLD:
+            raise Refused(f"Attunement costs {ATTUNE_GOLD} gold.")
+        self.gold -= ATTUNE_GOLD
+        tower.attuned = True
+        tower.charges = CHARGES_MAX
+        tower.spent += ATTUNE_GOLD
+        self._emit("attuned", tower.id)
+
+    def _worth_charge(self, t: Tower, target: Monster, spans: tuple[tuple[float, float], ...], reach: float,
+                      stats: TowerLevel, damage: float) -> bool:
+        """Whether the empowered shot is worth its charge: the normal shot does not kill, and under
+        normal fire the target walks out of this tower's reach alive, but not with this shot empowered.
+        Armor and hymns are beneath the reckoning: a wise guess, not a promise."""
+        if target.hp <= damage:
+            return False
+        if target.route == "main":
+            left = 0.0
+            for a, b in spans:
+                if target.s < b:
+                    left = max(left, b - max(target.s, a))
+        else:
+            left = reach
+        shots = left / max(target.speed, 1e-6) * stats.rate + 1.0   # this shot and the volley after it
+        return target.hp > damage * shots and target.hp <= damage * (EMPOWER + shots - 1.0)
 
     def _hook_target(self, t: Tower, spans: tuple[tuple[float, float], ...], reach: float, near: float,
                      single_route: bool) -> Monster | None:
