@@ -37,6 +37,10 @@ var time := 0.0
 var step := 0
 var alpha := 1.0                     # how far between the last two steps the picture is
 var slain := {}                      # wave -> its monsters killed, counted from deaths (the HUD's tally)
+var goals: Array = []                # the run's wager here: [{key, arg, line, verdict}], kept live
+var xp := 0.0
+var xp_level := 1
+var xp_next := 0.0
 var demo := false                    # a scripted player plays (the demo, or a playtest): this side only watches
 var minds := true                    # say what the leaders weighed (the settings' "leaders' minds")
 var paused := false
@@ -52,9 +56,18 @@ func setup(lvl: Level, battle: Dictionary) -> void:
 	start = battle
 	dt = float(battle["sim_dt"])
 	demo = bool(battle["scripted"])
+	goals = (battle.get("goals", []) as Array).duplicate(true)
 	_take_state(battle["state"])
 	start_lives = lives
 	Net.frame.connect(_on_frame)
+
+
+## A boss walks the map: its strikes at the shrine cost boss_strike_lives each.
+func boss_out() -> bool:
+	for m in living():
+		if bool(monster_table(m.kind)["boss"]):
+			return true
+	return false
 
 
 func _exit_tree() -> void:
@@ -200,6 +213,9 @@ func _take_state(s: Dictionary) -> void:
 	lives = int(s["lives"])
 	mana = float(s["mana"])
 	mana_max = float(s["mana_max"])
+	xp = float(s.get("xp", 0.0))
+	xp_level = int(s.get("xp_level", 1))
+	xp_next = float(s.get("xp_next", 0.0))
 	wave = int(s["wave"])
 	var was := outcome
 	outcome = "" if s["outcome"] == null else String(s["outcome"])
@@ -390,6 +406,29 @@ func _event(e: Array) -> void:
 				_thought(monsters.get(int(e[1])), e[2])
 		"victory", "defeat":
 			pass
+		"step":
+			pass   # the save's second mark: nothing to show
+		"goal":
+			var line := ""
+			for g in goals:
+				if String(g["key"]) == String(e[1]):
+					g["verdict"] = String(e[2])
+					line = String(g["line"])
+			if String(e[2]) == "met":
+				announce.emit("Wager met", line)
+				Sfx.play("cleared")
+			else:
+				announce.emit("Wager missed", line)
+				Sfx.play("fizzle")
+		"level_up":
+			announce.emit("Level %d" % int(e[1]), "A skill point waits at the camp.")
+			Sfx.play("upgrade")
+		"bonus":
+			if String(e[2]) == "cleared":
+				announce.emit("The wager pays", "The bonus pack is broken.")
+				Sfx.play("gold")
+			else:
+				announce.emit("The wager fails", "The bonus pack got through.")
 		_:
 			push_warning("an event this client does not show: %s" % kind)
 	happened.emit(e)

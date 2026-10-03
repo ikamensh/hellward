@@ -323,3 +323,5 @@ func _order(name: String) -> void:
 				world.order("breach", {"mode": name.substr(7)})
 			elif name.begins_with("spell:"):
 				hold(name)
+			elif name.begins_with("summon:"):
+				world.order("summon", {"stake": int(name.substr(7))})
