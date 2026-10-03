@@ -111,7 +111,11 @@ def busy_world() -> World:
     free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
             if world.level.buildable(x, y)]
     towers = [world.build(kind, tile) for kind, tile in zip(
-        ("arrow", "pyre", "storm", "frost", "plague", "altar", "grove"), free)]
+        ("arrow", "pyre", "storm", "frost", "plague", "altar", "grove", "idol", "well"), free)]
+    ex, ey = world.level.waypoints[-1]
+    shrine = min((t for t in free if t not in {u.tile for u in towers}),
+                 key=lambda t: (t[0] - ex) ** 2 + (t[1] - ey) ** 2)
+    towers.append(world.build("censer", shrine))
     gx, gy = world.level.doors[0]
     by_gate = sorted((t for t in free if t not in {u.tile for u in towers}),
                      key=lambda t: ((t[0] - gx) ** 2 + (t[1] - gy) ** 2, t))
@@ -165,6 +169,12 @@ def busy_world() -> World:
     towers[2].hymn = 4.0
     leader.chant_curse, leader.chant_spot, leader.chant_left = Curse.WEAKEN, towers[3].tile, 0.8
     next(t for t in towers if t.kind.key == "grove").timer = 3.5
+    next(t for t in towers if t.kind.key == "idol").timer = 44.9   # the rite fires in the fight
+    world.attune(towers[0].id)
+    towers[0].charges = 1.0   # the well has a thirsty neighbour to water
+    stray = min((m for m in world.monsters if m.kind.key != "bone_priest"),
+                  key=lambda m: world.remaining(m))
+    stray.s = world.level.route(stray.route).length - 0.1   # it leaks by the censer, which answers
     for m in world.monsters[:3]:
         m.amplified, m.amplify = 2.0, 0.3
     return world
