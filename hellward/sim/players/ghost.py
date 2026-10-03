@@ -69,6 +69,11 @@ def issue(world: World, hands: Hands, name: str, args: tuple[Any, ...]) -> bool:
             hands.orb(float(args[0]), float(args[1]))
         elif name == "skip_grind":
             world.skip_grind()
+        elif name == "set_mode":
+            tower = world.tower_at(_tile(args[0]))
+            if tower is None:
+                raise Refused("No tower stands there yet.")
+            world.set_mode(tower.id, str(args[1]))
         else:
             raise ValueError(f"unknown replay command {name!r}")
     except Refused:

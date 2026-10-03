@@ -12,6 +12,7 @@ from hellward.server.saves import Saves
 from hellward.sim.breaches import BREACHES
 from hellward.sim.campaign import ACTS, LOCATIONS, ORDER, Location, sigils
 from hellward.sim.items import PATTERNS, Loadout, Pattern
+from hellward.sim.modes import MODES, Mode
 from hellward.sim.skills import can_learn, check, cost, kept
 
 SLOT = "campaign"
@@ -63,6 +64,7 @@ class Progress:
     breach_claims: dict[str, str] = field(default_factory=dict)   # location → first successful choice: trophy or cash
     trophies: frozenset[str] = frozenset()   # unspent trophy IDs, each the breach location's key
     patterns: frozenset[str] = frozenset()   # forged patterns, owned permanently
+    modes: frozenset[str] = frozenset()      # strategies taught, owned permanently ("first" is free)
     loadout: Loadout = field(default_factory=Loadout)
     runs_won: int = 0
     runs_lost: int = 0
@@ -87,10 +89,15 @@ class Progress:
         loadout = Loadout(tuple(state.get("loadout", ())))
         if not set(loadout.equipped) <= owned:
             raise ValueError("Equipped tower pattern is not owned")
+        taught = frozenset(state.get("modes", ()))
+        unknown_modes = sorted(key for key in taught if key not in MODES)
+        if unknown_modes:
+            raise ValueError(f"Unknown strategy in save: {unknown_modes[0]}")
         progress = cls(won=dict(won), learned=learned, at=state["at"], seen=frozenset(state.get("seen", ())),
                        salvage_best=dict(state.get("salvage_best", {})), salvage=state.get("salvage", 0),
                        breach_claims=dict(state.get("breach_claims", {})),
-                       trophies=frozenset(state.get("trophies", ())), patterns=owned, loadout=loadout,
+                       trophies=frozenset(state.get("trophies", ())), patterns=owned, modes=taught,
+                       loadout=loadout,
                        runs_won=state.get("runs_won", 0), runs_lost=state.get("runs_lost", 0),
                        profile=profile, saves=saves)
         check(progress.learned)
@@ -101,7 +108,8 @@ class Progress:
             state = {"won": self.won, "learned": sorted(self.learned), "at": self.at, "seen": sorted(self.seen),
                      "salvage_best": self.salvage_best, "salvage": self.salvage,
                      "breach_claims": self.breach_claims, "trophies": sorted(self.trophies),
-                     "patterns": sorted(self.patterns), "loadout": list(self.loadout.equipped),
+                     "patterns": sorted(self.patterns), "modes": sorted(self.modes),
+                     "loadout": list(self.loadout.equipped),
                      "runs_won": self.runs_won, "runs_lost": self.runs_lost}
             self.saves.save(slot_for_profile(self.profile), state, "Progress",
                             summary={"sigils": self.sigils, "at": self.at})
@@ -234,6 +242,18 @@ class Progress:
         self.patterns |= {key}
         self.save()
         return pattern
+
+    def teach(self, key: str) -> Mode:
+        """Spend banked salvage on one permanent targeting strategy."""
+        mode = MODES[key]
+        if key == "first" or key in self.modes:
+            raise ValueError(f"{mode.name} is already taught")
+        if self.salvage < mode.salvage_cost:
+            raise ValueError(f"{mode.name} needs {mode.salvage_cost} salvage")
+        self.salvage -= mode.salvage_cost
+        self.modes = self.modes | {key}
+        self.save()
+        return mode
 
     def equip(self, key: str) -> Loadout:
         """Equip an owned pattern, replacing any other pattern on that tower family."""

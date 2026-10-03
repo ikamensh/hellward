@@ -29,6 +29,7 @@ from hellward.sim.bonus import draw as draw_pack
 from hellward.sim.campaign import ORDER, Location, first_offering, offers
 from hellward.sim.content import SPELLS, Curse
 from hellward.sim.items import EMPTY_LOADOUT, Loadout
+from hellward.sim.modes import MODES
 from hellward.sim.kit import Kit
 from hellward.sim.model import SIM_DT, Planner, Refused, World
 from hellward.sim.planner import Decision, Option
@@ -71,12 +72,14 @@ class Battle:
                  breach_claim: str | None = None, replays: Path | None = None,
                  on_outcome: Callable[[World], dict] | None = None, kit: Kit | None = None,
                  run_seed: int | None = None, run_index: int | None = None,
-                 drawn: tuple[Drawn, ...] = (), on_save: Callable[[], None] | None = None) -> None:
+                 drawn: tuple[Drawn, ...] = (), on_save: Callable[[], None] | None = None,
+                 modes: frozenset[str] = frozenset()) -> None:
         if kit is not None:   # a run's defence: the Kit deals everything, down to the pool as its lives
             location, learned, loadout, seed = kit.location, kit.learned, kit.loadout, kit.seed
         self.location = location
         self.kit = kit
         self.player = player
+        self.modes = modes | {"first"}   # the profile's taught strategies, foremost always among them
         if player is not None:
             learned = player.draft(location, 3 * ORDER.index(location.key))
             loadout = getattr(player, "loadout", EMPTY_LOADOUT)
@@ -128,6 +131,8 @@ class Battle:
         message["goals"] = [{"key": goal.key, "arg": goal.arg, "line": describe_goal(goal),
                              "verdict": fold.verdict()}
                             for goal, fold in zip(self.drawn, self.folds)]
+        message["modes"] = [{"key": key, "name": MODES[key].name, "words": MODES[key].words}
+                            for key in MODES if key in self.modes]
         return message
 
     # -- The clock ------------------------------------------------------------------------------
@@ -348,6 +353,15 @@ class Battle:
         self.world.summon(pack)
         self.repeats += 1
         return [int(stake)]
+
+    def _set_mode(self, tower: int, mode: str) -> list:
+        """Teach a tower its strategy for this defence; untaught strategies are refused."""
+        if mode not in self.modes:
+            name = MODES[mode].name if mode in MODES else mode
+            raise Refused(f"{name} is not taught: learn it in the forge.")
+        t = self._tower(tower)
+        self.world.set_mode(t.id, mode)
+        return [list(t.tile), mode]
 
     def _skip_grind(self) -> list:
         """Skip the surely clean wave: the offer must stand for this wave and these orders."""

@@ -68,7 +68,7 @@ def monster_facts(m: Monster) -> dict:
 
 
 def tower_facts(t: Tower) -> dict:
-    return {"kind": t.kind.key, "tile": list(t.tile), "level": t.level, "spent": t.spent}
+    return {"kind": t.kind.key, "tile": list(t.tile), "level": t.level, "spent": t.spent, "mode": t.mode}
 
 
 def monsters(world: World) -> list[list]:
