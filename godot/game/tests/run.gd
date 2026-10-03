@@ -22,7 +22,8 @@ func _ready() -> void:
 			test_defeat_ends_the_battle_and_its_music,
 			test_the_watched_defence_holds_and_ends_with_victory, test_a_campaign_walk_through_every_screen,
 			test_a_run_from_the_long_night_to_its_laying_down, test_the_camp_offers_relics_and_one_is_taken,
-			test_the_bar_offers_the_grind_and_g_skips_it, test_every_location_lays_out_and_plays]:
+			test_the_bar_offers_the_grind_and_g_skips_it, test_the_card_teaches_strategies_sold_in_the_forge,
+			test_every_location_lays_out_and_plays]:
 		if only != "" and only not in t.get_method():
 			continue
 		_main = null
@@ -563,6 +564,48 @@ func test_the_bar_offers_the_grind_and_g_skips_it() -> void:
 	press(m.get_viewport(), KEY_G)
 	check(await until(func(): return not why.is_empty(), 3.0), "G sends the skip as an order")
 	check(why.size() > 0 and "surely clean" in why[0], "refused: no live wave is surely clean (%s)" % [why])
+
+
+## Strategies on the card and in the forge: no button with only Foremost taught, the aim's button with two,
+## and M sends the teaching as an order (refused here: the profile taught nothing); the forge's last slot sells
+## the four aims for salvage.
+func test_the_card_teaches_strategies_sold_in_the_forge() -> void:
+	var m := await start()
+	m.rig.user_control = false
+	var w: World = m.world
+	var tile: Vector2i = lane_side(m.level, 1)[0]
+	await w.order("build", {"kind": "arrow", "tile": [tile.x, tile.y]})
+	var tower: Tower = w.tower_at(tile)
+	m.builder.choose(tower)
+	await frames(2)
+	check(not m.hud._mode.visible, "only Foremost taught: no button on the card")
+	w.start["modes"] = [{"key": "first", "name": "Foremost", "words": ""},
+		{"key": "strong", "name": "Strongest", "words": ""}]
+	m.hud.refresh()
+	check(m.hud._mode.visible and "FOREMOST" in m.hud._mode.text, "with two taught, the card names the aim")
+	var why := []
+	w.refused.connect(func(text: String): why.append(text))
+	press(m.get_viewport(), KEY_M)
+	check(await until(func(): return not why.is_empty(), 3.0), "M sends the teaching as an order")
+	check(why.size() > 0 and "not taught" in why[0], "refused: the profile taught nothing (%s)" % [why])
+	_main.queue_free()
+	await frames(2)
+	_main = null
+	var game: Game = load("res://scenes/game.tscn").instantiate()
+	_main = game
+	var seen: Array = []
+	game.shown.connect(func(s: Screen): seen.append(s.get_script().get_global_name()))
+	add_child(game)
+	check(await until(func(): return _showing(seen, "TitleScreen"), 10.0), "the title shows (%s)" % [seen])
+	game.forge()
+	check(await until(func(): return _showing(seen, "ForgeScreen"), 10.0), "the forge opens (%s)" % [seen])
+	await frames(20)
+	var poor := 0
+	var forge: Screen = game._overlays.back()
+	for b in forge.find_children("*", "Button", true, false):
+		if (b as Button).text == "Need more salvage":
+			poor += 1
+	check(poor == 4, "its last slot sells the four aims for salvage (%d)" % poor)
 
 
 ## Every location of both acts lays out (its scenery, its arsenal on the bar) and its battle runs a few seconds,

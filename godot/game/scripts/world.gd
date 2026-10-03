@@ -435,6 +435,10 @@ func _event(e: Array) -> void:
 		"skipped":
 			announce.emit("The grind is skipped", "The vision showed it clean: +%d gold." % int(e[2]))
 			Sfx.play("gold")
+		"mode":
+			var taught: Tower = towers.get(int(e[1]))
+			if taught != null:
+				taught.mode = String(e[2])
 		_:
 			push_warning("an event this client does not show: %s" % kind)
 	happened.emit(e)

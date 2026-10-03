@@ -1,8 +1,9 @@
 class_name Builder
 extends Node3D
 ## The player's hands: hold a tower (1-8 or a slot) and click bare ground to raise it; click a tower to choose it,
-## then U upgrades, Delete (or Backspace) sells. Z, X and C pick Smite, Meteor and Frozen Orb, aimed with a
-## click; R sings Battle Hymn over the chosen tower, or with none chosen picks it to aim at one. Hold the gate
+## then U upgrades, Delete (or Backspace) sells, M teaches the next owned strategy. Z, X and C pick Smite,
+## Meteor and Frozen Orb, aimed with a click; R sings Battle Hymn over the chosen tower, or with none chosen
+## picks it to aim at one. Hold the gate
 ## and click an arch to ward it. Space summons a wave, F doubles the pace, V sells a salvage drop, H hides the
 ## HUD, G skips a surely clean wave for its bonus, Esc lets go. WASD, Q and E are the camera's (CameraRig).
 ## Keys are read by their place on the keyboard, as
@@ -224,6 +225,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_SPACE: _order("wave")
 			KEY_F: _order("pace")
 			KEY_H: hud.toggle()
+			KEY_M: hud.cycle_mode()
 			KEY_ESCAPE:
 				if held != "" or chosen:
 					let_go()
@@ -326,5 +328,8 @@ func _order(name: String) -> void:
 				world.order("breach", {"mode": name.substr(7)})
 			elif name.begins_with("spell:"):
 				hold(name)
+			elif name.begins_with("mode:"):
+				if chosen:
+					world.order("set_mode", {"tower": chosen.id, "mode": name.substr(5)})
 			elif name.begins_with("summon:"):
 				world.order("summon", {"stake": int(name.substr(7))})

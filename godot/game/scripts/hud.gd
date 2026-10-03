@@ -7,7 +7,7 @@ extends CanvasLayer
 ## element tags and the hit each of the player's towers deals it (`hover`).
 
 signal slot_pressed(kind: String)     # a tower kind, "gate", or "spell:<key>"
-signal order(name: String)            # "wave", "skip", "upgrade", "sell", "pace", "salvage", "breach:<mode>", "menu"
+signal order(name: String)            # "wave", "skip", "upgrade", "sell", "mode:<key>", "pace", "salvage", "breach:<mode>", "menu"
 
 const SPELLS := {"smite": "Z", "meteor": "X", "orb": "C", "hymn": "R"}
 const SPELL_TONES := {"smite": Color(1.0, 0.95, 0.7), "meteor": Color(1.0, 0.45, 0.12), "orb": Color(0.45, 0.7, 1.0),
@@ -98,6 +98,7 @@ var _curse_bar: ShaderMaterial
 var _curse_text: Label
 var _upgrade: Button
 var _sell: Button
+var _mode: Button                   # the chosen tower's strategy: a press teaches the next owned one
 var _hymn_box: Control
 var _hymn_bar: ShaderMaterial
 var _hymn_text: Label
@@ -652,6 +653,9 @@ func _build_card() -> void:
 	_sell = _button("")
 	_sell.pressed.connect(func(): order.emit("sell"))
 	orders.add_child(_sell)
+	_mode = _button("")
+	_mode.pressed.connect(cycle_mode)
+	orders.add_child(_mode)
 
 	_card.visible = false
 
@@ -1285,9 +1289,33 @@ func _refresh_card() -> void:
 		_upgrade.disabled = true
 	_sell.text = "SELL · DEL  +%d" % t.refund
 	_sell.disabled = cursed or world.demo
+	_mode.visible = (world.start.get("modes", []) as Array).size() > 1
+	if _mode.visible:
+		_mode.text = "AIMS %s · M" % _mode_name(t.mode).to_upper()
+		_mode.disabled = world.demo
 	if not was:
 		_card.modulate.a = 0.0
 		_card.create_tween().tween_property(_card, "modulate:a", 1.0, 0.18)
+
+
+## The chosen tower's strategy, named from the battle's owned modes.
+func _mode_name(mode: String) -> String:
+	for m in world.start.get("modes", []):
+		if String(m["key"]) == mode:
+			return String(m["name"])
+	return mode.capitalize()
+
+
+## Teach the chosen tower the next owned strategy.
+func cycle_mode() -> void:
+	var modes := world.start.get("modes", []) as Array
+	if _selected == null or modes.size() < 2:
+		return
+	var keys: Array = []
+	for m in modes:
+		keys.append(String(m["key"]))
+	var next: String = keys[(keys.find(_selected.mode) + 1) % keys.size()]
+	order.emit("mode:" + next)
 
 
 func _show_portrait(on: bool) -> void:

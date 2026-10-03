@@ -16,6 +16,7 @@ const HYMN := Color(1.0, 0.78, 0.3)  # Battle Hymn's gold
 var world: World
 var id := 0
 var kind: String
+var mode := "first"               # its strategy, from its facts and the mode event
 var tile: Vector2i
 var rank := 0
 var spent := 0
@@ -46,6 +47,7 @@ func setup(w: World, ident: int, facts: Dictionary) -> void:
 	tile = Vector2i(int(facts["tile"][0]), int(facts["tile"][1]))
 	rank = int(facts["level"])
 	spent = int(facts["spent"])
+	mode = String(facts.get("mode", "first"))
 	reach = float(world.tower_table(kind)["levels"][rank]["range"])
 
 
