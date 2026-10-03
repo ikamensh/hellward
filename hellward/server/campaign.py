@@ -15,6 +15,8 @@ from dataclasses import replace
 from pathlib import Path
 from hellward.run import LIFE, MET, Run, camp, describe, from_json, kit, observe_world, start, to_json
 from hellward.run import finish as settle
+from hellward.run import take_relic
+from hellward.sim.relics import RELICS
 from hellward.run import learn as learn_skill
 from hellward.run import bonus_preview
 from hellward.run import unlearn as unlearn_skill
@@ -133,7 +135,24 @@ class Campaign:
                         for r in run.records],
             "salvage": run.salvage, "equipped": list(run.equipped),
             "won": run.won, "lost": run.lost,
+            "relics": [{"key": key, "name": RELICS[key].name, "words": RELICS[key].words}
+                       for key in run.relics],
+            "offer": [{"key": key, "name": RELICS[key].name, "words": RELICS[key].words}
+                      for key in run.offer],
         }
+
+    def take_relic(self, key: str) -> dict:
+        """Take the camp's offered relic into the run; anything unoffered is refused."""
+        if self.run is None:
+            raise Refusal("No run is going.")
+        if self.battle is not None:
+            raise Refusal("Finish the defence first.")
+        try:
+            self.run = take_relic(self.run, key)
+        except ValueError as e:
+            raise Refusal(str(e))
+        self._save_run()
+        return self.run_view()
 
     def camp(self) -> dict:
         """The camp between locations: the pool mends, the save is written, the run's state returns."""

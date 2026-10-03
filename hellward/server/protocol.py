@@ -113,7 +113,7 @@ def state(world: World) -> dict:
         "salvage": world.salvage_held, "breach": breach, "outcome": world.outcome,
         "cost": {kind: world.cost(kind) for kind in arsenal.towers if kind not in world.perks.locked},
         "door_cost": world.door_cost if arsenal.gates else None,
-        "spell_cost": {key: world.spell_cost(key) for key in arsenal.spells if key not in world.perks.locked},
+        "spell_cost": {key: world.spell_cost(key) for key in world.spells},
         "kills": world.kills,
     }
 
@@ -157,7 +157,7 @@ def battle_start(world: World, *, demo: bool, breach_claim: str | None) -> dict:
                   for name, w in zip(location.wave_names, world.waves)],
         "arsenal": {"towers": [k for k in location.arsenal.towers if k not in world.perks.locked],
                     "gates": location.arsenal.gates,
-                    "spells": [k for k in location.arsenal.spells if k not in world.perks.locked]},
+                    "spells": list(world.spells)},
         "towers": {kind: tower_table(world, kind) for kind in location.arsenal.towers
                    if kind not in world.perks.locked},
         "worth": {kind: worth_table(world, kind) for kind in location.arsenal.towers
@@ -173,7 +173,7 @@ def battle_start(world: World, *, demo: bool, breach_claim: str | None) -> dict:
         "spells": {key: {"name": s.name, "aim": s.aim, "blurb": s.blurb, "radius": s.radius, "delay": s.delay,
                          "lasting": s.lasting, "recharge": s.recharge}
                    for key, s in SPELLS.items()
-                   if key in location.arsenal.spells and key not in world.perks.locked},
+                   if key in world.spells},
         "gate": {"life": world.gate_life, "blurb": "Bars an arch: walkers must break it; flyers pass over."}
         if location.arsenal.gates else None,
         "breach": None if world.breach_spec is None else breach_table(world, breach_claim),

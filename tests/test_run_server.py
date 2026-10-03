@@ -294,6 +294,30 @@ def test_the_threats_label_names_armor_flyers_tags_boss_and_curses():
     assert threats(LOCATIONS["tristram"])["curses"]
 
 
+def test_the_camp_offers_three_relics_and_one_is_taken(tmp_path):
+    from hellward.run import finish, kit, observe_world
+    from hellward.sim.relics import RELICS
+
+    campaign = campaign_at(tmp_path / "data")
+    campaign.start_run(seed=11)
+    assert campaign.run is not None
+    played = kit(campaign.run)
+    world = played.world()
+    world.outcome = "victory"
+    campaign.run = finish(campaign.run, observe_world(played, world, campaign.run.drawn))
+    view = campaign.run_view()
+    assert [o["key"] for o in view["offer"]] == list(campaign.run.offer)
+    assert all(o["name"] == RELICS[o["key"]].name and o["words"] for o in view["offer"])
+    unoffered = next(key for key in RELICS if key not in campaign.run.offer)
+    with pytest.raises(Refusal, match="offered"):
+        campaign.take_relic(unoffered)
+    view = campaign.take_relic(campaign.run.offer[0])
+    assert [r["key"] for r in view["relics"]] == list(campaign.run.relics)
+    assert view["offer"] == []
+    again = campaign_at(tmp_path / "data")   # the relic survives a server restart
+    assert again.run is not None and again.run.relics == campaign.run.relics
+
+
 def test_the_worst_case_counts_the_roster_and_a_bosss_strikes():
     assert worst_line(LOCATIONS["tristram"], 30).startswith("Worst case: ")
     assert "strikes at 5" in worst_line(LOCATIONS["temple"], 30)
