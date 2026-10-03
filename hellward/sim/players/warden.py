@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import random
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -153,9 +154,13 @@ def small(location: Location) -> float:
     return sum(share for key, share in host(location).items() if MONSTERS[key].small)
 
 
-def draft_skills(location: Location, sigils: int, must: frozenset[str] = frozenset()) -> frozenset[str]:
+def draft_skills(location: Location, sigils: int, must: frozenset[str] = frozenset(),
+                 want: tuple[str, ...] = (), skip: float = 0.0,
+                 rng: random.Random | None = None) -> frozenset[str]:
     """Skills bought in a veteran's order from the columns the location has use for, then the rest of the tree; never
-    one that does nothing here. The ``must`` skills come first: a plan's unlocks, so its steps never wait."""
+    one that does nothing here. The ``must`` skills come first: a plan's unlocks, so its steps never wait. The
+    ``want`` skills come next, in order: a plan's own skills, cheapest tier first. A ``skip`` share of
+    every other skill is fumbled instead of learned, drawn from ``rng``: a weaker read misses some."""
     arsenal = location.arsenal
     wanted: list[str] = []
     if "pyre" in arsenal.towers:
@@ -208,8 +213,10 @@ def draft_skills(location: Location, sigils: int, must: frozenset[str] = frozens
         wanted += ["unlock_meteor"]
     learned: frozenset[str] = frozenset()
     stage = ORDER.index(location.key)
-    for key in [*sorted(must), *wanted, *SKILLS]:
+    for key in [*sorted(must), *want, *wanted, *SKILLS]:
         if (key in must or not idle(location, SKILLS[key].needs)) and can_learn(learned, key, sigils, stage):
+            if key not in must and skip > 0.0 and rng is not None and rng.random() < skip:
+                continue   # fumbled: the purse keeps it for a later skill
             learned |= {key}
     return learned
 
@@ -328,6 +335,8 @@ class Warden:
     plans: dict[str, Plan] = field(default_factory=load_plans)
     plan: Plan | None = None                  # a plan to play instead of the stored one (the search's candidates)
     redraft_skills: bool = False              # play the stored steps with freshly drafted skills (a weaker read)
+    skip: float = 0.0                       # the redraft's fumbled share: a weaker read misses some skills
+    seed: int | str = 0                     # the defence's seed: the fumbles are drawn from it, every time alike
     chosen: Plan | None = None                # the plan of this defence, fixed when the skills are learned
     done: int = 0                             # steps of the plan taken
     reserve: int = 0                        # gold held for a coming wager: the build keeps it unspent
@@ -348,15 +357,20 @@ class Warden:
         if self.plan is not None:
             return self.plan
         stored = self.plans.get(plan_key(location, sigils))
-        if stored is not None and stored.map == fingerprint(location):
+        if stored is not None and stored.map == fingerprint(location) and not self.redraft_skills:
             return stored
         same = [plan for key, plan in self.plans.items() if key.split("/")[0] == location.key
                 and plan.map == fingerprint(location)]
         if same:
             if self.redraft_skills:
-                kinds = {s.kind for s in same[0].steps if s.what == "build"}
+                base = stored if stored is not None and stored.map == fingerprint(location) else same[0]
+                kinds = {s.kind for s in base.steps if s.what == "build"}
                 need = frozenset(u for k in kinds if (u := UNLOCK[k]) is not None)
-                return Plan(draft_skills(location, sigils, need), same[0].steps, same[0].early, same[0].map)
+                want = tuple(s for s in sorted(base.skills - need, key=lambda s: (SKILLS[s].tier, s))
+                             if not idle(location, SKILLS[s].needs))
+                draw = random.Random(self.seed)
+                skills = draft_skills(location, sigils, need, want, self.skip, draw)
+                return Plan(skills, base.steps, base.early, base.map)
             return same[0]   # one entry a location: played with what's kept, learned or not
         learned = draft_skills(location, sigils)
         return Plan(learned, draft_build(location, learned))

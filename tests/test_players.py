@@ -410,6 +410,50 @@ def test_warden_draft_and_search_mutations_cannot_buy_future_skills():
                for key in warden_plans.mutate(stale, location, 6, random.Random(2)).skills)
 
 
+def test_warden_redraft_plays_stored_steps_with_drafted_skills():
+    from hellward.sim.campaign import idle
+    from hellward.sim.players.warden import Plan, Warden, load_plans, plan_key
+    from hellward.sim.skills import UNLOCK, above
+
+    location = LOCATIONS["docks"]
+    base = load_plans()[plan_key(location, 33)]
+    kinds = {s.kind for s in base.steps if s.what == "build"}
+    need = frozenset(u for k in kinds if (u := UNLOCK[k]) is not None)
+    kept_shape = {s for s in base.skills - need if not idle(location, SKILLS[s].needs)}
+    have = kept_shape | need   # the shape the draft can complete: every skill above it learned too
+
+    def chain_ok(key: str) -> bool:
+        up = above(SKILLS[key])
+        while up is not None:
+            if up.key not in have:
+                return False
+            up = above(up)
+        return True
+
+    kept_shape = {s for s in kept_shape if chain_ok(s)}
+    plan = Warden(redraft_skills=True, seed="7/docks").choose(location, 33)
+    assert plan.steps == base.steps            # the stored build, not a fresh draft
+    assert need <= plan.skills                 # the build's unlocks are never fumbled
+    assert kept_shape <= plan.skills           # the book's shape at a full purse, idle weight dropped
+    assert cost(plan.skills) <= 33
+
+
+def test_warden_redraft_fumbles_a_seed_share_and_repeats_it():
+    from hellward.sim.players.warden import Warden, load_plans, plan_key
+    from hellward.sim.skills import UNLOCK
+
+    location = LOCATIONS["docks"]
+    base = load_plans()[plan_key(location, 33)]
+    kinds = {s.kind for s in base.steps if s.what == "build"}
+    need = frozenset(u for k in kinds if (u := UNLOCK[k]) is not None)
+    full = Warden(redraft_skills=True, seed="7/docks").choose(location, 33).skills
+    assert (Warden(redraft_skills=True, seed="7/docks").choose(location, 33).skills == full
+            and Warden(redraft_skills=True, skip=1.0, seed="7/docks").choose(location, 33).skills == need)
+    varied = {Warden(redraft_skills=True, skip=0.5, seed=f"{n}/docks").choose(location, 33).skills
+              for n in range(8)}
+    assert len(varied) > 1   # the fumbles differ a defence at a time
+
+
 def test_scripted_players_wait_for_the_local_gate_price(monkeypatch):
     from hellward.sim.players.planned import Plan as PlannedPlan, Planned
     from hellward.sim.players.warden import Plan as WardenPlan, Step, Warden

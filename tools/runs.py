@@ -7,8 +7,9 @@ end the run, but lost life is counted: G3.2's gold and levels per act, M3's goal
 Every bot's Kit at every location is written as the corpus ``<out>/corpus/``, which the per-location tools take
 their Kits from; ``summary.json`` holds every run for the scorecard.
 
-The middling bot is the warden drafting from the Kit with the draft's skill priority; the strong bot plays the
-stored plans (its authored archetype orders land with the stage-3 tree). Both summon bonus waves by one rule on
+The middling bot is the warden playing the stored steps with redrafted skills: the book's shape at a full
+purse, a MIDDLING_SKIP share fumbled, played with veteran hands; the strong bot plays the stored plans whole.
+Both summon bonus waves by one rule on
 what a person sees: the last wave clean, the pool comfortable, the wager in hand, the margin felt
 over the pack's life, at most three a location, the stake by the pool's comfort. While the waves
 stay clean the coming break's wager is kept back for it — deep in from strength, shallower only from
@@ -66,20 +67,25 @@ def _stored_sigils() -> dict[str, int]:
     return found
 
 
-def _player(bot: str) -> Warden:
+MIDDLING_SKIP = 0.13   # the middling bot's fumbled share of its redrafted skills (0: 29/30, 0.1: 9, 0.13: 5, 0.15: 3, 0.3: 0)
+
+
+def _player(bot: str, seed: str = "") -> Warden:
     if bot == "middling":
-        # the searched builds read worse and played slower: drafted skills, veteran hands
-        return Warden(redraft_skills=True, reaction=(0.8, 1.2), aim_gap=1.0)
+        # the searched builds read worse and played slower: fumbled drafts, veteran hands
+        skip = float(env) if (env := os.environ.get("HELLWARD_SKIP")) is not None else MIDDLING_SKIP
+        return Warden(redraft_skills=True, skip=skip, seed=seed, reaction=(0.8, 1.2), aim_gap=1.0)
     return Warden()
 
 
-SKILL_SHARE = {"strong": 1.0, "middling": 0.9}   # the stored purse's share the bot's skills spend
+SKILL_SHARE = {"strong": 1.0, "middling": 1.0}   # the stored purse's share the bot's skills spend
 
 
 def _sigils(bot: str, run: Run, location: str, stored: dict[str, int]) -> int:
+    share = float(env) if (env := os.environ.get("HELLWARD_SHARE")) is not None else SKILL_SHARE[bot]
     if location in stored:
-        return stored[location] if bot == "strong" else int(SKILL_SHARE[bot] * stored[location])
-    return int(SKILL_SHARE[bot] * (run.skill_points + tree.cost(run.learned)))
+        return stored[location] if bot == "strong" else int(share * stored[location])
+    return int(share * (run.skill_points + tree.cost(run.learned)))
 
 
 def _learn(run: Run, location: str) -> Run:
@@ -186,7 +192,7 @@ def play_run(seed: int, bot: str, locations: tuple[str, ...], immortal: bool,
         events: list = []
         state = {"leaks": 0, "last_clean": True, "repeats": 0, "pack": None, "pool": run.pool,
                  "fight_leaks": 0, "lives": IMMORTAL_LIVES if immortal else run.pool}
-        player = _player(bot)
+        player = _player(bot, f"{seed}/{key}")
         pursue = 0   # the drawn bonus goal's stake, when the run pursues it
         off = os.environ.get("HELLWARD_NOPURSUIT", "").split(",")
         for drawn in run.drawn:   # the lean and the leaders by standard play; the dear goals only when rich
@@ -423,10 +429,20 @@ def main(argv: list[str] | None = None) -> list[dict]:
                         " the pack's fairness apart from the economy's savings")
     parser.add_argument("--force-pool", type=int, default=0,
                         help="research with --force-stake: the pool's comfort, instead of the rule's")
+    parser.add_argument("--share", type=float, default=None,
+                        help="research: the stored purse's share the bot's skills spend,"
+                        " instead of SKILL_SHARE")
+    parser.add_argument("--skip", type=float, default=None,
+                        help="research: the middling bot's fumbled share of its drafts,"
+                        " instead of MIDDLING_SKIP")
     parser.add_argument("--locations", default=",".join(ORDER),
                         help="a head of the campaign, in order (a run always starts at Tristram)")
     parser.add_argument("--out", default="runs")
     args = parser.parse_args(argv)
+    if args.share is not None:
+        os.environ["HELLWARD_SHARE"] = str(args.share)
+    if args.skip is not None:
+        os.environ["HELLWARD_SKIP"] = str(args.skip)
     locations = tuple(key for key in ORDER if key in args.locations.split(","))
     out = Path(args.out)
     seeds = list(range(args.seed0, args.seed0 + args.seeds))
