@@ -1,7 +1,7 @@
 {
  "catacombs/16": {
   "early": 0.7,
-  "map": "6270fc900370",
+  "map": "7081eab893fc",
   "searched": {
    "leaders": "greedy",
    "life": 1.325,
@@ -181,7 +181,7 @@
  },
  "caves/20": {
   "early": 0.9,
-  "map": "65af5100a891",
+  "map": "776417ccf16b",
   "searched": {
    "leaders": "greedy",
    "life": 1.0,
@@ -270,7 +270,7 @@
  },
  "docks/33": {
   "early": 0.9,
-  "map": "76e612853d98",
+  "map": "b55a7063e8aa",
   "searched": {
    "leaders": "greedy",
    "life": 1.269,
@@ -346,7 +346,7 @@
  },
  "drowned_city/53": {
   "early": 0.7,
-  "map": "500266ead7cf",
+  "map": "def4ccaffa60",
   "searched": {
    "leaders": "greedy",
    "life": 1.022,
@@ -524,7 +524,7 @@
  },
  "hells_gate/27": {
   "early": 0.7,
-  "map": "b8571c66035e",
+  "map": "cbe57db8093a",
   "searched": {
    "leaders": "greedy",
    "life": 1.103,
@@ -603,7 +603,7 @@
  },
  "jungle/45": {
   "early": 0.9,
-  "map": "78d807bf336f",
+  "map": "fc831a7ccae4",
   "searched": {
    "leaders": "greedy",
    "life": 1.102,
@@ -672,7 +672,7 @@
  },
  "spider_forest/37": {
   "early": 0.9,
-  "map": "75b6a8f5e7b6",
+  "map": "30274744c1cb",
   "searched": {
    "leaders": "greedy",
    "life": 1.526,
@@ -728,7 +728,7 @@
  },
  "temple/63": {
   "early": 0.5,
-  "map": "d1bc03961d4c",
+  "map": "e71d51f56f55",
   "searched": {
    "leaders": "greedy",
    "life": 1.022,
@@ -813,7 +813,7 @@
  },
  "travincal/56": {
   "early": 0.7,
-  "map": "99c1f3716981",
+  "map": "8f20b8d3d7e0",
   "searched": {
    "leaders": "greedy",
    "life": 1.0,

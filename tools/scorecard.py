@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim.balance import BALANCE  # noqa: E402
-from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
+from hellward.sim.campaign import ACTS, LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import MAX_POISON_STACKS, MONSTERS, SPELLS, TOWERS, TowerKind, felt_hit  # noqa: E402
 from hellward.sim.model import World  # noqa: E402
 from tools.maps import (LEAST_CLUSTERED, LEAST_OCCUPIED, MOST_PRIME, REFERENCE_REACH, survey, traffic,  # noqa: E402
@@ -129,11 +129,70 @@ def no_dispel() -> Result:
     return Result("S1", "spells that lift a curse or break a chant", ", ".join(dispels) or "none", not dispels)
 
 
+def hymn_seeks() -> list[Result]:
+    """S3: Battle Hymn doubles a tower's rate for 6 s, and the leaders' curses go for the boosted tower:
+    eight smart defences of the caves, the hymned share of the aimed towers against the hymned share in
+    reach at each chant (tools/balance.py). The lift isolates the choice itself (a random curser reads
+    1.0x by construction); the planner prices a tower at its hymned rate, so the seeking is emergent."""
+    from tools.balance import chant_lift, match
+    hymn = SPELLS["hymn"]
+    chants = [c for i in range(8) for c in match("smart", i, 8, "caves")["chants"]]
+    lift, hymned, expected = chant_lift(chants)
+    return [Result("S3", "hymn's rate and lasting", f"x{hymn.rate:g} for {hymn.lasting:g} s",
+                   hymn.rate == 2.0 and hymn.lasting == 6.0),
+            Result("S3", "leaders' hymn lift over eight smart caves defences",
+                   f"{lift:.1f}x ({hymned}/{expected:.1f} over {len(chants)} chants)",
+                   lift >= 1.5 and expected >= 2.0)]
+
+
+def armor_duels() -> list[Result]:
+    """M9: in each act from the Catacombs on, a location a light build loses and a heavy build of equal
+    gold wins (tools/armor.py: pure arrows against pure ballistae at 3:2 counts on shared tiles). The
+    tripwire fights two seeds; tests/test_armor.py fights six."""
+    from tools.armor import capped, duel, full
+    gate_light, gate_heavy, gate_cost = duel("hells_gate", capped, 9, [0, 1])
+    temple_light, temple_heavy, temple_cost = duel("temple", full, 9, [0, 1])
+    caves_light, _, caves_cost = duel("caves", capped, 9, [0, 1])
+    return [
+        Result("M9", "hells_gate: light loses, heavy wins (108 gold)",
+               f"light {' '.join(gate_light)} heavy {' '.join(gate_heavy)}",
+               gate_cost == 108 and all(o.startswith("d") for o in gate_light)
+               and all(o.startswith("v") for o in gate_heavy)),
+        Result("M9", "temple: light loses, heavy wins (300 gold)",
+               f"light {' '.join(temple_light)} heavy {' '.join(temple_heavy)}",
+               temple_cost == 300 and all(o.startswith("d") for o in temple_light)
+               and all(o.startswith("v") for o in temple_heavy)),
+        Result("M9", "caves control: light holds unarmored at 108 gold", " ".join(caves_light),
+               caves_cost == 108 and all(o.startswith("v") for o in caves_light)),
+    ]
+
+
 def tower_kinds() -> list[Result]:
     mechanics = [kind.name for kind in TOWERS.values() if kind.attack not in ATTACKS]
     share = len(mechanics) / len(TOWERS)
     return [Result("M4", "tower kinds", str(len(TOWERS)), len(TOWERS) >= 14),
-            Result("M6", "share of mechanics towers", f"{share:.0%}", share >= 0.4)]
+            Result("M6", "share of mechanics towers", f"{share:.0%}", share >= 0.4),
+            tree_too_dear()]
+
+
+def tree_too_dear() -> Result:
+    """M4's floor: the whole tree costs at least 2.5x a perfect run's points without packs — every sigil
+    (three for lives, three for goals, a location) plus the levels the campaign's kills and clears reach.
+    Packs pay more (bounded: three a location for the bots, decaying repeats for a person); tools/runs.py
+    quotes the true ratio, strong-30's tree over 72 plus its highest level."""
+    from hellward.sim.skills import TREE_COST
+    from hellward.sim.xp import XP_NEXT_BASE, XP_NEXT_GROWTH, clear_xp, kill_xp
+    total = sum(sum(group.count * kill_xp(MONSTERS[group.kind].hp) for group in wave.groups)
+                + clear_xp(number)
+                for location in LOCATIONS.values() for number, wave in enumerate(location.waves, start=1))
+    level, need = 1, XP_NEXT_BASE
+    while total >= need:
+        total -= need
+        level += 1
+        need = XP_NEXT_BASE + XP_NEXT_GROWTH * (level - 1) * (level - 1)
+    perfect = 6 * len(LOCATIONS) + level
+    return Result("M4", "tree over a packless perfect run's points",
+                  f"{TREE_COST}/{perfect} = {TREE_COST / perfect:.2f}x", TREE_COST >= 2.5 * perfect)
 
 
 def real_estate() -> list[Result]:
@@ -151,6 +210,36 @@ def real_estate() -> list[Result]:
                f"{maps[scattered].clustered_share:.0%} ({scattered})",
                maps[scattered].clustered_share >= LEAST_CLUSTERED),
     ]
+
+
+def worth_and_cells() -> list[Result]:
+    """R2: a battle's start carries every offered kind's per-cell coverage; R7: every frame's state carries
+    each taken cell with its waves left, and each mark with its seconds."""
+    from hellward.server.protocol import battle_start, state
+    world = World(LOCATIONS["tristram"], seed=1)
+    start = battle_start(world, demo=True, breach_claim=None)
+    kinds = set(start["worth"]) == set(LOCATIONS["tristram"].arsenal.towers)
+    bare = bool(start["worth"]["arrow"]["bare"])
+    world.blighted[(3, 4)] = (2, "webbed")
+    found = state(world)
+    taken = found["blighted"] == [[3, 4, 2, "webbed"]] and isinstance(found["blight_marks"], list)
+    return [Result("R2", "per-cell coverage in the battle's start", f"{len(start['worth'])} kinds",
+                   kinds and bare),
+            Result("R7", "a taken cell in the frame's state", str(found["blighted"]), taken)]
+
+
+def blight_kinds() -> list[Result]:
+    """R6's content half: a kind that takes empty cells walks each act's waves, its mark burning at least 1.5 s
+    before it lands, its cells taken for two cleared waves (tests/test_blight.py plays the engine)."""
+    blighters = {key for key, kind in MONSTERS.items() if kind.blight is not None}
+    out = []
+    for act, keys in ACTS.items():
+        walked = {g.kind for key in keys for wave in LOCATIONS[key].waves for g in wave.groups}
+        mine = sorted(blighters & walked)
+        spec = all(MONSTERS[key].blight is not None and MONSTERS[key].blight.telegraph >= 1.5
+                   and MONSTERS[key].blight.waves == 2 for key in mine)
+        out.append(Result("R6", f"act {act}'s cell-takers", ", ".join(mine) or "none", bool(mine) and spec))
+    return out
 
 
 def power_table() -> list[Result]:
@@ -300,14 +389,14 @@ def _union_length(spans: list[tuple[float, float]]) -> float:
 
 
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
-    bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, tower_kinds, real_estate,
-    power_table,
+    bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, hymn_seeks, tower_kinds, real_estate,
+    worth_and_cells, blight_kinds, power_table, armor_duels,
 )
 
 NOT_YET = (
     "G1.1", "G1.2", "G1.3", "G1.4", "G1.5", "G1.6", "G2.2", "G2.5", "G2.6", "G3.1", "G3.2", "G3.3",
-    "M1", "M2", "M3", "M5", "M7", "M9", "M10", "S2", "S3", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
-    "R2", "R4", "R6", "R7", "T2", "T4",
+    "M1", "M2", "M3", "M5", "M7", "M10", "S2", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
+    "R4", "T2", "T4",
 )
 
 

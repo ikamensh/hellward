@@ -54,20 +54,23 @@ def test_a_kind_is_locked_until_its_unlock_is_learned():
     assert can_learn(frozenset({"unlock_ballista"}), "adept_ballista", 8)
 
 
-def test_the_tree_costs_one_hundred_seventy_seven_with_a_column_per_kind():
-    assert TREE_COST == 177
-    assert len(SKILLS) == 48
+def test_the_tree_costs_two_hundred_forty_six_with_a_column_per_kind():
+    assert TREE_COST == 246
+    assert len(SKILLS) == 60
     assert COLUMNS["arrow"] == "Arrow"
     assert sum(s.cost for s in SKILLS.values() if s.column == "arrow") == 6
-    for column in ("ballista", "hook", "knife"):
-        assert sum(s.cost for s in SKILLS.values() if s.column == column) == 10
+    assert sum(s.cost for s in SKILLS.values() if s.column == "ballista") == 10
+    assert sum(s.cost for s in SKILLS.values() if s.column == "hook") == 13
+    assert sum(s.cost for s in SKILLS.values() if s.column == "knife") == 12
+    for column in ("idol", "censer", "well", "effigy"):   # mechanics columns are premium: engines cost choices
+        assert sum(s.cost for s in SKILLS.values() if s.column == column) == 16
     for column in ("fire", "lightning", "cold", "poison", "bone", "nature"):
         assert sum(s.cost for s in SKILLS.values() if s.column == column) == 20
     assert sum(s.cost for s in SKILLS.values() if s.column == "warding") == 5
     assert sum(s.cost for s in SKILLS.values() if s.column == "sorcery") == 7
     assert sum(s.cost for s in SKILLS.values() if s.column == "spells") == 9
-    assert set(COLUMNS) == {"arrow", "ballista", "hook", "knife", "fire", "lightning", "cold",
-                            "poison", "bone", "nature", "warding", "sorcery", "spells"}
+    assert set(COLUMNS) == {"arrow", "ballista", "hook", "knife", "idol", "censer", "well", "effigy", "fire",
+                            "lightning", "cold", "poison", "bone", "nature", "warding", "sorcery", "spells"}
     for skill in SKILLS.values():
         assert 1 <= skill.tier <= 5
 

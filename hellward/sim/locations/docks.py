@@ -51,6 +51,6 @@ DOCKS = Location(
     theme="docks",
     blurb="Kurast's harbour: rotting piers over black water, and the Flayers waiting along them.",
     taunt="You crossed a sea for a lamp that is not yours. My shaman will raise every Flayer you leave whole.",
-    lesson="Hooks drag Flayers back under your towers, knives make the gate a kill zone; kill the shaman before it raises the dead.",
+    lesson="Zealots wear armor 2 but burn: fire answers them. The Fetish Shaman raises what falls.",
     requires=("hells_gate",),
 )

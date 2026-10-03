@@ -1,10 +1,12 @@
 class_name Builder
 extends Node3D
 ## The player's hands: hold a tower (1-8 or a slot) and click bare ground to raise it; click a tower to choose it,
-## then U upgrades, Delete (or Backspace) sells. Z, X and C pick Smite, Meteor and Frozen Orb, aimed with a
-## click; R sings Battle Hymn over the chosen tower, or with none chosen picks it to aim at one. Hold the gate
+## then U upgrades, Delete (or Backspace) sells, M teaches the next owned strategy, T attunes for charges.
+## Z, X and C pick Smite, Meteor and Frozen Orb, aimed with a click; R sings Battle Hymn over the chosen tower,
+## or with none chosen picks it to aim at one. Hold the gate
 ## and click an arch to ward it. Space summons a wave, F doubles the pace, V sells a salvage drop, H hides the
-## HUD, Esc lets go. WASD, Q and E are the camera's (CameraRig). Keys are read by their place on the keyboard, as
+## HUD, G skips a surely clean wave for its bonus, Esc lets go. WASD, Q and E are the camera's (CameraRig).
+## Keys are read by their place on the keyboard, as
 ## the camera reads its own (the labels name a QWERTY keyboard's letters): any layout, Cyrillic too, gives the
 ## same keys. The monster under the mouse shows its plate (Hud.hover).
 ## Everything is an order to the server; the ghost and the marks are only this side's guesses.
@@ -27,6 +29,7 @@ var _reach_mark: MeshInstance3D
 var _field: MeshInstance3D            # the whole map's buildability, while a tower is held: green floor, ember lanes
 var _arch_marks: Array = []           # a diamond over every gate socket, while the gate is held
 var _staged := Vector2i(-1, -1)       # a staged cursor tile (captures, tests): the mouse's stead while set
+var _worth_mark: Label3D             # the hovered cell's worth to the held tower, in tiles of the walk
 var _mouse := Vector2(-1, -1)        # the mouse in the viewport's pixels, as its last motion put it
 
 
@@ -38,6 +41,17 @@ func setup(w: World, h: Hud, r: CameraRig) -> void:
 	hud.order.connect(_order)
 	_tile_mark = _marker(true)
 	_reach_mark = _marker(false)
+	_worth_mark = Label3D.new()
+	_worth_mark.font = Style.title_font()
+	_worth_mark.font_size = 48
+	_worth_mark.pixel_size = 0.005
+	_worth_mark.modulate = Color(0.9, 0.95, 1.0)
+	_worth_mark.outline_modulate = Color(0.02, 0.03, 0.06)
+	_worth_mark.outline_size = 10
+	_worth_mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_worth_mark.no_depth_test = true
+	_worth_mark.visible = false
+	add_child(_worth_mark)
 	_ghost_mat = StandardMaterial3D.new()
 	_ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_ghost_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -147,6 +161,7 @@ func _process(_delta: float) -> void:
 	_field.visible = held != "" and not held.begins_with("spell:") and held != "gate"
 	_set_arches(held == "gate")
 	if held == "" or held == "gate":
+		_worth_mark.visible = false
 		_tile_mark.visible = held == "gate" and _arch_at(tile) >= 0
 		if _tile_mark.visible:
 			_tile_mark.global_position = world.level.tile_pos(tile) + Vector3(0, 0.06, 0)
@@ -157,6 +172,7 @@ func _process(_delta: float) -> void:
 		_hover(tile)
 		return
 	if held.begins_with("spell:"):
+		_worth_mark.visible = false
 		_spell_mark(held.substr(6), p, tile)
 		return
 	var state := ghost_state(held, tile)
@@ -179,12 +195,13 @@ func _process(_delta: float) -> void:
 		"poor":
 			hint = "%s costs %d gold" % [world.tower_table(held)["name"], world.tower_cost(held)]
 	hud.build_hint(hint, _screen(p), state != "ok")
+	_show_worth(tile, at)
 
 
-## This side's guess at whether a tower of `kind` would rise on `tile`: ok, ground (no floor), taken (a tower
-## stands there) or poor (the purse is short). The server decides; the ghost only guesses.
+## This side's guess at whether a tower of `kind` would rise on `tile`: ok, ground (no floor, or blighted),
+## taken (a tower stands there) or poor (the purse is short). The server decides; the ghost only guesses.
 func ghost_state(kind: String, tile: Vector2i) -> String:
-	if not world.level.buildable(tile):
+	if not world.level.buildable(tile) or world.blighted_at(tile):
 		return "ground"
 	if world.tower_at(tile) != null:
 		return "taken"
@@ -220,6 +237,23 @@ func _spell_mark(key: String, p: Vector3, tile: Vector2i) -> void:
 ## A ground point on the screen, in window pixels for the HUD's cursor tag.
 func _screen(p: Vector3) -> Vector2:
 	return get_viewport().get_final_transform() * rig.cam.unproject_position(p)
+
+
+## The hovered cell's worth to the held tower, from the battle's worth tables: how much of the monsters'
+## walk a tower there reaches, with the gates as they stand.
+func _show_worth(tile: Vector2i, at: Vector3) -> void:
+	var table: Dictionary = (world.start.get("worth", {}) as Dictionary).get(held, {})
+	_worth_mark.visible = _tile_mark.visible and not table.is_empty()
+	if not _worth_mark.visible:
+		return
+	var cells: Dictionary = table["bare"]
+	for d in world.doors:
+		if bool(d[2]):
+			for g in table["gates"]:
+				if int(g["door"]) == int(d[0]):
+					cells = g["cells"]
+	_worth_mark.global_position = at + Vector3(0, 1.6, 0)
+	_worth_mark.text = "%.1f tiles of the walk" % float(cells.get("%d,%d" % [tile.x, tile.y], 0.0))
 
 
 ## With nothing held, the tower under the mouse shows its reach faintly; the chosen tower's stays bright.
@@ -278,9 +312,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_U: _order("upgrade")
 			KEY_DELETE, KEY_BACKSPACE: _order("sell")
 			KEY_V: _order("salvage")
+			KEY_G: _order("skip")
 			KEY_SPACE: _order("wave")
 			KEY_F: _order("pace")
 			KEY_H: hud.toggle()
+			KEY_M: hud.cycle_mode()
+			KEY_T: _order("attune")
 			KEY_ESCAPE:
 				if held != "" or chosen:
 					let_go()
@@ -361,6 +398,7 @@ func _cast(key: String, p: Vector3, shift: bool) -> void:
 func _order(name: String) -> void:
 	match name:
 		"wave": world.order("call_wave")
+		"skip": world.order("skip_grind")
 		"pace":
 			Engine.time_scale = 1.0 if Engine.time_scale > 1.0 else 2.0
 			hud.set_pace(Engine.time_scale > 1.0)
@@ -374,11 +412,19 @@ func _order(name: String) -> void:
 				var t := chosen
 				if await world.order("sell", {"tower": t.id}):
 					choose(null)
+		"attune":
+			if chosen:
+				await world.order("attune", {"tower": chosen.id})
 		_:
 			if name.begins_with("breach:"):
 				world.order("breach", {"mode": name.substr(7)})
 			elif name.begins_with("spell:"):
 				hold(name)
+			elif name.begins_with("mode:"):
+				if chosen:
+					world.order("set_mode", {"tower": chosen.id, "mode": name.substr(5)})
+			elif name.begins_with("summon:"):
+				world.order("summon", {"stake": int(name.substr(7))})
 
 
 ## The living monster nearest a ground point, within a smite's reach of it; or null.

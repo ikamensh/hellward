@@ -40,7 +40,7 @@ CATACOMBS = Location(
          g("witch", 1, start=25.0, route="side_detour")),
     ),
     wave_names=("The Bone Halls", "Rot Below", "Doorbreaker", "The Overlords' Tread"),
-    arsenal=Arsenal(("arrow", "pyre", "frost", "ballista"), gates=True, spells=("smite", "hymn")),
+    arsenal=Arsenal(("arrow", "pyre", "frost", "ballista", "idol"), gates=True, spells=("smite", "hymn")),
     start_gold=BALANCE.starting_gold(),
     theme="catacombs",
     blurb="Under the nave, two bone halls cross an open ossuary. Overlords break gates for a living.",

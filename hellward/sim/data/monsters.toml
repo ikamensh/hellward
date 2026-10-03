@@ -125,6 +125,7 @@ vulnerable = []
 armor = 0
 boss = false
 leader = { curses = ["weaken"] }
+blight = { verb = "desecrate", past = "desecrated" }
 
 [priest]
 name = "Bone Acolyte"
@@ -202,6 +203,7 @@ protected = ["poison"]
 vulnerable = ["cold"]
 armor = 0
 boss = false
+blight = { verb = "web", past = "webbed" }
 
 [bat]
 name = "Blood Bat"

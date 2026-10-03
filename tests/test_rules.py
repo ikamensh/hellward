@@ -253,3 +253,53 @@ def test_a_monster_a_spell_kills_between_steps_walks_no_further():
     lives = world.lives
     run(world, 1)
     assert world.lives == lives and world.kills == 1
+
+
+def test_the_world_counts_the_kills_its_casts_finish():
+    world = World(wave_of("fallen", 2))
+    floor = [(x, y) for y in range(12) for x in range(20) if world.buildable(x, y)]
+    tile = max(floor, key=lambda t: sum(b - a for a, b in world.level.coverage(t, 2.8)))
+    world.build("arrow", tile)
+    started(world)
+    run(world, 2)
+    world.mana = 100
+    pig, stray = world.monsters
+    pig.hp = min(pig.hp, SPELLS["smite"].damage * world.power())
+    world.smite(pig.id)
+    assert (world.kills, world.spell_kills) == (1, 1)
+    run(world, 60)
+    assert world.kills == 2 and world.spell_kills == 1   # the arrow's kill is its tower's
+
+
+def test_smite_finishes_a_small_stray_at_three_fifths_life():
+    small = [kind for kind in MONSTERS.values()
+             if kind.hp <= 16 and not kind.boss and kind.leader is None]
+    assert len(small) >= 8   # bat to goatman: the craft below covers them all
+    for kind in small:
+        world = World(wave_of(kind.key))
+        started(world)
+        run(world, 2)
+        world.mana = 100
+        stray = world.monsters[0]
+        stray.hp = kind.hp * 0.6
+        world.smite(stray.id)
+        assert not world.monsters, kind.key
+        assert world.spell_kills == 1
+
+
+def test_a_meteors_burn_kills_as_a_cast_and_a_pyres_does_not():
+    from hellward.sim.model import Hazard
+    assert Hazard(1.0, 2.0, 3.0, 4.0, 5.0).spell is False
+    world = World(wave_of("hulk"))
+    started(world)
+    run(world, 2)
+    world.mana = 100
+    hulk = world.monsters[0]
+    x, y = world.position(hulk)
+    world.meteor(x, y)
+    hulk.frozen = 99.0   # pinned where it stands: landing and burn both find it
+    run(world, 1.5)   # the landing: hurting, not killing
+    assert hulk.hp > 0 and world.hazards and world.hazards[0].spell is True
+    hulk.hp = 1.0   # the floor finishes it
+    run(world, 3)
+    assert not world.monsters and world.spell_kills == 1

@@ -93,3 +93,16 @@ def test_a_ghost_learns_its_logs_skills_or_says_they_cost_too_much():
     assert ghost.draft(LOCATIONS["tristram"], 3) == frozenset({"adept_arrow"})
     with pytest.raises(ValueError):
         ghost.draft(LOCATIONS["tristram"], 0)
+
+
+def test_a_ghost_replays_its_logs_foresight_and_old_logs_spent_wisely():
+    eager = {"version": 3, "location": "tristram", "seed": 1, "skills": [], "loadout": [],
+             "outcome": "victory", "lives": 20, "time": 0.0, "foresight": False, "commands": []}
+    world = World(LOCATIONS["tristram"], seed=1)
+    Ghost(eager).act(Hands(world, react_for(1)))
+    assert world.foresight is False
+    old = {"version": 2, "location": "tristram", "seed": 1, "skills": [], "loadout": [],
+           "outcome": "victory", "lives": 20, "time": 0.0, "commands": []}
+    world = World(LOCATIONS["tristram"], seed=1, foresight=False)
+    Ghost(old).act(Hands(world, react_for(1)))
+    assert world.foresight is True   # version 2 never said: it always spent wisely

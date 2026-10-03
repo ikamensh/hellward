@@ -7,13 +7,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from hellward.run import lives_sigils
 from hellward.server.saves import Saves
 from hellward.sim.breaches import BREACHES
 from hellward.sim.campaign import ACTS, LOCATIONS, ORDER, Location, sigils
 from hellward.sim.items import PATTERNS, Loadout, Pattern
+from hellward.sim.modes import ATTUNE, FORESIGHT, MODES, Mode
 from hellward.sim.skills import can_learn, check, cost, kept
 
 SLOT = "campaign"
+RUN_SLOT = "run"
 BREACH_SITES = frozenset(BREACHES)
 
 
@@ -22,6 +25,13 @@ def slot_for_profile(profile: str) -> str:
     if not profile.isidentifier():
         raise ValueError(f"Profile name must be a simple word: {profile!r}")
     return SLOT if profile == "main" else f"{SLOT}_{profile}"
+
+
+def slot_for_run(profile: str) -> str:
+    """One run save per profile: the Run, the current defence's Kit, and its log."""
+    if not profile.isidentifier():
+        raise ValueError(f"Profile name must be a simple word: {profile!r}")
+    return RUN_SLOT if profile == "main" else f"{RUN_SLOT}_{profile}"
 
 
 def campaign_profiles(saves: Saves) -> tuple[str, ...]:
@@ -54,7 +64,12 @@ class Progress:
     breach_claims: dict[str, str] = field(default_factory=dict)   # location → first successful choice: trophy or cash
     trophies: frozenset[str] = frozenset()   # unspent trophy IDs, each the breach location's key
     patterns: frozenset[str] = frozenset()   # forged patterns, owned permanently
+    modes: frozenset[str] = frozenset()      # strategies taught, owned permanently ("first" is free)
+    attune: bool = False                    # attunement taught: towers may hold charges
+    foresight: bool = False                 # foresight taught: charges are spent only where they kill
     loadout: Loadout = field(default_factory=Loadout)
+    runs_won: int = 0
+    runs_lost: int = 0
     profile: str = "main"
     saves: Saves | None = field(default=None, repr=False, compare=False)
 
@@ -76,10 +91,17 @@ class Progress:
         loadout = Loadout(tuple(state.get("loadout", ())))
         if not set(loadout.equipped) <= owned:
             raise ValueError("Equipped tower pattern is not owned")
+        taught = frozenset(state.get("modes", ()))
+        unknown_modes = sorted(key for key in taught if key not in MODES)
+        if unknown_modes:
+            raise ValueError(f"Unknown strategy in save: {unknown_modes[0]}")
         progress = cls(won=dict(won), learned=learned, at=state["at"], seen=frozenset(state.get("seen", ())),
                        salvage_best=dict(state.get("salvage_best", {})), salvage=state.get("salvage", 0),
                        breach_claims=dict(state.get("breach_claims", {})),
-                       trophies=frozenset(state.get("trophies", ())), patterns=owned, loadout=loadout,
+                       trophies=frozenset(state.get("trophies", ())), patterns=owned, modes=taught,
+                       attune=bool(state.get("attune", False)), foresight=bool(state.get("foresight", False)),
+                       loadout=loadout,
+                       runs_won=state.get("runs_won", 0), runs_lost=state.get("runs_lost", 0),
                        profile=profile, saves=saves)
         check(progress.learned)
         return progress
@@ -89,7 +111,10 @@ class Progress:
             state = {"won": self.won, "learned": sorted(self.learned), "at": self.at, "seen": sorted(self.seen),
                      "salvage_best": self.salvage_best, "salvage": self.salvage,
                      "breach_claims": self.breach_claims, "trophies": sorted(self.trophies),
-                     "patterns": sorted(self.patterns), "loadout": list(self.loadout.equipped)}
+                     "patterns": sorted(self.patterns), "modes": sorted(self.modes),
+                     "attune": self.attune, "foresight": self.foresight,
+                     "loadout": list(self.loadout.equipped),
+                     "runs_won": self.runs_won, "runs_lost": self.runs_lost}
             self.saves.save(slot_for_profile(self.profile), state, "Progress",
                             summary={"sigils": self.sigils, "at": self.at})
 
@@ -160,6 +185,27 @@ class Progress:
         self.save()
         return RewardGain(gained, salvage_gained, trophy_gained)
 
+    def record_run(self, location: str, lives_lost: int, breach_mode: str | None,
+                   breach_cleared: bool) -> RewardGain:
+        """Keep a run defence's win: the best lives sigils there, and a first breach trophy. The run's
+        salvage stays in the run until it ends; only the profile's purse outlives it."""
+        if location not in LOCATIONS:
+            raise KeyError(location)
+        earned = lives_sigils(lives_lost)
+        gained = max(0, earned - self.best(location))
+        if gained:
+            self.won[location] = earned
+        trophy_gained = None
+        if breach_cleared and location not in self.breach_claims:
+            assert breach_mode in ("cash", "trophy")
+            self.breach_claims[location] = breach_mode
+            if breach_mode == "trophy":
+                self.trophies = self.trophies | {location}
+                trophy_gained = location
+        self.at = location
+        self.save()
+        return RewardGain(gained, 0, trophy_gained)
+
     def next_location(self, act: int) -> Location | None:
         """The first location in the given act that is open and not yet held."""
         for key in ACTS[act]:
@@ -200,6 +246,44 @@ class Progress:
         self.patterns |= {key}
         self.save()
         return pattern
+
+    def teach(self, key: str) -> Mode:
+        """Spend banked salvage on one permanent targeting strategy."""
+        if key == ATTUNE.key:
+            return self.teach_attunement()
+        if key == FORESIGHT.key:
+            return self.teach_foresight()
+        mode = MODES[key]
+        if key == "first" or key in self.modes:
+            raise ValueError(f"{mode.name} is already taught")
+        if self.salvage < mode.salvage_cost:
+            raise ValueError(f"{mode.name} needs {mode.salvage_cost} salvage")
+        self.salvage -= mode.salvage_cost
+        self.modes = self.modes | {key}
+        self.save()
+        return mode
+
+    def teach_attunement(self) -> Mode:
+        """Spend banked salvage on attunement: every tower may hold charges."""
+        if self.attune:
+            raise ValueError(f"{ATTUNE.name} is already taught")
+        if self.salvage < ATTUNE.salvage_cost:
+            raise ValueError(f"{ATTUNE.name} needs {ATTUNE.salvage_cost} salvage")
+        self.salvage -= ATTUNE.salvage_cost
+        self.attune = True
+        self.save()
+        return ATTUNE
+
+    def teach_foresight(self) -> Mode:
+        """Spend banked salvage on foresight: charges are spent only where they kill."""
+        if self.foresight:
+            raise ValueError(f"{FORESIGHT.name} is already taught")
+        if self.salvage < FORESIGHT.salvage_cost:
+            raise ValueError(f"{FORESIGHT.name} needs {FORESIGHT.salvage_cost} salvage")
+        self.salvage -= FORESIGHT.salvage_cost
+        self.foresight = True
+        self.save()
+        return FORESIGHT
 
     def equip(self, key: str) -> Loadout:
         """Equip an owned pattern, replacing any other pattern on that tower family."""

@@ -5,9 +5,12 @@
 
 Each defender is the ordinary player with a different element rotation and tower count. For every leader
 policy it prints the victories, the lives the defenders lost (mean and range), the curses cast, and S3's measure:
-the share of the towers the curses caught that were hymned when caught, against the share of tower-time that was
-hymned. The leaders are worth something when ``smart`` costs the defenders clearly more lives than ``random``, and
-see the hymn when they curse hymned towers more often than the hymn's share of the time.
+the hymn's lift at decision time. Every chant names its aimed tower; the lift is the hymned share of the aimed
+towers against the hymned share of the towers in reach at each chant, summed over chants. Aggregates over a
+whole defence cannot show seeking (hymned towers are the busy ones, so even a random curser catches them more
+often); the lift isolates the choice itself, and ``random`` reads 1.0x by construction. The leaders are worth
+something when ``smart`` costs the defenders clearly more lives than ``random``, and see the hymn when their
+lift is clearly above 1.
 
 It runs the compiled simulation (:mod:`hellward.fastsim`, built on first use), which plays as the source does;
 ``HELLWARD_INTERPRETED=1`` runs the source.
@@ -44,6 +47,13 @@ def defenders(count: int) -> list[Ordinary]:
     return [Ordinary(shift=i % 5, towers=(13, 15)[i // 5 % 2]) for i in range(count)]
 
 
+def chant_lift(chants: list[tuple[int, float]]) -> tuple[float, int, float]:
+    """The hymn's lift: hymned aimed towers over the hymned share of the towers in reach, summed over chants."""
+    hymned = sum(h for h, _ in chants)
+    expected = sum(s for _, s in chants)
+    return (hymned / expected if expected > 0 else 0.0, hymned, expected)
+
+
 def match(policy: str, index: int, count: int, location: str) -> dict:
     defender = defenders(count)[index]
     world = World(LOCATIONS[location], seed=index, planner=POLICIES[policy]())
@@ -51,24 +61,28 @@ def match(policy: str, index: int, count: int, location: str) -> dict:
     hands = Hands(world, react=0.6)
     stats: Counter = Counter()
     leaks: Counter = Counter()
+    chants: list[tuple[int, float]] = []   # (aimed tower hymned, hymned share in reach) per chant
     while world.outcome is None and world.time < 1800:
         defender.act(hands)
         world.step(SIM_DT)
         hands.observe(world.events)
-        stats["tower_steps"] += len(world.towers)
-        stats["hymned_steps"] += sum(1 for t in world.towers.values() if t.hymn > 0)
         for e in world.events:
             if e[0] in ("cursed", "fizzle", "hymn", "door_broken"):
                 stats[e[0]] += 1
-            if e[0] == "cursed":
-                stats["caught"] += len(e[4])
-                stats["caught_hymned"] += sum(1 for tid in e[4] if world.towers[tid].hymn > 0)
+            if e[0] == "chant":
+                leader = next((m for m in world.monsters if m.id == e[1]), None)
+                aimed = next((t for t in world.towers.values() if t.tile == e[3]), None)
+                if leader is not None and aimed is not None:
+                    in_reach = planner.reachable(world, leader)
+                    if in_reach:
+                        chants.append((1 if aimed.hymn > 0 else 0,
+                                       sum(1 for t in in_reach if t.hymn > 0) / len(in_reach)))
             elif e[0] in ("leak", "returned"):
                 leaks[world.wave] += e[3]
         world.events.clear()
     lost = 10_000 - world.lives
     return {"policy": policy, "outcome": "victory" if lost < START_LIVES else "defeat", "lost": lost, "wave": world.wave,
-            "stats": stats, "leaks": leaks}
+            "stats": stats, "leaks": leaks, "chants": chants}
 
 
 def main() -> None:
@@ -89,11 +103,13 @@ def main() -> None:
         stats: Counter = sum((r["stats"] for r in rows), Counter())
         leaks: Counter = sum((r["leaks"] for r in rows), Counter())
         n = len(rows)
-        hymned = stats["caught_hymned"] / stats["caught"] if stats["caught"] else 0.0
-        hymn_time = stats["hymned_steps"] / stats["tower_steps"] if stats["tower_steps"] else 0.0
+        chants = [c for r in rows for c in r["chants"]]
+        lift, hymned, expected = chant_lift(chants)
+        s3 = (f"hymn lift {lift:.1f}x ({hymned}/{expected:.1f} over {len(chants)} chants)"
+              if expected > 0 else "hymn lift n/a")
         print(f"{policy:8s} wins {wins}/{n}  lives lost mean {statistics.mean(lost):5.1f} range {min(lost)}-{max(lost)}  "
               f"curses {stats['cursed'] / n:4.1f} hymns {stats['hymn'] / n:4.1f} doors broken {stats['door_broken'] / n:3.1f}  "
-              f"hymned caught {hymned:.0%} of tower-time {hymn_time:.0%}  "
+              f"{s3}  "
               f"lives lost by wave {' '.join(f'{w + 1}:{leaks[w] / n:.1f}' for w in sorted(leaks))}")
 
 

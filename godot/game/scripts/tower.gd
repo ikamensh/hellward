@@ -5,7 +5,9 @@ extends Node3D
 ## shown from its muzzle. It turns to face what it last shot at.
 
 # a family without a model of its own wears another's, tinted, until it has one
-const STAND_INS := {}   # kind -> [the model it borrows, its tint], while its own is not built
+const STAND_INS := {"idol": ["frost", Color(0.75, 0.88, 1.0)],   # kind -> [model, tint], while its own is not built
+	"censer": ["pyre", Color(1.0, 0.55, 0.45)], "well": ["frost", Color(0.55, 0.75, 0.95)],
+	"effigy": ["pyre", Color(0.6, 0.55, 0.7)]}
 const LOOKS := {"arrow": "arrow", "ballista": "ballista", "knife": "knife", "pyre": "fire", "frost": "frost",
 	"plague": "frost", "altar": "fire", "grove": "fire"}
 const CASTS := {"arrow": "arrow_cast", "ballista": "ballista_cast", "knife": "knife_cast", "pyre": "fire_cast",
@@ -16,6 +18,10 @@ const HYMN := Color(1.0, 0.78, 0.3)  # Battle Hymn's gold
 var world: World
 var id := 0
 var kind: String
+var mode := "first"               # its strategy, from its facts and the mode event
+var attuned := false              # whether it holds charges, from its frames
+var charges := 0.0
+var attunable := true             # whether its shots spend charges: the card's ATTUNE shows only then
 var tile: Vector2i
 var rank := 0
 var spent := 0
@@ -46,6 +52,7 @@ func setup(w: World, ident: int, facts: Dictionary) -> void:
 	tile = Vector2i(int(facts["tile"][0]), int(facts["tile"][1]))
 	rank = int(facts["level"])
 	spent = int(facts["spent"])
+	mode = String(facts.get("mode", "first"))
 	reach = float(world.tower_table(kind)["levels"][rank]["range"])
 
 
@@ -173,6 +180,9 @@ func sync(entry: Array) -> void:
 	upgrade_cost = entry[5]
 	needs = entry[6]
 	refund = int(entry[7])
+	attuned = bool(entry[8])
+	charges = float(entry[9])
+	attunable = entry.size() <= 10 or bool(entry[10])
 	_sing(hymn > 0.0)
 
 

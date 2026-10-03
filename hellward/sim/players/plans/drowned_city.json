@@ -7,7 +7,7 @@
  "orb_worth": 1.8,
  "reserve": 60.0,
  "trained": {"confirmed_on": [13, 14, 15, 16, 17, 18, 19, 20], "life": 1.0, "smart_score": 30.5, "smart_score_at_1": 30.5, "defences": 1036, "minutes": 0.4, "generations": 40},
- "map": "e73c9f770338",
+ "map": "32fa3a0f8fc4",
  "steps": [
   ["build", "pyre", [13, 7]],
   ["build", "storm", [30, 2]],

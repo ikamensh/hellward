@@ -36,13 +36,41 @@ from hellward.sim.content import (
 )
 from hellward.sim.items import EMPTY_LOADOUT, Loadout, PATTERNS
 from hellward.sim.level import Level
+from hellward.sim.modes import MODES
+from hellward.sim.relics import (
+    BELL_MANA,
+    BELLOWS_MANA,
+    BELLOWS_WELL,
+    BLOOD_GOLD,
+    BLOOD_LIVES,
+    CANTICLE_WELL,
+    HOARD_REACH,
+    MARTYR_GOLD,
+    MASTERWORK_MANA,
+    RELICS,
+    SCAFFOLD_GOLD,
+    SPITE_MANA,
+    TRANCE_RATE,
+    TRANCE_TIME,
+)
 from hellward.sim.skills import NO_PERKS, RANK_SKILL, SKILLS, SPELL_UNLOCK, UNLOCK, Perks, baked
+from hellward.sim import worth as cell_worth
 from hellward.sim.xp import clear_xp, kill_xp, xp_next
 
 if TYPE_CHECKING:
     from hellward.sim.planner import Decision
 
 SIM_DT: Final = 0.05            # the clock's step: not a tuning value (replays and the protocol count steps)
+SKIP_STEPS: Final = 3600        # a grind prediction's and a skip's longest look: three sim-minutes
+ATTUNE_GOLD: Final = 25         # an attunement's price in battle gold, per tower
+ATTUNABLE: Final = ("bolt", "chain", "venom")   # the shots that spend charges; the hook drags and the supports sing, and attunement would idle on them
+CHARGES_MAX: Final = 3.0        # the charges an attuned tower holds
+CHARGE_EVERY: Final = 15.0      # seconds per charge regained
+CHARGED_COOLDOWN: Final = 3.0   # seconds after an empowered shot before the next
+EMPOWER: Final = 3.0            # an empowered shot's damage
+IDOL_EVERY: Final = (45.0, 32.0, 22.0)   # the idol's rite, seconds per rank: a free smite
+CENSER_HURT: Final = (30.0, 60.0, 100.0)   # the immolation's damage, per rank
+WELL_EVERY: Final = (20.0, 15.0, 11.0)   # the well's watering, seconds per rank: a charge given
 DOOR_STOP: Final = tuning.number("battle.door_stop")
 JOSTLE: Final = tuning.number("battle.jostle")
 CHAIN_JUMP: Final = tuning.number("battle.chain_jump")
@@ -58,6 +86,9 @@ HOOK_PULL: Final = tuning.number("battle.hook_pull")
 HOOK_PAST: Final = tuning.number("battle.hook_past")
 HYMN_RATE: Final = SPELLS["hymn"].rate
 HOOK: Final = 1                 # the Hook's bit in Monster.moved: each mover kind moves a monster back once
+BLIGHT_MAX: Final = 5         # blighted and marked cells at once
+BLIGHT_CELLS: Final = 5       # cells a defence takes in all: R6 wants one to five a location that has blight
+BLIGHT_RETRY: Final = 2.0     # seconds before a blighter without a cell looks again
 
 
 class Refused(Exception):
@@ -68,6 +99,7 @@ class Monster:
     __slots__ = ("id", "kind", "hp", "max_hp", "s", "route", "bounty", "salvage", "breach", "elite_name", "speed_factor",
                  "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
                  "cooldown", "asking", "ask_left", "chant_curse", "chant_spot", "chant_left", "door",
+                 "blight_cd", "blight_cell", "blight_left", "blight_wave",
                  "amplified", "amplify", "risen", "marking", "moved", "strikes", "bonus")
 
     def __init__(self, id: int, kind: MonsterKind, wave: int, lane: float, jostle: float, hp: float, cooldown: float,
@@ -98,6 +130,10 @@ class Monster:
         self.chant_spot: tuple[int, int] = (-1, -1)
         self.chant_left = 0.0
         self.door = -1                        # the door socket it is battering, or -1
+        self.blight_cd = kind.blight.delay if kind.blight is not None else 0.0
+        self.blight_cell: tuple[int, int] = (-1, -1)   # the cell its mark burns on, while it marks
+        self.blight_left = 0.0
+        self.blight_wave = -1                 # the wave it marked in last: once a wave
         self.amplified = 0.0                  # seconds of Amplify Damage left
         self.amplify = 0.0                    # the fraction it takes extra (0.3 = 30% more damage)
         self.risen = False                    # has this monster been raised once already
@@ -113,6 +149,8 @@ class Monster:
         m.max_hp, m.s, m.chill, m.chill_left, m.frozen = self.max_hp, self.s, self.chill, self.chill_left, self.frozen
         m.poison = [stack[:] for stack in self.poison]
         m.chant_curse, m.chant_spot, m.chant_left, m.door = self.chant_curse, self.chant_spot, self.chant_left, self.door
+        m.blight_cd, m.blight_cell, m.blight_left, m.blight_wave = (self.blight_cd, self.blight_cell, self.blight_left,
+                                                                   self.blight_wave)
         m.amplified, m.amplify = self.amplified, self.amplify
         m.risen, m.marking, m.moved, m.strikes = self.risen, self.marking, self.moved, self.strikes
         return m
@@ -136,7 +174,7 @@ class Monster:
 
 class Tower:
     __slots__ = ("id", "kind", "levels", "level", "tile", "cooldown", "curses", "hymn", "spent", "spans", "spans_reach",
-                 "timer")
+                 "timer", "mode", "attuned", "charges", "charged_at")
 
     def __init__(self, id: int, kind: TowerKind, levels: tuple[TowerLevel, ...], tile: tuple[int, int]) -> None:
         self.id = id
@@ -151,12 +189,18 @@ class Tower:
         self.spans: tuple[tuple[float, float], ...] = ()   # the path it reaches, for the reach it had last
         self.spans_reach = -1.0
         self.timer = 0.0                      # a grove's twister clock
+        self.mode = "first"                   # its strategy: foremost until taught otherwise
+        self.attuned = False                  # whether it holds charges for empowered shots
+        self.charges = 0.0                    # charges held, to CHARGES_MAX, one per CHARGE_EVERY seconds
+        self.charged_at = -1e9                # when it last spent a charge: the cooldown starts here
 
     def copy(self) -> Tower:
         t = Tower(self.id, self.kind, self.levels, self.tile)
         t.level, t.cooldown, t.curses = self.level, self.cooldown, dict(self.curses)
         t.hymn, t.spent, t.spans, t.spans_reach = self.hymn, self.spent, self.spans, self.spans_reach
-        t.timer = self.timer
+        t.timer, t.mode = self.timer, self.mode
+        t.attuned, t.charges = self.attuned, self.charges
+        t.charged_at = self.charged_at
         return t
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -271,16 +315,17 @@ class Meteor:
 class Hazard:
     """Burning floor: every walker on it takes fire damage each second (flyers pass over)."""
 
-    __slots__ = ("x", "y", "radius", "dps", "left")
+    __slots__ = ("x", "y", "radius", "dps", "left", "spell")
 
-    def __init__(self, x: float, y: float, radius: float, dps: float, left: float) -> None:
+    def __init__(self, x: float, y: float, radius: float, dps: float, left: float, spell: bool = False) -> None:
         self.x, self.y, self.radius, self.dps, self.left = x, y, radius, dps, left
+        self.spell = spell   # a meteor's burning floor (a pyre's is its tower's)
 
     def copy(self) -> Hazard:
-        return Hazard(self.x, self.y, self.radius, self.dps, self.left)
+        return Hazard(self.x, self.y, self.radius, self.dps, self.left, self.spell)
 
     def __reduce__(self) -> tuple[Any, ...]:
-        return Hazard, (self.x, self.y, self.radius, self.dps, self.left)
+        return Hazard, (self.x, self.y, self.radius, self.dps, self.left, self.spell)
 
 
 @dataclass
@@ -308,9 +353,12 @@ class World:
     def __init__(self, location: Location = CATHEDRAL, *, hardness: float = 1.0, perks: Perks = NO_PERKS,
                  seed: int = 0, planner: Planner | None = None, record: bool = True, curse_scale: float = 1.0,
                  loadout: Loadout = EMPTY_LOADOUT, xp: float = 0.0, xp_level: int = 1,
-                 arsenal: Arsenal | None = None) -> None:
+                 arsenal: Arsenal | None = None, relics: tuple[str, ...] = (),
+                 counters: tuple[tuple[str, int], ...] = (), foresight: bool = True) -> None:
         self.location = location
         self.arsenal = location.arsenal if arsenal is None else arsenal
+        self.relics = relics   # the run's relics, won a location at a time
+        self.progress = {key: n for key, n in counters if key in relics}   # each relic's count toward its firing
         self.stage = ORDER.index(location.key)
         self.level = location.level
         self.waves = location.waves
@@ -336,7 +384,7 @@ class World:
         self.time = 0.0
         self.gold = location.start_gold
         self.lives = START_LIVES
-        self.mana = min(MANA_START, perks.mana_max)
+        self.mana = min(MANA_START, self.mana_max)
         self.xp = xp                    # the run's progress to the next level, counted on from here
         self.xp_level = xp_level        # the run's level (``level`` is the map): each level-up refills the mana
         self.xp_total = 0.0             # every point earned this defence, for the run's settling
@@ -369,6 +417,17 @@ class World:
         self.kills = 0
         self.curses_landed = 0
         self.spells_cast = 0
+        self.spell_kills = 0   # kills whose finishing blow was a cast: a player's, the idol's or a relic's
+        self.player_casts = 0   # casts by the player's own hand (S2 counts these a wave)
+        self.wasted_charges = 0   # empowered shots a plain one would have killed with
+        self.foresight = foresight   # the forge's teaching: spend a charge only where it kills
+        self.blighted: dict[tuple[int, int], tuple[int, str]] = {}   # taken cells: cleared waves left, what it is
+        self.blights = 0                  # cells taken this defence, for the run's settling
+        self.blighted_cells: set[tuple[int, int]] = set()   # every cell taken this defence
+        self.builds = 0       # the verbs, counted where they happen: towers raised, ranks bought,
+        self.upgrades = 0     # spells cast (spells_cast), curses landing (curses_landed) and leaks
+        self.leaks = 0
+        self.fervor = 0.0     # the Battle Trance's seconds left: every tower quickened while they last
         self.recharge: dict[str, float] = {}  # seconds each spell still gathers itself after a cast
         self._next_id = 1
 
@@ -403,6 +462,13 @@ class World:
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
         w.leaked_life, w.forced, w.outcome, w.kills, w._next_id = self.leaked_life, [], self.outcome, self.kills, self._next_id
         w.curses_landed, w.spells_cast = self.curses_landed, self.spells_cast
+        w.spell_kills = self.spell_kills
+        w.player_casts = self.player_casts
+        w.wasted_charges, w.foresight = self.wasted_charges, self.foresight
+        w.blighted, w.blights, w.blighted_cells = dict(self.blighted), self.blights, set(self.blighted_cells)
+        w.relics = self.relics
+        w.progress = dict(self.progress)
+        w.builds, w.upgrades, w.leaks, w.fervor = self.builds, self.upgrades, self.leaks, self.fervor
         return w
 
     def _id(self) -> int:
@@ -456,9 +522,17 @@ class World:
         found.sort(key=lambda t: t.id)
         return found
 
+    def striking_reach(self, tower: Tower) -> float:
+        """How far the tower's strikes reach: its own reach, plus the Hoarder's Seal for an attuned tower
+        with full charges."""
+        reach = tower.reach
+        if "hoard" in self.relics and tower.attuned and tower.charges >= CHARGES_MAX:
+            reach += HOARD_REACH
+        return reach
+
     def in_reach(self, tower: Tower, s: float, route: str = "main") -> bool:
-        spans = (self.level.coverage(tower.tile, tower.reach) if route == "main"
-                 else self.level.route(route).coverage(tower.tile, tower.reach))
+        spans = (self.level.coverage(tower.tile, self.striking_reach(tower)) if route == "main"
+                 else self.level.route(route).coverage(tower.tile, self.striking_reach(tower)))
         for a, b in spans:
             if a <= s <= b:
                 return True
@@ -510,7 +584,87 @@ class World:
 
     @property
     def mana_max(self) -> float:
-        return self.perks.mana_max
+        return (self.perks.mana_max - (CANTICLE_WELL if "canticle" in self.relics else 0.0)
+                - (BELLOWS_WELL if "bellows" in self.relics else 0.0))
+
+    @property
+    def spells(self) -> tuple[str, ...]:
+        """The spells offered: the arsenal's unlocked, and the Canticle's Hymn where neither holds it."""
+        offered = tuple(k for k in self.arsenal.spells if k not in self.perks.locked)
+        if "canticle" in self.relics and "hymn" not in offered:
+            offered += ("hymn",)
+        return offered
+
+    def _fervor(self) -> float:
+        """What the Battle Trance makes of every tower's attacks per second."""
+        return TRANCE_RATE if self.fervor > 0 else 1.0
+
+    def _relic(self, verb: str, amount: float = 0.0, who: Monster | Tower | None = None) -> None:
+        """A verb happened: every held relic that reads it counts one, and fires on its count. `who` is the verb's
+        subject where it has one: the tower raised or ranked, the leader whose curse landed."""
+        for key in self.relics:
+            spec = RELICS[key]
+            if spec.verb != verb:
+                continue
+            n = self.progress.get(key, 0) + 1
+            self.progress[key] = n
+            if n % spec.every != 0:
+                continue
+            if key == "tithe":
+                self.gold += round(amount)
+            elif key == "scaffold":
+                self.gold += SCAFFOLD_GOLD
+            elif key == "whetstone":
+                self.gold += round(amount / 2)
+            elif key == "masterwork":
+                self.mana = min(self.mana_max, self.mana + MASTERWORK_MANA)
+            elif key == "trance":
+                self.fervor = TRANCE_TIME
+            elif key == "deep_well":
+                self.mana = min(self.mana_max, self.mana + amount / 2)
+            elif key == "spite":
+                self.mana = min(self.mana_max, self.mana + SPITE_MANA)
+            elif key == "martyr":
+                self.gold += MARTYR_GOLD
+            elif key == "blood_money":
+                self.gold += round(amount) * BLOOD_GOLD
+                self.lives -= BLOOD_LIVES
+            elif key == "bell":
+                for tower in self.towers.values():
+                    if tower.attuned:
+                        tower.charges = min(CHARGES_MAX, tower.charges + 1.0)
+                self.mana = max(0.0, self.mana - BELL_MANA)
+            elif key == "candle":
+                if isinstance(who, Monster) and who.hp > 0:
+                    self._answer(who)
+            elif key == "volatile":
+                foremost: Monster | None = None
+                for monster in self.monsters:
+                    if monster.hp > 0 and (foremost is None or self.remaining(monster) < self.remaining(foremost)):
+                        foremost = monster
+                if foremost is not None:
+                    self._answer(foremost)
+            elif key == "temper" or key == "lodestone":
+                if isinstance(who, Tower) and not who.attuned:
+                    who.attuned = True
+                    who.charges = CHARGES_MAX
+                    self._emit("attuned", who.id)
+            elif key == "bellows":
+                self.mana = min(self.mana_max, self.mana + BELLOWS_MANA)
+            elif key == "stormglass":
+                for tower in self.towers.values():
+                    if tower.attuned:
+                        tower.charges = min(CHARGES_MAX, tower.charges + 1.0)
+            self._emit("relic", key, spec.name)
+
+    def _answer(self, monster: Monster) -> None:
+        """A relic's answering smite: free, and a cast that counts, like the idol's rite. No bury: the slain
+        walk no further this step (every phase skips hp <= 0, like the censer's dead) and the step's end
+        buries them — burying here would mutate the monster list the caller walks."""
+        self._emit("smite", monster.id, self.position(monster))
+        self._hurt(monster, felt_hit(SPELLS["smite"].damage * self.power(), None, monster.kind), None, spell=True)
+        self.spells_cast += 1
+        self._relic("cast", 0.0)
 
     @property
     def gate_life(self) -> float:
@@ -562,6 +716,9 @@ class World:
             raise Refused("Towers stand on the bare floor, not on the path, the walls or the pits.")
         if self.tower_at(tile) is not None:
             raise Refused("A tower already stands there.")
+        if tile in self.blighted:
+            waves, verb = self.blighted[tile]
+            raise Refused(f"That cell is {verb} for {waves} more wave{'s' if waves != 1 else ''}.")
         levels = self.tower_levels[kind]
         cost = self.cost(kind)
         if self.gold < cost:
@@ -570,6 +727,8 @@ class World:
         tower = Tower(self._id(), tower_kind, levels, tile)
         tower.spent = cost
         self.towers[tower.id] = tower
+        self.builds += 1
+        self._relic("build", cost, tower)
         self._emit("built", tower.id, kind)
         return tower
 
@@ -603,6 +762,8 @@ class World:
         self.gold -= cost
         tower.level += 1
         tower.spent += cost
+        self.upgrades += 1
+        self._relic("upgrade", cost, tower)
         self._emit("upgraded", tower.id)
 
     def sell(self, tower_id: int) -> int:
@@ -648,9 +809,9 @@ class World:
         self._emit("door_built", index)
 
     def _spend(self, key: str) -> None:
-        if key not in self.arsenal.spells:
+        if key not in self.arsenal.spells and not (key == "hymn" and "canticle" in self.relics):
             raise Refused(f"{SPELLS[key].name} is not yours to cast in {self.location.called}.")
-        if key in self.perks.locked:
+        if key in self.perks.locked and not (key == "hymn" and "canticle" in self.relics):
             raise Refused(f"{SPELLS[key].name} is locked: learn {SKILLS[SPELL_UNLOCK[key]].name} first.")
         left = self.recharge.get(key, 0.0)
         if left > 0:
@@ -660,6 +821,8 @@ class World:
             raise Refused(f"{SPELLS[key].name} takes {cost:.0f} mana.")
         self.mana -= cost
         self.spells_cast += 1
+        self.player_casts += 1   # the player's own hand: the idol's rites and a relic's answers are not it
+        self._relic("cast", cost)
         if SPELLS[key].recharge > 0:
             self.recharge[key] = SPELLS[key].recharge
 
@@ -678,7 +841,7 @@ class World:
             raise Refused("There is nothing there to smite.")
         self._spend("smite")
         self._emit("smite", m.id, self.position(m))
-        self._hurt(m, felt_hit(SPELLS["smite"].damage * self.power(), None, m.kind), None)
+        self._hurt(m, felt_hit(SPELLS["smite"].damage * self.power(), None, m.kind), None, spell=True)
         self._bury()   # cast between steps: what it killed must not walk on into the next one
 
     def meteor(self, x: float, y: float) -> None:
@@ -700,7 +863,7 @@ class World:
             m.frozen = max(m.frozen, spec.lasting)
             m.door = -1
         for m in struck:
-            self._strike(m, damage, Element.COLD)
+            self._strike(m, damage, Element.COLD, spell=True)
         self._bury()
 
     def _inside_map(self, x: float, y: float) -> None:
@@ -722,6 +885,40 @@ class World:
             raise Refused("The next wave cannot be called yet.")
         self.gold += self.early_call_bonus
         self._start_wave()
+
+    def predict_clean(self) -> bool:
+        """Whether the wave now fighting ends with no losses and no orders: a clone with the leaders'
+        planner steps it to its clearing. Only while a fully spawned wave fights, no pack and no breach."""
+        if (self.outcome is not None or self.wave < 0 or self.break_left is not None or self.schedule
+                or self.bonus is not None or self.breach_remaining > 0):
+            return False
+        twin = self.clone()
+        twin.planner = self.planner
+        lives = twin.lives
+        for _ in range(SKIP_STEPS):
+            twin.step(SIM_DT)
+            if twin.lives < lives:
+                return False
+            if not twin.monsters and not twin.schedule and \
+                    (twin.break_left is not None or twin.outcome is not None):
+                return True
+        return False
+
+    def skip_grind(self) -> int:
+        """Step the fought wave to its clearing, now: the prediction come true, and the bonus gold paid.
+        Refused if a life is lost on the way (the offer was stale)."""
+        lives = self.lives
+        for _ in range(SKIP_STEPS):
+            self.step(SIM_DT)
+            if self.lives < lives:
+                raise Refused("The wave was not clean: a life was lost on the way.")
+            if not self.monsters and not self.schedule and \
+                    (self.break_left is not None or self.outcome is not None):
+                break
+        bonus = BALANCE.income_unit()
+        self.gold += bonus
+        self._emit("skipped", self.wave, bonus)
+        return bonus
 
     def summon(self, pack: BonusPack) -> None:
         """Wager the pack's gold on its monsters: they spawn while the break clock stops, and a clear with no
@@ -805,7 +1002,9 @@ class World:
         if self.outcome is not None:
             return
         self.time += dt
-        self.mana = min(self.perks.mana_max, self.mana + self.perks.mana_regen * dt)
+        self.mana = min(self.mana_max, self.mana + self.perks.mana_regen * dt)
+        if self.fervor > 0:
+            self.fervor = max(0.0, self.fervor - dt)
         if self.recharge:
             for key in list(self.recharge):
                 left = self.recharge[key] - dt
@@ -815,6 +1014,7 @@ class World:
                     self.recharge[key] = left
         self._spawn(dt)
         self._leaders(dt)
+        self._blight(dt)
         self._move(dt)
         self._towers(dt)
         self._bolts(dt)
@@ -924,11 +1124,17 @@ class World:
             self._emit("fizzle", leader_id, spot)
             return
         cursed: list[int] = []
-        for tower in self.caught(spot, curse_radius(curse, leader.kind, self.curse_scale)):
-            tower.curses[curse] = CURSES[curse].duration
-            cursed.append(tower.id)
+        rod = self._effigy(spot)
+        if rod is not None:   # a warding effigy stands unsullied near the spot: the curse goes to it instead
+            rod.curses[curse] = CURSES[curse].duration
+            cursed.append(rod.id)
+        else:
+            for tower in self.caught(spot, curse_radius(curse, leader.kind, self.curse_scale)):
+                tower.curses[curse] = CURSES[curse].duration
+                cursed.append(tower.id)
         if cursed:
             self.curses_landed += 1
+            self._relic("curse", 0.0, leader)
             self._emit("cursed", leader_id, spot, curse, tuple(cursed))
             if spec is not None and spec.burn > 0:
                 amount = spec.burn * len(cursed)
@@ -939,6 +1145,83 @@ class World:
         else:
             self._emit("fizzle", leader_id, spot)
         leader.marking = False
+
+    def _effigy(self, spot: tuple[int, int]) -> Tower | None:
+        """The nearest effigy holding no curse whose reach covers the spot, if one stands."""
+        cx, cy = spot[0] + 0.5, spot[1] + 0.5
+        best: Tower | None = None
+        nearest = 0.0
+        for t in self.towers.values():
+            if t.kind.key != "effigy" or t.curses:
+                continue
+            dx, dy = t.tile[0] + 0.5 - cx, t.tile[1] + 0.5 - cy
+            reach = t.levels[t.level].range
+            if dx * dx + dy * dy <= reach * reach and (best is None or dx * dx + dy * dy < nearest
+                                                       or (dx * dx + dy * dy == nearest and t.id < best.id)):
+                best, nearest = t, dx * dx + dy * dy
+        return best
+
+    def _blight(self, dt: float) -> None:
+        for m in self.monsters:
+            spec = m.kind.blight
+            if spec is None or m.hp <= 0:
+                continue
+            if m.blight_cell != (-1, -1):
+                m.blight_left -= dt
+                if m.blight_left <= 0:
+                    self._land_blight(m)
+                continue
+            if m.blight_wave == self.wave:
+                continue
+            m.blight_cd -= dt
+            if m.blight_cd > 0:
+                continue
+            cell = self._blight_target(m)
+            if cell is None:
+                m.blight_cd = BLIGHT_RETRY
+                continue
+            m.blight_cell, m.blight_left, m.blight_wave = cell, spec.telegraph, self.wave
+            self._emit("blight_mark", m.id, cell, spec.telegraph, spec.past)
+
+    def _blight_target(self, m: Monster) -> tuple[int, int] | None:
+        """The best empty cell in the blighter's reach: worth what a tower there would reach, the simulation's own
+        reckoning. Nothing worthless, nothing taken or already marked, nothing past the fifth cell at once."""
+        spec = m.kind.blight
+        assert spec is not None
+        marked = {o.blight_cell for o in self.monsters if o.blight_cell != (-1, -1)}
+        if len(self.blighted) + len(marked) >= BLIGHT_MAX or len(self.blighted_cells) >= BLIGHT_CELLS:
+            return None
+        x, y = self.position(m)
+        every, ground = cell_worth.shares(self.level, self.waves)
+        built = frozenset(d.index for d in self.doors if d.built)
+        reach = TOWERS["arrow"].levels[0].range
+        best: tuple[int, int] | None = None
+        most = 0.0
+        for cy in range(max(0, int(y - spec.reach)), min(self.level.height, int(y + spec.reach) + 2)):
+            for cx in range(max(0, int(x - spec.reach)), min(self.level.width, int(x + spec.reach) + 2)):
+                cell = (cx, cy)
+                if ((cell in marked or cell in self.blighted or self.tower_at(cell) is not None
+                        or not self.buildable(cx, cy))
+                        or _hypot(cx + 0.5 - x, cy + 0.5 - y) > spec.reach):
+                    continue
+                worth = cell_worth.cell(self.level, every, ground, cell, reach, built=built)
+                if worth > most:
+                    best, most = cell, worth
+        return best
+
+    def _land_blight(self, m: Monster) -> None:
+        spec = m.kind.blight
+        cell = m.blight_cell
+        m.blight_cell, m.blight_left = (-1, -1), 0.0
+        assert spec is not None
+        if (cell in self.blighted or self.tower_at(cell) is not None or not self.buildable(*cell)
+                or (cell not in self.blighted_cells and len(self.blighted_cells) >= BLIGHT_CELLS)):
+            self._emit("blight_fizzle", m.id, cell)   # a tower raced the mark and won, the fifth cell went first
+            return
+        self.blighted[cell] = (spec.waves, spec.past)
+        self.blights += 1
+        self.blighted_cells.add(cell)
+        self._emit("blight", m.id, cell, spec.waves, spec.past)
 
     def _move(self, dt: float) -> None:
         level = self.level
@@ -951,6 +1234,8 @@ class World:
         leaked = False
         ordered, last = True, -math.inf   # whether those still on the map remain nearest the sanctuary first
         for m in monsters:
+            if m.hp <= 0:   # the censer's dead walk no further this step; the step's end buries them
+                continue
             route = level.route(m.route)
             if m.frozen > 0:
                 m.frozen -= dt
@@ -990,12 +1275,21 @@ class World:
                     if m.bonus and self.bonus is not None:
                         self.bonus.leaked = True   # a strike or a leak fails the pack, boss or no boss
                     if m.kind.boss:   # struck back to its portal, with its life and afflictions, to walk again
+                        self._censers(m)   # at the shrine, before the return
+                        if m.hp <= 0:   # the immolation killed it: no return
+                            ordered = False
+                            continue
                         m.s, m.door = 0.0, -1
                         m.strikes += 1
+                        self.leaks += 1
+                        self._relic("leak", m.kind.lives)
                         self._emit("returned", m.id, m.kind.key, m.kind.lives, m.strikes)
                         ordered = False
                         continue
                     self._count_off(m)
+                    self.leaks += 1
+                    self._censers(m)
+                    self._relic("leak", m.kind.lives)
                     self._emit("leak", m.id, m.kind.key, m.kind.lives)
                     leaked = True
                     continue
@@ -1065,6 +1359,84 @@ class World:
             best.door = -1
             self._emit("twister", t.id, best.id)
 
+    def _idol(self, t: Tower, dt: float) -> None:
+        """The idol's rite: every so often it smites the foremost monster in reach, free — a cast
+        that counts the verb, for the relics that read it."""
+        t.timer += dt
+        if t.timer < IDOL_EVERY[t.level]:
+            return
+        ix, iy = t.tile[0] + 0.5, t.tile[1] + 0.5
+        radius = t.levels[t.level].range
+        best: Monster | None = None
+        for m in self.monsters:
+            if m.hp <= 0:
+                continue
+            x, y = self.position(m)
+            dx, dy = x - ix, y - iy
+            if dx * dx + dy * dy <= radius * radius \
+                    and (best is None or self.remaining(m) < self.remaining(best)):
+                best = m
+        if best is None:
+            return
+        t.timer -= IDOL_EVERY[t.level]
+        self._emit("smite", best.id, self.position(best))
+        self._hurt(best, felt_hit(SPELLS["smite"].damage * self.power(), None, best.kind), None, spell=True)
+        self.spells_cast += 1
+        self._relic("cast", 0.0)
+        self._bury()   # what it killed must not walk on into the rest of this step
+
+    def _well(self, t: Tower, dt: float) -> None:
+        """The well's watering: every so often it gives a charge to the attuned neighbour with the fewest,
+        if one holds less than full."""
+        t.timer += dt
+        if t.timer < WELL_EVERY[t.level]:
+            return
+        ix, iy = t.tile[0] + 0.5, t.tile[1] + 0.5
+        radius = t.levels[t.level].range
+        best: Tower | None = None
+        for o in self.towers.values():
+            if o.id == t.id or not o.attuned or o.charges >= CHARGES_MAX:
+                continue
+            dx, dy = o.tile[0] + 0.5 - ix, o.tile[1] + 0.5 - iy
+            if dx * dx + dy * dy <= radius * radius and (best is None or o.charges < best.charges
+                                                         or (o.charges == best.charges and o.id < best.id)):
+                best = o
+        if best is None:
+            return
+        t.timer -= WELL_EVERY[t.level]
+        best.charges = min(CHARGES_MAX, best.charges + 1.0)
+        self._emit("charge_given", t.id, best.id)
+        self._relic("charge")
+
+    def _immolate(self, t: Tower) -> None:
+        """A censer's answer to a leak in its reach: every monster near it burns. Once a wave (the timer
+        keeps the wave it answered, one-based: never answered is 0); the dead are buried at the step's end,
+        with the other fallen."""
+        if t.silenced or t.timer == float(self.wave) + 1.0:
+            return
+        t.timer = float(self.wave) + 1.0
+        cx, cy = t.tile[0] + 0.5, t.tile[1] + 0.5
+        radius = t.levels[t.level].range
+        hurt = CENSER_HURT[t.level]
+        for m in self.monsters:
+            if m.hp <= 0 or (m.s >= self.level.route(m.route).length and m.kind.boss is None):
+                continue   # the already leaked earn no bounty by burning; a striking boss still burns
+            x, y = self.position(m)
+            if (x - cx) ** 2 + (y - cy) ** 2 <= radius * radius:
+                self._hurt(m, felt_hit(hurt, None, m.kind), None)
+        self._emit("immolated", t.id)
+
+    def _censers(self, m: Monster) -> None:
+        """A leak at the shrine: every censer whose reach holds it answers."""
+        x, y = self.position(m)
+        for t in self.towers.values():
+            if t.kind.key != "censer":
+                continue
+            cx, cy = t.tile[0] + 0.5, t.tile[1] + 0.5
+            radius = t.levels[t.level].range
+            if (x - cx) ** 2 + (y - cy) ** 2 <= radius * radius:
+                self._immolate(t)
+
     def _altar(self, t: Tower, stats: TowerLevel, spans: tuple[tuple[float, float], ...], near: float,
                reach: float) -> None:
         """An altar's pulse: amplify the thickest knot of monsters in reach.
@@ -1119,7 +1491,7 @@ class World:
                 if m.amplified < lasting:
                     m.amplified = lasting
                 hit.append(m.id)
-        rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0)
+        rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0) * self._fervor()
         t.cooldown += 1.0 / rate
         self._emit("amplify", t.id, (best_x, best_y), tuple(hit))
 
@@ -1128,11 +1500,15 @@ class World:
         if not monsters:
             for t in self.towers.values():
                 t.cooldown = max(0.0, t.cooldown - dt)
+                if t.attuned and t.charges < CHARGES_MAX:
+                    t.charges = min(CHARGES_MAX, t.charges + dt / CHARGE_EVERY)
             return
         level = self.level
         single_route = len(level.routes) == 1
         static = self.perks.static_field
         for t in self.towers.values():
+            if t.attuned and t.charges < CHARGES_MAX:
+                t.charges = min(CHARGES_MAX, t.charges + dt / CHARGE_EVERY)
             if t.cooldown > 0:
                 t.cooldown -= dt
                 if t.cooldown > 0:
@@ -1141,12 +1517,17 @@ class World:
                 t.cooldown = 0.0
                 continue
             attack = t.kind.attack
-            if attack == "aura":   # a grove never attacks; its timer waits while silenced (above)
-                self._twister(t, dt)
+            if attack == "aura":   # support never attacks; its timer waits while silenced (above)
+                if t.kind.key == "idol":
+                    self._idol(t, dt)
+                elif t.kind.key == "well":
+                    self._well(t, dt)
+                elif t.kind.key == "grove":
+                    self._twister(t, dt)
                 t.cooldown = 0.0
                 continue
             stats = t.levels[t.level]
-            reach = stats.range * t.range_mult() if t.curses else stats.range
+            reach = self.striking_reach(t)
             if reach != t.spans_reach:
                 t.spans, t.spans_reach = level.coverage(t.tile, reach), reach
             spans = t.spans
@@ -1188,24 +1569,24 @@ class World:
                         if not hit:
                             hit = [m]
             else:
-                hit = []
-                for m in monsters:
-                    if single_route and m.s < near:
-                        break
-                    if m.hp > 0 and self._tower_covers(t, m, spans, reach):
-                        if not hit:
-                            hit = [m]
-                            if not (static and attack == "chain") or m.kind.leader is not None:
-                                break
-                        elif m.kind.leader is not None:   # Static Field: a leader in reach draws the first strike
-                            hit = [m]
-                            break
+                picked = self._pick(t, monsters, spans, reach, near, single_route, static, attack)
+                hit = [picked] if picked is not None else []
             if not hit:
                 t.cooldown = 0.0
                 continue
             aura = self.aura_mult(t)
             damage = stats.damage * (t.damage_mult() if t.curses else 1.0)   # the hit; the aura is a factor
-            rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0)
+            if attack in ("bolt", "chain", "venom") and t.attuned and t.charges >= 1.0 \
+                    and self.time - t.charged_at >= CHARGED_COOLDOWN \
+                    and (not self.foresight or self._worth_charge(t, hit[0], damage * aura)):
+                if hit[0].hp <= damage * aura:
+                    self.wasted_charges += 1   # the plain shot would have killed with it
+                damage *= EMPOWER
+                t.charges -= 1.0
+                t.charged_at = self.time
+                self._emit("spent", t.id, hit[0].id)
+                self._relic("charge")
+            rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0) * self._fervor()
             t.cooldown += 1.0 / rate
             if attack == "nova":
                 self._emit("nova", t.id)
@@ -1230,6 +1611,67 @@ class World:
                             stats.leader_bonus, aura)
                 self.bolts.append(bolt)
                 self._emit("bolt", bolt)
+
+    def _pick(self, t: Tower, monsters: list[Monster], spans: tuple[tuple[float, float], ...], reach: float,
+              near: float, single_route: bool, static: bool, attack: str) -> Monster | None:
+        """The default choice of one target: foremost, unless the tower's strategy says otherwise. Ties
+        go foremost; a taught tower scans all it covers, since the answer may stand anywhere in reach."""
+        if t.mode == "first" and not (static and attack == "chain"):
+            for m in monsters:
+                if single_route and m.s < near:
+                    break
+                if m.hp > 0 and self._tower_covers(t, m, spans, reach):
+                    return m
+            return None
+        best: Monster | None = None
+        for m in monsters:
+            if m.hp <= 0 or not self._tower_covers(t, m, spans, reach):
+                continue
+            if best is None:
+                best = m
+            elif t.mode == "strong" and m.hp > best.hp:
+                best = m
+            elif t.mode == "weak" and m.hp < best.hp:
+                best = m
+            elif t.mode == "fast" and m.speed > best.speed:
+                best = m
+            elif t.mode == "last":
+                best = m   # nearest the sanctuary first: the last covered stands nearest the portal
+            elif static and attack == "chain" and m.kind.leader is not None and best.kind.leader is None:
+                best = m   # Static Field: a leader in reach draws the first strike
+        return best
+
+    def set_mode(self, tower_id: int, mode: str) -> None:
+        """Teach a tower its strategy; an unknown one is refused."""
+        if mode not in MODES:
+            raise Refused(f"No strategy {mode!r} is taught.")
+        tower = self.towers[tower_id]
+        if tower.mode == mode:
+            return
+        tower.mode = mode
+        self._emit("mode", tower.id, mode)
+
+    def attune(self, tower_id: int) -> None:
+        """Attune a tower: it holds charges for empowered shots, starting full."""
+        tower = self.towers[tower_id]
+        if tower.kind.attack not in ATTUNABLE:
+            raise Refused(f"{tower.kind.name} never spends charges: attunement would idle.")
+        if tower.attuned:
+            raise Refused(f"{tower.kind.name} is already attuned.")
+        if self.gold < ATTUNE_GOLD:
+            raise Refused(f"Attunement costs {ATTUNE_GOLD} gold.")
+        self.gold -= ATTUNE_GOLD
+        tower.attuned = True
+        tower.charges = CHARGES_MAX
+        tower.spent += ATTUNE_GOLD
+        self._emit("attuned", tower.id)
+
+    def _worth_charge(self, t: Tower, target: Monster, damage: float) -> bool:
+        """Whether the empowered shot is worth its charge: everything but the obvious waste. A kill a
+        plain shot takes is held for the next target; a full tower cannot draw, so it spends even then.
+        What is left spends, even what plain fire would fell in time: killing faster frees the tower for
+        the queue behind, and a spent charge draws its replacement."""
+        return target.hp > damage or t.charges >= CHARGES_MAX
 
     def _hook_target(self, t: Tower, spans: tuple[tuple[float, float], ...], reach: float, near: float,
                      single_route: bool) -> Monster | None:
@@ -1348,8 +1790,8 @@ class World:
             struck = self._around(mt.x, mt.y, spec.radius, flyers=True)
             self._emit("meteor", mt.x, mt.y, [m.id for m in struck])
             for m in struck:
-                self._strike(m, mt.damage, Element.FIRE)
-            self.hazards.append(Hazard(mt.x, mt.y, BURN_RADIUS, mt.burn, spec.lasting))
+                self._strike(m, mt.damage, Element.FIRE, spell=True)
+            self.hazards.append(Hazard(mt.x, mt.y, BURN_RADIUS, mt.burn, spec.lasting, spell=True))
 
     def _poison(self, m: Monster, dps: float, seconds: float) -> None:
         if len(m.poison) >= MAX_POISON_STACKS:
@@ -1372,7 +1814,7 @@ class World:
         if self.hazards:
             for h in self.hazards:
                 for m in self._around(h.x, h.y, h.radius, flyers=False):
-                    self._wither(m, h.dps * min(dt, h.left), Element.FIRE)
+                    self._wither(m, h.dps * min(dt, h.left), Element.FIRE, spell=h.spell)
                 h.left -= dt
             self.hazards = [h for h in self.hazards if h.left > 0]
         for m in self.monsters:
@@ -1391,23 +1833,26 @@ class World:
             return 1.0
         return m.kind.taken(element, self._exposed(m))
 
-    def _strike(self, m: Monster, hit: float, element: Element, factor: float = 1.0) -> None:
+    def _strike(self, m: Monster, hit: float, element: Element, factor: float = 1.0,
+                  *, spell: bool = False) -> None:
         """A hit, through the damage pipeline (:func:`~hellward.sim.content.felt_hit`): ``factor`` and the
         monster's amplification join the element's factor."""
         if m.hp <= 0:
             return
         if m.amplified > 0:
             factor *= 1.0 + m.amplify
-        self._hurt(m, felt_hit(hit, element, m.kind, factor, exposed=self._exposed(m)), element)
+        self._hurt(m, felt_hit(hit, element, m.kind, factor, exposed=self._exposed(m)), element, spell=spell)
 
-    def _wither(self, m: Monster, amount: float, element: Element) -> None:
+    def _wither(self, m: Monster, amount: float, element: Element, *, spell: bool = False) -> None:
         """Damage over time: the element's factor and the amplification, no armor, no rounding."""
         if m.hp <= 0:
             return
         factor = 1.0 + m.amplify if m.amplified > 0 else 1.0
-        self._hurt(m, felt_over_time(amount, element, m.kind, factor, exposed=self._exposed(m)), element, quiet=True)
+        self._hurt(m, felt_over_time(amount, element, m.kind, factor, exposed=self._exposed(m)), element,
+                   quiet=True, spell=spell)
 
-    def _hurt(self, m: Monster, amount: float, element: Element | None, *, quiet: bool = False, bursts: bool = True) -> None:
+    def _hurt(self, m: Monster, amount: float, element: Element | None, *, quiet: bool = False, bursts: bool = True,
+              spell: bool = False) -> None:
         """Damage as it is felt (the pipeline's, or holy damage's whole amount)."""
         if m.hp <= 0:
             return
@@ -1415,9 +1860,9 @@ class World:
         if not quiet:
             self._emit("hit", m.id, element)
         if m.hp <= 0:
-            self._died(m, element, bursts)
+            self._died(m, element, bursts, spell)
 
-    def _died(self, m: Monster, element: Element | None, bursts: bool) -> None:
+    def _died(self, m: Monster, element: Element | None, bursts: bool, spell: bool) -> None:
         # A monster its kind's shaman stands near rises once, unless a burst tore it apart: one killed it (bursts is
         # False), or its own death bursts (Shatter, Corpse Explosion), which leaves nothing to raise
         bursting = bursts and ((self.perks.shatter and m.chill_left > 0) or (self.perks.corpse_explosion and m.amplified > 0))
@@ -1445,6 +1890,8 @@ class World:
 
         self.gold += m.bounty
         self.kills += 1
+        if spell:
+            self.spell_kills += 1
         if not m.bonus:   # a bonus kill pays no bounty and no XP: the clean clear pays instead
             self._earn(kill_xp(m.max_hp))
         where = self.position(m)
@@ -1454,9 +1901,9 @@ class World:
             self._emit("salvage", m.id, where, m.salvage)
         amplified = m.amplified > 0
         if amplified and self.perks.life_tap:
-            self.mana = min(self.perks.mana_max, self.mana + m.bounty / 5)
+            self.mana = min(self.mana_max, self.mana + m.bounty / 5)
         if m.kind.leader is not None and self.perks.soul_harvest:
-            self.mana = min(self.perks.mana_max, self.mana + SOUL)
+            self.mana = min(self.mana_max, self.mana + SOUL)
         if self.perks.contagion and m.poison:
             self._spread(m, where)
         if bursts and self.perks.shatter and m.chill_left > 0:
@@ -1536,6 +1983,13 @@ class World:
                 bonus = self.waves[w].bonus
                 self.gold += bonus
                 self._earn(clear_xp(w + 1))
+                for cell in sorted(self.blighted):   # a cleared wave lifts every taken cell one wave nearer open
+                    left, past = self.blighted[cell]
+                    if left - 1 <= 0:
+                        del self.blighted[cell]
+                        self._emit("blight_clear", cell)
+                    else:
+                        self.blighted[cell] = (left - 1, past)
                 for d in self.doors:
                     if d.built:
                         d.hp += (self.gate_life - d.hp) * self.perks.gate_mend

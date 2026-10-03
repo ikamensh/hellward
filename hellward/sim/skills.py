@@ -278,7 +278,7 @@ def tower_levels(kind: str, p: Perks, loadout: Loadout = EMPTY_LOADOUT) -> tuple
     elif kind == "frost":
         trained = tuple(replace(r, damage=r.damage * p.frost_damage, range=r.range + p.frost_reach,
                                 splash=0.9 if p.shatter else 0.0) for r in ranks)
-    elif kind in ("plague", "altar", "grove"):
+    elif kind in ("plague", "altar", "grove", "idol", "censer", "well", "effigy"):
         trained = tuple(ranks)
     else:
         raise KeyError(kind)

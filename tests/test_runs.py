@@ -133,8 +133,8 @@ def test_a_run_never_misfires_its_summons(tmp_path):
 
 
 def test_a_clean_clear_does_not_resummon_past_the_cap(tmp_path):
-    """Seed 1 summons at the cap in the caves: the rule counts its summons and stops at three."""
-    (summary,) = runs.main(["--bot", "strong", "--seeds", "1", "--seed0", "1", "--jobs", "1",
+    """Seed 0 summons at the cap in the caves: the rule counts its summons and stops at three."""
+    (summary,) = runs.main(["--bot", "strong", "--seeds", "1", "--seed0", "0", "--jobs", "1",
                             "--immortal", "--locations", "tristram,graveyard,cathedral,catacombs,caves",
                             "--out", str(tmp_path)])
     assert summary["reached"] == 5

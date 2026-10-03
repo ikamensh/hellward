@@ -26,7 +26,7 @@ from hellward.sim.campaign import Location
 from hellward.sim.content import Curse
 from hellward.sim.items import EMPTY_LOADOUT, Loadout
 from hellward.sim.kit import Kit
-from hellward.sim.model import SIM_DT, START_LIVES, Planner, Refused, World, curse_radius
+from hellward.sim.model import ATTUNE_GOLD, ATTUNABLE, SIM_DT, START_LIVES, Planner, Refused, World, curse_radius
 from hellward.sim.sums import int_sum
 
 REACT = (0.5, 0.8)    # a person answers a leader's sign this long after it appears, drawn per seed
@@ -82,6 +82,18 @@ def ready(world: World, spell: str, spare: float = 0.0) -> bool:
     gathered again after its last cast, and paid for with ``spare`` mana still in hand."""
     return (spell in world.arsenal.spells and spell not in world.perks.locked
             and world.recharge.get(spell, 0.0) <= 0 and world.mana - spare >= world.spell_cost(spell))
+
+
+def attune_spare(world: World, reserve: int = 0) -> bool:
+    """Attune the highest-rank unattuned striker when the purse holds the price over the reserve: spare gold
+    into charges, never starving a build or a rank. Whether one was attuned."""
+    if world.gold < reserve + ATTUNE_GOLD:
+        return False
+    candidates = [t for t in world.towers.values() if not t.attuned and t.kind.attack in ATTUNABLE]
+    if not candidates:
+        return False
+    world.attune(max(candidates, key=lambda t: (t.level, -t.id)).id)
+    return True
 
 
 def react_for(seed: int, reaction: tuple[float, float] = REACT) -> float:
@@ -181,12 +193,13 @@ class Hands:
 
 def reference_kit(location: Location, learned: frozenset[str], seed: int, *,
                 loadout: Loadout = EMPTY_LOADOUT, gold: int | None = None,
-                lives: int | None = None) -> Kit:
+                lives: int | None = None, relics: tuple[str, ...] = (),
+                counters: tuple[tuple[str, int], ...] = ()) -> Kit:
     """The Kit today's convention deals: the location's start gold and sanctuary lives, the learned skills,
     and the seed. The per-location tools deal from here, so one defence then and now starts the same."""
     return Kit(location=location, learned=learned, loadout=loadout, seed=seed,
                gold=location.start_gold if gold is None else gold,
-               lives=START_LIVES if lives is None else lives)
+               lives=START_LIVES if lives is None else lives, relics=relics, counters=counters)
 
 
 def defend(kit: Kit, player: Player, *, planner: Planner | None, hardness: float = 1.0,

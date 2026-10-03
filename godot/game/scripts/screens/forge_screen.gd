@@ -2,7 +2,8 @@ class_name ForgeScreen
 extends Screen
 ## The tower forge, before a defence: the server's patterns (`forge_view`), one card each with its tower turning in
 ## a portrait, what it does, its price in salvage and trophies and one button: forge and equip, equip, or unequip.
-## A click asks the server (`forge`) and the reply is the new view. Back (Esc).
+## The grid's last slot teaches targeting strategies for salvage. A click asks the server (`forge`) and the reply
+## is the new view. Back (Esc).
 
 const CARD := Vector2(540, 334)
 const GAP := 36.0
@@ -42,16 +43,14 @@ func _lay_out(flash: String) -> void:
 	_stage = SkillsScreen.stage(self)
 	_header()
 	var cards: Array = data["cards"]
+	var total := cards.size() + 1   # the strategies share the grid's last slot
 	var seen := {}                         # a family's cards so far: its first shows rank I, the next rank II...
 	for i in cards.size():
 		var card: Dictionary = cards[i]
 		var family := String(card["family"])
 		var rank: int = mini(int(seen.get(family, 0)), 2)
 		seen[family] = int(seen.get(family, 0)) + 1
-		var row: int = i / 3
-		var in_row: int = mini(cards.size() - row * 3, 3)
-		var x := Ui.W / 2 - (in_row * CARD.x + (in_row - 1) * GAP) / 2 + (i % 3) * (CARD.x + GAP)
-		var box := _card(card, Rect2(Vector2(x, TOP + row * (CARD.y + GAP)), CARD), rank)
+		var box := _card(card, _slot(i, total), rank)
 		if first:
 			box.modulate.a = 0.0
 			var tw := box.create_tween()
@@ -64,10 +63,64 @@ func _lay_out(flash: String) -> void:
 			var tw := box.create_tween().set_parallel()
 			tw.tween_property(box, "scale", Vector2.ONE, 0.45).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 			tw.tween_property(box, "modulate", Color.WHITE, 0.7)
+	_strategies(_slot(cards.size(), total))
 	var leave := Ui.button("Back", "Esc", 300)
 	leave.position = Vector2(Ui.W / 2 - 150, 976)
 	leave.pressed.connect(back)
 	_stage.add_child(leave)
+
+
+## The grid's i-th slot of `total` cards: rows of three, each row centred.
+func _slot(i: int, total: int) -> Rect2:
+	var row: int = i / 3
+	var in_row: int = mini(total - row * 3, 3)
+	var x := Ui.W / 2 - (in_row * CARD.x + (in_row - 1) * GAP) / 2 + (i % 3) * (CARD.x + GAP)
+	return Rect2(Vector2(x, TOP + row * (CARD.y + GAP)), CARD)
+
+
+## The teachings' card in the grid's last slot: each aim, the attunement and foresight, their prices, their Teach buttons.
+func _strategies(box: Rect2) -> void:
+	var slot := Control.new()
+	slot.position = box.position
+	slot.size = box.size
+	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_stage.add_child(slot)
+	slot.add_child(SkillsScreen.plate(box.size, Style.BRONZE, Color(0, 0, 0, 0), 0.0, 0.0, 0.0, 16.0))
+	var title := SkillsScreen.words("Tower Teachings", Style.title_font(), 28, Style.GOLD)
+	title.position = Vector2(22, 10)
+	title.size = Vector2(box.size.x - 44, 38)
+	slot.add_child(title)
+	var y := 56.0
+	for gift in data["strategies"]:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		row.position = Vector2(22, y)
+		row.size = Vector2(box.size.x - 44, 50)
+		slot.add_child(row)
+		var words := SkillsScreen.words("%s — %s" % [String(gift["name"]), String(gift["price"])],
+			Style.text_font(), 19, Style.BONE if bool(gift["enabled"]) else Color(0.5, 0.47, 0.43))
+		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		words.tooltip_text = "%s %s" % [String(gift["words"]), String(gift["why"])]
+		row.add_child(words)
+		var act := Ui.button(String(gift["label"]), "", 150)
+		act.disabled = not bool(gift["enabled"]) or bool(gift["owned"])
+		act.tooltip_text = String(gift["why"])
+		var key := String(gift["key"])
+		act.pressed.connect(func(): _teach(key))
+		row.add_child(act)
+		y += 55.0
+
+
+func _teach(key: String) -> void:
+	if _busy:
+		return
+	_busy = true
+	var view = await ask("forge", {"key": key})
+	_busy = false
+	if view != null:
+		data = view
+		_lay_out("")
+		Sfx.play("upgrade")
 
 
 ## The title, the drops held and how the forge works.
@@ -75,7 +128,8 @@ func _header() -> void:
 	SkillsScreen.heading(_stage, "Tower Forge", String(data["line"]))
 	var help := [["Save monster drops for permanent patterns, or sell them during a wave break for battle gold.", Style.BONE],
 		["One pattern per tower family can be equipped before a defence. Forging spends salvage and trophies.",
-			Color(0.62, 0.58, 0.52)]]
+			Color(0.62, 0.58, 0.52)],
+		["Strategies teach every tower a new aim, in every defence.", Color(0.62, 0.58, 0.52)]]
 	for i in help.size():
 		var l := SkillsScreen.words(String(help[i][0]), Style.text_font(), 19, help[i][1])
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

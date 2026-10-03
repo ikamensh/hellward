@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from hellward.sim.campaign import Location
 from hellward.sim.content import WAVE_BREAK
 from hellward.sim.model import DOOR_STOP, JOSTLE, Refused, Tower, World
-from hellward.sim.players.hands import Hands, REACT, AIM_GAP, ready
+from hellward.sim.players.hands import Hands, REACT, AIM_GAP, attune_spare, ready
 from hellward.sim.sums import float_sum, int_sum
 
 ROTATION = ("arrow", "pyre", "ballista", "frost", "storm", "plague", "knife", "arrow", "hook", "pyre", "storm",
@@ -95,11 +95,16 @@ class Ordinary:
                 kind, tile = todo[0]
                 if world.gold < world.cost(kind):
                     return
-                world.build(kind, tile)
+                try:
+                    world.build(kind, tile)
+                except Refused:   # a blighted cell: the plan gives it up and builds on
+                    self.planned.remove((kind, tile))
                 continue
             upgrades = [(t, cost) for t in world.towers.values()
                         if (cost := world.upgrade_cost(t)) is not None and world.rank_needs(t) is None]
             if not upgrades:
+                while attune_spare(world):
+                    pass
                 return
             tower, cost = min(upgrades, key=lambda u: (u[0].level, u[0].id))
             if world.gold < cost:

@@ -51,19 +51,27 @@ func build() -> void:
 	for pair in data["extra"]:
 		var line_tone: Color = TONES[String(pair[0])]
 		inner.add_child(Ui.paragraph(String(pair[1]), 22, line_tone, 860, HORIZONTAL_ALIGNMENT_CENTER))
+	for line in data.get("met", []):
+		inner.add_child(Ui.paragraph("Met: %s" % String(line), 22, Style.GOLD, 860, HORIZONTAL_ALIGNMENT_CENTER))
+	for line in data.get("missed", []):
+		inner.add_child(Ui.paragraph("Missed: %s" % String(line), 22, Style.DIM_GOLD, 860,
+			HORIZONTAL_ALIGNMENT_CENTER))
 	col.add_child(PauseScreen.card(inner, 960))
 	col.add_child(PauseScreen.gap(14))
 
 	var ways := HBoxContainer.new()
 	ways.alignment = BoxContainer.ALIGNMENT_CENTER
 	ways.add_theme_constant_override("separation", 20)
-	var again := PauseScreen.primary(Ui.button("Again", "Enter", 280))
+	var words := "Onward" if data.has("run") else "Again"
+	var again := PauseScreen.primary(Ui.button(words, "Enter", 280))
 	again.pressed.connect(func(): _leave(true))
-	var to_map := Ui.button("To the map", "Esc", 280)
-	to_map.pressed.connect(func(): _leave(false))
-	for b in [again, to_map]:
-		ways.add_child(b)
-		_buttons.append(b)
+	ways.add_child(again)
+	_buttons.append(again)
+	if not data.has("run"):
+		var to_map := Ui.button("To the map", "Esc", 280)
+		to_map.pressed.connect(func(): _leave(false))
+		ways.add_child(to_map)
+		_buttons.append(to_map)
 	col.add_child(ways)
 	add_child(PauseScreen.centred(col))
 

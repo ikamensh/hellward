@@ -31,7 +31,7 @@ from pathlib import Path
 from hellward.sim.campaign import ORDER, Location, idle
 from hellward.sim.content import MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Element, felt_hit
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
-from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
+from hellward.sim.players.hands import AIM_GAP, Hands, REACT, attune_spare, ready
 from hellward.sim.players.spacing import score_with_spacing
 from hellward.sim.skills import SKILLS, UNLOCK, can_learn, kept, perks, tower_levels, unlock_skills, unlocked
 
@@ -478,6 +478,9 @@ class Warden:
                     world.build_door(step.door)
             elif step.what == "build":
                 if world.tower_at(step.tile) is None:
+                    if step.tile in world.blighted:   # taken ground: the step is skipped, never waited on
+                        self.done += 1
+                        continue
                     kind = step.kind
                     if not self._family_ok(TOWERS[kind].element.value):
                         swapped = self._family_kind(world)
@@ -503,6 +506,8 @@ class Warden:
                     world.upgrade(tower.id)
             self.done += 1
         self._more(world)
+        while attune_spare(world, self.reserve):
+            pass
 
     def _more(self, world: World) -> None:
         """With the build done: a rank for the tower that has worked hardest, or a new tower on the best tile left."""
@@ -530,7 +535,8 @@ class Warden:
                 return
             reach = world.tower_levels[kind][1].range
             free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
-                    if world.level.buildable(x, y) and world.tower_at((x, y)) is None]
+                    if world.level.buildable(x, y) and world.tower_at((x, y)) is None
+                    and (x, y) not in world.blighted]
             if not free:
                 return
             world.build(kind, max(free, key=lambda t: (tile_value(location, kind, t, reach), -t[1], -t[0])))

@@ -7,7 +7,7 @@ extends CanvasLayer
 ## element tags and the hit each of the player's towers deals it (`hover`).
 
 signal slot_pressed(kind: String)     # a tower kind, "gate", or "spell:<key>"
-signal order(name: String)            # "wave", "upgrade", "sell", "pace", "salvage", "breach:<mode>", "menu"
+signal order(name: String)            # "wave", "skip", "upgrade", "sell", "attune", "mode:<key>", "pace", "salvage", "breach:<mode>", "menu"
 
 const SPELLS := {"smite": "Z", "meteor": "X", "orb": "C", "hymn": "R"}
 const SPELL_TONES := {"smite": Color(1.0, 0.95, 0.7), "meteor": Color(1.0, 0.45, 0.12), "orb": Color(0.45, 0.7, 1.0),
@@ -30,6 +30,8 @@ const ELEMENT_TONES := {"physical": Color(0.82, 0.76, 0.66), "fire": Color(1.0, 
 const TOWER_HUES := {"arrow": Color(0.55, 0.32, 0.14), "pyre": Color(0.7, 0.26, 0.08),   # a portrait's halo, per kind
 	"frost": Color(0.16, 0.32, 0.6), "storm": Color(0.32, 0.22, 0.62), "plague": Color(0.24, 0.5, 0.14),
 	"altar": Color(0.55, 0.5, 0.38), "grove": Color(0.2, 0.48, 0.18),
+	"idol": Color(0.75, 0.82, 0.9), "censer": Color(0.85, 0.35, 0.2),
+	"well": Color(0.5, 0.68, 0.88), "effigy": Color(0.52, 0.46, 0.62),
 	"ballista": Color(0.5, 0.36, 0.2), "hook": Color(0.36, 0.38, 0.42), "knife": Color(0.42, 0.44, 0.5)}
 const TONES := {"wave": Color(0.95, 0.76, 0.4), "curse": Color(0.76, 0.42, 1.0),
 	"won": Color(0.86, 0.9, 0.55), "lost": Color(0.88, 0.12, 0.07)}
@@ -55,6 +57,7 @@ var _wave_name: Label
 var _progress: ShaderMaterial
 var _progress_text: Label
 var _call: Button
+var _skip: Button                   # the grind's offer, while a wave is surely clean
 var _pace: Button
 var _slots := {}
 var _slot_pics := {}
@@ -97,6 +100,9 @@ var _curse_bar: ShaderMaterial
 var _curse_text: Label
 var _upgrade: Button
 var _sell: Button
+var _mode: Button                   # the chosen tower's strategy: a press teaches the next owned one
+var _attune: Button                 # attune the chosen tower, while it is not
+var _charges: Label                 # its charges, once attuned
 var _hymn_box: Control
 var _hymn_bar: ShaderMaterial
 var _hymn_text: Label
@@ -116,6 +122,14 @@ var _hover_shown: Array = []          # the monster, strikes and movers the plat
 var _held := ""                       # what the hand holds: a tower kind, "gate", "spell:<key>" or ""
 var _hint: PanelContainer             # a tag by the cursor while aiming: what the held thing wants, or why not here
 var _hint_text: Label
+var _goals_box: VBoxContainer         # the run's wager: each goal with its verdict's color
+var _strikes: Label                   # while a boss walks: how many more strikes end the run
+var _xp_bar: ShaderMaterial           # the level's gauge, a thin strip above the bar
+var _xp_text: Label
+var _wager: Button                    # a run's break: open the bonus wagers
+var _wagers: Control                  # the stakes on the table, with their previews
+var _wager_rows: VBoxContainer
+var _wager_open := false
 
 
 ## Film mode: the bar and orbs sink away, leaving the battle and the banners.
@@ -201,6 +215,7 @@ func _build() -> void:
 	_build_card()
 	_build_banner(top)
 	_build_leader(top)
+	_build_run(top)
 	_build_hover()
 	_build_hint()
 	_chronicle = VBoxContainer.new()
@@ -546,6 +561,10 @@ func _build_info() -> void:
 	_call.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_call.pressed.connect(func(): order.emit("wave"))
 	row.add_child(_call)
+	_skip = _button("")
+	_skip.custom_minimum_size = Vector2(150, 0)
+	_skip.pressed.connect(func(): order.emit("skip"))
+	row.add_child(_skip)
 	_pace = _button("")
 	_pace.custom_minimum_size = Vector2(118, 0)
 	_pace.pressed.connect(func(): order.emit("pace"))
@@ -654,6 +673,14 @@ func _build_card() -> void:
 	_sell = _button("")
 	_sell.pressed.connect(func(): order.emit("sell"))
 	orders.add_child(_sell)
+	_mode = _button("")
+	_mode.pressed.connect(cycle_mode)
+	orders.add_child(_mode)
+	_attune = _button("")
+	_attune.pressed.connect(func(): order.emit("attune"))
+	orders.add_child(_attune)
+	_charges = _caps(15, Style.DIM_GOLD)
+	orders.add_child(_charges)
 
 	_card.visible = false
 
@@ -794,6 +821,45 @@ func _build_leader(top: Control) -> void:
 
 
 # a monster under the mouse: a dark plate by the cursor with its name, life, armor and tags, and the hits table
+# the run above the battle: its wager's lines, the strikes a boss has left, the level's gauge, the wagers
+func _build_run(top: Control) -> void:
+	_goals_box = VBoxContainer.new()
+	_goals_box.add_theme_constant_override("separation", 2)
+	_pin(_goals_box, 0.0, 0.0, Rect2(24, 22, 520, 0))
+	_goals_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(_goals_box)
+	for g in world.goals:
+		var line := _caps(17, Style.BONE)
+		line.name = "goal_%s" % String(g["key"])
+		_goals_box.add_child(line)
+	_strikes = _caps(18, Color(1.0, 0.45, 0.35))
+	_pin(_strikes, 0.0, 0.0, Rect2(24, 22 + 3 * 24, 520, 0))
+	_strikes.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	top.add_child(_strikes)
+
+	var xp := ColorRect.new()
+	_xp_bar = _gauge(xp, Color(0.45, 0.35, 0.85), Vector2(0, 5))
+	_pin(xp, 0.5, 1.0, Rect2(-BAR.x / 2, -LIFT - BAR.y - 9, BAR.x, 5))
+	_root.add_child(xp)
+	_xp_text = _caps(15, Style.DIM_GOLD)
+	_pin(_xp_text, 0.5, 1.0, Rect2(-BAR.x / 2, -LIFT - BAR.y - 32, 300, 0))
+	_root.add_child(_xp_text)
+
+	_wager = _button("Wager")
+	_wager.custom_minimum_size = Vector2(118, 0)
+	_wager.pressed.connect(_open_wagers)
+	_pin(_wager, 1.0, 1.0, Rect2(-142, -LIFT - BAR.y - 52, 118, 0))
+	_root.add_child(_wager)
+
+	_wagers = PanelContainer.new()
+	_pin(_wagers, 0.5, 0.5, Rect2(-330, -190, 330, 190))
+	_wagers.visible = false
+	_over.add_child(_wagers)
+	_wager_rows = VBoxContainer.new()
+	_wager_rows.add_theme_constant_override("separation", 10)
+	_wagers.add_child(_wager_rows)
+
+
 func _build_hover() -> void:
 	_hover = PanelContainer.new()
 	var sb := StyleBoxFlat.new()
@@ -1096,6 +1162,11 @@ func refresh() -> void:
 	_call.disabled = not world.can_call() or world.demo
 	var bonus := int(world.state["early_bonus"])
 	_call.text = "Summon · Space" + ("  +%d" % bonus if bonus > 0 else "")
+	var offer = world.state.get("skip_offer")
+	_skip.visible = offer is Dictionary and not (offer as Dictionary).is_empty() and not world.demo \
+		and world.outcome == ""
+	if _skip.visible:
+		_skip.text = "Skip · G  +%d" % int((offer as Dictionary)["bonus"])
 	for kind in _slot_keys:
 		var cost := int(world.state["door_cost"]) if kind == "gate" else world.tower_cost(kind)
 		_costs[kind].text = str(cost)
@@ -1106,6 +1177,85 @@ func refresh() -> void:
 			_slot_pics[_slots[kind]].modulate = Color(1.4, 1.3, 1.05)
 	_refresh_choices()
 	_refresh_card()
+	_refresh_run()
+
+
+## The run's lines, every frame: each goal in its verdict's color, a boss's strikes, the level's gauge, and the
+## wager button while a run's break is open.
+func _refresh_run() -> void:
+	var run := bool(world.start.get("run", false))
+	_goals_box.visible = run and not world.goals.is_empty()
+	_xp_text.visible = run
+	for g in world.goals:
+		var line := _goals_box.get_node_or_null("goal_%s" % String(g["key"])) as Label
+		if line == null:
+			continue
+		match String(g["verdict"]):
+			"met":
+				line.add_theme_color_override("font_color", Style.GOLD)
+				line.text = "✓  %s" % String(g["line"])
+			"failed":
+				line.add_theme_color_override("font_color", Color(0.62, 0.5, 0.45))
+				line.text = "✗  %s" % String(g["line"])
+			_:
+				line.add_theme_color_override("font_color", Style.BONE)
+				line.text = "·  %s" % String(g["line"])
+	var strikes := 0
+	if run and world.boss_out():
+		var each := int(world.start.get("boss_strike_lives", 5))
+		strikes = int(ceil(float(world.lives) / max(each, 1)))
+	_strikes.visible = strikes > 0
+	if strikes > 0:
+		_strikes.text = "%d more strike%s end%s the run" % [strikes, "" if strikes == 1 else "s",
+			"s" if strikes == 1 else ""]
+	if world.xp_next > 0:
+		_xp_bar.set_shader_parameter("fill", clampf(world.xp / world.xp_next, 0.0, 1.0))
+		_xp_text.text = "Level %d · %d of %d" % [world.xp_level, int(world.xp), int(world.xp_next)]
+	var open := run and world.state["break_left"] != null and not world.demo and world.outcome == ""
+	_wager.visible = open and not _wager_open
+	if not open and _wager_open:
+		_wagers.visible = false
+		_wager_open = false
+
+
+## The bonus wagers on the table: each stake's pack and price, a finger on each.
+func _open_wagers() -> void:
+	if _wager_open:
+		return
+	_wager_open = true
+	for child in _wager_rows.get_children():
+		child.queue_free()
+	var title := _caps(19, Style.GOLD)
+	title.text = "Wager a bonus wave"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_wager_rows.add_child(title)
+	var table: Dictionary = await Net.ask("summon_preview", {}).done
+	if table.is_empty():
+		_wager_open = false
+		return
+	for row in table["stakes"]:
+		var words := Ui.label(String(row["words"]), 18, Style.BONE)
+		words.custom_minimum_size = Vector2(560, 0)
+		words.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_wager_rows.add_child(words)
+		var take := _button("Summon stake %d · %d gold" % [int(row["stake"]), int(row["wager"])])
+		take.disabled = world.gold < int(row["wager"])
+		take.pressed.connect(func(): _summon(int(row["stake"])))
+		_wager_rows.add_child(take)
+	var shut := _button("Not now")
+	shut.pressed.connect(_close_wagers)
+	_wager_rows.add_child(shut)
+	_wagers.visible = true
+
+
+func _summon(stake: int) -> void:
+	_close_wagers()
+	order.emit("summon:%d" % stake)
+
+
+func _close_wagers() -> void:
+	_wagers.visible = false
+	_wager_open = false
 
 
 func _process(delta: float) -> void:
@@ -1206,9 +1356,42 @@ func _refresh_card() -> void:
 		_upgrade.disabled = true
 	_sell.text = "SELL · DEL  +%d" % t.refund
 	_sell.disabled = cursed or world.demo
+	_mode.visible = (world.start.get("modes", []) as Array).size() > 1
+	if _mode.visible:
+		_mode.text = "AIMS %s · M" % _mode_name(t.mode).to_upper()
+		_mode.disabled = world.demo
+	var craft: Dictionary = world.start.get("attune", {})
+	_attune.visible = bool(craft.get("unlocked", false)) and not t.attuned and t.attunable
+	if _attune.visible:
+		_attune.text = "ATTUNE · T   %d" % int(craft["gold"])
+		_attune.tooltip_text = "Hold charges for empowered shots, spent where they kill."
+		_attune.disabled = world.gold < int(craft["gold"]) or world.demo
+	_charges.visible = t.attuned
+	if t.attuned:
+		_charges.text = "CHARGES %d / 3" % int(t.charges)
 	if not was:
 		_card.modulate.a = 0.0
 		_card.create_tween().tween_property(_card, "modulate:a", 1.0, 0.18)
+
+
+## The chosen tower's strategy, named from the battle's owned modes.
+func _mode_name(mode: String) -> String:
+	for m in world.start.get("modes", []):
+		if String(m["key"]) == mode:
+			return String(m["name"])
+	return mode.capitalize()
+
+
+## Teach the chosen tower the next owned strategy.
+func cycle_mode() -> void:
+	var modes := world.start.get("modes", []) as Array
+	if _selected == null or modes.size() < 2:
+		return
+	var keys: Array = []
+	for m in modes:
+		keys.append(String(m["key"]))
+	var next: String = keys[(keys.find(_selected.mode) + 1) % keys.size()]
+	order.emit("mode:" + next)
 
 
 func _show_portrait(on: bool) -> void:

@@ -8,7 +8,8 @@ dismantle_refund = 0.7   # share of every standing tower's cost that comes back 
 xp_life = 10.0           # a kill gives its monster's life divided by this
 xp_clear = 5.0           # a cleared wave gives this times its number
 xp_next_base = 18.0      # the XP from level 1 to 2; Tristram's first wave gives 10, its second 20 more
-xp_next_growth = 0.8     # each level past the first needs this much more; the campaign's ~2193 XP reach ~55
+xp_next_growth = 0.6     # times the square of the levels past the first; the campaign's ~2182 XP reach 22,
+                         # a pack-rich run ~25: levels are skill points, and the tree stays too dear to open (M4)
 reskill_every = 4        # every fourth level gives a reskill point
 sigil_lost = [5, 2, 0]   # lives lost at a location for one, two and three lives sigils
 

@@ -5,7 +5,7 @@ The mood is the old Tristram and Cathedral one: slow, dark and sparse, a detuned
 arpeggio in a minor mode over a low drone, distant voices, a heartbeat for a drum, a great deal
 of room and now and then a bell.  ``title`` is the night over the town; each ``battle_<location>``
 is the same world heard from one dungeon down the descent, with its own key, pulse and consort;
-``boss`` is Azazel's last wave, with drums.
+``boss`` is the last-wave suite, with drums: Azazel's at the gate, the Bone Priest's at the temple.
 
 A dungeon is a sequence of eight-bar chapters with a distinct harmonic route and changing
 orchestration.  Chapters overlap in the room; the complete score fades to silence and is played once.
@@ -239,6 +239,7 @@ class Dungeon:
     room: float
     wet: float
     rms: float
+    blurb: str = ""   # what plays, in a line: the story walk's music note (docs/audio.md says more)
 
 
 DUNGEONS: dict[str, Dungeon] = {
@@ -247,41 +248,47 @@ DUNGEONS: dict[str, Dungeon] = {
         TRISTRAM, inst.twelve_string, inst.hollow_choir, HEART_KIT,
         {"heart": "x.......x.......", "frame": "......o.......o."},
         (0, 2, 3, 4, 3, 2, 1, 2), "embers",
-        (0, 1, 1, 2, 2, 1, 2, 3, 2, 3, 4, 3, 2, 0), 4.5, 0.43, 0.08),
+        (0, 1, 1, 2, 2, 1, 2, 3, 2, 3, 4, 3, 2, 0), 4.5, 0.43, 0.08,
+        blurb="D aeolian: a solitary twelve-string, the heart and a village lament as the fire grows"),
     "graveyard": Dungeon("E2", "dorian", 60,
         ((0, 0, 3, 3, 4, 4, 3, 2), (0, 5, 4, 3, 2, 3, 0, 0), (0, 0, 2, 3, 5, 4, 2, 0)),
         ((7, 2), (5, 1), (4, 1), (3, 1), (2, 1), (0, 2)),
         inst.hollow_choir, inst.organ, BONE_KIT,
         {"heart": "x...............", "rattle": "..o...o...o...o."},
         (0, 3, 4, 3, 2, 1, 0, 2), "wind_drips",
-        (0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 3, 0), 5.0, 0.5, 0.075),
+        (0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 3, 0), 5.0, 0.5, 0.075,
+        blurb="E dorian: wind, grave drops, a distant choral lament, organ and funeral bells"),
     "cathedral": Dungeon("D2", "phrygian", 72,
         ((0, 0, 5, 6, 0, 0, 1, 0), (0, 3, 5, 6, 1, 0, 6, 0), (0, 0, 1, 5, 3, 3, 1, 0)),
         DESCENT, inst.twelve_string, inst.monks, HEART_KIT,
         {"heart": "x.......x.......", "frame": "......o.......o.", "rattle": "....o.......o..."},
         (0, 2, 3, 2, 4, 2, 3, 1), "nave_drips",
-        (0, 1, 2, 2, 3, 1, 2, 3, 3, 4, 2, 3, 2, 0), 4.0, 0.43, 0.085),
+        (0, 1, 2, 2, 3, 1, 2, 3, 3, 4, 2, 3, 2, 0), 4.0, 0.43, 0.085,
+        blurb="D phrygian: a torchlit procession, monks, frame drum and bells gathering in the nave"),
     "catacombs": Dungeon("C2", "phrygian", 66,
         ((0, 0, 1, 1, 0, 6, 1, 1), (0, 1, 0, 6, 1, 3, 1, 0), (0, 0, 6, 1, 3, 1, 6, 0)),
         ((0, 1), (1, 0.5), (0, 0.5), (-1, 1), (0, 1), (4, 1), (1, 1), (0, 2)),
         inst.cello, inst.organ, {"heart": HEART_KIT["heart"], "tom": (inst.tom, 0.13, -0.3)},
         {"heart": "x...............", "tom": "....x.......x..."},
         (0, 1, 2, 1, 0, 1, 3, 1), "crypt_drips",
-        (0, 1, 2, 2, 1, 2, 3, 2, 3, 4, 3, 2, 0), 2.7, 0.3, 0.08),
+        (0, 1, 2, 2, 1, 2, 3, 2, 3, 4, 3, 2, 0), 2.7, 0.3, 0.08,
+        blurb="C phrygian: close dripping stone, a bowed flat second, organ and toms in the bone halls"),
     "caves": Dungeon("F2", "phrygian_dominant", 92,
         ((0, 0, 5, 4, 0, 6, 5, 4), (0, 1, 5, 6, 4, 5, 1, 0), (0, 0, 4, 5, 6, 5, 4, 0)),
         ((0, 0.5), (1, 0.5), (4, 0.5), (5, 1), (7, 0.5), (5, 1), (4, 1), (1, 1), (0, 2)),
         inst.twelve_string, inst.cello, LAVA_KIT,
         {"war": "x.....x...x.....", "taiko": "....x.......x..x", "rattle": "..o...o...o...o."},
         (0, 3, 2, 3, 4, 3, 2, 3), "lava",
-        (0, 1, 2, 2, 3, 2, 3, 4, 3, 2, 4, 3, 4, 4, 3, 1, 0), 3.5, 0.36, 0.085),
+        (0, 1, 2, 2, 3, 2, 3, 4, 3, 2, 4, 3, 4, 4, 3, 1, 0), 3.5, 0.36, 0.085,
+        blurb="F phrygian-dominant: lava breaths, racing guitar, a rising ember melody and war drums"),
     "hells_gate": Dungeon("D2", "phrygian", 84,
         ((0, 0, 1, 1, 0, 0, 6, 5), (0, 1, 3, 1, 6, 5, 1, 0), (0, 0, 6, 1, 3, 1, 6, 0)),
         ((7, 1), (6, 0.5), (4, 0.5), (1, 1), (0, 1), (-1, 1), (1, 1), (0, 2)),
         inst.hollow_choir, inst.monks, DOOM_KIT,
         {"war": "x.....x...x.....", "taiko": "....x.......x..x", "heart": "........x......."},
         (0, 3, 2, 3, 4, 3, 2, 3), "abyss",
-        (0, 1, 2, 3, 2, 3, 4, 3, 2, 4, 3, 4, 4, 3, 2, 0), 3.2, 0.37, 0.09),
+        (0, 1, 2, 3, 2, 3, 4, 3, 2, 4, 3, 4, 4, 3, 2, 0), 3.2, 0.37, 0.09,
+        blurb="D phrygian: infernal air, a falling choir and the village melody back in a darker form"),
 }
 
 # Act II, the Drowned Temples: the same night heard across the sea, in Kurast's jungle and its drowned city.
@@ -292,14 +299,16 @@ DUNGEONS.update({
         inst.chime, inst.hollow_choir, {"heart": (inst.heartbeat, 0.2, 0.0), "frame": (inst.frame_drum, 0.12, -0.3)},
         {"heart": "x.......x.......", "frame": "....o.......o..."},
         (0, 2, 4, 2, 3, 2, 1, 2), "harbour",
-        (0, 1, 1, 2, 2, 1, 2, 3, 2, 3, 3, 2, 1, 0), 5.0, 0.48, 0.08),
+        (0, 1, 1, 2, 2, 1, 2, 3, 2, 3, 3, 2, 1, 0), 5.0, 0.48, 0.08,
+        blurb="G aeolian: a harbour swell, chimes over a hollow choir, a slow heart and frame drum"),
     "spider_forest": Dungeon("A2", "dorian", 76,
         ((0, 0, 1, 1, 3, 3, 1, 0), (0, 3, 1, 0, 4, 3, 1, 0), (0, 1, 3, 4, 3, 1, 0, 0)),
         ((4, 0.5), (5, 0.5), (4, 0.5), (2, 0.5), (1, 1), (0, 1), (-1, 1), (0, 3)),
         inst.twelve_string, inst.choir, {"rattle": (inst.rattle, 0.14, 0.45), "tom": (inst.tom, 0.12, -0.3)},
         {"rattle": "o.o...o.o...o...", "tom": "....x.......x..."},
         (0, 1, 3, 1, 4, 1, 3, 1), "insects",
-        (0, 1, 2, 1, 2, 3, 2, 3, 3, 2, 1, 0), 4.2, 0.4, 0.08),
+        (0, 1, 2, 1, 2, 3, 2, 3, 3, 2, 1, 0), 4.2, 0.4, 0.08,
+        blurb="A dorian: skittering twelve-string over rattles and toms, insects in the dark"),
     "jungle": Dungeon("E2", "phrygian", 96,
         ((0, 0, 1, 0, 6, 6, 1, 0), (0, 1, 3, 1, 0, 6, 1, 0), (0, 0, 6, 1, 3, 1, 0, 0)),
         ((0, 0.5), (0, 0.5), (3, 0.5), (1, 0.5), (0, 1), (-2, 1), (0, 2)),
@@ -307,33 +316,47 @@ DUNGEONS.update({
         {"taiko": (inst.taiko, 0.22, 0.25), "tom": (inst.tom, 0.18, -0.35), "frame": (inst.frame_drum, 0.12, 0.1)},
         {"taiko": "x..x..x...x..x..", "tom": "..x...x...x...x.", "frame": "o.o.o.o.o.o.o.o."},
         (0, 3, 2, 3, 4, 3, 2, 3), "insects",
-        (0, 1, 2, 3, 2, 3, 4, 3, 4, 4, 3, 2, 0), 3.2, 0.34, 0.085),
+        (0, 1, 2, 3, 2, 3, 4, 3, 4, 4, 3, 2, 0), 3.2, 0.34, 0.085,
+        blurb="E phrygian: hunting drums (taiko, toms, a running frame drum), a cello and monks"),
     "drowned_city": Dungeon("C#2", "aeolian", 56,
         ((0, 0, 5, 5, 3, 3, 6, 6), (0, 6, 5, 3, 4, 5, 6, 0)),
         ((4, 2), (3, 1), (1, 1), (0, 2), (-1, 1), (-3, 1)),
         inst.hollow_choir, inst.organ, {"heart": (inst.heartbeat, 0.26, 0.0)},
         {"heart": "x..............."},
         (0, 2, 1, 2, 0, 2, 1, 2), "canal",
-        (0, 1, 1, 2, 1, 2, 2, 3, 2, 1, 2, 0), 6.0, 0.55, 0.075),
+        (0, 1, 1, 2, 1, 2, 2, 3, 2, 1, 2, 0), 6.0, 0.55, 0.075,
+        blurb="C# aeolian: sunk and slow, a hollow choir over organ, a lone heart, water dripping"),
     "travincal": Dungeon("D#2", "phrygian", 80,
         ((0, 0, 1, 1, 3, 3, 1, 0), (0, 1, 6, 5, 1, 0, 1, 0), (0, 3, 1, 6, 0, 1, 6, 0)),
         ((0, 1), (1, 1), (3, 1), (4, 1), (3, 0.5), (1, 0.5), (0, 2)),
         inst.monks, inst.organ, DOOM_KIT,
         {"war": "x.......x.......", "taiko": "....x.......x...", "heart": "x...x...x...x..."},
         (0, 3, 2, 3, 4, 3, 2, 3), "terrace",
-        (0, 1, 2, 3, 2, 3, 4, 3, 4, 4, 3, 4, 4, 3, 1, 0), 3.8, 0.4, 0.09),
+        (0, 1, 2, 3, 2, 3, 4, 3, 4, 4, 3, 4, 4, 3, 1, 0), 3.8, 0.4, 0.09,
+        blurb="D# phrygian: the council's procession, monks and organ over war drums"),
     "temple": Dungeon("B1", "phrygian_dominant", 72,
         ((0, 0, 4, 4, 5, 5, 1, 0), (0, 1, 4, 5, 4, 1, 0, 0), (0, 0, 5, 4, 1, 1, 4, 0)),
         ((7, 2), (4, 1), (5, 1), (4, 1), (1, 1), (0, 2)),
         inst.choir, inst.organ, HEART_KIT,
         {"heart": "x.......x.......", "frame": "......o.......o."},
         (0, 2, 4, 2, 4, 2, 3, 1), "temple_hum",
-        (0, 1, 1, 2, 2, 3, 3, 4, 3, 4, 4, 3, 2, 0), 5.5, 0.5, 0.085),
+        (0, 1, 1, 2, 2, 3, 3, 4, 3, 4, 4, 3, 2, 0), 5.5, 0.5, 0.085,
+        blurb="B phrygian-dominant: the mother lamp's hall, choir and organ, the heart rising to the last fight"),
 })
 
 BOSS = replace(DUNGEONS["hells_gate"], bpm=88, motif=DESCENT,
                progressions=((0, 0, 1, 1, 0, 0, 6, 1), (0, 1, 6, 1, 3, 1, 6, 0)),
-               arc=(2, 3, 4, 3, 4, 4, 3, 4, 4, 2, 0), rms=0.095)
+               arc=(2, 3, 4, 3, 4, 4, 3, 4, 4, 2, 0), rms=0.095,
+               blurb="Azazel's last wave: the gate's music driven harder, then emptied out at the end")
+
+#: What the walk says over each boss's entrance, by monster kind: one suite, two hearings.
+BOSS_BLURBS: dict[str, str] = {
+    "azazel": BOSS.blurb,
+    "bone_priest": "The Bone Priest's last wave: drums over the temple's music, then emptied out at the end",
+}
+
+TITLE_BLURB = ("D aeolian over a D–A drone: a lone twelve-string arpeggio, a slow falling melody, "
+               "distant voices, a bell, a heart under the second half")
 
 
 def _atmosphere(s: Score, kind: str, chapter: int) -> None:

@@ -21,6 +21,9 @@ func _ready() -> void:
 			test_a_monster_at_the_shrine_strikes_it_and_is_gone, test_the_plate_of_a_monster_under_the_mouse,
 			test_defeat_ends_the_battle_and_its_music,
 			test_the_watched_defence_holds_and_ends_with_victory, test_a_campaign_walk_through_every_screen,
+			test_a_run_from_the_long_night_to_its_laying_down, test_the_camp_offers_relics_and_one_is_taken,
+			test_the_bar_offers_the_grind_and_g_skips_it, test_the_card_teaches_strategies_sold_in_the_forge,
+			test_blight_marks_and_takes_a_cell_that_shows_its_waves, test_holding_a_tower_shows_the_cells_worth,
 			test_every_location_lays_out_and_plays]:
 		if only != "" and only not in t.get_method():
 			continue
@@ -464,8 +467,208 @@ func test_a_campaign_walk_through_every_screen() -> void:
 	check(view["profile"] == "walker" and int(view["sigils"]) == 0, "the walker's campaign holds no sigils after a fall")
 
 
+## A run end to end: R on the title begins the Long Night at the camp, Continue walks into the wagered intro,
+## Defend starts the battle (the run's goals stand over it), an undefended Tristram falls to a reckoning that
+## names the goals met and missed, and Onward lays the lost run down at its summary, back to the title.
+func test_a_run_from_the_long_night_to_its_laying_down() -> void:
+	var game: Game = load("res://scenes/game.tscn").instantiate()
+	_main = game
+	var seen: Array = []
+	var faced := [null]
+	game.shown.connect(func(s: Screen):
+		seen.append(s.get_script().get_global_name())
+		faced[0] = s)
+	add_child(game)
+	var made = await game.ask("create_profile", {"name": "runner"})
+	check(made != null and made["current"] == "runner", "a runner's profile is made and chosen")
+	var vp := game.get_viewport()
+	check(await until(func(): return _showing(seen, "TitleScreen"), 10.0), "the title shows (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_R)
+	check(await until(func(): return _showing(seen, "CampScreen"), 10.0), "R begins the Long Night at the camp (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ENTER)
+	check(await until(func(): return _showing(seen, "StoryScreen"), 10.0), "Continue walks into the place's before page (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ESCAPE)
+	check(await until(func(): return _showing(seen, "BriefingScreen"), 5.0), "then its intro (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ENTER)
+	check(await until(func(): return game.battle != null and game.battle.world != null, 10.0), "Defend starts the battle")
+	if game.battle == null:
+		return
+	var w: World = game.battle.world
+	check(not w.goals.is_empty(), "the run's goals are wagered on the battle (%d)" % w.goals.size())
+	await frames(2)
+	check(game.battle.hud._goals_box.visible, "and their lines stand over it")
+	Engine.time_scale = 8.0
+	check(await until(func():
+		if w.can_call():
+			w.order("call_wave")
+		return _showing(seen, "ReckoningScreen"), 600.0), "an undefended Tristram falls to the reckoning (%s)" % [seen])
+	Engine.time_scale = 1.0
+	check(faced[0] != null and (faced[0] as Screen).data.has("run"), "the reckoning carries the run")
+	await frames(40)
+	press(vp, KEY_ENTER)
+	check(await until(func(): return _showing(seen, "SummaryScreen") or _showing(seen, "CampScreen"), 10.0),
+		"Onward lays the run down (%s)" % [seen])
+	await frames(20)
+	press(vp, KEY_ENTER)
+	check(await until(func(): return _showing(seen, "TitleScreen"), 10.0), "and it ends back at the title (%s)" % [seen])
+	var view = await game.ask("campaign")
+	check(view != null and int(view["runs_lost"]) >= 1, "the runner's campaign counts the lost run")
+	await Net.ask("switch_profile", {"name": "main"}).done
+
+
+## A run's relic: the camp after a held Tristram offers three, and the first key takes one into the run.
+func test_the_camp_offers_relics_and_one_is_taken() -> void:
+	await Net.ask("create_profile", {"name": "relic"}).done
+	var started: Dictionary = await Net.ask("start_run", {"seed": 11}).done
+	check(bool(started["data"]["active"]), "a run starts")
+	check(await win("tristram", "adaptive"), "the campaign's scripted player holds Tristram in the run")
+	await Net.ask("leave", {"again": true}).done   # the reckoning's Onward: the camp may take relics now
+	var view: Dictionary = (await Net.ask("run").done)["data"]
+	check((view["offer"] as Array).size() == 3, "the camp offers three relics")
+	var game: Game = load("res://scenes/game.tscn").instantiate()
+	_main = game
+	var seen: Array = []
+	game.shown.connect(func(s: Screen): seen.append(s.get_script().get_global_name()))
+	add_child(game)
+	check(await until(func(): return _showing(seen, "TitleScreen"), 10.0), "the title shows")
+	game.camp()
+	check(await until(func(): return _showing(seen, "CampScreen"), 10.0), "the camp shows (%s)" % [seen])
+	await frames(20)
+	var held := 0
+	for i in 150:   # the camp lays out after its own ask: knock until it answers
+		press(game.get_viewport(), KEY_1)
+		await frames(2)
+		var after = await game.ask("run")
+		if after != null and (after["relics"] as Array).size() == 1 and (after["offer"] as Array).is_empty():
+			held = 1
+			break
+	check(held == 1, "the first key takes one into the run")
+	await Net.ask("switch_profile", {"name": "main"}).done
+
+
+## The grind's skip on the bar: no button without the server's offer, the button with its bonus with one,
+## and G sends the skip as an order (refused here: the offer is this test's, not a live wave's).
+func test_the_bar_offers_the_grind_and_g_skips_it() -> void:
+	var m := await start()
+	m.rig.user_control = false
+	var w: World = m.world
+	check(not m.hud._skip.visible, "no offer on the break: no button")
+	w.state["skip_offer"] = {"wave": 0, "bonus": 12}
+	m.hud.refresh()
+	check(m.hud._skip.visible and "+12" in m.hud._skip.text, "the button shows the offer's bonus")
+	var why := []
+	w.refused.connect(func(text: String): why.append(text))
+	press(m.get_viewport(), KEY_G)
+	check(await until(func(): return not why.is_empty(), 3.0), "G sends the skip as an order")
+	check(why.size() > 0 and "surely clean" in why[0], "refused: no live wave is surely clean (%s)" % [why])
+
+
+## Strategies on the card and in the forge: no button with only Foremost taught, the aim's button with two,
+## and M sends the teaching as an order (refused here: the profile taught nothing); the forge's last slot sells
+## the four aims and the attunement for salvage.
+func test_the_card_teaches_strategies_sold_in_the_forge() -> void:
+	var m := await start()
+	m.rig.user_control = false
+	var w: World = m.world
+	var tile: Vector2i = lane_side(m.level, 1)[0]
+	await w.order("build", {"kind": "arrow", "tile": [tile.x, tile.y]})
+	var tower: Tower = w.tower_at(tile)
+	m.builder.choose(tower)
+	await frames(2)
+	check(not m.hud._mode.visible, "only Foremost taught: no button on the card")
+	w.start["modes"] = [{"key": "first", "name": "Foremost", "words": ""},
+		{"key": "strong", "name": "Strongest", "words": ""}]
+	m.hud.refresh()
+	check(m.hud._mode.visible and "FOREMOST" in m.hud._mode.text, "with two taught, the card names the aim")
+	var why := []
+	w.refused.connect(func(text: String): why.append(text))
+	press(m.get_viewport(), KEY_M)
+	check(await until(func(): return not why.is_empty(), 3.0), "M sends the teaching as an order")
+	check(why.size() > 0 and "not taught" in why[0], "refused: the profile taught nothing (%s)" % [why])
+	check(not m.hud._attune.visible, "attunement untaught: no button on the card")
+	w.start["attune"] = {"unlocked": true, "gold": 25}
+	m.hud.refresh()
+	check(m.hud._attune.visible and "25" in m.hud._attune.text, "taught, the card offers it for its price")
+	why.clear()
+	press(m.get_viewport(), KEY_T)
+	check(await until(func(): return not why.is_empty(), 3.0), "T sends the attunement as an order")
+	check(why.size() > 0 and "not taught" in why[0], "refused: the profile taught nothing (%s)" % [why])
+	_main.queue_free()
+	await frames(2)
+	_main = null
+	var game: Game = load("res://scenes/game.tscn").instantiate()
+	_main = game
+	var seen: Array = []
+	game.shown.connect(func(s: Screen): seen.append(s.get_script().get_global_name()))
+	add_child(game)
+	check(await until(func(): return _showing(seen, "TitleScreen"), 10.0), "the title shows (%s)" % [seen])
+	game.forge()
+	check(await until(func(): return _showing(seen, "ForgeScreen"), 10.0), "the forge opens (%s)" % [seen])
+	await frames(20)
+	var poor := 0
+	var forge: Screen = game._overlays.back()
+	for b in forge.find_children("*", "Button", true, false):
+		if (b as Button).text == "Need more salvage":
+			poor += 1
+	check(poor == 6, "its last slot sells the four aims, the attunement and foresight (%d)" % poor)
+
+
 ## Every location of both acts lays out (its scenery, its arsenal on the bar) and its battle runs a few seconds,
 ## a scripted player defending: a script error anywhere fails the suite (tools/test.sh).
+## Tristram's shaman marks a cell before it takes it; the taken cell wears its blight and its waves left,
+## and the server refuses a tower there with the reason.
+func test_blight_marks_and_takes_a_cell_that_shows_its_waves() -> void:
+	var m := await start()
+	m.rig.user_control = false
+	var w: World = m.world
+	Engine.time_scale = 8.0
+	var marks := []
+	var lands := []
+	w.happened.connect(func(e: Array):
+		if e[0] == "blight_mark":
+			marks.append(e)
+		elif e[0] == "blight":
+			lands.append(e))
+	for i in 120:
+		if w.can_call():
+			await w.order("call_wave")
+		await seconds(1)
+		if not lands.is_empty() or w.outcome != "":
+			break
+	Engine.time_scale = 1.0
+	check(not marks.is_empty(), "a shaman marks a cell before it takes it")
+	check(not lands.is_empty(), "the mark lands and the cell is taken")
+	if lands.is_empty():
+		return
+	var tile := Vector2i(int(lands[0][2][0]), int(lands[0][2][1]))
+	check(w.blighted_at(tile), "this side knows the cell is taken")
+	var count: Label3D = w.blight_nodes[tile].get_node("Count")
+	check("wave" in count.text.to_lower(), "the cell shows its waves left (%s)" % count.text)
+	var why := []
+	w.refused.connect(func(text: String): why.append(text))
+	await w.order("build", {"kind": "arrow", "tile": [tile.x, tile.y]})
+	check(not why.is_empty() and "wave" in why[0], "a tower there is refused with the reason (%s)" % [why])
+
+
+## Holding an Arrow Tower, the cell under the mouse says how much of the monsters' walk a tower there reaches.
+func test_holding_a_tower_shows_the_cells_worth() -> void:
+	var m := await start()
+	m.rig.user_control = false
+	var w: World = m.world
+	var tile: Vector2i = lane_side(m.level, 1)[0]
+	press(m.get_viewport(), KEY_1)
+	await frames(2)
+	move_mouse(m, m.level.tile_pos(tile))
+	await frames(2)
+	check(m.builder.held == "arrow", "1 holds an Arrow Tower")
+	check(m.builder._worth_mark.visible, "the hovered cell shows its worth")
+	check("tiles of the walk" in m.builder._worth_mark.text, "in tiles of the walk (%s)" % m.builder._worth_mark.text)
+
+
 func test_every_location_lays_out_and_plays() -> void:
 	var view: Dictionary = (await Net.ask("campaign").done)["data"]
 	var seen := {}   # the kinds whose bodies are checked (check_bodies), over every location's battle

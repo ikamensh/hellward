@@ -175,6 +175,42 @@ func _descend(view: Dictionary) -> void:
 		world_map()
 
 
+## The title's Long Night: a run going goes on at its camp, else one begins there.
+func run_or_camp() -> void:
+	var view = await ask("run")
+	if view == null:
+		return
+	if not bool(view["active"]):
+		view = await ask("start_run")
+		if view == null:
+			return
+	camp(view)
+
+
+## The camp between a run's locations: its state, the tree, the way on.
+func camp(view = null) -> void:
+	if view == null:
+		view = await ask("run")
+		if view == null:
+			return
+	if not bool(view["active"]):
+		title()
+		return
+	show_screen(CampScreen.new(), view)
+
+
+## The run's summary when it ended: what it won and lost, then its laying down.
+func summary(view: Dictionary) -> void:
+	show_screen(SummaryScreen.new(), view)
+
+
+## Leaving the run at a camp: its salvage banked, back to the title.
+func abandon_run() -> void:
+	var left = await ask("abandon")
+	if left != null:
+		title()
+
+
 ## The map, after the story it owes first, if any.
 func world_map() -> void:
 	var view = await ask("campaign")
@@ -343,6 +379,8 @@ func leave_reckoning(again: bool) -> void:
 		match String(way["then"]):
 			"intro": intro(String(way["location"]))
 			"act2": open_map(2, true)
+			"camp": camp(way["run"])
+			"summary": summary(way["run"])
 			_: world_map()
 	if way["story"] != null:
 		story(way["story"], then)
@@ -402,4 +440,9 @@ func _open_named(name: String) -> void:
 		"reckoning":
 			title()
 			overlay(ReckoningScreen.new(), SAMPLE_RECKONING)
+		"camp": camp()
+		"summary":
+			var view = await ask("run")
+			if view != null:
+				summary(view)
 		_: push_error("no screen %s" % name)

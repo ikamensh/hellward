@@ -38,7 +38,7 @@ from hellward import fastsim  # noqa: E402
 if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of its worker processes, not as a library
     fastsim.activate()   # the compiled simulation, unless HELLWARD_INTERPRETED is set
 
-from hellward.run import HYMN_N, MET, Run, camp, finish, kit, learn, observe_world, start  # noqa: E402
+from hellward.run import HYMN_N, MET, Run, camp, finish, kit, learn, observe_world, start, take_relic  # noqa: E402
 from hellward.run.goals import Hymn  # noqa: E402
 from hellward.sim import planner, skills as tree  # noqa: E402
 from hellward.sim.balance import BALANCE  # noqa: E402
@@ -279,21 +279,34 @@ def play_run(seed: int, bot: str, locations: tuple[str, ...], immortal: bool,
                 summary["summons"].append((_key, stake))
 
         dealt = reference_kit(played.location, player.draft(played.location, _sigils(bot, run, key, stored)),
-                              played.seed)
-        world, _ = defend(dealt, player, planner=planner.smart,
-                          lives=IMMORTAL_LIVES if immortal else run.pool, watch=watch)
+                              played.seed, relics=run.relics, counters=run.counters)
+        world, record = defend(dealt, player, planner=planner.smart,
+                              lives=IMMORTAL_LIVES if immortal else run.pool, watch=watch)
+        strikes = sum(n for key, n in record.spells.items() if key != "hymn")
         world.events = events
         lives = IMMORTAL_LIVES if immortal else None
         result = observe_world(played, world, run.drawn, lives=lives)
         if immortal:   # the pool never ends the run, but the lost life is counted against it
             result = replace(result, lives_left=run.pool - result.lives_lost)
         run = finish(run, result)
+        if run.offer:   # the bots take the camp's first relic, no choosing
+            run = take_relic(run, run.offer[0])
+            summary.setdefault("relics", []).append([key, run.relics[-1]])
         summary["sim_seconds"] += world.time
         summary["reached"] += 1
+        catches = [len(e[4]) for e in events if e[0] == "cursed"]
         summary["locations"][key] = {"won": result.won, "lives_lost": result.lives_lost,
                                      "pool": run.pool, "gold": run.gold, "level": run.level,
                                      "sigils": run.records[-1].sigils,
-                                     "goals": [(d.key, d.arg, v) for d, v in result.goals]}
+                                     "goals": [(d.key, d.arg, v) for d, v in result.goals],
+                                     "towers": len(world.towers), "builds": world.builds,
+                                     "curses": len(catches),
+                                     "caught": round(sum(catches) / len(catches), 2) if catches else 0.0,
+                                     "blights": world.blights,
+                                     "blight_cells": len(world.blighted_cells),
+                                     "spells": world.spells_cast, "spell_kills": world.spell_kills,
+                                     "casts": world.player_casts, "strikes": strikes,
+                                     "kills": world.kills, "waves": max(1, world.wave + 1)}
         for goal, verdict in run.records[-1].goals:
             met, pursued = summary["goals"].get(goal.key, (0, 0))
             if goal.key == "family" and not player.pursued_family:
@@ -403,8 +416,33 @@ def _report(summaries: list[dict], immortal: bool) -> list[str]:
             losses[summary["loss_at"]] = losses.get(summary["loss_at"], 0) + 1
     if losses:
         lines.append("losses: " + ", ".join(f"{key} {count}" for key, count in sorted(losses.items())))
-    tree = sum(s["tree"] for s in summaries) / len(summaries)
-    lines.append(f"mean tree opened: {tree:.0%}")
+    opened = sum(s["tree"] for s in summaries) / len(summaries)
+    lines.append(f"mean tree opened: {opened:.0%}")
+    top = max(s["level"] for s in summaries)
+    lines.append(f"tree over a perfect run's points: {tree.TREE_COST}/{72 + top} = "
+                 f"{tree.TREE_COST / (72 + top):.2f}x (M4: at least 2.5x)")
+    places = [place for s in summaries for place in s["locations"].values()]
+    towers = [p["towers"] for p in places]
+    lines.append(f"towers standing at a defence's end: mean {sum(towers) / len(towers):.1f} "
+                 f"most {max(towers)} (R4: low with no cap)")
+    curses = sum(p["curses"] for p in places)
+    caught = sum(p["caught"] * p["curses"] for p in places)
+    lines.append(f"landed curses caught {caught / curses:.2f} towers on average over {curses} "
+                 f"(R5: at least 1.5)" if curses else "no curse landed")
+    cells = [(key, p["blight_cells"]) for s in summaries for key, p in s["locations"].items() if p["blight_cells"]]
+    if cells:
+        counts = [c for _, c in cells]
+        lines.append(f"blighted cells a location that has blight: {min(counts)}-{max(counts)} "
+                     f"(R6: 1-5, {len(cells)} defences)")
+    casts = sum(p["casts"] for p in places)
+    strikes = sum(p["strikes"] for p in places)
+    waves = sum(p["waves"] for p in places)
+    kills = sum(p["kills"] for p in places)
+    by_spell = sum(p["spell_kills"] for p in places)
+    lines.append(f"spells a wave: {casts / waves:.2f} ({strikes / waves:.2f} striking, no hymn) "
+                 f"over {waves} waves (S2: about two)")
+    lines.append(f"spells' share of the kills: {by_spell / kills:.1%} over {kills} kills (S2: at most 15%)"
+                 if kills else "no kills")
     minutes = sum(s["sim_seconds"] for s in summaries) / len(summaries) / 60
     lines.append(f"mean run: {minutes:.1f} sim-minutes")
     return lines

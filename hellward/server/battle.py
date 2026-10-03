@@ -19,32 +19,81 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from hellward.run import Drawn
+from hellward.run import describe as describe_goal
+from hellward.run import make as make_goal
 from hellward.server import protocol
+from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
+from hellward.sim.bonus import draw as draw_pack
 from hellward.sim.campaign import ORDER, Location, first_offering, offers
-from hellward.sim.content import SPELLS
+from hellward.sim.content import SPELLS, Curse
 from hellward.sim.items import EMPTY_LOADOUT, Loadout
-from hellward.sim.model import SIM_DT, Planner, Refused, World
+from hellward.sim.modes import MODES
+from hellward.sim.kit import Kit
+from hellward.sim.model import ATTUNE_GOLD, SIM_DT, Planner, Refused, World
+from hellward.sim.planner import Decision, Option
+from hellward.sim.players.ghost import issue as replay_command
 from hellward.sim.players.hands import AIM_GAP, REACT, Hands, Player, react_for
 from hellward.sim.skills import perks
 
 PERSON_REACT = 0.6   # the person's hands: only their record of the leaders' signs uses it
 
 
+class _LoggedDecision:
+    """One logged decision, answered as the planner's handle would answer it."""
+
+    def __init__(self, logged: dict) -> None:
+        self.logged = logged
+
+    def result(self) -> Decision:
+        cast = self.logged["cast"]
+        return Decision(leader=0, cast=None if cast is None else Option(Curse(cast[0]), tuple(cast[1])),
+                        retry=float(self.logged["retry"]))
+
+
+class _ReplayPlanner:
+    """The resume's planner: the logged decisions, in order, per leader. No rollouts, no processes, and an
+    empty queue is a bug: the replayed world asks exactly what the played world asked."""
+
+    def __init__(self, decisions: dict) -> None:
+        self.queues = {int(leader): list(queue) for leader, queue in decisions.items()}
+
+    def __call__(self, world: World, leader: int):
+        queue = self.queues.get(leader)
+        if not queue:
+            raise RuntimeError(f"the log holds no more decisions for leader {leader}")
+        return _LoggedDecision(queue.pop(0))
+
+
 class Battle:
     def __init__(self, location: Location, *, learned: frozenset[str] = frozenset(), loadout: Loadout = EMPTY_LOADOUT,
                  seed: int = 0, planner: Planner | None, player: Player | None = None,
                  breach_claim: str | None = None, replays: Path | None = None,
-                 on_outcome: Callable[[World], dict] | None = None) -> None:
+                 on_outcome: Callable[[World], dict] | None = None, kit: Kit | None = None,
+                 run_seed: int | None = None, run_index: int | None = None,
+                 drawn: tuple[Drawn, ...] = (), on_save: Callable[[], None] | None = None,
+                 modes: frozenset[str] = frozenset(), attune_unlocked: bool = False,
+                 foresight_taught: bool = False) -> None:
+        if kit is not None:   # a run's defence: the Kit deals everything, down to the pool as its lives
+            location, learned, loadout, seed = kit.location, kit.learned, kit.loadout, kit.seed
         self.location = location
+        self.kit = kit
         self.player = player
+        self.modes = modes | {"first"}   # the profile's taught strategies, foremost always among them
+        self.attune_unlocked = attune_unlocked
+        self.foresight_taught = foresight_taught
         if player is not None:
             learned = player.draft(location, 3 * ORDER.index(location.key))
             loadout = getattr(player, "loadout", EMPTY_LOADOUT)
         self.learned = learned
         self.seed = seed
-        self.world = World(location, perks=perks(learned, ORDER.index(location.key)), seed=seed, planner=planner,
-                           loadout=loadout)
+        if kit is not None:
+            self.world = kit.world(planner=planner)
+        else:
+            self.world = World(location, perks=perks(learned, ORDER.index(location.key)), seed=seed, planner=planner,
+                               loadout=loadout)
+        self.world.foresight = foresight_taught   # the profile's teaching, or eager spending without it
         if player is not None:
             self.hands = Hands(self.world, react_for(seed, getattr(player, "reaction", REACT)),
                                getattr(player, "aim_gap", AIM_GAP))
@@ -58,6 +107,21 @@ class Battle:
         self.paused = False
         self.steps = 0
         self.commands: list[list] = []      # the person's accepted orders, [time, name, args...]
+        self.run_seed, self.run_index = run_seed, run_index
+        self.repeats = 0                    # bonus waves summoned: the draw counts them down in price
+        self.drawn = drawn
+        self.folds = [make_goal(goal) for goal in drawn]
+        if kit is not None:
+            for fold in self.folds:
+                fold.start(kit)
+        self.all_events: list[tuple] = []   # every event, for the run's settling at the outcome
+        self.log: dict = {"commands": self.commands, "decisions": {}, "marks": []}
+        self.on_save = on_save
+        self._dirty = False                 # the log grew since the last save
+        self._warnings: list[str] = []
+        self._second = -1
+        self._skip: tuple[tuple, dict | None] | None = None   # the grind offer's memo: key, offer
+        self._replaying = False           # a resume's replay steps the world: no offers are predicted
 
     def start(self) -> dict:
         message = protocol.battle_start(self.world, demo=self.player is not None and self.on_outcome is None,
@@ -66,6 +130,14 @@ class Battle:
         message["salvage_sale_gold"] = BALANCE.salvage_sale_gold()
         message["breach_cash"] = BALANCE.breach_cache()
         message["skills"] = sorted(self.learned)
+        message["run"] = self.kit is not None
+        message["boss_strike_lives"] = tuning.integer("battle.boss_strike_lives")
+        message["goals"] = [{"key": goal.key, "arg": goal.arg, "line": describe_goal(goal),
+                             "verdict": fold.verdict()}
+                            for goal, fold in zip(self.drawn, self.folds)]
+        message["modes"] = [{"key": key, "name": MODES[key].name, "words": MODES[key].words}
+                            for key in MODES if key in self.modes]
+        message["attune"] = {"unlocked": self.attune_unlocked, "gold": ATTUNE_GOLD}
         return message
 
     # -- The clock ------------------------------------------------------------------------------
@@ -84,16 +156,96 @@ class Battle:
             frames.append(self._flush(SIM_DT))
         return frames
 
+    def _refresh_skip(self) -> None:
+        """The grind's offer, predicted at most once per wave, orders and wave state: a person's battle
+        only, never a replay (its leaders read their decisions from the log, which a prediction must not
+        drink). A prediction stands while no orders land: the live wave walks the predicted steps."""
+        world = self.world
+        if self.player is not None or self._replaying:
+            self._skip = None
+            return
+        key = (world.wave, len(self.commands), bool(world.schedule), world.bonus is None,
+               world.breach_remaining)
+        if self._skip is not None and self._skip[0] == key:
+            return
+        offer = {"wave": world.wave, "bonus": BALANCE.income_unit()} if world.predict_clean() else None
+        self._skip = (key, offer)
+
     def _flush(self, dt: float) -> dict:
         world = self.world
         self.hands.observe(world.events, dt=dt)
-        message = protocol.frame(world, self.steps, world.events)
-        world.events.clear()
+        if self.kit is not None:
+            self.all_events.extend(world.events)
+            if int(world.time) > self._second:   # a step mark at least once a second, for the resume
+                self._second = int(world.time)
+                world.events.append(("step", round(world.time, 3)))
+                self.all_events.append(world.events[-1])
+                self.log["marks"].append(round(world.time, 3))
+                self._dirty = True
+            for e in world.events:
+                if e[0] == "plan":
+                    by_leader = self.log["decisions"].setdefault(e[1], [])
+                    cast = e[2].cast
+                    by_leader.append({"cast": None if cast is None else [cast.curse.value, list(cast.spot)],
+                                      "retry": e[2].retry})
+                    self._dirty = True
+                elif e[0] == "wave":
+                    self._dirty = True   # the save is written at every wave's start
+            synth: list[tuple] = []
+            for goal, fold in zip(self.drawn, self.folds):
+                before = fold.verdict()
+                for e in world.events:
+                    fold.observe(e)
+                if fold.verdict() != before:
+                    synth.append(("goal", goal.key, fold.verdict()))
+            world.events.extend(synth)
+            self.all_events.extend(synth)
+            message = protocol.frame(world, self.steps, world.events)
+            world.events.clear()
+        else:
+            message = protocol.frame(world, self.steps, world.events)
+            world.events.clear()
+        if self._warnings:
+            message["warnings"] = self._warnings
+            self._warnings = []
         if world.outcome is not None and self.result is None:
+            if self.kit is not None:
+                world.events = self.all_events   # the settling replays the whole defence
             self.result = self.on_outcome(world) if self.on_outcome is not None else {}
             self._write_replay()
             message["result"] = self.result
+        elif self._dirty and self.on_save is not None:
+            self.on_save()
+            self._dirty = False
+        self._refresh_skip()
+        message["state"]["skip_offer"] = self._skip[1] if self._skip is not None else None
         return message
+
+    def resume_from(self, log: dict, planner: Planner | None) -> None:
+        """Replay the save's log on to its last mark: its commands through the hands, its leaders' decisions
+        from the log instead of a live planner. Quitting never rewinds more than a second: whatever came
+        after the last mark is let go. The live planner takes over from the mark."""
+        assert self.kit is not None
+        self.log = {"commands": [list(entry) for entry in log["commands"]], "decisions": {}, "marks": []}
+        self.commands = self.log["commands"]
+        saved, self.on_save = self.on_save, None   # the replay regrows the log; it writes nothing
+        self.world.planner = _ReplayPlanner(log["decisions"])
+        self._replaying = True
+        try:
+            end = log["marks"][-1] if log["marks"] else 0.0
+            pending = sorted(self.log["commands"], key=lambda entry: entry[0])
+            while self.world.time < end - 1e-9 and self.world.outcome is None:
+                while pending and pending[0][0] <= self.world.time + 1e-9:
+                    _, name, *rest = pending.pop(0)
+                    if name == "summon":
+                        self._summon(int(rest[0]))
+                    elif not replay_command(self.world, self.hands, name, tuple(rest)):
+                        raise RuntimeError(f"the replayed {name} was refused")
+                self.advance(1)
+        finally:
+            self.world.planner = planner
+            self.on_save = saved
+            self._replaying = False
 
     # -- Orders ---------------------------------------------------------------------------------
 
@@ -106,12 +258,17 @@ class Battle:
         handler = getattr(self, f"_{name}", None)
         if handler is None or name.startswith("_"):
             raise ValueError(f"unknown battle order {name!r}")
+        self._warnings = [warned for fold in self.folds
+                          if (warned := fold.warn(name, args)) is not None]
+        at = self.world.time   # before the handler: a skip jumps the clock it is logged at
         try:
             logged = handler(**args)
         except Refused as refusal:
+            self._warnings = []
             return str(refusal), None
         if logged is not None:
-            self.commands.append([self.world.time, name, *logged])
+            self.commands.append([at, name, *logged])
+            self._dirty = True   # every accepted order joins the resume's log
         return None, self._flush(0.0)
 
     def _tower(self, tower: int):
@@ -192,6 +349,42 @@ class Battle:
         self.paused = bool(paused)
         return None
 
+    def _summon(self, stake: int) -> list:
+        """Wager the stake's bonus wave: a run's bet, drawn from its seed."""
+        if self.kit is None or self.run_seed is None or self.run_index is None:
+            raise Refused("Bonus waves are a run's wager.")
+        pack = draw_pack(self.location, int(stake), self.run_seed, self.run_index, self.repeats,
+                         self.world.wave)
+        self.world.summon(pack)
+        self.repeats += 1
+        return [int(stake)]
+
+    def _attune(self, tower: int) -> list:
+        """Attune a tower: it holds charges for empowered shots from here on."""
+        if not self.attune_unlocked:
+            raise Refused("Attunement is not taught: learn it in the forge.")
+        t = self._tower(tower)
+        self.world.attune(t.id)
+        return [list(t.tile)]
+
+    def _set_mode(self, tower: int, mode: str) -> list:
+        """Teach a tower its strategy for this defence; untaught strategies are refused."""
+        if mode not in self.modes:
+            name = MODES[mode].name if mode in MODES else mode
+            raise Refused(f"{name} is not taught: learn it in the forge.")
+        t = self._tower(tower)
+        self.world.set_mode(t.id, mode)
+        return [list(t.tile), mode]
+
+    def _skip_grind(self) -> list:
+        """Skip the surely clean wave: the offer must stand for this wave and these orders."""
+        key = (self.world.wave, len(self.commands), bool(self.world.schedule),
+               self.world.bonus is None, self.world.breach_remaining)
+        if self._skip is None or self._skip[1] is None or self._skip[0] != key:
+            raise Refused("No wave is surely clean: the grind must be fought.")
+        self.world.skip_grind()
+        return []
+
     def _ready(self, key: str) -> None:
         """An aimed spell is cast in the fight's own time, and only where it is offered; the world refuses the rest
         (recharge, mana)."""
@@ -204,9 +397,9 @@ class Battle:
 
     def replay(self) -> dict:
         world = self.world
-        return {"version": 2, "location": self.location.key, "seed": self.seed, "skills": sorted(self.learned),
+        return {"version": 3, "location": self.location.key, "seed": self.seed, "skills": sorted(self.learned),
                 "loadout": list(world.loadout.equipped), "outcome": world.outcome, "lives": world.lives,
-                "time": world.time, "commands": self.commands}
+                "time": world.time, "foresight": world.foresight, "commands": self.commands}
 
     def _write_replay(self) -> None:
         """The moment a person's defence is decided: their orders as one JSON file in the replays folder.

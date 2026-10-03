@@ -116,7 +116,7 @@ def draw(location: Location, stake: int, seed: int, index: int, repeats: int = 0
     kill = float_sum(group.count * MONSTERS[group.kind].hp for group in groups)
     if kind is not None:
         kill += MONSTERS[kind].hp
-    xp = kill / XP_LIFE * PROFIT[stake - 1] * REPEAT ** repeats
+    xp = kill / XP_LIFE * REPEAT ** repeats   # its kills' XP, never the gold's profit: a pack pays riches, not levels
     lives = int_sum(group.count * MONSTERS[group.kind].lives for group in groups)
     if kind is not None:
         lives += MONSTERS[kind].lives

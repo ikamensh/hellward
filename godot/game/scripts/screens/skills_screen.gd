@@ -1,6 +1,6 @@
 class_name SkillsScreen
 extends Screen
-## The skill tree, over the map or a location's intro: thirteen columns (ten tower kinds, Warding, Sorcery,
+## The skill tree, over the map or a location's intro: seventeen columns (fourteen tower kinds, Warding, Sorcery,
 ## Battle Magic) of up to five skills, each needing the one above it, bought with sigils. The server's `skills`
 ## view is what it shows; a click on a skill asks to learn it and the reply is the new view. Opened from an
 ## intro (`location`), the skills that do nothing there are greyed. Unlearn all (U) gives every sigil back; Close (Esc).
@@ -586,7 +586,7 @@ func _node(node: Dictionary, box: Rect2) -> Control:
 	var m := p.material as ShaderMaterial
 	hit.mouse_entered.connect(func(): m.set_shader_parameter("hover", 1.0 if learnable or learned else 0.4))
 	hit.mouse_exited.connect(func(): m.set_shader_parameter("hover", 0.0))
-	hit.pressed.connect(func(): _learn(key, learned))
+	hit.pressed.connect(func(): _press(node))
 	slot.add_child(hit)
 	return slot
 
@@ -666,11 +666,18 @@ func _orders() -> void:
 	col.position = Vector2(x - 120, TIER_Y[2] + 30)
 	col.size = Vector2(240, 0)
 	_stage.add_child(col)
-	var unlearn := Ui.button("Unlearn all", "U", 240)
-	unlearn.disabled = not bool(data["any"])
-	unlearn.tooltip_text = "Every sigil back, to spend again." if bool(data["any"]) else "Nothing is learned yet."
-	unlearn.pressed.connect(_unlearn)
-	col.add_child(unlearn)
+	if not bool(data.get("run", false)):
+		var unlearn := Ui.button("Unlearn all", "U", 240)
+		unlearn.disabled = not bool(data["any"])
+		unlearn.tooltip_text = "Every sigil back, to spend again." if bool(data["any"]) else "Nothing is learned yet."
+		unlearn.pressed.connect(_unlearn)
+		col.add_child(unlearn)
+	else:
+		var note := Ui.label("Click a bottom skill to unlearn it for a reskill point.", 18, Style.DIM_GOLD)
+		note.custom_minimum_size = Vector2(240, 0)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(note)
 	var close := Ui.button("Close", "Esc", 240)
 	close.pressed.connect(back)
 	col.add_child(close)
@@ -760,8 +767,22 @@ func _with_location(args: Dictionary) -> Dictionary:
 	return args
 
 
-func _learn(key: String, learned: bool) -> void:
-	if _busy or learned:
+func _press(node: Dictionary) -> void:
+	if _busy:
+		return
+	if bool(node["learned"]) and bool(node.get("unlearnable", false)):
+		_busy = true
+		var view = await ask("unlearn", {"column": String(node["column"])})
+		_busy = false
+		if view != null:
+			_show(view, "")
+			Sfx.play("sell")
+	elif not bool(node["learned"]):
+		_learn(String(node["key"]))
+
+
+func _learn(key: String) -> void:
+	if _busy:
 		return
 	_busy = true
 	var view = await ask("learn", _with_location({"key": key}))

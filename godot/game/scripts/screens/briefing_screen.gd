@@ -64,6 +64,9 @@ func build() -> void:
 	if data["breach"] != null:
 		_space(body, 10)
 		body.add_child(_breach(data["breach"]))
+	if not (data["goals"] as Array).is_empty():
+		_space(body, 10)
+		body.add_child(_goals())
 	_space(body, 18, 1.5)
 	var lower := HBoxContainer.new()
 	lower.add_theme_constant_override("separation", 24)
@@ -385,6 +388,21 @@ func _curses() -> Control:
 		720), 0)
 	words.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	answer.add_child(words)
+	return box
+
+
+## The run's wager here: the goals drawn, the worst case against the pool, and the answers the roster's
+## standout has. Only in a run: elsewhere the briefing carries no goals.
+func _goals() -> Control:
+	var box := _panel()
+	var col := box.get_child(0) as VBoxContainer
+	col.add_child(_heading("The wager"))
+	for goal in data["goals"]:
+		col.add_child(Ui.paragraph("•  %s" % String(goal["line"]), 21, Style.BONE, 560))
+	if data["worst"] != null:
+		col.add_child(Ui.paragraph(String(data["worst"]), 21, Style.GOLD, 560))
+	if data["threat_answers"] != null:
+		col.add_child(Ui.paragraph(String(data["threat_answers"]), 21, HOLY, 560))
 	return box
 
 

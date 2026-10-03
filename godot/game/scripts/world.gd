@@ -25,6 +25,8 @@ var monsters := {}                   # id -> Monster
 var towers := {}                     # id -> Tower
 var doors: Array = []                # [index, hp, built, rubble]
 var hazards: Array = []
+var blight_nodes := {}               # Vector2i -> the taken cell's quad and count below
+var _blight_taught := false
 var gold := 0
 var lives := 20
 var start_lives := 20
@@ -37,6 +39,10 @@ var time := 0.0
 var step := 0
 var alpha := 1.0                     # how far between the last two steps the picture is
 var slain := {}                      # wave -> its monsters killed, counted from deaths (the HUD's tally)
+var goals: Array = []                # the run's wager here: [{key, arg, line, verdict}], kept live
+var xp := 0.0
+var xp_level := 1
+var xp_next := 0.0
 var demo := false                    # a scripted player plays (the demo, or a playtest): this side only watches
 var minds := true                    # say what the leaders weighed (the settings' "leaders' minds")
 var paused := false
@@ -52,9 +58,18 @@ func setup(lvl: Level, battle: Dictionary) -> void:
 	start = battle
 	dt = float(battle["sim_dt"])
 	demo = bool(battle["scripted"])
+	goals = (battle.get("goals", []) as Array).duplicate(true)
 	_take_state(battle["state"])
 	start_lives = lives
 	Net.frame.connect(_on_frame)
+
+
+## A boss walks the map: its strikes at the shrine cost boss_strike_lives each.
+func boss_out() -> bool:
+	for m in living():
+		if bool(monster_table(m.kind)["boss"]):
+			return true
+	return false
 
 
 func _exit_tree() -> void:
@@ -200,11 +215,69 @@ func _take_state(s: Dictionary) -> void:
 	lives = int(s["lives"])
 	mana = float(s["mana"])
 	mana_max = float(s["mana_max"])
+	xp = float(s.get("xp", 0.0))
+	xp_level = int(s.get("xp_level", 1))
+	xp_next = float(s.get("xp_next", 0.0))
 	wave = int(s["wave"])
 	var was := outcome
 	outcome = "" if s["outcome"] == null else String(s["outcome"])
 	if was == "" and outcome != "":
 		_decided()
+	_show_blight(s.get("blighted", []))
+
+
+## Whether a taken cell holds `tile`: no tower stands there while it does.
+func blighted_at(tile: Vector2i) -> bool:
+	return blight_nodes.has(tile)
+
+
+## Taken cells wear their blight and its waves left; freed cells lose both.
+func _show_blight(cells: Array) -> void:
+	var live := {}
+	for c in cells:
+		var tile := Vector2i(int(c[0]), int(c[1]))
+		live[tile] = true
+		var line := "%s, %d %s left" % [String(c[3]).capitalize(), int(c[2]), "wave" if int(c[2]) == 1 else "waves"]
+		if blight_nodes.has(tile):
+			(blight_nodes[tile].get_node("Count") as Label3D).text = line
+		else:
+			blight_nodes[tile] = _blight_cell(tile, String(c[3]), line)
+	for tile in blight_nodes.keys():
+		if not live.has(tile):
+			(blight_nodes[tile] as Node3D).queue_free()
+			blight_nodes.erase(tile)
+
+
+func _blight_cell(tile: Vector2i, past: String, line: String) -> Node3D:
+	var root := Node3D.new()
+	root.position = level.tile_pos(tile)
+	add_child(root)
+	var quad := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(Level.TILE * 0.92, Level.TILE * 0.92)
+	quad.mesh = pm
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.62, 0.66, 0.72, 0.5) if past == "webbed" else Color(0.45, 0.16, 0.5, 0.5)
+	quad.material_override = mat
+	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	quad.position = Vector3(0, 0.05, 0)
+	root.add_child(quad)
+	var label := Label3D.new()
+	label.name = "Count"
+	label.text = line
+	label.font = Style.title_font()
+	label.font_size = 48
+	label.pixel_size = 0.005
+	label.modulate = Color(0.95, 0.9, 0.85)
+	label.outline_modulate = Color(0.05, 0.02, 0.08)
+	label.outline_size = 10
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.position = Vector3(0, 1.1, 0)
+	root.add_child(label)
+	return root
 
 
 func _decided() -> void:
@@ -308,6 +381,18 @@ func _event(e: Array) -> void:
 				t.curse_ends(String(e[2]))
 		"burned":
 			announce.emit("", "The curse burns %d mana." % int(e[2]))
+		"blight_mark":
+			var at := level.tile_pos(Vector2i(int(e[2][0]), int(e[2][1])))
+			Vfx.rune_circle_at(self, at, Level.TILE * 0.7, float(e[3]))
+			Sfx.play("chant", at)
+		"blight":
+			if not _blight_taught:
+				_blight_taught = true
+				announce.emit("The ground is taken", "A %s cell holds no tower while its waves last." % String(e[4]))
+		"blight_fizzle":
+			Sfx.play("fizzle", level.tile_pos(Vector2i(int(e[2][0]), int(e[2][1]))))
+		"blight_clear":
+			pass   # the next frame's state lifts the quad
 		"leak":
 			var m: Monster = monsters.get(int(e[1]))
 			if m:
@@ -390,6 +475,43 @@ func _event(e: Array) -> void:
 				_thought(monsters.get(int(e[1])), e[2])
 		"victory", "defeat":
 			pass
+		"step":
+			pass   # the save's second mark: nothing to show
+		"goal":
+			var line := ""
+			for g in goals:
+				if String(g["key"]) == String(e[1]):
+					g["verdict"] = String(e[2])
+					line = String(g["line"])
+			if String(e[2]) == "met":
+				announce.emit("Wager met", line)
+				Sfx.play("cleared")
+			else:
+				announce.emit("Wager missed", line)
+				Sfx.play("fizzle")
+		"level_up":
+			announce.emit("Level %d" % int(e[1]), "A skill point waits at the camp.")
+			Sfx.play("upgrade")
+		"bonus":
+			if String(e[2]) == "cleared":
+				announce.emit("The wager pays", "The bonus pack is broken.")
+				Sfx.play("gold")
+			else:
+				announce.emit("The wager fails", "The bonus pack got through.")
+		"relic":
+			announce.emit(String(e[2]), "A relic fires.")
+			Sfx.play("upgrade")
+		"skipped":
+			announce.emit("The grind is skipped", "The vision showed it clean: +%d gold." % int(e[2]))
+			Sfx.play("gold")
+		"mode":
+			var taught: Tower = towers.get(int(e[1]))
+			if taught != null:
+				taught.mode = String(e[2])
+		"attuned", "spent":
+			pass   # the frames carry the charges; the empowered shot's flash is still to paint
+		"immolated":
+			announce.emit("The censer answers", "A leak near it immolates the field.")
 		_:
 			push_warning("an event this client does not show: %s" % kind)
 	happened.emit(e)

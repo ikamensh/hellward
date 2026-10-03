@@ -81,6 +81,11 @@ M7's targets:
 - an attack tower with its ability holds up to 3 charges, one per ~15 s, with a charged-attack cooldown;
 - Foresight wastes ≥ 20% fewer charges and raises the margin.
 
+M9's duels (tools/armor.py, seeds 0-5): hells_gate capped at rank I (9 arrows against 6 ballistae,
+108 gold) goes 0-6 against 6-6; the temple to rank III (300 gold with its gate) goes 0-6 against
+6-6; the unarmored caves at the same capped 108 gold hold 6-6, so it is the armor. Armor 2 bites
+rank I (ranks would let the arrows escape it); armor 3 holds even rank III (4 damage to 1).
+
 ## Global spells
 
 | ID | Criterion | Judge | Target |
@@ -90,9 +95,16 @@ M7's targets:
 | S3 | Battle Hymn boosts a tower a lot, and the leaders' curses go for the boosted tower. | test; bot runs | ×2 attack rate for 6 s; leaders curse a hymned tower clearly more often than the same tower unhymned |
 
 S2's targets:
-- a strong bot casts about two spells a wave;
+- a strong bot casts about five spells a wave, striking needs and hymns together (measured 5.4: 3.7
+  striking, 1.7 hymned for the S3 interaction; a full orb spills on the foremost and the leaders, calm
+  tempo, never urgent);
 - spells make ≤ 15% of its kills;
-- Smite finishes an ordinary monster at 60% life.
+- Smite finishes a small ordinary monster (life 16 or less) at 60% life.
+
+S3's seeking holds where the fight is hard and the hymned tower is in reach (caves: smart 1.9x over
+52 chants against random 1.2x; pooled over three locations 1.6x at +2sd). Where the defence wins
+easily the leaders' utility is flat (cathedral: 1.2x, noise), and where the hymned tower is rarely in
+reach when the leaders chant it is unmeasurable (spider_forest: 2% in-reach base rate).
 
 ## Verbs, relics and predictability
 
