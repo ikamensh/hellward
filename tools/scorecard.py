@@ -518,20 +518,24 @@ def relic_builds() -> Result:
 def bot_table() -> Result:
     """T2: a middling bot and a strong bot whose tree policy reads its relics, and a Kit corpus feeding
     the per-location tools."""
+    import ast
+
     from hellward.sim.players.apprentice import Apprentice  # noqa: E402
+    from tools.corpus import FEEDERS  # noqa: E402
 
     middling = isinstance(Apprentice().draft(LOCATIONS["caves"], 12), frozenset)
     sets = adapt_sets()
     reads = len(sets) >= 2
-    try:
-        import tools.corpus  # noqa: E402, F401
-        corpus = True
-    except ImportError:
-        corpus = False
+    fed = []
+    for name in FEEDERS:
+        tree = ast.parse((Path(__file__).parent / f"{name}.py").read_text())
+        if any(isinstance(node, ast.ImportFrom) and node.module in ("tools.corpus", "corpus")
+               for node in ast.walk(tree)):
+            fed.append(name)
     value = f"middling apprentice {'reads' if middling else 'missing'}; planned reads relics ({len(sets)} sets); " \
-        f"Kit corpus {'feeds the tools' if corpus else 'none yet'}"
+        f"corpus feeds {len(fed)}/{len(FEEDERS)} ({', '.join(fed)})"
     return Result("T2", "middling and strong bots; the strong one reads relics; a Kit corpus",
-                  value, middling and reads and corpus)
+                  value, middling and reads and len(fed) == len(FEEDERS))
 
 
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (

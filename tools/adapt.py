@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -28,10 +27,10 @@ if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of it
     fastsim.activate()   # the compiled simulation, unless HELLWARD_INTERPRETED is set
 
 from hellward.sim import planner  # noqa: E402
-from hellward.sim.campaign import LOCATIONS, ORDER  # noqa: E402
-from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
+from hellward.sim.campaign import ORDER  # noqa: E402
+from hellward.sim.players.hands import defend  # noqa: E402
 from hellward.sim.players.planned import Planned  # noqa: E402
-from hellward.sim.relics import DOWNSIDES, RELICS, draw  # noqa: E402
+from tools.corpus import deal, takes as camp_takes  # noqa: E402
 
 LOCATION = "jungle"   # every tower on offer, and the planned player holds it at HEAD
 CAMPS = ORDER.index(LOCATION)   # camps before it: the run takes this many relics
@@ -39,23 +38,15 @@ SEEDS = tuple(range(1000, 1010))
 
 
 def takes(seed: int) -> tuple[str, ...]:
-    """Eleven camp takes the way a person takes: most verbs shared with the run's takes, pacts declined."""
-    held: tuple[str, ...] = ()
-    for index in range(CAMPS):
-        offered = [key for key in draw(seed, index, held) if key not in DOWNSIDES]
-        if not offered:
-            continue
-        verbs = Counter(RELICS[key].verb for key in held)
-        held += (max(offered, key=lambda k: (verbs[RELICS[k].verb], -offered.index(k))),)
-    return held
+    """The run's camp takes the way a person takes them."""
+    return camp_takes(seed, CAMPS)
 
 
 def end_build(seed: int, relics: tuple[str, ...], *, tree: bool = True) -> tuple[str, frozenset[str]]:
-    """The temple defended with these takes: the outcome and the tower kinds standing at the end."""
-    location = LOCATIONS[LOCATION]
+    """The jungle defended with these takes: the outcome and the tower kinds standing at the end."""
     player = Planned()
-    learned = player.draft(location, 3 * ORDER.index(LOCATION), relics if tree else ())
-    world, _ = defend(reference_kit(location, learned, seed, relics=relics), player, planner=planner.smart)
+    world, _ = defend(deal(LOCATION, player, seed, relics=relics if tree else (), kit_relics=relics),
+                      player, planner=planner.smart)
     return world.outcome or "undecided", frozenset(t.kind.key for t in world.towers.values())
 
 

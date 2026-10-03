@@ -47,9 +47,10 @@ from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import MONSTERS, TOWERS, felt_hit  # noqa: E402
 from hellward.sim.model import DOOR_STOP, JOSTLE, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
-from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
+from hellward.sim.players.hands import defend  # noqa: E402
 from hellward.sim.players.planned import Plan, Planned, fingerprint, load, plan_path  # noqa: E402
 from hellward.sim.skills import SKILLS, column_of, unlock_skills  # noqa: E402
+from tools.corpus import deal, sigils_for  # noqa: E402
 
 
 
@@ -73,10 +74,6 @@ FIRST_TOWERS = 12             # towers in a first build
 # -- Playing ------------------------------------------------------------------------------------------
 
 
-def sigils_for(location: str) -> int:
-    return 3 * ORDER.index(location)
-
-
 def score(world: World) -> float:
     """20 plus the lives kept for a victory; for a fall, 20 times the share of the host slain before it."""
     if world.outcome == "victory":
@@ -88,7 +85,7 @@ def score(world: World) -> float:
 def play(plan: dict, location: str, sigils: int, seed: int, hp: float, leaders: str) -> float:
     player = Planned(plan=Plan.from_json(plan))
     loc = LOCATIONS[location]
-    world, _ = defend(reference_kit(loc, player.draft(loc, sigils), seed), player,
+    world, _ = defend(deal(loc, player, seed, sigils=sigils), player,
                       planner=LEADERS[leaders], hardness=hp)
     return score(world)
 
@@ -452,7 +449,7 @@ def climb(pool: ProcessPoolExecutor, location_key: str, generations: int, childr
 
 def table_row(player: str, location: str, sigils: int, seed: int) -> dict:
     who = PLAYERS[player](seed)
-    world, record = defend(reference_kit(LOCATIONS[location], who.draft(LOCATIONS[location], sigils), seed),
+    world, record = defend(deal(LOCATIONS[location], who, seed, sigils=sigils),
                            who, planner=planner.smart)
     return {"player": player, "location": location, "seed": seed, "outcome": world.outcome,
             "lives": world.lives, "spells": dict(record.spells), "landed": record.landed, "strikes": record.strikes}

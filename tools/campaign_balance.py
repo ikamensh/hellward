@@ -58,7 +58,8 @@ from hellward.sim import campaign, planner  # noqa: E402
 from hellward.sim.content import MONSTERS, START_LIVES  # noqa: E402
 from hellward.sim.model import Planner, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
-from hellward.sim.players.hands import defend, react_for, reference_kit  # noqa: E402
+from hellward.sim.players.hands import defend, react_for  # noqa: E402
+from tools.corpus import deal  # noqa: E402
 from tools.tuning import life_margin  # noqa: E402
 
 SEEDS = "1000-1019"                    # the evaluation seeds; offline planning may use 0-99
@@ -111,7 +112,7 @@ def play(player: str, location: str, seed: int, sigils: int, *, leaders: str = "
     policy = Timed(LEADERS[leaders](seed))
     started = time.process_time()
     who = PLAYERS[player](seed)
-    world, record = defend(reference_kit(place, who.draft(place, sigils), seed), who,
+    world, record = defend(deal(place, who, seed, sigils=sigils), who,
                            planner=policy, hardness=life, lives=lives, curse_scale=curse_scale)
     start_lives = START_LIVES if lives is None else lives
     caught = record.towers_caught
