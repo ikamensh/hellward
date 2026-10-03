@@ -74,6 +74,13 @@ def test_the_draw_is_by_seed_and_differs_between_runs():
     assert {draw_goals(seed, 0, tristram) for seed in range(20)}.__len__() > 1
 
 
+def test_the_leaders_draw_names_no_kind():
+    jungle = LOCATIONS["jungle"]
+    args = {goal.arg for seed in range(60) for goal in draw_goals(seed, ORDER.index("jungle"), jungle)
+            if goal.key == "leaders"}
+    assert args == {""}   # every leader: the fold watches them all
+
+
 def test_a_kit_tops_carried_gold_up_to_the_floor_and_carries_the_pool():
     run = start(3)
     assert kit(run).gold == gold_floor(LOCATIONS["tristram"]) == round(LOCATIONS["tristram"].start_gold * 0.8)
@@ -236,12 +243,17 @@ def test_one_family_judges_every_tower_built():
 
 
 def test_the_leaders_die_first_or_curse_first():
-    assert _fold("leaders", "bone_priest", ("spawn", 1, "bone_priest"),
-                 ("death", 1, "bone_priest", "fire", (0, 0), 5)).verdict() == MET
-    assert _fold("leaders", "bone_priest", ("spawn", 1, "bone_priest"),
-                 ("cursed", 1, (0, 0), "rot", (2,))).verdict() == FAILED
-    assert _fold("leaders", "bone_priest", ("spawn", 1, "azazel"),
+    assert _fold("leaders", "", ("spawn", 1, "bone_priest"), ("spawn", 2, "shaman"),
+                 ("death", 1, "bone_priest", "fire", (0, 0), 5),
+                 ("death", 2, "shaman", "fire", (0, 0), 5)).verdict() == MET
+    assert _fold("leaders", "", ("spawn", 1, "bone_priest"), ("spawn", 2, "shaman"),
+                 ("death", 1, "bone_priest", "fire", (0, 0), 5),
+                 ("cursed", 2, (0, 0), "rot", (2,))).verdict() == FAILED
+    assert _fold("leaders", "", ("spawn", 1, "azazel"),
                  ("cursed", 1, (0, 0), "rot", (2,))).verdict() == OPEN
+    failed = _fold("leaders", "", ("spawn", 1, "shaman"), ("cursed", 1, (0, 0), "rot", (2,)),
+                   ("death", 1, "shaman", "fire", (0, 0), 5))
+    assert failed.verdict() == FAILED   # a curse cannot be un-cursed by the kill
 
 
 def test_a_fragile_hymn_counts_only_the_hymns_no_curse_touches():

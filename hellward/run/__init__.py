@@ -119,7 +119,7 @@ def draw_goals(seed: int, index: int, location: Location) -> tuple[Drawn, ...]:
         elif key == "family":
             drawn.append(Drawn(key, rng.choice([*elements, "!physical"])))
         elif key == "leaders":
-            drawn.append(Drawn(key, rng.choice(leaders)))
+            drawn.append(Drawn(key, ""))   # every leader: the fold names no kind
         elif key == "hymn":
             drawn.append(Drawn(key, str(HYMN_N)))
         else:

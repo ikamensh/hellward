@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from hellward.sim.content import SPELLS, TOWERS
+from hellward.sim.content import MONSTERS, SPELLS, TOWERS
 
 OPEN: str = "open"
 MET: str = "met"
@@ -40,7 +40,7 @@ def describe(drawn: Drawn) -> str:
         return ("one family: no tower built is physical" if drawn.arg == "!physical"
                 else f"one family: every tower built is {drawn.arg}")
     if drawn.key == "leaders":
-        return f"the leaders die first: every {drawn.arg} dies before its first curse lands"
+        return "the leaders die first: every leader dies before its first curse lands"
     if drawn.key == "hymn":
         return f"a fragile hymn: Battle Hymn is cast {drawn.arg} times with no curse on the hymned tower"
     if drawn.key == "bonus":
@@ -137,7 +137,7 @@ class Family(Goal):
 
 
 class Leaders(Goal):
-    """Every leader of the named kind dies before its first curse lands."""
+    """Every leader dies before its first curse lands."""
 
     key: ClassVar[str] = "leaders"
 
@@ -147,8 +147,10 @@ class Leaders(Goal):
         self.seen = False
 
     def observe(self, event: tuple) -> None:
+        if self.state != OPEN:
+            return   # a curse cannot be un-cursed, nor a kill un-counted
         if event[0] == "spawn" and len(event) >= 3:   # older recordings carry the id alone
-            if event[2] == self.arg:
+            if MONSTERS[event[2]].leader is not None:
                 self.alive.add(event[1])
                 self.seen = True
         elif event[0] == "death" and event[1] in self.alive:
