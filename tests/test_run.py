@@ -122,14 +122,14 @@ def test_the_first_level_up_comes_in_tristrams_second_wave():
     assert first < xp_next(1) <= first + second_kills
 
 
-def test_the_campaigns_xp_reaches_about_fifty_five_levels():
+def test_the_campaigns_xp_reaches_about_twenty_two_levels():
     total = 0.0
     for key in ORDER:
         for number, wave in enumerate(LOCATIONS[key].waves, start=1):
             total += (sum(group.count * kill_xp(MONSTERS[group.kind].hp) for group in wave.groups)
                         + clear_xp(number))
     run, gained = add_xp(start(0), total)
-    assert 54 <= run.level <= 58
+    assert 21 <= run.level <= 23
     assert gained == run.level - 1
 
 

@@ -118,7 +118,8 @@ def test_the_warden_rushing_the_gate_builds_it_before_the_third_wave():
     from hellward.sim.players.warden import Warden
     warden = Warden(gate_rush=True)
     events: list = []
-    world, _ = defend(reference_kit(LOCATIONS["graveyard"], warden.draft(LOCATIONS["graveyard"], 0), 1),
+    # Tristram's pay, not nothing: a rush with no skills at all is not a defence anyone plays.
+    world, _ = defend(reference_kit(LOCATIONS["graveyard"], warden.draft(LOCATIONS["graveyard"], 6), 1),
                       warden, planner=planner.smart, watch=lambda w: events.extend(w.events))
     assert world.outcome == "victory"
     first_door = next(i for i, e in enumerate(events) if e[0] == "door_built")
