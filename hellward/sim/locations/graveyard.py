@@ -6,9 +6,6 @@ from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import Arsenal, Location, corridor_level, g, water, waves
 from hellward.sim.level import Route
 
-LIFE_FACTOR = 0.98   # this location's tuning, by simulation: every monster's life here,
-                            # and the spells' strength, is multiplied by it (0.85-1.2)
-
 
 GRAVEYARD = Location(
     key="graveyard",
@@ -46,7 +43,7 @@ GRAVEYARD = Location(
             Route("breach", ((19, 0), (19, 2), (23, 3), (27, 5), (32, 5))),
         ),
     ),
-    waves=waves(1,
+    waves=waves(
         (g("skeleton", 4, 1.3), g("skeleton", 3, 1.3, start=5.0, route="side")),
         (g("zombie", 5, 2.0), g("skeleton", 8, 1.0, start=5.0, route="side")),
         (g("skeleton", 8, 1.0), g("zombie", 6, 1.5, start=5.0, route="side"),
@@ -56,13 +53,12 @@ GRAVEYARD = Location(
     ),
     wave_names=("Rattling Bones", "The Hungry Dead", "The Priest Walks", "All Souls' Night"),
     arsenal=Arsenal(("arrow",), gates=True, spells=("smite", "hymn")),
-    start_gold=BALANCE.starting_gold(1),
+    start_gold=BALANCE.starting_gold(),
     theme="graveyard",
     blurb="The dead of Tristram's churchyard have left their graves. Two grave roads meet near the crypt arch, "
           "if someone wards it.",
     taunt="I buried every one of them, and they still come when I call. Build your gate. My acolytes will smother "
           "your arrows behind it.",
-    lesson="A gate holds the dead in a queue. A hymned tower fires twice as fast, and the acolytes curse it first.",
+    lesson="A gate holds the dead in a queue. A tower under Battle Hymn fires twice as fast, and the acolytes curse it first.",
     requires=("tristram",),
-    life=BALANCE.life_growth ** 1 * LIFE_FACTOR,
 )

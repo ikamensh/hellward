@@ -6,9 +6,6 @@ from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import Arsenal, Location, corridor_level, g, water, waves
 from hellward.sim.level import Route
 
-LIFE_FACTOR = 0.89   # this location's tuning, by simulation: every monster's life here,
-                            # and the spells' strength, is multiplied by it (0.85-1.2)
-
 
 TRISTRAM = Location(
     key="tristram",
@@ -42,7 +39,7 @@ TRISTRAM = Location(
                               (19, 15), (19, 13), (23, 13), (23, 10), (28, 10), (28, 9), (32, 9))),
         ),
     ),
-    waves=waves(0,
+    waves=waves(
         (g("fallen", 5, 2.0),),
         (g("fallen", 7, 1.2), g("zombie", 2, 3.0, start=5.0)),
         (g("flayer", 5, 1.0, route="north"), g("fallen", 6, 1.1, start=5.0),
@@ -52,11 +49,10 @@ TRISTRAM = Location(
     ),
     wave_names=("The Fallen Swarm", "The Village Dead", "Red Knives", "The Burning of Tristram"),
     arsenal=Arsenal(("arrow",), gates=False, spells=("smite",)),
-    start_gold=BALANCE.starting_gold(0),
+    start_gold=BALANCE.starting_gold(),
     theme="village",
     blurb="The village under the cathedral burns. The Fallen swarm through its lanes, the village dead walk behind "
           "them, and a shaman sings them on.",
     taunt="Huddle your towers together, if it comforts you. When my shaman's curse falls, it falls on all of them.",
     lesson="His curses fall on a tower and the towers beside it: spread your arrows.",
-    life=BALANCE.life_growth ** 0 * LIFE_FACTOR,
 )

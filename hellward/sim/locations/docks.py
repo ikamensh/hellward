@@ -6,9 +6,6 @@ from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import ALL_TOWERS_II, Arsenal, Location, corridor_level, g, water, waves
 from hellward.sim.level import Route
 
-LIFE_FACTOR = 0.87   # this location's tuning, by simulation: every monster's life here,
-                            # and the spells' strength, is multiplied by it (0.85-1.2)
-
 
 DOCKS = Location(
     key="docks",
@@ -26,10 +23,11 @@ DOCKS = Location(
         extra_routes=(
             Route("meander", ((17, 0), (17, 2), (12, 2), (12, 8), (20, 8), (20, 4), (32, 4))),
             Route("side", ((0, 4), (9, 4), (9, 7), (13, 7), (13, 1), (20, 1), (20, 4), (32, 4))),
-            Route("side_detour", ((0, 4), (4, 7), (9, 7), (9, 1), (25, 1), (25, 4), (32, 4))),
+            Route("side_detour", ((0, 4), (2, 4), (2, 7), (4, 7), (4, 10), (10, 10),
+                                  (10, 7), (10, 1), (25, 1), (25, 4), (32, 4))),
         ),
     ),
-    waves=waves(6,
+    waves=waves(
         (g("flayer", 5, 1.2, start=0.0, route="main"),
          g("flayer", 4, 1.2, start=5.0, route="side")),
         (g("zealot", 6, 1.2, start=0.0, route="side"),
@@ -49,11 +47,10 @@ DOCKS = Location(
     ),
     wave_names=("The Piers", "Zealots Ashore", "Low Tide", "The Shaman's Song", "The Harbour Burns"),
     arsenal=Arsenal(ALL_TOWERS_II, gates=True, spells=("smite", "hymn")),
-    start_gold=BALANCE.starting_gold(6),
+    start_gold=BALANCE.starting_gold(),
     theme="docks",
     blurb="Kurast's harbour: rotting piers over black water, and the Flayers waiting along them.",
     taunt="You crossed a sea for a lamp that is not yours. My shaman will raise every Flayer you leave whole.",
     lesson="Hooks drag Flayers back under your towers, knives make the gate a kill zone; kill the shaman before it raises the dead.",
     requires=("hells_gate",),
-    life=BALANCE.life_growth ** 6 * LIFE_FACTOR,
 )

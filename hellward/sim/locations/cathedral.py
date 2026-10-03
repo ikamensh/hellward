@@ -6,9 +6,6 @@ from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import Arsenal, Location, corridor_level, g, water, waves
 from hellward.sim.level import Route
 
-LIFE_FACTOR = 0.89   # this location's tuning, by simulation: every monster's life here,
-                            # and the spells' strength, is multiplied by it (0.85-1.2)
-
 
 CATHEDRAL = Location(
     key="cathedral",
@@ -41,26 +38,25 @@ CATHEDRAL = Location(
                                     (32, 12))),
         ),
     ),
-    waves=waves(2,
-        (g("fallen", 4, 1.4), g("fallen", 3, 1.4, start=5.0, route="side")),
-        (g("fallen", 6, 1.2), g("skeleton", 4, 1.4, start=6.0, route="side")),
+    waves=waves(
+        (g("fallen", 3, 1.4), g("fallen", 3, 1.4, start=5.0, route="side")),
+        (g("fallen", 5, 1.2), g("skeleton", 4, 1.4, start=6.0, route="side")),
         (g("skeleton", 5, 1.2, route="meander"), g("goatman", 4, 1.4, start=6.0, route="side"),
          g("shaman", 1, start=14.0)),
-        (g("goatman", 5, 1.2), g("shaman", 1, start=1.0),
-         g("fallen", 6, 1.0, start=6.0, route="side_detour"), g("witch", 1, start=12.0, route="side")),
-        (g("goatman", 6, 1.2, route="meander"), g("skeleton", 5, 1.1, start=6.0, route="side"),
+        (g("goatman", 4, 1.2), g("shaman", 1, start=1.0),
+         g("fallen", 5, 1.0, start=6.0, route="side_detour"), g("witch", 1, start=12.0, route="side")),
+        (g("goatman", 5, 1.2, route="meander"), g("skeleton", 4, 1.1, start=6.0, route="side"),
          g("fallen", 5, 0.9, start=12.0), g("witch", 1, start=18.0, route="side_detour"),
          g("shaman", 1, start=24.0)),
     ),
     wave_names=("The Nave Fills", "Horns in the Aisle", "The Warband", "The Blood Witch",
                 "The Lamp Gutters"),
     arsenal=Arsenal(("arrow", "pyre"), gates=True, spells=("smite", "hymn")),
-    start_gold=BALANCE.starting_gold(2),
+    start_gold=BALANCE.starting_gold(),
     theme="cathedral",
-    blurb="The nave where the lamp hangs. Two open aisles lead from separate doors toward one sanctuary arch.",
+    blurb="The nave where the lamp hangs. Two open aisles lead from separate portals toward the sanctuary, where your lantern burns.",
     taunt="Two nights you have kept my lamp. It changes nothing. The witch will make your towers old, and the "
           "goatmen will take both aisles.",
     lesson="Two aisles split the host: place arrows where they cover both before spending on fire.",
     requires=("graveyard",),
-    life=BALANCE.life_growth ** 2 * LIFE_FACTOR,
 )

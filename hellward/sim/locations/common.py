@@ -36,9 +36,6 @@ class Location:
     taunt: str                        # the Bone Priest, who has watched this fight before
     lesson: str                       # the intro's one line of advice: what this place teaches
     requires: tuple[str, ...] = ()    # the location that must be held first
-    life: float = 1.0                 # every monster's life here, and the spells' strength, is multiplied by this: the
-                                       # location's tuning, by simulation (docs/campaign.md); the waves' own
-                                       # life multipliers give the ramp within it
     act: int = 1                      # which act this location belongs to (1 or 2)
 
     def __post_init__(self) -> None:
@@ -65,12 +62,12 @@ ALL_TOWERS = ("arrow", "pyre", "storm", "frost", "plague", "ballista")
 ALL_SPELLS = ("smite", "hymn", "meteor", "orb")
 
 
-def waves(stage: int, *rows: tuple[Group, ...]) -> tuple[Wave, ...]:
+def waves(*rows: tuple[Group, ...]) -> tuple[Wave, ...]:
     """Waves from their authored groups: the authored counts are the counts."""
     found: list[Wave] = []
     for index, groups in enumerate(rows):
         bodies = int_sum(group.count for group in groups)
-        found.append(Wave(groups, BALANCE.wave_clear_bonus(stage, index, bodies), BALANCE.wave_growth ** index))
+        found.append(Wave(groups, BALANCE.wave_clear_bonus(index, bodies)))
     return tuple(found)
 
 

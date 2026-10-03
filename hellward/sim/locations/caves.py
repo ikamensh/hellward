@@ -6,9 +6,6 @@ from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
 
-LIFE_FACTOR = 1.12   # this location's tuning, by simulation: every monster's life here,
-                            # and the spells' strength, is multiplied by it (0.85-1.2)
-
 
 CAVES = Location(
     key="caves",
@@ -41,7 +38,7 @@ CAVES = Location(
                         | {(10, 8), (11, 9), (12, 8)}),                # pond under the gate's flank
         boulders=frozenset({(30, 4), (31, 4)}),  # clearable rock on the merge's north flank
     ),
-    waves=waves(4,
+    waves=waves(
         (g("fallen", 4, 2.0), g("fallen", 3, 2.0, start=5.0, route="side")),
         (g("goatman", 5, 1.5), g("fallen", 6, 1.0, start=5.0, route="side"),
          g("gargoyle", 3, 1.5, start=10.0)),
@@ -54,11 +51,10 @@ CAVES = Location(
     ),
     wave_names=("Lava Light", "The Goatman Clans", "Wings in the Dark", "The Den", "The Burning Vault"),
     arsenal=Arsenal(("arrow", "pyre", "frost", "plague", "ballista"), gates=True, spells=("smite", "hymn")),
-    start_gold=BALANCE.starting_gold(4),
+    start_gold=BALANCE.starting_gold(),
     theme="caves",
     blurb="Below the catacombs the caves open onto lava. Gargoyles nest in the vault and fly where they please.",
     taunt="Walls mean nothing to wings. Look up. And tell me, keeper: why do my bones never show your face?",
     lesson="Wings ignore the gate, and the lava leaves fewer places to build.",
     requires=("catacombs",),
-    life=BALANCE.life_growth ** 4 * LIFE_FACTOR,
 )

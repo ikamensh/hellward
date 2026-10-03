@@ -6,9 +6,6 @@ from hellward.sim.balance import BALANCE
 from hellward.sim.locations.common import EVERY_TOWER, Arsenal, Location, corridor_level, g, waves
 from hellward.sim.level import Route
 
-LIFE_FACTOR = 0.96   # this location's tuning, by simulation: every monster's life here,
-                            # and the spells' strength, is multiplied by it (0.85-1.2)
-
 
 SPIDER_FOREST = Location(
     key="spider_forest",
@@ -34,31 +31,31 @@ SPIDER_FOREST = Location(
         }),
         boulders=frozenset({(24, 9), (15, 7), (18, 13)}),
         extra_routes=(
-            Route("meander", ((9, 0), (9, 3), (13, 3), (13, 9), (22, 9), (22, 14), (32, 14))),
+            Route("meander", ((9, 0), (9, 3), (13, 3), (13, 5), (11, 5), (11, 9), (13, 9),
+                              (22, 9), (22, 14), (32, 14))),
             Route("side", ((0, 14), (16, 14), (16, 11), (28, 11), (28, 14), (32, 14))),
             Route("side_detour", ((0, 14), (5, 14), (5, 10), (13, 10), (13, 14), (16, 14), (16, 11),
                                   (28, 11), (28, 14), (32, 14))),
             Route("breach", ((32, 3), (28, 6), (28, 11), (32, 14))),
         ),
     ),
-    waves=waves(7,
-        (g("spider", 5, 1.2), g("spider", 3, 1.2, start=5.0, route="side")),
-        (g("spider", 6, 1.1), g("bat", 4, 0.8, start=5.0, route="side"),
+    waves=waves(
+        (g("spider", 4, 1.2), g("spider", 2, 1.2, start=5.0, route="side")),
+        (g("spider", 5, 1.1), g("bat", 3, 0.8, start=5.0, route="side"),
          g("spider", 2, 1.1, start=10.0)),
         (g("spider", 7, 1.0), g("bat", 5, 0.7, start=5.0, route="side"), g("witch", 1, start=10.0)),
-        (g("spider", 5, 1.0), g("flayer", 6, 0.6, start=5.0, route="side"),
-         g("spider", 5, 1.0, start=10.0, route="side"), g("witch", 1, start=15.0)),
+        (g("spider", 5, 1.0), g("flayer", 5, 0.6, start=5.0, route="side"),
+         g("spider", 4, 1.0, start=10.0, route="side"), g("witch", 1, start=15.0)),
         (g("spider", 6, 0.9), g("flayer", 4, 0.6, start=5.0, route="side"),
          g("bat", 3, 0.7, start=10.0), g("witch", 1, start=15.0),
          g("fetish", 1, start=20.0), g("spider", 2, 0.9, start=25.0, route="side")),
     ),
     wave_names=("Webs", "Dusk Wings", "The Witch Walks", "Brood", "The Queen's Children"),
     arsenal=Arsenal(EVERY_TOWER, gates=True, spells=("smite", "hymn")),
-    start_gold=BALANCE.starting_gold(7),
+    start_gold=BALANCE.starting_gold(),
     theme="spider_forest",
     blurb="The road to the temples, through a forest the spiders own. In a clearing, the druids' ring of oaks.",
     taunt="The old trees have taken your side. Stand close to them, then. One curse will find you all.",
     lesson="Venom barely bites the spiders here. A grove makes a bunch worth its risk.",
     requires=("docks",),
-    life=BALANCE.life_growth ** 7 * LIFE_FACTOR,
 )
