@@ -55,6 +55,25 @@ def client(tmp_path):
         yield c
 
 
+def test_spawn_and_built_reach_the_client_as_id_and_facts():
+    """The sim's kinds are for the server's folds; the wire keeps [name, id, facts]."""
+    world = World(LOCATIONS["tristram"], seed=1)
+    world.gold = 1000
+    tile = next((x, y) for y in range(world.level.height) for x in range(world.level.width)
+                if world.buildable(x, y))
+    tower = world.build("arrow", tile)
+    built = event(world, ("built", tower.id, "arrow"))
+    assert built[0] == "built" and built[1] == tower.id
+    assert built[2]["kind"] == "arrow" and built[2]["tile"] == [tile[0], tile[1]]
+    world.call_wave()
+    while not world.monsters:
+        world.step()
+    m = world.monsters[0]
+    spawned = event(world, ("spawn", m.id, m.kind.key))
+    assert spawned[0] == "spawn" and spawned[1] == m.id
+    assert spawned[2]["kind"] == m.kind.key
+
+
 def test_a_scripted_defence_through_the_server_is_the_same_defence(client):
     start = client.request("demo", location="tristram", player="ordinary")
     assert start["t"] == "battle" and start["location"]["key"] == "tristram" and start["demo"]
@@ -69,8 +88,9 @@ def test_a_persons_orders_log_a_defence_whose_ghost_fights_the_same_battle(tmp_p
     """Orders through the protocol, Battle Hymn cast on a tower whenever it is ready: the replay the server writes,
     played by its ghost directly and through the server's demo, gives the same events."""
     data = tmp_path / "data"
-    Progress(saves=Saves(data / "saves"), won={"tristram": 1}).save()   # the Graveyard, where Hymn is learned, is open
+    Progress(saves=Saves(data / "saves"), won={"tristram": 3}).save()   # the Graveyard, where Hymn is learned, is open
     with Client(data, seed=3) as client:
+        client.request("learn", key="unlock_hymn")
         grid = client.request("defend", location="graveyard")["grid"]
         tiles = [[x, y] for y, row in enumerate(grid) for x, c in enumerate(row) if c == "."]
         sent: list = []
@@ -90,8 +110,11 @@ def test_a_persons_orders_log_a_defence_whose_ghost_fights_the_same_battle(tmp_p
                         sent.extend(f["events"])
                 if (outcome is None and state["mana"] >= state["spell_cost"]["hymn"]
                         and state["recharge"].get("hymn", 0) <= 0):
-                    for f in client.order("hymn", tower=frame["towers"][0][0]):
-                        sent.extend(f["events"])
+                    try:
+                        for f in client.order("hymn", tower=frame["towers"][0][0]):
+                            sent.extend(f["events"])
+                    except Refused:
+                        pass   # the shown mana rounds up past the cost: the next frame affords it
         replays = sorted((data / "replays").glob("*-graveyard.json"))
         assert len(replays) == 1
         log = json.loads(replays[0].read_text())
@@ -109,8 +132,10 @@ def test_the_battle_start_tells_each_kind_its_armor_its_tags_and_the_hits_it_tak
     """The hover's table comes from the simulation's own felt hit: one entry per rank of every tower here that strikes
     blows, whole and at least 1. The frames carry each monster's movers' bits last."""
     data = tmp_path / "data"
-    Progress(saves=Saves(data / "saves"), won={key: 1 for key in ACTS[1]}).save()
+    Progress(saves=Saves(data / "saves"), won={key: 3 for key in ACTS[1]}).save()
     with Client(data, seed=3) as client:
+        for key in ("unlock_hook", "unlock_knife", "unlock_hymn"):
+            client.request("learn", key=key)
         start = client.request("defend", location="docks")
         world = World(LOCATIONS["docks"], perks=perks(frozenset(), ORDER.index("docks")), seed=3, planner=None)
         striking = [k for k in start["arsenal"]["towers"] if TOWERS[k].attack not in ("amplify", "aura")]

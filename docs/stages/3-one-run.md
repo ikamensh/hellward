@@ -45,7 +45,8 @@ plays, after stage 2. One critique round (systems, feasibility, player experienc
 ## Sanctuary life (Ilya: one pool)
 
 - 30 at the start (`run.life`). A leak costs the monster's lives.
-- A camp restores half the missing life (`run.camp_heal`), shown as its own moment.
+- A camp restores half the missing life (`run.camp_heal`), shown as its own moment — except before an act's end,
+  where the pool fills: the run meets its bosses at full strength and pays for it after.
 - The briefing shows the location's worst case against the pool (its roster's lives, and a boss's strikes at 5).
 - A boss shows "N more strikes end the run".
 
@@ -101,6 +102,13 @@ record and the server share:
 
 Each goal's N is set from the run bots' measured distributions.
 
+**Pursuit.** The strong bot pursues every drawn goal: the lean and the leaders by its standard play, the
+hymn by chanting past its count. Three goals it pursues selectively, and M3 counts only the pursuits: one
+family when its plan already builds it, the family has a tower that kills, and the pool is rich (else it
+plays rainbow and forfeits the sigil); the gate by rushing it when the pool is comfortable (else its plan's
+gate comes in time); the bonus when it wagers a bonus wave at stake 2 or more (a wager never placed is not
+a pursuit).
+
 Each sigil is worth 1 skill point.
 
 ## The tree (Ilya: open tree, reskill points)
@@ -141,9 +149,9 @@ most half of the ten kinds past rank I by the Temple. M4's 2.5× arrives with st
 
 | Stake | The pack | Wager |
 |---:|---|---:|
-| 1 | the location's middle-wave pack | 1 income unit |
-| 2 | ×1.5 life, plus an elite | 2 income units |
-| 3 | the last wave's pack ×1.5, with a leader | 3 income units |
+| 1 | the next wave's pack (tomorrow's host today) | 1 income unit |
+| 2 | two waves ahead, plus an elite | 2 income units |
+| 3 | two waves ahead, with a leader | 3 income units |
 
 - **The payout** is paid only if no monster of the pack leaks: the wager back plus a profit that grows faster than the
   stake (`bonus.profit`, about ×2, ×5, ×10 the wager's unit). The XP scales the same way.

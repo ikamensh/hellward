@@ -17,7 +17,7 @@ CENTRE = (11, 3)   # open 3x3 build area beside this test field's route
 
 def waves_of(kind: str) -> campaign.Location:
     pack = Wave((Group(kind, 1, 1.0),), 10)
-    return replace(campaign.JUNGLE, level=ARENA, waves=(pack,), wave_names=("pack",), life=1.0)
+    return replace(campaign.JUNGLE, level=ARENA, waves=(pack,), wave_names=("pack",))
 
 
 def world_with_leader(kind: str = "shaman", seed: int = 7) -> World:
@@ -144,7 +144,7 @@ def test_a_cursed_tower_cannot_be_sold():
 
 
 def chill_world() -> tuple[World, Tower, float]:
-    cold = perks({"adept_cold", "glacial_spike", "master_cold", "shatter"}, stage=8)
+    cold = perks({"unlock_frost", "adept_cold", "glacial_spike", "master_cold", "shatter"}, stage=8)
     world = World(replace(campaign.JUNGLE, level=ARENA), seed=11, perks=cold)
     world.gold = 10000
     tower = world.build("frost", (10, 3))   # one tile nearer the main route than the curse geometry block
@@ -184,7 +184,7 @@ def test_a_cold_vulnerable_monster_is_chilled_deeper():
 
 def test_the_planner_prefers_the_spot_whose_circle_holds_more_working_towers():
     pack = Wave((Group("skeleton", 6, 0.6), Group("shaman", 1, 1, start=3.0)), 10)
-    world = World(replace(campaign.JUNGLE, level=ARENA, waves=(pack,), wave_names=("pack",), life=1.0))
+    world = World(replace(campaign.JUNGLE, level=ARENA, waves=(pack,), wave_names=("pack",)))
     world.gold = 5000
     pair = [(5, 1), (6, 1)]
     single = (3, 4)

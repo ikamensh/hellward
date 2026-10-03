@@ -114,13 +114,13 @@ class TestRaising:
 
         # Add fetish shaman at s=10
         fetish = MONSTERS["fetish"]
-        fetish_hp = fetish.hp * world.waves[0].hp * location.life
+        fetish_hp = fetish.hp
         shaman = Monster(world._id(), fetish, 0, 0.0, 0.0, fetish_hp, fetish.leader.first_cast)
         shaman.s = 10.0
         world.monsters.append(shaman)
 
         flayer = MONSTERS["flayer"]
-        flayer_hp = flayer.hp * world.waves[0].hp * location.life
+        flayer_hp = flayer.hp
         flayer_mon = Monster(world._id(), flayer, 0, 0.0, 0.0, flayer_hp, 0.0)
         flayer_mon.s = 11.0  # within 3 tiles of shaman at s=10
         world.monsters.append(flayer_mon)
@@ -147,20 +147,20 @@ class TestRaising:
     def test_flayer_killed_by_shatter_stays_dead(self) -> None:
         """A Flayer killed by a Shatter burst stays dead (no raise)."""
         location = LOCATIONS["docks"]
-        world = World(location, seed=2, perks=perks(["adept_cold", "glacial_spike", "master_cold", "shatter"]), planner=None, record=True)
+        world = World(location, seed=2, perks=perks(["unlock_frost", "adept_cold", "glacial_spike", "master_cold", "shatter"]), planner=None, record=True)
         world.lives = 10000
         world.wave = 0
         world.wave_alive[0] = 2
 
         from hellward.sim.model import Monster
         fetish = MONSTERS["fetish"]
-        fetish_hp = fetish.hp * world.waves[0].hp * location.life
+        fetish_hp = fetish.hp
         shaman = Monster(world._id(), fetish, 0, 0.0, 0.0, fetish_hp, fetish.leader.first_cast)
         shaman.s = 10.0
         world.monsters.append(shaman)
 
         flayer = MONSTERS["flayer"]
-        flayer_hp = flayer.hp * world.waves[0].hp * location.life
+        flayer_hp = flayer.hp
         flayer_mon = Monster(world._id(), flayer, 0, 0.0, 0.0, flayer_hp, 0.0)
         flayer_mon.s = 11.0
         flayer_mon.chill_left = 2.0  # chilled so it can be shattered
@@ -185,13 +185,13 @@ class TestRaising:
 
         from hellward.sim.model import Monster
         fetish = MONSTERS["fetish"]
-        fetish_hp = fetish.hp * world.waves[0].hp * location.life
+        fetish_hp = fetish.hp
         shaman = Monster(world._id(), fetish, 0, 0.0, 0.0, fetish_hp, fetish.leader.first_cast)
         shaman.s = 10.0
         world.monsters.append(shaman)
 
         flayer = MONSTERS["flayer"]
-        flayer_hp = flayer.hp * world.waves[0].hp * location.life
+        flayer_hp = flayer.hp
         flayer_mon = Monster(world._id(), flayer, 0, 0.0, 0.0, flayer_hp, 0.0)
         flayer_mon.s = 20.0  # far from shaman at s=10
         world.monsters.append(flayer_mon)
@@ -218,7 +218,7 @@ class TestMarking:
 
         from hellward.sim.model import Monster
         inquisitor = MONSTERS["inquisitor"]
-        inq_hp = inquisitor.hp * world.waves[0].hp * location.life
+        inq_hp = inquisitor.hp
         leader = Monster(world._id(), inquisitor, 0, 0.0, 0.0, inq_hp, inquisitor.leader.first_cast)
         leader.s = 10.0
         world.monsters.append(leader)
@@ -250,7 +250,7 @@ class TestMarking:
 
         from hellward.sim.model import Monster
         inquisitor = MONSTERS["inquisitor"]
-        inq_hp = inquisitor.hp * world.waves[0].hp * location.life
+        inq_hp = inquisitor.hp
         leader = Monster(world._id(), inquisitor, 0, 0.0, 0.0, inq_hp, inquisitor.leader.first_cast)
         leader.s = 10.0
         world.monsters.append(leader)
@@ -282,7 +282,7 @@ class TestMarking:
 
         from hellward.sim.model import Monster
         inquisitor = MONSTERS["inquisitor"]
-        inq_hp = inquisitor.hp * world.waves[0].hp * location.life
+        inq_hp = inquisitor.hp
         leader = Monster(world._id(), inquisitor, 0, 0.0, 0.0, inq_hp, inquisitor.leader.first_cast)
         leader.s = 10.0
         world.monsters.append(leader)
@@ -312,7 +312,7 @@ class TestBurning:
         location = replace(LOCATIONS["temple"], level=Level("Burning field", 16, 9, ((0, 4), (15, 4)), ()))
         world = World(location, seed=7, perks=NO_PERKS, planner=None, record=True)
         world.lives = 10000
-        world.mana = 100
+        world.mana = world.mana_max
         world.wave = 0
         world.wave_alive[0] = 1
         world.gold = 3 * world.cost("arrow")
@@ -323,7 +323,7 @@ class TestBurning:
 
         from hellward.sim.model import Monster
         bone_priest = MONSTERS["bone_priest"]
-        bp_hp = bone_priest.hp * world.waves[0].hp * location.life
+        bp_hp = bone_priest.hp
         leader = Monster(world._id(), bone_priest, 0, 0.0, 0.0, bp_hp, bone_priest.leader.first_cast)
         leader.s = 10.0
         world.monsters.append(leader)
@@ -341,7 +341,7 @@ class TestBurning:
             world.step(0.05)
 
         # Should have burned 5 * 3 = 15 mana
-        assert world.mana == 85
+        assert world.mana == world.mana_max - 15
 
 
 class TestAct2Locations:

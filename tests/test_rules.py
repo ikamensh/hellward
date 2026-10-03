@@ -20,7 +20,7 @@ def with_waves(*waves: Wave) -> campaign.Location:
     """An authored arena with these waves at their base life, independent of campaign layouts and unlocks."""
     arsenal = replace(campaign.CATHEDRAL.arsenal, towers=tuple(TOWERS), spells=tuple(SPELLS), gates=True)
     return replace(campaign.CATHEDRAL, level=ARENA, arsenal=arsenal, waves=waves,
-                   wave_names=tuple(f"wave {i}" for i in range(len(waves))), life=1.0)
+                   wave_names=tuple(f"wave {i}" for i in range(len(waves))))
 
 
 def wave_of(kind: str, count: int = 1, interval: float = 1.0) -> campaign.Location:
@@ -169,7 +169,7 @@ def test_commands_refuse_what_the_rules_forbid():
 
 def test_selling_refunds_most_of_what_was_spent():
     from hellward.sim.skills import perks
-    world = World(wave_of("fallen"), perks=perks({"adept_lightning"}))
+    world = World(wave_of("fallen"), perks=perks({"unlock_storm", "adept_lightning"}))
     world.gold = 3 * world.cost("storm")
     initial_gold = world.gold
     tower = world.build("storm", (4, 3))

@@ -152,7 +152,7 @@ def test_the_tree_learns_what_free_sigils_pay_for_says_why_not_and_unlearns_for_
     with Client(data) as c:
         tree = c.request("skills")
         assert tree["sigils"] == 3 and tree["free"] == 3 and not tree["any"]
-        with pytest.raises(Refused, match="needs Adept of Steel first"):
+        with pytest.raises(Refused, match="needs Adept of Arrows first"):
             c.request("learn", key="master_arrow")
         tree = c.request("learn", key="adept_arrow")
         assert tree["free"] == 3 - SKILLS["adept_arrow"].cost and tree["any"]
@@ -167,7 +167,7 @@ def test_the_tree_learns_what_free_sigils_pay_for_says_why_not_and_unlearns_for_
 
 def test_a_skill_learned_later_is_dormant_at_an_earlier_location_and_counted_as_waste(data):
     campaign(data, won={key: 3 for key in ACTS[1]} | {"docks": 3, "spider_forest": 3, "jungle": 3},
-             learned=frozenset({"adept_fire", "master_fire", "fire_ball"}))
+             learned=frozenset({"unlock_pyre", "adept_fire", "master_fire", "fire_ball"}))
     with Client(data) as c:
         nodes = {n["key"]: n for n in c.request("skills", location="tristram")["nodes"]}
         assert nodes["fire_ball"]["dormant"] and "Inactive in Tristram" in nodes["fire_ball"]["tip"]
@@ -180,6 +180,7 @@ def test_a_skill_learned_later_is_dormant_at_an_earlier_location_and_counted_as_
 def test_hymn_quickens_the_tower_it_is_cast_on_and_no_spell_is_cast_while_paused(data):
     campaign(data, won={"tristram": 3})
     with Client(data) as c:
+        c.request("learn", key="unlock_hymn")
         start = c.request("defend", location="graveyard")
         assert {"smite", "hymn"} <= set(start["arsenal"]["spells"]) and "cleanse" not in start["spells"]
         tile = lane_side(start["grid"], 1)[0]

@@ -12,8 +12,8 @@ from hellward.sim.model import SIM_DT, World
 from hellward.sim.skills import perks
 
 
-def act2_world(*groups: Group, learned=(), seed=0) -> World:
-    """A short open field with buildable tiles next to the route."""
+def act2_world(*groups: Group, learned=("unlock_pyre", "unlock_grove", "unlock_altar"), seed=0) -> World:
+    """A short open field with buildable tiles next to the route; the arena's kinds come unlocked."""
     arsenal = replace(campaign.CATHEDRAL.arsenal,
                       towers=campaign.CATHEDRAL.arsenal.towers + ("altar", "grove"))
     level = Level("Act II tower field", 12, 9, ((0, 4), (11, 4)), ())
@@ -66,9 +66,9 @@ def test_an_altar_amplifies_the_thickest_knot_and_everything_hurts_it_more():
 
 def test_amplification_multiplies_a_pyres_damage_but_not_after_it_lapses():
     world = act2_world(g("fallen", 1), seed=0)
-    world.waves = (replace(world.waves[0], hp=20.0),)   # it lives through both blows
     spawned(world, 1)
     m = world.monsters[0]
+    m.hp = m.max_hp = 200.0   # it lives through both blows
     m.amplified, m.amplify = 5.0, 0.3
     hp = m.hp
     world._strike(m, 4.0, Element.FIRE)
@@ -142,7 +142,8 @@ def test_dim_vision_does_nothing_to_an_aura():
 
 
 def test_corpse_explosion_bursts_once_and_does_not_chain():
-    world = act2_world(g("fallen", 3, 0.1), learned=("adept_bone", "master_bone", "life_tap", "corpse_explosion"))
+    world = act2_world(g("fallen", 3, 0.1),
+                       learned=("unlock_altar", "adept_bone", "master_bone", "life_tap", "corpse_explosion"))
     spawned(world, 3)
     a, b, c = world.monsters
     a.s = b.s = c.s = 4.0
@@ -158,7 +159,8 @@ def test_corpse_explosion_bursts_once_and_does_not_chain():
 
 
 def test_life_tap_pays_a_fifth_of_the_bounty_in_mana():
-    world = act2_world(g("fallen", 1), learned=("adept_bone", "corpse_explosion", "master_bone", "life_tap"))
+    world = act2_world(g("fallen", 1),
+                       learned=("unlock_altar", "adept_bone", "corpse_explosion", "master_bone", "life_tap"))
     spawned(world, 1)
     m = world.monsters[0]
     m.amplified, m.amplify = 5.0, 0.3
@@ -174,7 +176,8 @@ def test_hurricane_slows_a_walker_near_a_grove():
     run(plain, 2.0)
     far = plain.monsters[0].s - 4.0
 
-    windy = act2_world(g("zombie", 1), learned=("adept_nature", "hurricane"))
+    windy = act2_world(g("zombie", 1),
+                       learned=("unlock_grove", "adept_nature", "master_nature", "hurricane"))
     windy.build("grove", (4, 3))
     spawned(windy, 1)
     windy.monsters[0].s = 4.0
@@ -184,7 +187,7 @@ def test_hurricane_slows_a_walker_near_a_grove():
 
 
 def test_twister_roots_the_front_walker_but_not_an_overlord_or_a_gargoyle():
-    learned = ("adept_nature", "hurricane", "master_nature", "twister")
+    learned = ("unlock_grove", "adept_nature", "hurricane", "master_nature", "twister")
     world = act2_world(g("zombie", 1), g("gargoyle", 1), g("overlord", 1), learned=learned)
     grove = world.build("grove", (4, 3))
     spawned(world, 3)
@@ -213,9 +216,9 @@ def test_the_new_towers_fit_the_price_scale_and_keep_rank_skills():
         assert len(levels) == len(TOWERS["arrow"].levels)
         assert all(level.cost > TOWERS["arrow"].levels[rank].cost for rank, level in enumerate(levels))
         assert 0 < levels[0].damage < levels[1].damage < levels[2].damage < 1
-    world = act2_world(g("fallen", 1), learned=("adept_bone", "adept_nature"))
+    world = act2_world(g("fallen", 1), learned=("unlock_altar", "adept_bone", "unlock_grove", "adept_nature"))
     assert world.rank_needs(world.build("altar", (4, 3))) is None
     assert world.rank_needs(world.build("grove", (5, 3))) is None
-    bare = act2_world(g("fallen", 1))
+    bare = act2_world(g("fallen", 1), learned=("unlock_altar", "unlock_grove"))
     assert bare.rank_needs(bare.build("altar", (4, 3))) == "adept_bone"
     assert bare.rank_needs(bare.build("grove", (5, 3))) == "adept_nature"

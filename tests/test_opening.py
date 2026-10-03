@@ -28,14 +28,14 @@ def test_an_arrow_hits_only_one_enemy_in_a_pack():
     """Two enemies together must still need two separate arrows."""
     place = replace(TRISTRAM, waves=(Wave((Group("fallen", 2, 0.0),), 0),), wave_names=("pair",))
     world = World(place, seed=2)
-    world.build("arrow", (10, 6))
+    world.build("arrow", (10, 12))
     world.call_wave()
     world.step()
     assert len(world.monsters) == 2
     # Fallen choose routes independently; keep this pair together to test one arrow's impact.
     for monster in world.monsters:
         monster.route = "main"
-        monster.s = 10.0
+        monster.s = 12.0
         monster.frozen = 10.0
     for _ in range(100):
         world.step()
@@ -83,15 +83,15 @@ def test_tristram_wanderers_use_multiple_seeded_trails():
 
 
 def test_frost_burst_is_a_reliable_late_aoe_without_trophies():
-    learned = {"adept_cold", "glacial_spike", "master_cold", "shatter"}
+    learned = {"unlock_frost", "adept_cold", "glacial_spike", "master_cold", "shatter"}
     assert tower_levels("frost", perks(learned, stage=7))[0].splash == 0
     assert tower_levels("frost", perks(learned, stage=8))[0].splash > 0
 
 
-def test_battle_prices_and_wave_drops_follow_the_local_gold_unit():
-    for stage, location in ((0, TRISTRAM), (1, GRAVEYARD), (11, TEMPLE)):
+def test_battle_prices_and_wave_drops_follow_the_one_gold_unit():
+    for location in (TRISTRAM, GRAVEYARD, TEMPLE):
         world = World(location, seed=3)
-        assert world.cost("arrow") == BALANCE.gold_unit(stage)
+        assert world.cost("arrow") == BALANCE.gold_unit()
         world.call_wave()
-        assert sum(world.gold_schedule) + location.waves[0].bonus == BALANCE.wave_income(stage, 0)
+        assert sum(world.gold_schedule) + location.waves[0].bonus == BALANCE.wave_income(0)
         assert world.clone().gold_schedule == world.gold_schedule

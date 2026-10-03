@@ -49,7 +49,7 @@ def test_a_worse_later_defence_adds_nothing_and_a_better_one_adds_only_the_diffe
 def test_sigils_learning_and_the_lantern_last_to_the_next_session(tmp_path):
     progress = Progress.load(Saves(tmp_path / "saves"))
     assert progress.record("tristram", "victory", 18) == 3
-    assert progress.learn("adept_fire")
+    assert progress.learn("adept_arrow")
     progress.move("graveyard")
     again = Progress.load(Saves(tmp_path / "saves"))
     assert again.won == progress.won
@@ -61,7 +61,7 @@ def test_a_named_profile_starts_fresh_and_keeps_the_existing_campaign(game):
     """A playtest can begin at Tristram without replacing the player's main progress."""
     main = Progress.load(game)
     main.record_result("tristram", "victory", 18, salvage=2)
-    main.learn("adept_fire")
+    main.learn("adept_arrow")
 
     test = Progress.load(game, "playtest")
     assert test.sigils == 0 and test.at == campaign.ORDER[0]
@@ -69,7 +69,7 @@ def test_a_named_profile_starts_fresh_and_keeps_the_existing_campaign(game):
     test.record_result("tristram", "victory", 10, salvage=1)
 
     assert Progress.load(game).won == {"tristram": 3}
-    assert Progress.load(game).learned == frozenset({"adept_fire"})
+    assert Progress.load(game).learned == frozenset({"adept_arrow"})
     assert Progress.load(game).salvage == 2
     assert Progress.load(game, "playtest").won == {"tristram": 2}
     assert Progress.load(game, "playtest").salvage == 1
@@ -81,11 +81,11 @@ def test_profile_names_cannot_escape_the_campaign_save_slots(game):
 
 
 def test_a_save_listing_a_removed_mastery_loads_with_it_forgotten(game):
-    game.save("campaign", {"won": {"tristram": 3}, "learned": ["fire_mastery", "adept_fire"],
+    game.save("campaign", {"won": {"tristram": 3}, "learned": ["fire_mastery", "adept_arrow"],
                                         "at": "tristram"}, "Progress", summary={})
     progress = Progress.load(game)
-    assert progress.learned == frozenset({"adept_fire"})
-    assert progress.free == 2
+    assert progress.learned == frozenset({"adept_arrow"})
+    assert progress.free == 1
 
 
 def test_the_save_ilya_played_before_the_new_tree_loads(game):
@@ -99,7 +99,7 @@ def test_the_save_ilya_played_before_the_new_tree_loads(game):
         "at": "hells_gate", "difficulty": "hell"}, "Progress", summary={})
     progress = Progress.load(game)
     assert progress.learned == frozenset({"warmth"})
-    assert progress.free == 17
+    assert progress.free == 15
 
 
 def test_a_save_whose_skills_now_cost_more_than_its_sigils_loads_with_none_owed(game):
@@ -127,17 +127,12 @@ def test_learning_needs_its_prerequisite_and_free_sigils_and_unlearning_returns_
     assert not progress.learn("fire_ball")   # its prerequisite is missing too
     assert progress.record("tristram", "victory", 18) == 3
     assert not can_learn(progress.learned, "fire_ball", progress.sigils)
-    assert not progress.learn("fire_ball")   # still needs Adept of Fire first
-    assert can_learn(progress.learned, "adept_fire", progress.sigils)
-    assert progress.learn("adept_fire")
-    assert progress.free == progress.sigils - SKILLS["adept_fire"].cost
-    assert can_learn(progress.learned, "master_fire", progress.sigils)
-    assert not progress.learn("fire_ball")   # its area attack opens much later
-    assert progress.learn("warmth")
-    assert progress.learn("adept_cold")
-    assert progress.free == 0
-    assert not progress.learn("holy_shield")   # no sigils left
-    assert not progress.learn("master_fire")   # one sigil short of the next tier
+    assert not progress.learn("fire_ball")   # still needs Master of Fire first
+    assert not progress.learn("adept_fire")   # needs Unlock Pyre first
+    assert not progress.learn("unlock_pyre")   # opens at the Cathedral
+    assert progress.learn("adept_arrow")
+    assert progress.free == progress.sigils - SKILLS["adept_arrow"].cost
+    assert not progress.learn("master_arrow")   # no sigils left
     earned = progress.sigils
     progress.unlearn_all()
     assert progress.learned == frozenset()
@@ -164,10 +159,11 @@ def test_area_skills_wait_for_the_late_campaign(game):
     progress = Progress.load(game)
     for key in campaign.ORDER[:6]:
         progress.record(key, "victory", 18)
+    assert progress.learn("unlock_pyre")
     assert progress.learn("adept_fire")
     assert progress.learn("master_fire")
     assert not progress.learn("fire_ball")
-    for key in campaign.ORDER[6:8]:
+    for key in campaign.ORDER[6:9]:
         progress.record(key, "victory", 18)
     assert progress.learn("fire_ball")
 

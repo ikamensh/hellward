@@ -190,7 +190,8 @@ def test_battle_hymn_doubles_a_towers_attacks_for_its_while():
 
 def test_a_clone_with_spells_in_the_air_plays_on_like_its_original():
     world = world_of(g("overlord", 4, 0.5), g("skeleton", 6, 0.4), g("priest", 1, start=2.0),
-                     perks=perks({"adept_fire", "fire_ball", "master_fire", "blaze"}))
+                     perks=perks({"unlock_pyre", "adept_fire", "fire_ball", "master_fire", "blaze",
+                                  "unlock_frost", "unlock_hymn", "unlock_orb", "unlock_meteor"}))
     world.gold = 2000
     world.build("pyre", (5, 5))
     world.build("frost", (9, 5))
