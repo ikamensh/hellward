@@ -88,7 +88,7 @@ def prologue_beats() -> list[Beat]:
                               ("HELLWARD", "Keep it burning. (written, not spoken)"),
                               "the lamp catches again under the title"))
             continue
-        panels = (_rel(PROLOGUE_DIR / f"{key}.jpg"),)
+        panels: tuple[str, ...] = (_rel(PROLOGUE_DIR / f"{key}.jpg"),)
         note, extra = "", []
         if key in STRIP:
             note = "one of four tower panels, side by side on one screen; each lights on its word"
@@ -209,7 +209,7 @@ def battle_beat(location: Location, *, first: bool = False) -> Beat:
     gauge = f"\u00d7{veteran:g} veteran / \u00d7{best:g} best bot" if veteran is not None \
         else f"\u00d7{best:g} best bot"
     body.append(f"hardship {gauge} ({DIFFICULTY_SOURCE}; higher = easier)")
-    panels = (_rel(STILLS_DIR / "levels" / f"{location.key}.jpg"),)
+    panels: tuple[str, ...] = (_rel(STILLS_DIR / "levels" / f"{location.key}.jpg"),)
     note = "overhead, as the demo plays it"
     if first:
         panels = (_rel(STILLS_DIR / "monsters.jpg"),) + panels
@@ -361,7 +361,7 @@ def label_monsters(png: Path, kinds: list[str]) -> Image.Image:
 
 def _jpeg(image: Image.Image, out: Path) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
-    image.resize((1600, int(image.height * 1600 / image.width + 0.5)), Image.LANCZOS).save(out, "JPEG", quality=86)
+    image.resize((1600, int(image.height * 1600 / image.width + 0.5)), Image.Resampling.LANCZOS).save(out, "JPEG", quality=86)
 
 
 def stills() -> int:
