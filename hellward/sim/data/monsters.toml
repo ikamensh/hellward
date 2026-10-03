@@ -1,4 +1,4 @@
-# Every monster kind. life is a role factor on economy.base_hp; speed in tiles per second; bounty weighs its share of
+# Every monster kind. life is the monster's life, the same at every location; speed in tiles per second; bounty weighs its share of
 # a wave's gold; lives is what it costs the sanctuary; door_dps its blows on a gate; size its drawn height in tiles.
 # protected and vulnerable name elements whose hits it takes at battle.protected and battle.vulnerable (at most two
 # tags between them, a boss may have more; physical is never tagged); armor is taken off every hit (at least 1 is
@@ -8,7 +8,7 @@
 
 [fallen]
 name = "Fallen"
-life = 1.0
+life = 10
 speed = 1.35
 bounty = 1
 lives = 1
@@ -23,7 +23,7 @@ boss = false
 
 [skeleton]
 name = "Skeleton"
-life = 1.3
+life = 13
 speed = 1.0
 bounty = 1
 lives = 1
@@ -38,7 +38,7 @@ boss = false
 
 [zombie]
 name = "Zombie"
-life = 1.5
+life = 15
 speed = 0.6
 bounty = 2
 lives = 1
@@ -53,7 +53,7 @@ boss = false
 
 [goatman]
 name = "Goatman"
-life = 1.6
+life = 16
 speed = 1.1
 bounty = 2
 lives = 1
@@ -68,7 +68,7 @@ boss = false
 
 [gargoyle]
 name = "Gargoyle"
-life = 1.1
+life = 11
 speed = 1.5
 bounty = 1
 lives = 1
@@ -83,7 +83,7 @@ boss = false
 
 [overlord]
 name = "Overlord"
-life = 2.4
+life = 24
 speed = 0.65
 bounty = 4
 lives = 2
@@ -98,7 +98,7 @@ boss = false
 
 [azazel]
 name = "Azazel the Flayer"
-life = 16.0
+life = 160
 speed = 0.5
 bounty = 8
 door_dps = 12.0
@@ -112,7 +112,7 @@ boss = true
 
 [shaman]
 name = "Fallen Shaman"
-life = 1.8
+life = 18
 speed = 1.0
 bounty = 3
 lives = 2
@@ -128,7 +128,7 @@ leader = { curses = ["weaken"] }
 
 [priest]
 name = "Bone Acolyte"
-life = 2.1
+life = 21
 speed = 0.9
 bounty = 3
 lives = 2
@@ -144,7 +144,7 @@ leader = { curses = ["bone_prison", "dim_vision"], cooldown = 10.0 }
 
 [witch]
 name = "Blood Witch"
-life = 2.0
+life = 20
 speed = 0.95
 bounty = 3
 lives = 2
@@ -160,7 +160,7 @@ leader = { curses = ["decrepify", "weaken"], cooldown = 8.5 }
 
 [flayer]
 name = "Flayer"
-life = 0.9
+life = 9
 speed = 1.45
 bounty = 1
 lives = 1
@@ -175,7 +175,7 @@ boss = false
 
 [zealot]
 name = "Zealot"
-life = 1.8
+life = 18
 speed = 1.0
 bounty = 2
 lives = 1
@@ -190,7 +190,7 @@ boss = false
 
 [spider]
 name = "Spider"
-life = 1.3
+life = 13
 speed = 1.35
 bounty = 1
 lives = 1
@@ -205,7 +205,7 @@ boss = false
 
 [bat]
 name = "Blood Bat"
-life = 0.8
+life = 8
 speed = 1.9
 bounty = 1
 lives = 1
@@ -220,7 +220,7 @@ boss = false
 
 [hulk]
 name = "Thorned Hulk"
-life = 2.6
+life = 26
 speed = 0.55
 bounty = 5
 lives = 2
@@ -233,9 +233,24 @@ vulnerable = ["fire"]
 armor = 3
 boss = false
 
+[abomination]
+name = "Abomination"
+life = 70
+speed = 0.5
+bounty = 6
+lives = 2
+door_dps = 8.0
+size = 1.25
+movement = "direct"
+flying = false
+protected = ["cold"]
+vulnerable = ["lightning"]
+armor = 2
+boss = false
+
 [drowned]
 name = "The Drowned"
-life = 2.0
+life = 20
 speed = 0.7
 bounty = 2
 lives = 1
@@ -250,7 +265,7 @@ boss = false
 
 [fetish]
 name = "Fetish Shaman"
-life = 1.9
+life = 19
 speed = 1.1
 bounty = 3
 lives = 2
@@ -266,7 +281,7 @@ leader = { curses = ["weaken"], cooldown = 9.0, raises = "flayer" }
 
 [inquisitor]
 name = "Zakarum Inquisitor"
-life = 2.2
+life = 22
 speed = 0.95
 bounty = 3
 lives = 2
@@ -282,7 +297,7 @@ leader = { curses = ["weaken", "dim_vision"], cooldown = 12.0, mark = 1.5 }
 
 [bone_priest]
 name = "The Bone Priest"
-life = 12.0
+life = 120
 speed = 0.45
 bounty = 0
 door_dps = 14.0
@@ -294,3 +309,48 @@ vulnerable = []
 armor = 3
 boss = true
 leader = { curses = ["bone_prison", "weaken", "decrepify", "dim_vision"], cast_range = 6.0, cooldown = 8.0, widen = 1.0, burn = 5.0 }
+
+[carver]
+name = "Carver"
+life = 12
+speed = 1.35
+bounty = 1
+lives = 1
+door_dps = 1.0
+size = 0.55
+movement = "wander"
+flying = false
+protected = []
+vulnerable = []
+armor = 0
+boss = false
+
+[devilkin]
+name = "Devilkin"
+life = 14
+speed = 1.35
+bounty = 1
+lives = 1
+door_dps = 1.0
+size = 0.55
+movement = "wander"
+flying = false
+protected = []
+vulnerable = []
+armor = 0
+boss = false
+
+[dark_one]
+name = "Dark One"
+life = 16
+speed = 1.35
+bounty = 2
+lives = 1
+door_dps = 1.0
+size = 0.55
+movement = "wander"
+flying = false
+protected = []
+vulnerable = []
+armor = 0
+boss = false

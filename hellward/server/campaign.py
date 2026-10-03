@@ -159,8 +159,7 @@ class Campaign:
         host = []
         for key in loc.monsters:
             kind = MONSTERS[key]
-            first = next(w for w in loc.waves if any(g.kind == key for g in w.groups))
-            life = kind.hp * first.hp * loc.life
+            life = kind.hp
             pace = "fast" if kind.speed >= 1.3 else "steady" if kind.speed >= 0.9 else "slow"
             lives = f", {kind.lives} lives" if kind.lives > 1 else ""
             notes = monster_notes(kind)

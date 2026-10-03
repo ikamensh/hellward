@@ -10,7 +10,6 @@ from __future__ import annotations
 from collections import Counter
 from typing import TYPE_CHECKING
 
-from hellward.sim.balance import BALANCE
 from hellward.sim.content import CURSES, MONSTERS, SPELLS, TOWERS, felt_hit
 from hellward.sim.model import SIM_DT, Monster, Tower, World
 
@@ -26,8 +25,8 @@ RULES = (
 
 
 def wave_hp(world: World, wave: int) -> float:
-    """The life multiplier of a wave's monsters: its ramp times the location and hardness."""
-    return world.waves[wave].hp * world.location.life * world.hardness
+    """The life multiplier of a wave's monsters: the world's hardness."""
+    return world.hardness
 
 
 def monster_hp(world: World, kind: str, wave: int) -> float:
@@ -91,7 +90,7 @@ def briefing(world: World, *, seed: int, skills: frozenset[str]) -> str:
     for key in location.arsenal.towers:
         tower = TOWERS[key]
         ranks = " | ".join(
-            f"r{i + 1} {world._price(lv.cost)}g {lv.damage:g}x{lv.rate:g}/{lv.range:g}"
+            f"r{i + 1} {lv.cost}g {lv.damage:g}x{lv.rate:g}/{lv.range:g}"
             for i, lv in enumerate(world.tower_levels[key]))
         extra = {"amplify": "marks foes to take more", "aura": "lends nearby towers damage",
                  "hook": "drags small foes back"}.get(tower.attack, "")
@@ -101,9 +100,7 @@ def briefing(world: World, *, seed: int, skills: frozenset[str]) -> str:
         lines.append(f"GATES: {world.door_cost}g each, {world.gate_life:.0f} life; "
                      "flyers pass over, walkers queue and batter")
     lines.append("SPELLS: " + "; ".join(_spell_line(world, key) for key in location.arsenal.spells))
-    growth = (BALANCE.wave_growth - 1.0) * 100
-    lines.append(f"FOES (wave-1 life x speed, armor, protected/vulnerable, leaders' curses; "
-                 f"life +{growth:.0f}%/wave):")
+    lines.append("FOES (life x speed, armor, protected/vulnerable, leaders' curses):")
     for key in location.monsters:
         m = MONSTERS[key]
         hp = monster_hp(world, key, 0)
@@ -117,7 +114,7 @@ def briefing(world: World, *, seed: int, skills: frozenset[str]) -> str:
     for i, wave in enumerate(world.waves):
         groups = " ".join(f"{g.kind}x{g.count}" + (f"@{g.route}" if g.route != "main" else "")
                           for g in wave.groups)
-        lines.append(f"  w{i + 1} '{location.wave_names[i]}' (x{wave.hp:.2f}, +{wave.bonus}g): {groups}")
+        lines.append(f"  w{i + 1} '{location.wave_names[i]}' (+{wave.bonus}g): {groups}")
     if skills:
         lines.append("SKILLS: " + ", ".join(sorted(skills)))
     lines.append(f"MAP ({level_size(world)}; y down; T towers as built):")

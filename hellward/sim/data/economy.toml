@@ -1,18 +1,14 @@
 # The common combat scale and the gold economy (hellward/sim/balance.py reads these).
-# Indices are zero-based: location 0 is Tristram, wave 0 its first wave.
+# A monster's life is its own (monsters.toml), the same at every location; what grows
+# with depth is the roster, not the monsters. Wave 0 is a location's first wave.
 
-base_hp = 10.0                    # a role-1.0 monster's life at the first wave of the first location
-life_growth = 1.16                # monster life grows by this per location (and gate life with it)
-wave_growth = 1.05                # monster life grows by this per wave within a location
-income_growth = 1.12              # a wave's gold grows by this per location, on top of the growth per wave
-stipend_growth = 1.16             # the starting gold grows by this per location, with the monsters' life
 arrow_hit = 2                     # a rank-I Arrow hit: the damage unit every tower's damage role multiplies
-base_gold_unit = 12               # a rank-I Arrow's price everywhere: prices do not grow with depth
-starting_units = 3.0              # gold in hand before the first wave, in gold units, at the first location
+base_gold_unit = 12               # a rank-I Arrow's price: the gold unit, everywhere
+starting_units = 3.0              # gold in hand before the first wave, in gold units
 wave_income_units = 1.0           # a wave's whole gold (kills and clearing), in units, at its first wave
 wave_income_growth_units = 0.5    # ... plus this many units per later wave
 rank_cost_units = [1.0, 0.6666666666666666, 1.0]   # rank I's price, and each upgrade's, in units
 salvage_budget = 3                # ordinary spawns per defence that carry salvage
-salvage_sale_fraction = 0.3333333333333333         # one salvage sold in a break, in income units
-breach_pack_income_units = 0.5    # extra kill gold the optional side pack carries, in income units
-breach_cache_units = 0.8          # the cash cache for clearing it, in income units
+salvage_sale_fraction = 0.3333333333333333         # one salvage sold in a break, in units
+breach_pack_income_units = 0.5    # extra kill gold the optional side pack carries, in units
+breach_cache_units = 0.8          # the cash cache for clearing it, in units

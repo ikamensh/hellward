@@ -63,9 +63,8 @@ class Battle:
         message = protocol.battle_start(self.world, demo=self.player is not None and self.on_outcome is None,
                                         breach_claim=self.breach_claim)
         message["scripted"] = self.player is not None   # a scripted player plays: the client only watches
-        stage = self.world.stage
-        message["salvage_sale_gold"] = BALANCE.salvage_sale_gold(stage)
-        message["breach_cash"] = BALANCE.breach_cache(stage)
+        message["salvage_sale_gold"] = BALANCE.salvage_sale_gold()
+        message["breach_cash"] = BALANCE.breach_cache()
         message["skills"] = sorted(self.learned)
         return message
 

@@ -12,6 +12,7 @@ from typing import Any, Final
 
 from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
+from hellward.sim.sums import half_up
 
 
 class Element(str, Enum):
@@ -167,7 +168,7 @@ def _monster(key: str, row: dict[str, Any]) -> MonsterKind:
     boss = bool(row["boss"])
     if boss == ("lives" in row):
         raise ValueError(f"{key}: a boss's strike costs battle.boss_strike_lives, any other monster its own lives")
-    return MonsterKind(key, row["name"], hp=BALANCE.effective_hp(float(row["life"]), 0, 0), speed=float(row["speed"]),
+    return MonsterKind(key, row["name"], hp=half_up(float(row["life"])), speed=float(row["speed"]),
                        bounty=int(row["bounty"]), lives=BOSS_STRIKE_LIVES if boss else int(row["lives"]),
                        door_dps=float(row["door_dps"]),
                        protected=tuple(Element(e) for e in row["protected"]),
@@ -228,7 +229,7 @@ def _tower(key: str, row: dict[str, Any]) -> TowerKind:
                                                _ranks(row, "poison_time"), _ranks(row, "lasting"))
     rank_units = row.get("rank_cost_units")
     units = None if rank_units is None else (float(rank_units[0]), float(rank_units[1]), float(rank_units[2]))
-    levels = tuple(TowerLevel(BALANCE.tower_cost(rank, price, 0, units), damage[rank], rate[rank], reach[rank],
+    levels = tuple(TowerLevel(BALANCE.tower_cost(rank, price, units), damage[rank], rate[rank], reach[rank],
                               splash=splash[rank], chill=chill[rank], chill_time=chill_time[rank], poison=poison[rank],
                               poison_time=poison_time[rank], lasting=lasting[rank])
                    for rank in range(3))
@@ -250,7 +251,7 @@ class DoorSpec:
 
 
 DOOR: Final = DoorSpec(BALANCE.tower_cost(0, tuning.number("battle.gate.cost_units")),
-                       BALANCE.base_hp * tuning.number("battle.gate.life_hp"), tuning.number("battle.gate.repair"))
+                       tuning.number("battle.gate.life"), tuning.number("battle.gate.repair"))
 
 
 @dataclass(frozen=True)
@@ -266,7 +267,6 @@ class Group:
 class Wave:
     groups: tuple[Group, ...]
     bonus: int              # gold for clearing it
-    hp: float = 1.0         # every monster's life is multiplied by this
 
 
 @dataclass(frozen=True)
@@ -276,7 +276,7 @@ class SpellSpec:
     mana: float
     aim: str              # what a click chooses: "tower", "monster" or "floor"
     blurb: str
-    damage: float = 0.0   # at a wave life multiplier of 1; it grows with the monsters' life
+    damage: float = 0.0   # absolute: against the monsters' own life, everywhere the same
     radius: float = 0.0
     delay: float = 0.0    # seconds between the cast and the strike
     lasting: float = 0.0  # seconds the ground burns, or the monsters stay frozen

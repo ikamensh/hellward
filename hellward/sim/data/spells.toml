@@ -1,5 +1,5 @@
-# The player's spells. damage_hits and burn_hits are in economy.arrow_hit and grow with the monsters' life; rate
-# multiplies the attacks per second of the tower a spell is aimed at, while it lasts.
+# The player's spells. damage_hits and burn_hits are in economy.arrow_hit, absolute: against the monsters' own
+# life, everywhere the same; rate multiplies the attacks per second of the tower a spell is aimed at, while it lasts.
 
 [smite]
 name = "Smite"

@@ -1,10 +1,11 @@
 """Every gameplay number, read once from the TOML files in ``hellward/sim/data/``.
 
 Each file is a table named by its stem (``economy.toml`` is ``economy``), and a value is addressed by a dotted
-path: ``number("economy.base_hp")``. Tuning means editing those files; nothing else holds a gameplay number.
+path: ``number("economy.base_gold_unit")``. Tuning means editing those files; nothing else holds a gameplay number.
 
 ``HELLWARD_TUNING`` names an override file for an experiment: its top-level tables are the file stems, and every
-value in it replaces the one at the same path (``[economy]`` then ``base_hp = 8`` replaces ``economy.base_hp``). A
+value in it replaces the one at the same path (``[economy]`` then ``base_gold_unit = 16`` replaces
+``economy.base_gold_unit``). A
 key the data does not have is an error, so a misspelt override never passes silently. Spawned worker processes
 inherit the variable, so the planner's workers and the tools' pools read the same numbers as their parent.
 """

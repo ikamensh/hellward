@@ -20,7 +20,6 @@ import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from hellward.sim.balance import BALANCE
 from hellward.sim.campaign import ORDER, Location
 from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, TOWERS, Curse, Element, felt_hit
 from hellward.sim.model import DOOR, DOOR_STOP, JOSTLE, Monster, Tower, World
@@ -96,16 +95,12 @@ def load(location: str) -> Plan:
 def fingerprint(location: Location) -> str:
     """The map, waves and prices a plan was searched on: a stored plan for a location that has changed
     since is not played."""
-    stage = ORDER.index(location.key)
-    unit = BALANCE.gold_unit(stage)
-    prices = tuple((kind, tuple(round(level.cost * unit / BALANCE.base_gold_unit)
-                                for level in TOWERS[kind].levels)) for kind in sorted(TOWERS))
-    door = round(DOOR.cost * unit / BALANCE.base_gold_unit)
+    prices = tuple((kind, tuple(level.cost for level in TOWERS[kind].levels)) for kind in sorted(TOWERS))
     level, arsenal = location.level, location.arsenal
     text = repr((level.width, level.height, level.waypoints, level.extra_routes, level.doors,
                  sorted(level.walkable_tiles), sorted(level.obstacles), sorted(level.pools),
                  sorted(level.boulders), arsenal.towers, arsenal.gates, arsenal.spells,
-                 location.waves, location.start_gold, prices, door))
+                 location.waves, location.start_gold, prices, DOOR.cost))
     return hashlib.sha1(text.encode()).hexdigest()[:12]
 
 
