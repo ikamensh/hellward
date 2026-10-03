@@ -1,0 +1,1 @@
+1. UI: sigil learning need hierarchical structure, right now it doesn't fit
