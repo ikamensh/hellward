@@ -84,7 +84,8 @@ class Battle:
         self.attune_unlocked = attune_unlocked
         self.foresight_taught = foresight_taught
         if player is not None:
-            learned = player.draft(location, 3 * ORDER.index(location.key))
+            learned = player.draft(location, 3 * ORDER.index(location.key),
+                                   kit.relics if kit is not None else ())
             loadout = getattr(player, "loadout", EMPTY_LOADOUT)
         self.learned = learned
         self.seed = seed

@@ -251,7 +251,7 @@ class Adaptive:
 
     # -- Skills --------------------------------------------------------------------------------------
 
-    def draft(self, location: Location, sigils: int) -> frozenset[str]:
+    def draft(self, location: Location, sigils: int, relics: tuple[str, ...] = ()) -> frozenset[str]:
         order = self.order
         if not order:
             plans = json.loads(PLANS.read_text()) if PLANS.exists() else {}

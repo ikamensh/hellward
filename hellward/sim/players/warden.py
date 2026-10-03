@@ -33,6 +33,10 @@ from hellward.sim.content import MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Element, 
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, attune_spare, ready
 from hellward.sim.players.spacing import score_with_spacing
+from hellward.sim.players.tree import chartered, extras, missing_unlocks, read as read_relics
+from hellward.sim.players.tree import adjust as read_plan
+from hellward.sim.players.tree import swap_kinds, unswap
+from hellward.sim.players.tree import tight as tight_read
 from hellward.sim.skills import SKILLS, UNLOCK, can_learn, kept, perks, tower_levels, unlock_skills, unlocked
 
 PLANS = Path(__file__).parent / "plans" / "warden.json"
@@ -89,6 +93,31 @@ class Plan:
     @staticmethod
     def of(row: dict) -> Plan:
         return Plan(frozenset(row["skills"]), tuple(Step.of(r) for r in row["steps"]), row["early"], row["map"])
+
+
+def adjust_plan(plan: Plan, relics: tuple[str, ...], location: Location, sigils: int, stage: int) -> Plan:
+    """The stored plan read for its relics: the tree's engines seeded, its unlocks learned, the payoffs'
+    extra towers and ranks appended. An engine the sigils cannot fund is unswapped again, so the plan always
+    raises; with no relics it stands exactly as searched."""
+    if not relics:
+        return plan
+    builds = [(s.kind, s.tile) for s in plan.steps if s.what == "build"]
+    skills, seeded, swaps = read_plan(sorted(plan.skills), builds, relics, location)
+    learned = kept(skills, sigils, stage)
+    missing = missing_unlocks(seeded, learned, relics)
+    while missing:
+        unlock = sorted(missing)[0]
+        skills, seeded, swaps, changed = unswap(skills, seeded, swaps, unlock)
+        if not changed:
+            break   # a base unlock short: the step is skipped in the fight, never waited on
+        learned = kept(skills, sigils, stage)
+        missing = missing_unlocks(seeded, learned, relics)
+    extra, ranks = extras(seeded, builds, read_relics(relics), location)
+    by_tile = {tile: kind for kind, tile in seeded}
+    steps = [Step("build", by_tile[s.tile], s.tile) if s.what == "build" else s for s in plan.steps]
+    steps += [Step("build", kind, tile) for kind, tile in extra]
+    steps += [Step("up", tile=tile) for tile in ranks]
+    return Plan(frozenset(skills), tuple(steps), plan.early, plan.map)
 
 
 def plan_key(location: Location, sigils: int) -> str:
@@ -162,11 +191,12 @@ def small(location: Location) -> float:
 
 def draft_skills(location: Location, sigils: int, must: frozenset[str] = frozenset(),
                  want: tuple[str, ...] = (), skip: float = 0.0,
-                 rng: random.Random | None = None) -> frozenset[str]:
+                 rng: random.Random | None = None, relics: tuple[str, ...] = ()) -> frozenset[str]:
     """Skills bought in a veteran's order from the columns the location has use for, then the rest of the tree; never
     one that does nothing here. The ``must`` skills come first: a plan's unlocks, so its steps never wait. The
     ``want`` skills come next, in order: a plan's own skills, cheapest tier first. A ``skip`` share of
-    every other skill is fumbled instead of learned, drawn from ``rng``: a weaker read misses some."""
+    every other skill is fumbled instead of learned, drawn from ``rng``: a weaker read misses some.
+    Held relics put their engines' unlocks first of all: the build grows around what the run holds."""
     arsenal = location.arsenal
     wanted: list[str] = []
     if "pyre" in arsenal.towers:
@@ -217,6 +247,8 @@ def draft_skills(location: Location, sigils: int, must: frozenset[str] = frozens
         wanted += ["unlock_orb"]
     if "meteor" in arsenal.spells:
         wanted += ["unlock_meteor"]
+    if relics:
+        wanted = [*(key for key in read_relics(relics).skills if key not in wanted), *wanted]
     learned: frozenset[str] = frozenset()
     stage = ORDER.index(location.key)
     for key in [*sorted(must), *want, *wanted, *SKILLS]:
@@ -278,11 +310,16 @@ def tile_value_spaced(location: Location, kind: str, tile: tuple[int, int], reac
     return score_with_spacing(base, existing, tile, location)
 
 
-def draft_build(location: Location, learned: frozenset[str], towers: int = 14) -> tuple[Step, ...]:
-    """The build a veteran lays out from the intro: gates, towers on the best tiles by element, then ranks."""
+def draft_build(location: Location, learned: frozenset[str], towers: int = 14,
+                relics: tuple[str, ...] = ()) -> tuple[Step, ...]:
+    """The build a veteran lays out from the intro: gates, towers on the best tiles by element, then ranks.
+    Held relics seed their engines into it, open their charters' kinds with no skill, and clump it when
+    curses pay."""
     level = location.level
     p = perks(learned, ORDER.index(location.key))
-    kinds = [kind for kind in location.arsenal.towers if unlocked(kind, learned)]
+    opened = chartered(relics)
+    kinds = [kind for kind in location.arsenal.towers if unlocked(kind, learned) or kind in opened]
+    tight = tight_read(relics)
     worths = {k: worth(location, k) for k in kinds}
     share = {k: v / tower_levels(k, p)[0].cost for k, v in worths.items()}
     if "frost" in share:
@@ -310,9 +347,17 @@ def draft_build(location: Location, learned: frozenset[str], towers: int = 14) -
         reach = tower_levels(kind, p)[1].range
         free = [t for t in tiles if t not in {tile for _, tile in chosen}]
         existing = [tile for _, tile in chosen]
-        tile = max(free, key=lambda t: (tile_value_spaced(location, kind, t, reach, existing), -t[1], -t[0]))
+        if tight:
+            tile = max(free, key=lambda t: (tile_value(location, kind, t, reach), -t[1], -t[0]))
+        else:
+            tile = max(free, key=lambda t: (tile_value_spaced(location, kind, t, reach, existing), -t[1], -t[0]))
         chosen.append((kind, tile))
         counts[kind] += 1
+    if relics:
+        reading = read_relics(relics)
+        engines = tuple((kind, count) for kind, count in reading.engines
+                        if kind in location.arsenal.towers and (kind in opened or unlocked(kind, learned)))
+        chosen, _ = swap_kinds(chosen, engines, reading.tight)
     order = sorted(range(len(level.doors)), key=lambda i: level.door_s[i])
     gates = [Step("gate", door=i) for i in order] if location.arsenal.gates else []
     steps: list[Step] = gates[:1]
@@ -359,12 +404,13 @@ class Warden:
     last_aim: float = -1e9
     work: dict[int, float] = field(default_factory=dict)   # per tower: what it has had in reach, summed over time
 
-    def choose(self, location: Location, sigils: int) -> Plan:
+    def choose(self, location: Location, sigils: int, relics: tuple[str, ...] = ()) -> Plan:
         if self.plan is not None:
             return self.plan
+        stage = ORDER.index(location.key)
         stored = self.plans.get(plan_key(location, sigils))
         if stored is not None and sealed(stored, location) and not self.redraft_skills:
-            return stored
+            return adjust_plan(stored, relics, location, sigils, stage)
         same = [plan for key, plan in self.plans.items() if key.split("/")[0] == location.key
                 and sealed(plan, location)]
         if same:
@@ -375,14 +421,16 @@ class Warden:
                 want = tuple(s for s in sorted(base.skills - need, key=lambda s: (SKILLS[s].tier, s))
                              if not idle(location, SKILLS[s].needs))
                 draw = random.Random(self.seed)
-                skills = draft_skills(location, sigils, need, want, self.skip, draw)
-                return Plan(skills, base.steps, base.early, base.map)
-            return same[0]   # one entry a location: played with what's kept, learned or not
-        learned = draft_skills(location, sigils)
-        return Plan(learned, draft_build(location, learned))
+                skills = draft_skills(location, sigils, need, want, self.skip, draw, relics)
+                redrafted = adjust_plan(Plan(skills, base.steps, base.early, base.map), relics,
+                                        location, sigils, stage)
+                return redrafted
+            return adjust_plan(same[0], relics, location, sigils, stage)   # one entry a location, read for its relics
+        learned = draft_skills(location, sigils, relics=relics)
+        return Plan(learned, draft_build(location, learned, relics=relics))
 
-    def draft(self, location: Location, sigils: int) -> frozenset[str]:
-        plan = self.choose(location, sigils)
+    def draft(self, location: Location, sigils: int, relics: tuple[str, ...] = ()) -> frozenset[str]:
+        plan = self.choose(location, sigils, relics)
         learned = kept(plan.skills, sigils, ORDER.index(location.key))
         self.chosen = plan if learned == plan.skills else Plan(learned, plan.steps, plan.early, plan.map)
         locked = perks(learned, ORDER.index(location.key)).locked
@@ -488,8 +536,8 @@ class Warden:
                             self.done += 1
                             continue
                         kind = swapped
-                    if kind in world.perks.locked:   # learned too little for this step: never waits, never crashes
-                        self.done += 1
+                    if kind in world.perks.locked and kind not in chartered(world.relics):
+                        self.done += 1   # learned too little for this step: never waits, never crashes
                         continue
                     if world.gold < world.cost(kind) + self.reserve:
                         return

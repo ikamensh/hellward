@@ -36,7 +36,7 @@ CLOSE = 3.0          # tiles from the sanctuary at which a monster one Smite kil
 class Apprentice(Ordinary):
     name: str = "apprentice"
 
-    def draft(self, location: Location, sigils: int) -> frozenset[str]:
+    def draft(self, location: Location, sigils: int, relics: tuple[str, ...] = ()) -> frozenset[str]:
         stage = ORDER.index(location.key)
         order = [*FIRST, *(key for key in SKILLS if key not in FIRST)]
         learned: set[str] = set()

@@ -63,7 +63,7 @@ class Ordinary:
                     if kind in world.arsenal.towers and kind not in world.perks.locked]
         self.planned = [(rotation[(i + self.shift) % len(rotation)], tile) for i, tile in enumerate(tiles[:self.towers])]
 
-    def draft(self, location: Location, sigils: int) -> frozenset[str]:
+    def draft(self, location: Location, sigils: int, relics: tuple[str, ...] = ()) -> frozenset[str]:
         return frozenset()
 
     def act(self, hands: Hands) -> None:

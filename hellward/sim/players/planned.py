@@ -17,14 +17,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 
 from hellward.sim.campaign import ORDER, Location
 from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, TOWERS, Curse, Element, felt_hit
 from hellward.sim.model import DOOR, DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, attune_spare, ready
-from hellward.sim.skills import UNLOCK, can_learn, unlock_skills
+from hellward.sim.players.tree import adjust as read_plan
+from hellward.sim.players.tree import chartered, extras, learn_ordered, missing_unlocks, read, unswap
+from hellward.sim.skills import UNLOCK, unlock_skills
 
 PLANS = Path(__file__).parent / "plans"
 THINK = 0.25          # seconds between two looks at the build and the next wave
@@ -66,14 +68,7 @@ class Plan:
 
     def learn(self, sigils: int, stage: int) -> frozenset[str]:
         """The skills of the plan's list that fit in ``sigils``, each as soon as the one above it is learned."""
-        learned: frozenset[str] = frozenset()
-        grew = True
-        while grew:
-            grew = False
-            for key in self.skills:
-                if can_learn(learned, key, sigils, stage):
-                    learned, grew = learned | {key}, True
-        return learned
+        return learn_ordered(self.skills, sigils, stage)
 
 
 def _step(step: list) -> tuple:
@@ -104,10 +99,37 @@ def fingerprint(location: Location, unlocks: frozenset[str]) -> str:
     return hashlib.sha1(text.encode()).hexdigest()[:12]
 
 
-def needs(plan: Plan) -> frozenset[str]:
-    """The unlock skills the plan's steps need: their tower kinds'."""
-    return frozenset(u for step in plan.steps if step[0] == "build"
+def needs(plan: Plan, relics: tuple[str, ...] = ()) -> frozenset[str]:
+    """The unlock skills the plan's steps need: their tower kinds', but never a chartered kind's."""
+    free = chartered(relics)
+    return frozenset(u for step in plan.steps if step[0] == "build" and step[1] not in free
                      for u in [UNLOCK[step[1]]] if u is not None)
+
+
+def adjust_plan(plan: Plan, relics: tuple[str, ...], location: Location, sigils: int, stage: int) -> Plan:
+    """The stored plan read for its relics: the tree's engines seeded, its unlocks learned, the payoffs'
+    extra towers and ranks appended. An engine the sigils cannot fund is unswapped again, so the plan always
+    raises; with no relics it stands exactly as searched."""
+    if not relics:
+        return plan
+    builds = [(step[1], step[2]) for step in plan.steps if step[0] == "build"]
+    skills, seeded, swaps = read_plan(plan.skills, builds, relics, location)
+    learned = learn_ordered(skills, sigils, stage)
+    missing = missing_unlocks(seeded, learned, relics)
+    while missing:
+        unlock = sorted(missing)[0]
+        skills, seeded, swaps, changed = unswap(skills, seeded, swaps, unlock)
+        if not changed:
+            raise ValueError(f"the {location.key} plan needs {sorted(missing)} to raise its steps")
+        learned = learn_ordered(skills, sigils, stage)
+        missing = missing_unlocks(seeded, learned, relics)
+    extra, ranks = extras(seeded, builds, read(relics), location)
+    by_tile = {tile: kind for kind, tile in seeded}
+    steps = [(("build", by_tile[step[2]], step[2]) if step[0] == "build" else step)
+             for step in plan.steps]
+    steps += [("build", kind, tile) for kind, tile in extra]
+    steps += [("rank", tile) for tile in ranks]
+    return replace(plan, skills=skills, steps=steps)
 
 
 def check(location: Location, learned: frozenset[str] | None = None) -> Plan:
@@ -132,6 +154,7 @@ class Planned:
     reaction: tuple[float, float] = REACT
     aim_gap: float = AIM_GAP
     plan: Plan | None = None   # given, or loaded for the location when the defence begins
+    stored: Plan | None = None   # the searched plan, never adjusted: every read starts from it
     next: int = 0              # the plan's next step
     gates: set[int] = field(default_factory=set)   # arches the plan has warded, to ward again when broken
     relocated: set[tuple[int, int]] = field(default_factory=set)   # planned towers sold to follow the final boss
@@ -140,11 +163,12 @@ class Planned:
     look: float = 0.0
     last_aim: float = -1e9
 
-    def draft(self, location: Location, sigils: int) -> frozenset[str]:
-        if self.plan is None:
-            self.plan = check(location)
+    def draft(self, location: Location, sigils: int, relics: tuple[str, ...] = ()) -> frozenset[str]:
+        if self.stored is None:
+            self.stored = self.plan if self.plan is not None else check(location)
+        self.plan = adjust_plan(self.stored, relics, location, sigils, ORDER.index(location.key))
         learned = self.plan.learn(sigils, ORDER.index(location.key))
-        missing = needs(self.plan) - unlock_skills(learned)
+        missing = needs(self.plan, relics) - unlock_skills(learned)
         if missing:
             raise ValueError(f"the {location.key} plan needs {sorted(missing)} to raise its steps")
         return learned
@@ -154,6 +178,7 @@ class Planned:
         if self.plan is None:
             self.plan = check(world.location)
             kinds = {step[1] for step in self.plan.steps if step[0] == "build"}
+            kinds -= chartered(world.relics)
             if kinds & world.perks.locked:
                 raise ValueError(f"the {world.location.key} plan's steps are locked in this defence")
         self._answer(hands)

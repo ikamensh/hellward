@@ -39,9 +39,10 @@ class Player(Protocol):
 
     name: str
 
-    def draft(self, location: Location, sigils: int) -> frozenset[str]:
-        """The skills it would learn for this location with ``sigils``: the dealers' question when they build
-        its Kit. What it defends with is the Kit's learned, which may be anything."""
+    def draft(self, location: Location, sigils: int, relics: tuple[str, ...] = ()) -> frozenset[str]:
+        """The skills it would learn for this location with ``sigils`` and the run's held ``relics``: the
+        dealers' question when they build its Kit. What it defends with is the Kit's learned, which may
+        be anything. Only the strong players read the relics; the rest learn as if they held none."""
 
     def act(self, hands: Hands) -> None:
         """Called before every step of the world; a player decides as often as it likes."""

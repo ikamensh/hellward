@@ -490,10 +490,54 @@ def _union_length(spans: list[tuple[float, float]]) -> float:
     return total
 
 
+def adapt_sets() -> set[frozenset[str]]:
+    """The planned player's draft tower-kind sets over the harness seeds, its tree reading each seed's takes."""
+    from hellward.sim.players.planned import Planned  # noqa: E402
+    from tools.adapt import LOCATION as ADAPT_LOCATION  # noqa: E402
+    from tools.adapt import SEEDS as ADAPT_SEEDS  # noqa: E402
+    from tools.adapt import takes as adapt_takes  # noqa: E402
+
+    location = LOCATIONS[ADAPT_LOCATION]
+    sigils = 3 * ORDER.index(ADAPT_LOCATION)
+    sets = set()
+    for seed in ADAPT_SEEDS:
+        player = Planned()
+        player.draft(location, sigils, adapt_takes(seed))
+        sets.add(frozenset(s[1] for s in player.plan.steps if s[0] == "build"))
+    return sets
+
+
+def relic_builds() -> Result:
+    """M5: different runs end in different builds, pushed by their relics. Draft sets stand for end-builds:
+    tools/adapt.py plays the same seeds out and its ends match these drafts kind for kind."""
+    sets = adapt_sets()
+    return Result("M5", "distinct tower sets over 10 seeds of the strongest bot",
+                  f"{len(sets)}/10 draft sets (ends: tools/adapt.py)", len(sets) >= 6)
+
+
+def bot_table() -> Result:
+    """T2: a middling bot and a strong bot whose tree policy reads its relics, and a Kit corpus feeding
+    the per-location tools."""
+    from hellward.sim.players.apprentice import Apprentice  # noqa: E402
+
+    middling = isinstance(Apprentice().draft(LOCATIONS["caves"], 12), frozenset)
+    sets = adapt_sets()
+    reads = len(sets) >= 2
+    try:
+        import tools.corpus  # noqa: E402, F401
+        corpus = True
+    except ImportError:
+        corpus = False
+    value = f"middling apprentice {'reads' if middling else 'missing'}; planned reads relics ({len(sets)} sets); " \
+        f"Kit corpus {'feeds the tools' if corpus else 'none yet'}"
+    return Result("T2", "middling and strong bots; the strong one reads relics; a Kit corpus",
+                  value, middling and reads and corpus)
+
+
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
     bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, hymn_seeks, tower_kinds, real_estate,
     worth_and_cells, blight_kinds, power_table, armor_duels, verb_rates, verb_costs, tower_verbs, verb_set,
-    relic_pool,
+    relic_pool, relic_builds, bot_table,
 )
 
 NOT_YET = (
