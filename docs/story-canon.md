@@ -313,7 +313,7 @@ already-fixed text and are marked [STALE] where they would have appeared.
     uniform objectives (genre; per-fight objectives would be a game change);
     lessons teach mechanics by design (drowned briefing); Abominations
     off-panel at the stair (words may exceed the panel).
-18. **Iteration 4 (applied, uncommitted):** docks-after bone repaint;
+18. **Iterations 4–5 (337cd79, e3dc839):** docks-after bone repaint;
     caves-after crowned waiter; docks-before wingless Flayers; KEEP-1
     (died of stopping, keeping holds him); MOTH-1 (daughters catch with
     mother, Akara witnesses); TAUNT-1 bluff clause; CURSE-1 (prologue beam
@@ -322,7 +322,9 @@ already-fixed text and are marked [STALE] where they would have appeared.
     seniority; own door; jungle taunt silence-fix; died-of-stopping;
     inciting cause; Abominations among the dead; temple floor; black sails;
     crossing nights; a set of bones; "let me look"; Tristram kept by him
-    (travincal taunt).
+    (travincal taunt). I5: 3 quote fixes + balance test; carrier narrowed;
+outage owns the doors; bribe reframed as seizure; open-eyes cut (Council
+duped, church fallen); renunciation cut; doors nearly shut; fallen hymns.
 19. **CLOSED by this canon:** orb fiction (ORB-1/LANT-1), wake-vs-build
     (TOWER-1/TOWER-2), priest's motive (PRIEST-1), why the bones never show
     the keeper (BONES-1), the lantern's survival (LANT-2), the chain
