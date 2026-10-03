@@ -16,6 +16,7 @@ from hellward.sim.content import WAVE_BREAK
 from hellward.sim.items import EMPTY_LOADOUT
 from hellward.sim.kit import Kit
 from hellward.sim.model import SIM_DT, START_LIVES, Refused, World
+from hellward.sim.xp import xp_next
 from hellward.sim.players import planned, warden
 from hellward.sim.players.ghost import Ghost
 from hellward.sim.players.hands import Hands, defend, react_for
@@ -88,6 +89,16 @@ def test_a_kit_round_trips_through_json_and_refuses_a_foreign_location():
     assert Kit.from_json({"location": "tristram"}).gold == LOCATIONS["tristram"].start_gold
     with pytest.raises(ValueError):
         Kit.from_json({"location": "mordor"})
+
+
+def test_a_kit_carries_the_runs_xp_and_reckons_what_is_missing():
+    kit = Kit(LOCATIONS["caves"], xp=5.0, level=3)
+    assert kit.xp_next == xp_next(3)
+    assert Kit.from_json(json.loads(json.dumps(kit.to_json()))) == kit
+    bare = Kit.from_json({"location": "tristram"})
+    assert (bare.xp, bare.level, bare.xp_next) == (0.0, 1, xp_next(1))
+    world = kit.world()
+    assert (world.xp, world.xp_level) == (5.0, 3)
 
 
 def test_a_clone_copies_the_derived_perks_and_baked_ranks():

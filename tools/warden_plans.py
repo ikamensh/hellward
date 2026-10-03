@@ -41,7 +41,9 @@ from hellward.sim.players.hands import defend  # noqa: E402
 from hellward.sim.players.warden import (  # noqa: E402
     PLANS, Plan, Step, Warden, draft_build, draft_skills, fingerprint, plan_key, tile_value,
 )
-from hellward.sim.skills import SKILLS, above, can_learn, kept, perks, tower_levels  # noqa: E402
+from hellward.sim.skills import (  # noqa: E402
+    SKILLS, UNLOCK, above, can_learn, cost, kept, perks, tower_levels, unlocked,
+)
 from tools.tuning import life_margin  # noqa: E402
 
 LEADERS = {"smart": planner.smart, "greedy": planner.greedy}
@@ -103,10 +105,16 @@ def tidy(steps: list[Step], location: Location) -> list[Step]:
     return out
 
 
-def reskill(learned: frozenset[str], sigils: int, rng: random.Random, stage: int) -> frozenset[str]:
-    """Unlearn a skill nothing below needs, then learn at random until the sigils run out."""
-    learned = kept(learned, sigils, stage)
-    leaves = [k for k in learned if not any(above(SKILLS[o]) is SKILLS[k] for o in learned)]
+def reskill(learned: frozenset[str], sigils: int, rng: random.Random, stage: int,
+            must: frozenset[str] = frozenset()) -> frozenset[str]:
+    """Unlearn a skill nothing below needs (never a ``must``), then learn at random until the sigils run out."""
+    base: frozenset[str] = frozenset()
+    for key in sorted(must):
+        if can_learn(base, key, sigils, stage):
+            base |= {key}
+    learned = base | kept(learned - base, sigils - cost(base), stage)
+    leaves = [k for k in learned if k not in must
+              and not any(above(SKILLS[o]) is SKILLS[k] for o in learned)]
     if leaves:
         learned = learned - {rng.choice(sorted(leaves))}
     while True:
@@ -131,7 +139,8 @@ def mutate(plan: Plan, location: Location, sigils: int, rng: random.Random) -> P
             old = steps[i]
             kind, tile = old.kind, old.tile
             if move == "kind":
-                kind = rng.choice([k for k in kinds if k != old.kind] or [old.kind])
+                open_kinds = [k for k in kinds if k != old.kind and unlocked(k, skills)] or [old.kind]
+                kind = rng.choice(open_kinds)
             elif move == "nudge":
                 tile = (old.tile[0] + rng.randint(-2, 2), old.tile[1] + rng.randint(-2, 2))
             else:
@@ -150,7 +159,7 @@ def mutate(plan: Plan, location: Location, sigils: int, rng: random.Random) -> P
             first = next(i for i, s in enumerate(steps) if s.what == "build" and s.tile == tile)
             steps.insert(rng.randint(first + 1, len(steps)), Step("up", tile=tile))
         elif move == "tower":
-            kind = rng.choice(kinds)
+            kind = rng.choice([k for k in kinds if unlocked(k, skills)] or list(kinds))
             reach = plan_reach(kind, skills)
             free = [t for t in tiles if not any(s.what == "build" and s.tile == t for s in steps)]
             tile = rng.choice(sorted(free, key=lambda t: -tile_value(location, kind, t, reach))[:JUMP])
@@ -164,7 +173,9 @@ def mutate(plan: Plan, location: Location, sigils: int, rng: random.Random) -> P
             if step.what == "build":
                 steps = [s for s in steps if not (s.what == "up" and s.tile == step.tile)]
         elif move == "skills":
-            skills = reskill(skills, sigils, rng, stage)
+            used = {s.kind for s in steps if s.what == "build"}
+            must = frozenset(u for k in used if (u := UNLOCK[k]) is not None)
+            skills = reskill(skills, sigils, rng, stage, must)
         elif move == "early":
             early = rng.choice(EARLY)
     return Plan(skills, tuple(tidy(steps, location)), early, plan.map)
@@ -216,7 +227,10 @@ def search(args: argparse.Namespace) -> None:
     rng = random.Random(args.rng)
     rows, row = stored(key, sigils)
     best = draft(location, sigils) if args.fresh else Plan.of(row)
-    best = Plan(kept(best.skills, sigils, ORDER.index(key)), best.steps, best.early, fingerprint(location))
+    used = {s.kind for s in best.steps if s.what == "build"}
+    must = frozenset(u for k in used if (u := UNLOCK[k]) is not None)
+    best = Plan(kept(must | best.skills, sigils, ORDER.index(key)), best.steps, best.early,
+                fingerprint(location))
     evaluated = 0
     started = time.time()
     with ProcessPoolExecutor(args.jobs) as pool:

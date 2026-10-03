@@ -113,7 +113,7 @@ def fit(location: Location, kind: str) -> float:
     for wave in location.waves:
         for group in wave.groups:
             monster = MONSTERS[group.kind]
-            life = monster.hp * wave.hp * group.count
+            life = monster.hp * group.count
             total += life
             felt += life * (felt_hit(hit, tower.element, monster) / hit if tower.attack not in ("aura", "amplify")
                             else monster.taken(tower.element))
@@ -174,7 +174,7 @@ def first_skills(kinds: list[str], location: Location) -> list[str]:
         order += [k for k, s in SKILLS.items() if s.column == column_of(kind)]
     if location.arsenal.gates:
         order += ["holy_shield", "thorns"]
-    order += ["warmth", "soul_harvest", "spell_mastery"]
+    order += ["warmth", "spell_mastery"]
     order += [k for k in SKILLS if k not in order]
     tier = {k: SKILLS[k].tier for k in order}
     return sorted(order, key=lambda k: (tier[k], order.index(k)))
