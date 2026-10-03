@@ -36,6 +36,18 @@ from hellward.sim.content import (
 )
 from hellward.sim.items import EMPTY_LOADOUT, Loadout, PATTERNS
 from hellward.sim.level import Level
+from hellward.sim.relics import (
+    BLOOD_GOLD,
+    BLOOD_LIVES,
+    CANTICLE_WELL,
+    MARTYR_GOLD,
+    MASTERWORK_MANA,
+    RELICS,
+    SCAFFOLD_GOLD,
+    SPITE_MANA,
+    TRANCE_RATE,
+    TRANCE_TIME,
+)
 from hellward.sim.skills import NO_PERKS, RANK_SKILL, SKILLS, SPELL_UNLOCK, UNLOCK, Perks, baked
 from hellward.sim.xp import clear_xp, kill_xp, xp_next
 
@@ -308,9 +320,12 @@ class World:
     def __init__(self, location: Location = CATHEDRAL, *, hardness: float = 1.0, perks: Perks = NO_PERKS,
                  seed: int = 0, planner: Planner | None = None, record: bool = True, curse_scale: float = 1.0,
                  loadout: Loadout = EMPTY_LOADOUT, xp: float = 0.0, xp_level: int = 1,
-                 arsenal: Arsenal | None = None) -> None:
+                 arsenal: Arsenal | None = None, relics: tuple[str, ...] = (),
+                 counters: tuple[tuple[str, int], ...] = ()) -> None:
         self.location = location
         self.arsenal = location.arsenal if arsenal is None else arsenal
+        self.relics = relics   # the run's relics, won a location at a time
+        self.progress = {key: n for key, n in counters if key in relics}   # each relic's count toward its firing
         self.stage = ORDER.index(location.key)
         self.level = location.level
         self.waves = location.waves
@@ -336,7 +351,7 @@ class World:
         self.time = 0.0
         self.gold = location.start_gold
         self.lives = START_LIVES
-        self.mana = min(MANA_START, perks.mana_max)
+        self.mana = min(MANA_START, self.mana_max)
         self.xp = xp                    # the run's progress to the next level, counted on from here
         self.xp_level = xp_level        # the run's level (``level`` is the map): each level-up refills the mana
         self.xp_total = 0.0             # every point earned this defence, for the run's settling
@@ -369,6 +384,10 @@ class World:
         self.kills = 0
         self.curses_landed = 0
         self.spells_cast = 0
+        self.builds = 0       # the verbs, counted where they happen: towers raised, ranks bought,
+        self.upgrades = 0     # spells cast (spells_cast), curses landing (curses_landed) and leaks
+        self.leaks = 0
+        self.fervor = 0.0     # the Battle Trance's seconds left: every tower quickened while they last
         self.recharge: dict[str, float] = {}  # seconds each spell still gathers itself after a cast
         self._next_id = 1
 
@@ -403,6 +422,9 @@ class World:
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
         w.leaked_life, w.forced, w.outcome, w.kills, w._next_id = self.leaked_life, [], self.outcome, self.kills, self._next_id
         w.curses_landed, w.spells_cast = self.curses_landed, self.spells_cast
+        w.relics = self.relics
+        w.progress = dict(self.progress)
+        w.builds, w.upgrades, w.leaks, w.fervor = self.builds, self.upgrades, self.leaks, self.fervor
         return w
 
     def _id(self) -> int:
@@ -510,7 +532,50 @@ class World:
 
     @property
     def mana_max(self) -> float:
-        return self.perks.mana_max
+        return self.perks.mana_max - (CANTICLE_WELL if "canticle" in self.relics else 0.0)
+
+    @property
+    def spells(self) -> tuple[str, ...]:
+        """The spells offered: the arsenal's unlocked, and the Canticle's Hymn where neither holds it."""
+        offered = tuple(k for k in self.arsenal.spells if k not in self.perks.locked)
+        if "canticle" in self.relics and "hymn" not in offered:
+            offered += ("hymn",)
+        return offered
+
+    def _fervor(self) -> float:
+        """What the Battle Trance makes of every tower's attacks per second."""
+        return TRANCE_RATE if self.fervor > 0 else 1.0
+
+    def _relic(self, verb: str, amount: float = 0.0) -> None:
+        """A verb happened: every held relic that reads it counts one, and fires on its count."""
+        for key in self.relics:
+            spec = RELICS[key]
+            if spec.verb != verb:
+                continue
+            n = self.progress.get(key, 0) + 1
+            self.progress[key] = n
+            if n % spec.every != 0:
+                continue
+            if key == "tithe":
+                self.gold += round(amount)
+            elif key == "scaffold":
+                self.gold += SCAFFOLD_GOLD
+            elif key == "whetstone":
+                self.gold += round(amount / 2)
+            elif key == "masterwork":
+                self.mana = min(self.mana_max, self.mana + MASTERWORK_MANA)
+            elif key == "trance":
+                self.fervor = TRANCE_TIME
+            elif key == "deep_well":
+                self.mana = min(self.mana_max, self.mana + amount / 2)
+            elif key == "spite":
+                self.mana = min(self.mana_max, self.mana + SPITE_MANA)
+            elif key == "martyr":
+                self.gold += MARTYR_GOLD
+            elif key == "blood_money":
+                self.gold += round(amount) * BLOOD_GOLD
+                self.lives -= BLOOD_LIVES
+            self._emit("relic", key, spec.name)
 
     @property
     def gate_life(self) -> float:
@@ -570,6 +635,8 @@ class World:
         tower = Tower(self._id(), tower_kind, levels, tile)
         tower.spent = cost
         self.towers[tower.id] = tower
+        self.builds += 1
+        self._relic("build", cost)
         self._emit("built", tower.id, kind)
         return tower
 
@@ -603,6 +670,8 @@ class World:
         self.gold -= cost
         tower.level += 1
         tower.spent += cost
+        self.upgrades += 1
+        self._relic("upgrade", cost)
         self._emit("upgraded", tower.id)
 
     def sell(self, tower_id: int) -> int:
@@ -648,9 +717,9 @@ class World:
         self._emit("door_built", index)
 
     def _spend(self, key: str) -> None:
-        if key not in self.arsenal.spells:
+        if key not in self.arsenal.spells and not (key == "hymn" and "canticle" in self.relics):
             raise Refused(f"{SPELLS[key].name} is not yours to cast in {self.location.called}.")
-        if key in self.perks.locked:
+        if key in self.perks.locked and not (key == "hymn" and "canticle" in self.relics):
             raise Refused(f"{SPELLS[key].name} is locked: learn {SKILLS[SPELL_UNLOCK[key]].name} first.")
         left = self.recharge.get(key, 0.0)
         if left > 0:
@@ -660,6 +729,7 @@ class World:
             raise Refused(f"{SPELLS[key].name} takes {cost:.0f} mana.")
         self.mana -= cost
         self.spells_cast += 1
+        self._relic("cast", cost)
         if SPELLS[key].recharge > 0:
             self.recharge[key] = SPELLS[key].recharge
 
@@ -805,7 +875,9 @@ class World:
         if self.outcome is not None:
             return
         self.time += dt
-        self.mana = min(self.perks.mana_max, self.mana + self.perks.mana_regen * dt)
+        self.mana = min(self.mana_max, self.mana + self.perks.mana_regen * dt)
+        if self.fervor > 0:
+            self.fervor = max(0.0, self.fervor - dt)
         if self.recharge:
             for key in list(self.recharge):
                 left = self.recharge[key] - dt
@@ -929,6 +1001,7 @@ class World:
             cursed.append(tower.id)
         if cursed:
             self.curses_landed += 1
+            self._relic("curse")
             self._emit("cursed", leader_id, spot, curse, tuple(cursed))
             if spec is not None and spec.burn > 0:
                 amount = spec.burn * len(cursed)
@@ -992,10 +1065,14 @@ class World:
                     if m.kind.boss:   # struck back to its portal, with its life and afflictions, to walk again
                         m.s, m.door = 0.0, -1
                         m.strikes += 1
+                        self.leaks += 1
+                        self._relic("leak", m.kind.lives)
                         self._emit("returned", m.id, m.kind.key, m.kind.lives, m.strikes)
                         ordered = False
                         continue
                     self._count_off(m)
+                    self.leaks += 1
+                    self._relic("leak", m.kind.lives)
                     self._emit("leak", m.id, m.kind.key, m.kind.lives)
                     leaked = True
                     continue
@@ -1119,7 +1196,7 @@ class World:
                 if m.amplified < lasting:
                     m.amplified = lasting
                 hit.append(m.id)
-        rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0)
+        rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0) * self._fervor()
         t.cooldown += 1.0 / rate
         self._emit("amplify", t.id, (best_x, best_y), tuple(hit))
 
@@ -1205,7 +1282,7 @@ class World:
                 continue
             aura = self.aura_mult(t)
             damage = stats.damage * (t.damage_mult() if t.curses else 1.0)   # the hit; the aura is a factor
-            rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0)
+            rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0) * self._fervor()
             t.cooldown += 1.0 / rate
             if attack == "nova":
                 self._emit("nova", t.id)
@@ -1454,9 +1531,9 @@ class World:
             self._emit("salvage", m.id, where, m.salvage)
         amplified = m.amplified > 0
         if amplified and self.perks.life_tap:
-            self.mana = min(self.perks.mana_max, self.mana + m.bounty / 5)
+            self.mana = min(self.mana_max, self.mana + m.bounty / 5)
         if m.kind.leader is not None and self.perks.soul_harvest:
-            self.mana = min(self.perks.mana_max, self.mana + SOUL)
+            self.mana = min(self.mana_max, self.mana + SOUL)
         if self.perks.contagion and m.poison:
             self._spread(m, where)
         if bursts and self.perks.shatter and m.chill_left > 0:

@@ -30,11 +30,13 @@ from hellward.sim.content import MONSTERS, TOWERS
 from hellward.sim.items import Loadout
 from hellward.sim.kit import Kit
 from hellward.sim.locations.common import Location
+from hellward.sim.relics import RELICS
+from hellward.sim.relics import draw as draw_relics
 
 __all__ = ["FAILED", "MET", "OPEN", "BonusPack", "DefenceResult", "Drawn", "Record", "Run", "add_xp", "bonus_pack",
            "bonus_preview", "camp", "clear_xp", "describe", "dismantle", "draw_goals", "finish", "from_json",
-           "gold_floor", "kill_xp", "kit", "learn", "lives_sigils", "observe_world", "start", "to_json", "unlearn",
-           "xp_next"]
+           "gold_floor", "kill_xp", "kit", "learn", "lives_sigils", "observe_world", "start", "take_relic",
+           "to_json", "unlearn", "xp_next"]
 
 LIFE: Final = tuning.integer("run.life")
 CAMP_HEAL: Final = tuning.number("run.camp_heal")
@@ -79,7 +81,9 @@ class Run:
     drawn: tuple[Drawn, ...]       # the current location's goals, drawn at its camp
     salvage: int
     equipped: tuple[str, ...]     # the patterns worn, as a loadout's equipped
-    counters: tuple = ()          # stage 4: the counters carried into the defence
+    counters: tuple[tuple[str, int], ...] = ()   # each relic's count toward its firing, carried on
+    relics: tuple[str, ...] = ()  # the relics won, a location at a time
+    offer: tuple[str, ...] = ()   # the camp's choice after a held location, until one is taken
 
     @property
     def location(self) -> Location:
@@ -145,7 +149,7 @@ def kit(run: Run) -> Kit:
     mixed with the location's place so no two defences roll alike."""
     return Kit(location=run.location, learned=run.learned, loadout=Loadout(run.equipped),
                gold=max(run.gold, gold_floor(run.location)), lives=run.pool, seed=run.seed * 128 + run.index,
-               xp=run.xp, level=run.level)
+               xp=run.xp, level=run.level, relics=run.relics, counters=run.counters)
 
 
 def camp(run: Run) -> Run:
@@ -208,6 +212,13 @@ def unlearn(run: Run, column: str) -> Run:
                    reskill_points=run.reskill_points - 1)
 
 
+def take_relic(run: Run, key: str) -> Run:
+    """The run with the camp's offered relic taken; anything unoffered is refused."""
+    if key not in run.offer:
+        raise ValueError(f"no {RELICS[key].name if key in RELICS else key!r} is offered at this camp")
+    return replace(run, relics=(*run.relics, key), offer=())
+
+
 @dataclass(frozen=True)
 class DefenceResult:
     """What one defence settled: the pool and gold left, what stood, what it earned, how the goals closed."""
@@ -220,6 +231,7 @@ class DefenceResult:
     xp_earned: float
     goals: tuple[tuple[Drawn, str], ...]   # each drawn goal with its live verdict
     salvage_earned: int
+    relics: tuple[tuple[str, int], ...] = ()   # each relic's count toward its firing, carried on
 
 
 def observe_world(kit: Kit, world: Any, drawn: tuple[Drawn, ...], *, lives: int | None = None) -> DefenceResult:
@@ -238,7 +250,8 @@ def observe_world(kit: Kit, world: Any, drawn: tuple[Drawn, ...], *, lives: int 
     first = kit.lives if lives is None else lives
     return DefenceResult(won=world.outcome == "victory", lives_left=left, lives_lost=first - left,
                          gold_left=world.gold, tower_costs=sum(t.spent for t in world.towers.values()),
-                         xp_earned=world.xp_total, goals=tuple(goals), salvage_earned=world.salvage_held)
+                         xp_earned=world.xp_total, goals=tuple(goals), salvage_earned=world.salvage_held,
+                         relics=tuple(sorted(world.progress.items())))
 
 
 def to_json(run: Run) -> dict[str, Any]:
@@ -249,7 +262,8 @@ def to_json(run: Run) -> dict[str, Any]:
             "records": [{"location": r.location, "lives_lost": r.lives_lost, "lives_sigils": r.lives_sigils,
                          "goals": [[g.key, g.arg, v] for g, v in r.goals]} for r in run.records],
             "drawn": [[g.key, g.arg] for g in run.drawn], "salvage": run.salvage,
-            "equipped": list(run.equipped), "counters": list(run.counters)}
+            "equipped": list(run.equipped), "counters": [list(pair) for pair in run.counters],
+            "relics": list(run.relics), "offer": list(run.offer)}
 
 
 def from_json(data: dict[str, Any]) -> Run:
@@ -267,7 +281,9 @@ def from_json(data: dict[str, Any]) -> Run:
               learned=learned, records=records,
               drawn=tuple(Drawn(str(g[0]), str(g[1])) for g in data.get("drawn", ())),
               salvage=int(data.get("salvage", 0)), equipped=tuple(str(p) for p in data.get("equipped", ())),
-              counters=tuple(data.get("counters", ())))
+              counters=tuple((str(pair[0]), int(pair[1])) for pair in data.get("counters", ())),
+              relics=tuple(str(r) for r in data.get("relics", ())),
+              offer=tuple(str(r) for r in data.get("offer", ())))
     if not 0 <= run.index <= len(ORDER):
         raise ValueError(f"a run's location is outside the campaign: {run.index}")
     return run
@@ -286,7 +302,8 @@ def finish(run: Run, result: DefenceResult) -> Run:
     record = Record(run.location.key, result.lives_lost, lives_sigils(result.lives_lost), folded)
     run = replace(run, pool=result.lives_left, gold=result.gold_left + dismantle(result.tower_costs),
                   salvage=run.salvage + result.salvage_earned, records=(*run.records, record),
-                  skill_points=run.skill_points + record.sigils, index=run.index + 1)
+                  skill_points=run.skill_points + record.sigils, index=run.index + 1,
+                  counters=result.relics, offer=draw_relics(run.seed, run.index, run.relics))
     run, _ = add_xp(run, result.xp_earned)
     if run.index >= len(ORDER):
         return replace(run, drawn=())
