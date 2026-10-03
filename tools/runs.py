@@ -38,7 +38,7 @@ from hellward import fastsim  # noqa: E402
 if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of its worker processes, not as a library
     fastsim.activate()   # the compiled simulation, unless HELLWARD_INTERPRETED is set
 
-from hellward.run import HYMN_N, MET, Run, camp, finish, kit, learn, observe_world, start  # noqa: E402
+from hellward.run import HYMN_N, MET, Run, camp, finish, kit, learn, observe_world, start, take_relic  # noqa: E402
 from hellward.run.goals import Hymn  # noqa: E402
 from hellward.sim import planner, skills as tree  # noqa: E402
 from hellward.sim.balance import BALANCE  # noqa: E402
@@ -279,7 +279,7 @@ def play_run(seed: int, bot: str, locations: tuple[str, ...], immortal: bool,
                 summary["summons"].append((_key, stake))
 
         dealt = reference_kit(played.location, player.draft(played.location, _sigils(bot, run, key, stored)),
-                              played.seed)
+                              played.seed, relics=run.relics, counters=run.counters)
         world, _ = defend(dealt, player, planner=planner.smart,
                           lives=IMMORTAL_LIVES if immortal else run.pool, watch=watch)
         world.events = events
@@ -288,6 +288,9 @@ def play_run(seed: int, bot: str, locations: tuple[str, ...], immortal: bool,
         if immortal:   # the pool never ends the run, but the lost life is counted against it
             result = replace(result, lives_left=run.pool - result.lives_lost)
         run = finish(run, result)
+        if run.offer:   # the bots take the camp's first relic, no choosing
+            run = take_relic(run, run.offer[0])
+            summary.setdefault("relics", []).append([key, run.relics[-1]])
         summary["sim_seconds"] += world.time
         summary["reached"] += 1
         summary["locations"][key] = {"won": result.won, "lives_lost": result.lives_lost,

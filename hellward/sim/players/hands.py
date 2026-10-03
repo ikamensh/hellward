@@ -181,12 +181,13 @@ class Hands:
 
 def reference_kit(location: Location, learned: frozenset[str], seed: int, *,
                 loadout: Loadout = EMPTY_LOADOUT, gold: int | None = None,
-                lives: int | None = None) -> Kit:
+                lives: int | None = None, relics: tuple[str, ...] = (),
+                counters: tuple[tuple[str, int], ...] = ()) -> Kit:
     """The Kit today's convention deals: the location's start gold and sanctuary lives, the learned skills,
     and the seed. The per-location tools deal from here, so one defence then and now starts the same."""
     return Kit(location=location, learned=learned, loadout=loadout, seed=seed,
                gold=location.start_gold if gold is None else gold,
-               lives=START_LIVES if lives is None else lives)
+               lives=START_LIVES if lives is None else lives, relics=relics, counters=counters)
 
 
 def defend(kit: Kit, player: Player, *, planner: Planner | None, hardness: float = 1.0,
