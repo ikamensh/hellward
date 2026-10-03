@@ -14,6 +14,7 @@ from hellward.sim.items import PATTERNS, Loadout, Pattern
 from hellward.sim.skills import can_learn, check, cost, kept
 
 SLOT = "campaign"
+RUN_SLOT = "run"
 BREACH_SITES = frozenset(BREACHES)
 
 
@@ -22,6 +23,13 @@ def slot_for_profile(profile: str) -> str:
     if not profile.isidentifier():
         raise ValueError(f"Profile name must be a simple word: {profile!r}")
     return SLOT if profile == "main" else f"{SLOT}_{profile}"
+
+
+def slot_for_run(profile: str) -> str:
+    """One run save per profile: the Run, the current defence's Kit, and its log."""
+    if not profile.isidentifier():
+        raise ValueError(f"Profile name must be a simple word: {profile!r}")
+    return RUN_SLOT if profile == "main" else f"{RUN_SLOT}_{profile}"
 
 
 def campaign_profiles(saves: Saves) -> tuple[str, ...]:

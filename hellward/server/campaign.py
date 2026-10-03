@@ -9,23 +9,29 @@ and saves it after every change, as the 2D game's screens did (their ways betwee
 
 from __future__ import annotations
 
+import random
 from collections.abc import Callable
 from pathlib import Path
+from hellward.run import LIFE, Run, camp, describe, from_json, start, to_json
+from hellward.run import learn as learn_skill
+from hellward.run import unlearn as unlearn_skill
 from hellward.server.battle import Battle
-from hellward.server.progress import Progress, campaign_profiles, slot_for_profile
+from hellward.server.progress import Progress, campaign_profiles, slot_for_profile, slot_for_run
+from hellward.server.protocol import HITLESS
 from hellward.server.saves import Saves
 from hellward.sim import tuning
 from hellward.sim.breaches import BREACHES
 from hellward.sim.campaign import (
     ACT_ENDS, ACT_NAMES, ACTS, CATHEDRAL, LOCATIONS, ORDER, SIGIL_LIVES, Location, idle, offers, sigils,
 )
-from hellward.sim.content import CURSES, MONSTERS, SPELLS, START_LIVES, TOWERS, Curse, Element, MonsterKind
+from hellward.sim.content import CURSES, MONSTERS, SPELLS, START_LIVES, TOWERS, Curse, Element, MonsterKind, felt_hit
 from hellward.sim.items import PATTERNS
 from hellward.sim.model import Planner, World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.ghost import Ghost
 from hellward.sim.players.hands import Player
-from hellward.sim.skills import COLUMNS, SKILLS, above, can_learn, perks
+from hellward.sim.skills import COLUMNS, SKILLS, above, can_learn, cost, perks, unlocked
+from hellward.sim.xp import xp_next
 from hellward.story import LAST_PAGES, STORIES, Story
 
 ARSENAL = ("arrow", "ballista", "hook", "knife", "pyre", "storm", "frost", "plague", "altar", "grove", "gate", "smite",
@@ -51,6 +57,7 @@ class Campaign:
         self.progress = Progress.load(self.saves, profile)
         self.battle: Battle | None = None
         self.last: dict | None = None    # the last decided defence: its location, outcome, and what it won
+        self.run: Run | None = self._load_run(profile)
 
     # -- Profiles ---------------------------------------------------------------------------------
 
@@ -74,11 +81,77 @@ class Campaign:
         fresh = Progress(profile=name, saves=self.saves)
         fresh.save()
         self.progress = fresh
+        self.run = self._load_run(name)
         return self.profiles()
 
     def switch_profile(self, name: str) -> dict:
         self.progress = Progress.load(self.saves, name)
+        self.run = self._load_run(name)
         return self.profiles()
+
+    # -- The run ----------------------------------------------------------------------------------
+
+    def _load_run(self, profile: str) -> Run | None:
+        saved = self.saves.load(slot_for_run(profile))
+        if saved is None or saved["state"]["run"] is None:
+            return None
+        return from_json(saved["state"]["run"])
+
+    def _save_run(self) -> None:
+        state = {"run": None if self.run is None else to_json(self.run), "kit": None, "log": None}
+        at = "nowhere" if self.run is None else self.run.location.key if self.run.index < len(ORDER) else "won"
+        self.saves.save(slot_for_run(self.progress.profile), state, "Run",
+                        summary={"at": at, "pool": 0 if self.run is None else self.run.pool})
+
+    def start_run(self, seed: int | None = None) -> dict:
+        """A new run through all twelve locations; the lantern walks to Tristram."""
+        if self.run is not None:
+            raise Refusal("A run is already going. Abandon it first.")
+        self.run = start(seed if seed is not None else random.randrange(1 << 30))
+        self._save_run()
+        return self.run_view()
+
+    def run_view(self) -> dict:
+        """The run's state for the map and the camp, or no run going."""
+        if self.run is None:
+            return {"active": False}
+        run = self.run
+        return {
+            "active": True, "seed": run.seed, "index": run.index,
+            "location": run.location.key if run.index < len(ORDER) else None,
+            "pool": run.pool, "pool_max": LIFE, "gold": run.gold, "level": run.level, "xp": run.xp,
+            "xp_next": xp_next(run.level), "skill_points": run.skill_points,
+            "reskill_points": run.reskill_points, "learned": sorted(run.learned),
+            "drawn": [{"key": g.key, "arg": g.arg, "line": describe(g)} for g in run.drawn],
+            "records": [{"location": r.location, "lives_lost": r.lives_lost, "sigils": r.sigils,
+                         "goals": [{"key": g.key, "arg": g.arg, "verdict": v} for g, v in r.goals]}
+                        for r in run.records],
+            "salvage": run.salvage, "equipped": list(run.equipped),
+            "won": run.won, "lost": run.lost,
+        }
+
+    def camp(self) -> dict:
+        """The camp between locations: the pool mends, the save is written, the run's state returns."""
+        if self.run is None:
+            raise Refusal("No run is going.")
+        if self.battle is not None:
+            raise Refusal("Finish the defence first.")
+        self.run = camp(self.run)
+        self._save_run()
+        return self.run_view()
+
+    def abandon(self) -> dict:
+        """Leave a live defence, or the run at a camp: a run's salvage stays in the profile's purse."""
+        if self.run is None:
+            self.battle = None
+            return {}
+        banked = self.run.salvage
+        self.progress.salvage += banked
+        self.progress.save()
+        self.battle = None
+        self.run = None
+        self._save_run()
+        return {"banked": banked}
 
     # -- The map ----------------------------------------------------------------------------------
 
@@ -207,6 +280,15 @@ class Campaign:
             waste = ("1 sigil sits in a skill that does" if wasted == 1 else f"{wasted} sigils sit in skills that do") + \
                 " nothing here."
         breach = BREACHES.get(loc.key)
+        run_here = self.run is not None and self.run.index < len(ORDER) and loc.key == self.run.location.key
+        goals: list[dict] = []
+        worst = None
+        threat_answers = None
+        if run_here:
+            assert self.run is not None
+            goals = [{"key": g.key, "arg": g.arg, "line": describe(g)} for g in self.run.drawn]
+            worst = worst_line(loc, self.run.pool)
+            threat_answers = answers_line(loc, self.run.learned)
         return {
             "key": loc.key, "name": loc.name, "act": loc.act, "theme": loc.theme,
             "heading": f"{ACT_NAMES[loc.act]}, {ACTS[loc.act].index(loc.key) + 1} of {len(ACTS[loc.act])}  ·  "
@@ -221,28 +303,44 @@ class Campaign:
             "story": story(STORIES[before_key]) if story_first else None,   # owed before the intro shows
             "before": story(STORIES[before_key]) if before_key in STORIES else None,   # the intro's Story button
             "opened": p.opened(loc),
+            "goals": goals, "worst": worst, "threat_answers": threat_answers,
         }
 
     # -- Skills -----------------------------------------------------------------------------------
 
     def skills(self, location: str | None = None) -> dict:
-        p = self.progress
+        if self.run is not None:
+            run = self.run
+            learned, budget, stage, free = run.learned, run.skill_points + cost(run.learned), run.index, \
+                run.skill_points
+            n = run.reskill_points
+            purse, unlearn_note = "points", f"{n} reskill point{'s' if n != 1 else ''} to unlearn with."
+            reskill = run.reskill_points
+        else:
+            p = self.progress
+            learned, budget, stage, free = p.learned, p.sigils, p.stage, p.free
+            purse, unlearn_note, reskill = "sigils", "Unlearning is free.", 0
         loc = self._location(location) if location else None
+        below = set()
+        for other in learned:
+            parent = above(SKILLS[other])
+            if parent is not None:
+                below.add(parent.key)
         nodes = []
         for key, skill in SKILLS.items():
-            learned = key in p.learned
-            learnable = can_learn(p.learned, key, p.sigils, p.stage)
+            is_learned = key in learned
+            learnable = can_learn(learned, key, budget, stage)
             parent = above(skill)
-            if learned:
+            if is_learned:
                 state = "Learned."
             elif learnable:
-                state = f"Click to learn it for {skill.cost} sigil{'s' if skill.cost > 1 else ''}."
-            elif p.stage < skill.first_location:
+                state = f"Click to learn it for {skill.cost} {purse[:-1] if skill.cost == 1 else purse}."
+            elif stage < skill.first_location:
                 state = f"Opens in {LOCATIONS[ORDER[skill.first_location]].name}."
-            elif parent is not None and parent.key not in p.learned:
+            elif parent is not None and parent.key not in learned:
                 state = f"Needs {parent.name} first."
             else:
-                state = f"Costs {skill.cost} sigils; {p.free} are free."
+                state = f"Costs {skill.cost} {purse}; {free} are free."
             note = ""
             dormant = False
             if loc is not None:
@@ -253,19 +351,28 @@ class Campaign:
                 elif idle(loc, skill.needs):
                     dormant = True
                     note = "Nothing to work on here."
+            unlearnable = self.run is not None and is_learned and key not in below
             nodes.append({"key": key, "name": skill.name, "column": skill.column, "tier": skill.tier,
-                          "cost": skill.cost, "blurb": skill.blurb, "learned": learned, "learnable": learnable,
+                          "cost": skill.cost, "blurb": skill.blurb, "learned": is_learned, "learnable": learnable,
                           "parent": parent.key if parent is not None else None, "dormant": dormant,
+                          "unlearnable": unlearnable,
                           "tip": f"{skill.name}\n{skill.blurb}\n{state}" + (f"\n{note}" if note else "")})
-        heading = f"{p.free} sigil{'s' if p.free != 1 else ''} free of {p.sigils} won. Unlearning is free."
+        heading = f"{free} {purse[:-1] if free == 1 else purse} free of {budget} won. {unlearn_note}"
         if loc is not None:
             heading += f"  ·  greyed: no effect in {loc.called}"
         return {"columns": [{"key": k, "name": v} for k, v in COLUMNS.items()], "nodes": nodes,
-                "sigils": p.sigils, "free": p.free, "heading": heading, "any": bool(p.learned)}
+                "sigils": budget, "free": free, "reskill": reskill, "heading": heading, "any": bool(learned)}
 
     def learn(self, key: str, location: str | None = None) -> dict:
         if key not in SKILLS:
             raise ValueError(f"no skill {key!r}")
+        if self.run is not None:
+            try:
+                self.run = learn_skill(self.run, key)
+            except ValueError as refused:
+                raise Refusal(str(refused)) from refused
+            self._save_run()
+            return self.skills(location)
         if not self.progress.learn(key):
             skill = SKILLS[key]
             parent = above(skill)
@@ -278,7 +385,20 @@ class Campaign:
             raise Refusal(f"{skill.name} costs {skill.cost} sigils; {self.progress.free} are free.")
         return self.skills(location)
 
+    def unlearn(self, column: str) -> dict:
+        """Unlearn the column's bottom skill for a reskill point, in a run."""
+        if self.run is None:
+            raise Refusal("Outside a run, unlearning is free: unlearn all.")
+        try:
+            self.run = unlearn_skill(self.run, column)
+        except ValueError as refused:
+            raise Refusal(str(refused)) from refused
+        self._save_run()
+        return self.skills()
+
     def unlearn_all(self, location: str | None = None) -> dict:
+        if self.run is not None:
+            raise Refusal("In a run, unlearning spends a reskill point: unlearn one column.")
         self.progress.unlearn_all()
         return self.skills(location)
 
@@ -429,6 +549,58 @@ class Campaign:
         if key not in LOCATIONS:
             raise ValueError(f"no location {key!r}")
         return LOCATIONS[key]
+
+
+def worst_line(location: Location, pool: int) -> str:
+    """The briefing's worst case: the roster's lives against the pool, and a boss's strikes."""
+    lives = sum(group.count * MONSTERS[group.kind].lives
+                for wave in location.waves for group in wave.groups)
+    line = f"Worst case: {lives} lives against your pool of {pool}."
+    bosses = sorted({MONSTERS[group.kind].name for wave in location.waves for group in wave.groups
+                     if MONSTERS[group.kind].boss})
+    if bosses:
+        line += f" {' and '.join(bosses)} strike{'s' if len(bosses) == 1 else ''} at {BOSS_STRIKE_LIVES}."
+    return line
+
+
+def answers_line(location: Location, learned: frozenset[str]) -> str | None:
+    """The camp's answers line for the roster's standout: what your kinds deal it, and what deals more, from
+    the hits table. Nothing to answer when no kind wears armor or tags, or yours already deal the most."""
+    index = ORDER.index(location.key)
+    roster = [MONSTERS[key] for key in location.monsters]
+    standout = max(roster, key=lambda m: (m.armor, bool(m.protected or m.vulnerable), m.hp))
+    if standout.armor <= 0 and not standout.protected and not standout.vulnerable:
+        return None
+    preview = World(location, perks=perks(learned, index))
+    felt = {}
+    for key in location.arsenal.towers:
+        tower = TOWERS[key]
+        if tower.attack not in HITLESS:   # locked kinds too: a locked answer names its unlock
+            felt[key] = [felt_hit(lv.damage, tower.element, standout) for lv in preview.tower_levels[key]]
+    yours = sorted(k for k in felt if unlocked(k, learned))
+    if not yours:
+        return None
+    dealt = {k: felt[k][0] for k in yours}
+    best = max(dealt.values())
+    your = ", ".join(f"{_plural(TOWERS[k].name)} deal {dealt[k]}" for k in yours)
+    answers = []
+    for key in location.arsenal.towers:
+        if key in felt and key not in yours and felt[key][0] > best:
+            tags = []
+            if TOWERS[key].element in standout.vulnerable:
+                tags.append("vulnerable")
+            if not unlocked(key, learned):
+                tags.append("locked")
+            answers.append(TOWERS[key].name + (f" ({', '.join(tags)})" if tags else ""))
+    if not answers:
+        return None
+    armored = f", armor {standout.armor}" if standout.armor > 0 else ""
+    return f"{_plural(standout.name)}{armored}: your {your}. Answers: {', '.join(answers)}."
+
+
+def _plural(name: str) -> str:
+    """The camp's plural: Witches and Zealots, not Witchs."""
+    return name + ("es" if name.endswith(("s", "x", "z", "ch", "sh")) else "s")
 
 
 def story(tale: Story) -> dict:

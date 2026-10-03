@@ -28,6 +28,7 @@ from hellward.run import (
     dismantle,
     draw_goals,
     finish,
+    from_json,
     gold_floor,
     kill_xp,
     kit,
@@ -35,6 +36,7 @@ from hellward.run import (
     lives_sigils,
     observe_world,
     start,
+    to_json,
     unlearn,
     xp_next,
 )
@@ -354,3 +356,27 @@ def test_observing_counts_the_lost_life_from_overridden_starting_lives():
 def test_bonus_packs_are_typed():
     pack = bonus_pack(LOCATIONS["tristram"], 1, 0, 0)
     assert isinstance(pack, BonusPack)
+
+
+def test_a_run_round_trips_through_json_with_its_records_and_goals():
+    import json
+
+    run = start(11)
+    settled = finish(run, DefenceResult(True, 24, 6, 500, 300, 12.0,
+                                        ((Drawn("lean", "8"), MET), (Drawn("gate", ""), FAILED)), 3))
+    back = from_json(json.loads(json.dumps(to_json(settled))))
+    assert back == settled
+    assert back.records[0].sigils == settled.records[0].sigils
+    won = from_json(to_json(replace(settled, index=len(ORDER), drawn=())))
+    assert won.won and won.drawn == ()
+
+
+def test_a_run_outside_the_campaign_is_refused():
+    from hellward.run import Record
+
+    run = start(11)
+    with pytest.raises(ValueError):
+        from_json({**to_json(run), "index": 99})
+    stray = replace(run, records=(Record("mordor", 0, 0),))
+    with pytest.raises(ValueError):
+        from_json(to_json(stray))

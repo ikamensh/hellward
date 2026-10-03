@@ -32,8 +32,9 @@ from hellward.sim.kit import Kit
 from hellward.sim.locations.common import Location
 
 __all__ = ["FAILED", "MET", "OPEN", "BonusPack", "DefenceResult", "Drawn", "Record", "Run", "add_xp", "bonus_pack",
-           "bonus_preview", "camp", "clear_xp", "describe", "dismantle", "draw_goals", "finish", "gold_floor",
-           "kill_xp", "kit", "learn", "lives_sigils", "observe_world", "start", "unlearn", "xp_next"]
+           "bonus_preview", "camp", "clear_xp", "describe", "dismantle", "draw_goals", "finish", "from_json",
+           "gold_floor", "kill_xp", "kit", "learn", "lives_sigils", "observe_world", "start", "to_json", "unlearn",
+           "xp_next"]
 
 LIFE: Final = tuning.integer("run.life")
 CAMP_HEAL: Final = tuning.number("run.camp_heal")
@@ -238,6 +239,38 @@ def observe_world(kit: Kit, world: Any, drawn: tuple[Drawn, ...], *, lives: int 
     return DefenceResult(won=world.outcome == "victory", lives_left=left, lives_lost=first - left,
                          gold_left=world.gold, tower_costs=sum(t.spent for t in world.towers.values()),
                          xp_earned=world.xp_total, goals=tuple(goals), salvage_earned=world.salvage_held)
+
+
+def to_json(run: Run) -> dict[str, Any]:
+    """The run as JSON: the save's form, one a resume reads back exactly."""
+    return {"seed": run.seed, "index": run.index, "pool": run.pool, "gold": run.gold, "xp": run.xp,
+            "level": run.level, "skill_points": run.skill_points, "reskill_points": run.reskill_points,
+            "learned": sorted(run.learned),
+            "records": [{"location": r.location, "lives_lost": r.lives_lost, "lives_sigils": r.lives_sigils,
+                         "goals": [[g.key, g.arg, v] for g, v in r.goals]} for r in run.records],
+            "drawn": [[g.key, g.arg] for g in run.drawn], "salvage": run.salvage,
+            "equipped": list(run.equipped), "counters": list(run.counters)}
+
+
+def from_json(data: dict[str, Any]) -> Run:
+    """The run from :func:`to_json`'s shape; a location outside the campaign is refused."""
+    learned = frozenset(str(s) for s in data.get("learned", ()))
+    records = tuple(Record(str(r["location"]), int(r["lives_lost"]), int(r["lives_sigils"]),
+                           tuple((Drawn(str(g[0]), str(g[1])), str(g[2])) for g in r.get("goals", ())))
+                    for r in data.get("records", ()))
+    for record in records:
+        if record.location not in LOCATIONS:
+            raise ValueError(f"a run's record is outside the campaign: {record.location!r}")
+    run = Run(seed=int(data.get("seed", 0)), index=int(data.get("index", 0)), pool=int(data.get("pool", LIFE)),
+              gold=int(data.get("gold", 0)), xp=float(data.get("xp", 0.0)), level=int(data.get("level", 1)),
+              skill_points=int(data.get("skill_points", 0)), reskill_points=int(data.get("reskill_points", 0)),
+              learned=learned, records=records,
+              drawn=tuple(Drawn(str(g[0]), str(g[1])) for g in data.get("drawn", ())),
+              salvage=int(data.get("salvage", 0)), equipped=tuple(str(p) for p in data.get("equipped", ())),
+              counters=tuple(data.get("counters", ())))
+    if not 0 <= run.index <= len(ORDER):
+        raise ValueError(f"a run's location is outside the campaign: {run.index}")
+    return run
 
 
 def finish(run: Run, result: DefenceResult) -> Run:
