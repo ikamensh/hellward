@@ -2262,8 +2262,11 @@ void fragment() {
 				col = vec3(0.006, 0.013, 0.016);
 				rough = 0.1;
 				spec = 0.55;
+				// still black water under a black sky: a faint fresnel sheen so it reads as water, not a hole
+				float fres = pow(1.0 - clamp(-dir.y, 0.0, 1.0), 2.0);
+				glow += vec3(0.035, 0.055, 0.07) * fres * (0.7 + 0.6 * nmap.r);
 			} else {
-				float scum = smoothstep(0.5, 0.7, texture(noise, p * 0.2).r);
+				float scum = smoothstep(0.5, 0.7, texture(noise, p * 0.2 + vec2(TIME * 0.008, TIME * 0.005)).r);
 				col = mix(vec3(0.01, 0.014, 0.008), vec3(0.06, 0.08, 0.03), scum);
 				rough = mix(0.12, 0.8, scum);
 				spec = 0.45;

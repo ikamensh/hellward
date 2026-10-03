@@ -111,17 +111,17 @@ func _tufts(points: Array, dry_color := Color(0.17, 0.17, 0.08), fresh := Color(
 	return mi
 
 
-## A tuft: a dozen tapering blades leaning out from one root.
+## A tuft: sixteen tapering blades leaning out from one root, the outer ones flopping further.
 func _tuft_mesh() -> ArrayMesh:
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 3
-	for b in 12:
+	for b in 16:
 		var a := rng.randf() * TAU
-		var lean := rng.randf_range(0.1, 0.45)
-		var h := rng.randf_range(0.25, 0.55)
-		var w := 0.035
+		var lean := rng.randf_range(0.15, 0.6)
+		var h := rng.randf_range(0.3, 0.65)
+		var w := 0.05
 		var dir := Vector3(cos(a), 0, sin(a))
 		var side := Vector3(-dir.z, 0, dir.x) * w
 		var root := dir * rng.randf_range(0.0, 0.08)
@@ -145,6 +145,7 @@ func _stones(points: Array, material := "stone") -> MultiMeshInstance3D:
 	sm.rings = 3
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.use_colors = true
 	mm.mesh = sm
 	mm.instance_count = points.size()
 	for i in points.size():
@@ -152,9 +153,13 @@ func _stones(points: Array, material := "stone") -> MultiMeshInstance3D:
 		var b := Basis(Vector3(_rng.randf(), 1, _rng.randf()).normalized(), _rng.randf() * TAU).scaled(
 			Vector3(s, s * _rng.randf_range(0.4, 0.8), s * _rng.randf_range(0.7, 1.2)))
 		mm.set_instance_transform(i, Transform3D(b, points[i]))
+		var v := _rng.randf_range(0.6, 1.1)
+		mm.set_instance_color(i, Color(v, v * _rng.randf_range(0.94, 1.0), v * _rng.randf_range(0.88, 1.0)))
 	var mi := MultiMeshInstance3D.new()
 	mi.multimesh = mm
-	mi.material_override = Mats.named(material)
+	var mat := (Mats.named(material) as StandardMaterial3D).duplicate() as StandardMaterial3D
+	mat.vertex_color_use_as_albedo = true   # the instance tints above; the library's own copy stays untouched
+	mi.material_override = mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF   # pebbles: their shadows cost four cascades
 	return mi
 
