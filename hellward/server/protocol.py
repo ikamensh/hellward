@@ -116,7 +116,18 @@ def state(world: World) -> dict:
         "door_cost": world.door_cost if arsenal.gates else None,
         "spell_cost": {key: world.spell_cost(key) for key in world.spells},
         "kills": world.kills,
+        "blighted": [[x, y, waves, past] for (x, y), (waves, past) in sorted(world.blighted.items())],
+        "blight_marks": blight_marks(world),
     }
+
+
+def blight_marks(world: World) -> list[list]:
+    """Every cell a blighter's mark burns on: [x, y, seconds left, what it will be]."""
+    out = []
+    for m in world.monsters:
+        if m.blight_cell != (-1, -1) and m.kind.blight is not None:
+            out.append([m.blight_cell[0], m.blight_cell[1], round(m.blight_left, 2), m.kind.blight.past])
+    return out
 
 
 def doors(world: World) -> list[list]:
@@ -200,10 +211,14 @@ def monster_table(world: World, kind: str) -> dict:
         leader = {"curses": [c.value for c in m.leader.curses], "cast_range": m.leader.cast_range,
                   "channel": m.leader.channel, "mark": m.leader.mark, "raises": m.leader.raises,
                   "widen": m.leader.widen}
+    blight = None
+    if m.blight is not None:
+        blight = {"verb": m.blight.verb, "past": m.blight.past, "reach": m.blight.reach,
+                  "telegraph": m.blight.telegraph, "waves": m.blight.waves}
     return {"name": m.name, "hp": m.hp, "speed": m.speed, "bounty": m.bounty, "lives": m.lives, "size": m.size,
             "flying": m.flying, "movement": m.movement, "armor": m.armor,
             "protected": [e.value for e in m.protected], "vulnerable": [e.value for e in m.vulnerable],
-            "boss": m.boss, "hits": hits(world, m), "leader": leader}
+            "boss": m.boss, "hits": hits(world, m), "leader": leader, "blight": blight}
 
 
 def worth_table(world: World, kind: str) -> dict:
