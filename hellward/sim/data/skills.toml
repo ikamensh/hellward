@@ -9,6 +9,8 @@ arrow = "Arrow"
 ballista = "Ballista"
 hook = "Hook"
 knife = "Knife"
+idol = "Idol"
+censer = "Censer"
 fire = "Fire"
 lightning = "Lightning"
 cold = "Cold"
@@ -421,3 +423,53 @@ cost = 4
 blurb = "Meteors can be called down on thick crowds."
 needs = ["meteor"]
 first_location = 10
+
+[skills.unlock_idol]
+name = "Unlock Sentinel Idol"
+column = "idol"
+tier = 1
+cost = 4
+blurb = "Idols can be raised: a free smite, again and again."
+needs = ["idol"]
+first_location = 3
+
+[skills.adept_idol]
+name = "Adept of Idols"
+column = "idol"
+tier = 2
+cost = 2
+blurb = "Idols can be raised to the second rank."
+needs = ["idol"]
+
+[skills.master_idol]
+name = "Master of Idols"
+column = "idol"
+tier = 3
+cost = 4
+blurb = "Idols can be raised to the third rank."
+needs = ["idol"]
+
+[skills.unlock_censer]
+name = "Unlock Martyr's Censer"
+column = "censer"
+tier = 1
+cost = 4
+blurb = "Censers can be raised: a leak near one immolates the field."
+needs = ["censer"]
+first_location = 4
+
+[skills.adept_censer]
+name = "Adept of Censers"
+column = "censer"
+tier = 2
+cost = 2
+blurb = "Censers can be raised to the second rank."
+needs = ["censer"]
+
+[skills.master_censer]
+name = "Master of Censers"
+column = "censer"
+tier = 3
+cost = 4
+blurb = "Censers can be raised to the third rank."
+needs = ["censer"]

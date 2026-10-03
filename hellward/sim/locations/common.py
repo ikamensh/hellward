@@ -58,7 +58,7 @@ class Location:
                 seen.setdefault(group.kind, None)
         return tuple(seen)
 
-ALL_TOWERS = ("arrow", "pyre", "storm", "frost", "plague", "ballista")
+ALL_TOWERS = ("arrow", "pyre", "storm", "frost", "plague", "ballista", "idol", "censer")
 ALL_SPELLS = ("smite", "hymn", "meteor", "orb")
 
 
@@ -100,6 +100,8 @@ def water(*blocks: tuple[int, int, int, int]) -> frozenset[tuple[int, int]]:
     return frozenset((x, y) for x0, y0, x1, y1 in blocks for x in range(x0, x1 + 1) for y in range(y0, y1 + 1))
 
 
-ALL_TOWERS_II = ("arrow", "pyre", "storm", "frost", "plague", "ballista", "altar", "hook", "knife")
-EVERY_TOWER = ("arrow", "pyre", "storm", "frost", "plague", "ballista", "altar", "hook", "knife", "grove")
+ALL_TOWERS_II = ("arrow", "pyre", "storm", "frost", "plague", "ballista", "altar", "hook", "knife",
+                 "idol", "censer")
+EVERY_TOWER = ("arrow", "pyre", "storm", "frost", "plague", "ballista", "altar", "hook", "knife", "grove",
+               "idol", "censer")
 

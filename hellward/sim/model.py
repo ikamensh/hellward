@@ -61,6 +61,8 @@ ATTUNE_GOLD: Final = 25         # an attunement's price in battle gold, per towe
 CHARGES_MAX: Final = 3.0        # the charges an attuned tower holds
 CHARGE_EVERY: Final = 15.0      # seconds per charge regained
 EMPOWER: Final = 3.0            # an empowered shot's damage
+IDOL_EVERY: Final = (45.0, 32.0, 22.0)   # the idol's rite, seconds per rank: a free smite
+CENSER_HURT: Final = (30.0, 60.0, 100.0)   # the immolation's damage, per rank
 DOOR_STOP: Final = tuning.number("battle.door_stop")
 JOSTLE: Final = tuning.number("battle.jostle")
 CHAIN_JUMP: Final = tuning.number("battle.chain_jump")
@@ -1068,6 +1070,8 @@ class World:
         leaked = False
         ordered, last = True, -math.inf   # whether those still on the map remain nearest the sanctuary first
         for m in monsters:
+            if m.hp <= 0:   # the censer's dead walk no further this step; the step's end buries them
+                continue
             route = level.route(m.route)
             if m.frozen > 0:
                 m.frozen -= dt
@@ -1107,6 +1111,10 @@ class World:
                     if m.bonus and self.bonus is not None:
                         self.bonus.leaked = True   # a strike or a leak fails the pack, boss or no boss
                     if m.kind.boss:   # struck back to its portal, with its life and afflictions, to walk again
+                        self._censers(m)   # at the shrine, before the return
+                        if m.hp <= 0:   # the immolation killed it: no return
+                            ordered = False
+                            continue
                         m.s, m.door = 0.0, -1
                         m.strikes += 1
                         self.leaks += 1
@@ -1116,6 +1124,7 @@ class World:
                         continue
                     self._count_off(m)
                     self.leaks += 1
+                    self._censers(m)
                     self._relic("leak", m.kind.lives)
                     self._emit("leak", m.id, m.kind.key, m.kind.lives)
                     leaked = True
@@ -1185,6 +1194,61 @@ class World:
             best.frozen = max(best.frozen, TWISTER_HELD)
             best.door = -1
             self._emit("twister", t.id, best.id)
+
+    def _idol(self, t: Tower, dt: float) -> None:
+        """The idol's rite: every so often it smites the foremost monster in reach, free — a cast
+        that counts the verb, for the relics that read it."""
+        t.timer += dt
+        if t.timer < IDOL_EVERY[t.level]:
+            return
+        ix, iy = t.tile[0] + 0.5, t.tile[1] + 0.5
+        radius = t.levels[t.level].range
+        best: Monster | None = None
+        for m in self.monsters:
+            if m.hp <= 0:
+                continue
+            x, y = self.position(m)
+            dx, dy = x - ix, y - iy
+            if dx * dx + dy * dy <= radius * radius \
+                    and (best is None or self.remaining(m) < self.remaining(best)):
+                best = m
+        if best is None:
+            return
+        t.timer -= IDOL_EVERY[t.level]
+        self._emit("smite", best.id, self.position(best))
+        self._hurt(best, felt_hit(SPELLS["smite"].damage * self.power(), None, best.kind), None)
+        self.spells_cast += 1
+        self._relic("cast", 0.0)
+        self._bury()   # what it killed must not walk on into the rest of this step
+
+    def _immolate(self, t: Tower) -> None:
+        """A censer's answer to a leak in its reach: every monster near it burns. Once a wave (the timer
+        keeps the wave it answered, one-based: never answered is 0); the dead are buried at the step's end,
+        with the other fallen."""
+        if t.silenced or t.timer == float(self.wave) + 1.0:
+            return
+        t.timer = float(self.wave) + 1.0
+        cx, cy = t.tile[0] + 0.5, t.tile[1] + 0.5
+        radius = t.levels[t.level].range
+        hurt = CENSER_HURT[t.level]
+        for m in self.monsters:
+            if m.hp <= 0 or (m.s >= self.level.route(m.route).length and m.kind.boss is None):
+                continue   # the already leaked earn no bounty by burning; a striking boss still burns
+            x, y = self.position(m)
+            if (x - cx) ** 2 + (y - cy) ** 2 <= radius * radius:
+                self._hurt(m, felt_hit(hurt, None, m.kind), None)
+        self._emit("immolated", t.id)
+
+    def _censers(self, m: Monster) -> None:
+        """A leak at the shrine: every censer whose reach holds it answers."""
+        x, y = self.position(m)
+        for t in self.towers.values():
+            if t.kind.key != "censer":
+                continue
+            cx, cy = t.tile[0] + 0.5, t.tile[1] + 0.5
+            radius = t.levels[t.level].range
+            if (x - cx) ** 2 + (y - cy) ** 2 <= radius * radius:
+                self._immolate(t)
 
     def _altar(self, t: Tower, stats: TowerLevel, spans: tuple[tuple[float, float], ...], near: float,
                reach: float) -> None:
@@ -1266,8 +1330,11 @@ class World:
                 t.cooldown = 0.0
                 continue
             attack = t.kind.attack
-            if attack == "aura":   # a grove never attacks; its timer waits while silenced (above)
-                self._twister(t, dt)
+            if attack == "aura":   # support never attacks; its timer waits while silenced (above)
+                if t.kind.key == "idol":
+                    self._idol(t, dt)
+                elif t.kind.key == "grove":
+                    self._twister(t, dt)
                 t.cooldown = 0.0
                 continue
             stats = t.levels[t.level]
