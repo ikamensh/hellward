@@ -95,7 +95,10 @@ class Ordinary:
                 kind, tile = todo[0]
                 if world.gold < world.cost(kind):
                     return
-                world.build(kind, tile)
+                try:
+                    world.build(kind, tile)
+                except Refused:   # a blighted cell: the plan gives it up and builds on
+                    self.planned.remove((kind, tile))
                 continue
             upgrades = [(t, cost) for t in world.towers.values()
                         if (cost := world.upgrade_cost(t)) is not None and world.rank_needs(t) is None]

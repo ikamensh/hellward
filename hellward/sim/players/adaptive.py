@@ -563,7 +563,7 @@ class Adaptive:
                 continue
             stats = world.tower_levels[kind][0]
             for tile in study.tiles:
-                if tile not in standing:
+                if tile not in standing and tile not in world.blighted:
                     worth = self.worth(kind, 0, stats, tile, self.chilled, self.darts)
                     if radius > 0:
                         worth = score_with_spacing(worth, existing_tiles, tile, world.location)

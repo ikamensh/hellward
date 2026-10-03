@@ -478,6 +478,9 @@ class Warden:
                     world.build_door(step.door)
             elif step.what == "build":
                 if world.tower_at(step.tile) is None:
+                    if step.tile in world.blighted:   # taken ground: the step is skipped, never waited on
+                        self.done += 1
+                        continue
                     kind = step.kind
                     if not self._family_ok(TOWERS[kind].element.value):
                         swapped = self._family_kind(world)
@@ -530,7 +533,8 @@ class Warden:
                 return
             reach = world.tower_levels[kind][1].range
             free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
-                    if world.level.buildable(x, y) and world.tower_at((x, y)) is None]
+                    if world.level.buildable(x, y) and world.tower_at((x, y)) is None
+                    and (x, y) not in world.blighted]
             if not free:
                 return
             world.build(kind, max(free, key=lambda t: (tile_value(location, kind, t, reach), -t[1], -t[0])))

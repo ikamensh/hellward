@@ -135,6 +135,7 @@ class Planned:
     next: int = 0              # the plan's next step
     gates: set[int] = field(default_factory=set)   # arches the plan has warded, to ward again when broken
     relocated: set[tuple[int, int]] = field(default_factory=set)   # planned towers sold to follow the final boss
+    skipped: set[tuple[int, int]] = field(default_factory=set)   # planned towers never built: their cell was taken
     clock: float = 0.0
     look: float = 0.0
     last_aim: float = -1e9
@@ -182,13 +183,17 @@ class Planned:
             step = steps[self.next]
             if step[0] == "build":
                 if world.tower_at(step[2]) is None:
+                    if step[2] in world.blighted:   # taken ground: the step is skipped, never waited on
+                        self.skipped.add(step[2])
+                        self.next += 1
+                        continue
                     if world.gold < world.cost(step[1]):
                         return
                     world.build(step[1], step[2])
             elif step[0] == "rank":
                 tower = world.tower_at(step[1])
                 if tower is None:
-                    assert step[1] in self.relocated
+                    assert step[1] in self.relocated or step[1] in self.skipped
                     self.next += 1
                     continue
                 price = world.upgrade_cost(tower)
@@ -223,7 +228,8 @@ class Planned:
         for y in range(world.level.height):
             for x in range(world.level.width):
                 tile = x, y
-                if not world.level.buildable(x, y) or world.tower_at(tile) is not None:
+                if (not world.level.buildable(x, y) or world.tower_at(tile) is not None
+                        or tile in world.blighted):
                     continue
                 covered = 0.0
                 for start, end in route.coverage(tile, reach):
