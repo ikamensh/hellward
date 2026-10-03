@@ -412,8 +412,8 @@ def _report(summaries: list[dict], immortal: bool) -> list[str]:
             losses[summary["loss_at"]] = losses.get(summary["loss_at"], 0) + 1
     if losses:
         lines.append("losses: " + ", ".join(f"{key} {count}" for key, count in sorted(losses.items())))
-    tree = sum(s["tree"] for s in summaries) / len(summaries)
-    lines.append(f"mean tree opened: {tree:.0%}")
+    opened = sum(s["tree"] for s in summaries) / len(summaries)
+    lines.append(f"mean tree opened: {opened:.0%}")
     top = max(s["level"] for s in summaries)
     lines.append(f"tree over a perfect run's points: {tree.TREE_COST}/{72 + top} = "
                  f"{tree.TREE_COST / (72 + top):.2f}x (M4: at least 2.5x)")
