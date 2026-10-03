@@ -24,6 +24,9 @@ var _ghost: Node3D
 var _ghost_mat: StandardMaterial3D
 var _tile_mark: MeshInstance3D
 var _reach_mark: MeshInstance3D
+var _field: MeshInstance3D            # the whole map's buildability, while a tower is held: green floor, ember lanes
+var _arch_marks: Array = []           # a diamond over every gate socket, while the gate is held
+var _staged := Vector2i(-1, -1)       # a staged cursor tile (captures, tests): the mouse's stead while set
 var _mouse := Vector2(-1, -1)        # the mouse in the viewport's pixels, as its last motion put it
 
 
@@ -39,7 +42,10 @@ func setup(w: World, h: Hud, r: CameraRig) -> void:
 	_ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_ghost_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_ghost_mat.albedo_color = Color(0.5, 1.0, 0.6, 0.35)
+	_build_field()
+	_build_arches()
 	world.towers_changed.connect(_forget_gone)
+	_stage_args()
 
 
 func _marker(square: bool) -> MeshInstance3D:
@@ -74,6 +80,7 @@ func hold(what: String) -> void:
 	choose(null)
 	let_go()
 	held = what
+	hud.set_held(what)
 	if what == "gate":
 		return
 	_ghost = Models.make(Tower.model_name(what, 0))
@@ -89,11 +96,16 @@ func hold(what: String) -> void:
 
 func let_go() -> void:
 	held = ""
+	_staged = Vector2i(-1, -1)
 	if _ghost:
 		_ghost.queue_free()
 		_ghost = null
 	_tile_mark.visible = false
 	_reach_mark.visible = false
+	_field.visible = false
+	_set_arches(false)
+	hud.set_held("")
+	hud.build_hint("", Vector2.ZERO, false)
 
 
 func choose(t: Tower) -> void:
@@ -129,38 +141,85 @@ func _ground_at(screen: Vector2) -> Vector3:
 
 
 func _process(_delta: float) -> void:
-	var p := _ground_at(_mouse)
+	var p := world.level.tile_pos(_staged) if _staged.x >= 0 else _ground_at(_mouse)
 	var tile := world.level.tile_at(p)
 	hud.hover(null if held != "" and not held.begins_with("spell:") else monster_at(_mouse), _mouse)
+	_field.visible = held != "" and not held.begins_with("spell:") and held != "gate"
+	_set_arches(held == "gate")
 	if held == "" or held == "gate":
 		_tile_mark.visible = held == "gate" and _arch_at(tile) >= 0
 		if _tile_mark.visible:
 			_tile_mark.global_position = world.level.tile_pos(tile) + Vector3(0, 0.06, 0)
+		if held == "gate":
+			hud.build_hint("Ward this arch" if _arch_at(tile) >= 0 else "Click a glowing arch", _screen(p), false)
+		else:
+			hud.build_hint("", Vector2.ZERO, false)
 		_hover(tile)
 		return
 	if held.begins_with("spell:"):
-		var spell: Dictionary = world.start["spells"][held.substr(6)]
-		if String(spell["aim"]) == "tower":   # the tower under the mouse lights up, its tile marked
-			var t := world.tower_at(tile)
-			_tile_mark.visible = t != null
-			_reach_mark.visible = false
-			if t:
-				_tile_mark.global_position = world.level.tile_pos(tile) + Vector3(0, 0.06, 0)
-				(_tile_mark.material_override as ShaderMaterial).set_shader_parameter("color", Color(Hud.SPELL_TONES[held.substr(6)], 0.95))
-			return
-		var radius: float = max(float(spell["radius"]), 0.6) * Level.TILE
-		_show_reach(Vector3(p.x, 0, p.z), radius, Color(0.6, 0.8, 1.0, 0.9))
+		_spell_mark(held.substr(6), p, tile)
 		return
-	var ok := world.level.buildable(tile) and world.tower_at(tile) == null and world.gold >= world.tower_cost(held)
+	var state := ghost_state(held, tile)
 	var at := world.level.tile_pos(tile)
 	_ghost.visible = world.level.cell(tile) != "#"
 	_ghost.global_position = at
-	_ghost_mat.albedo_color = Color(0.5, 1.0, 0.6, 0.35) if ok else Color(1.0, 0.3, 0.25, 0.35)
+	var colour := Color(0.5, 1.0, 0.6, 0.9) if state == "ok" else \
+		(Color(1.0, 0.72, 0.3, 0.9) if state == "poor" else Color(1.0, 0.35, 0.3, 0.9))
+	_ghost_mat.albedo_color = Color(colour, 0.35)
 	_tile_mark.visible = _ghost.visible
 	_tile_mark.global_position = at + Vector3(0, 0.06, 0)
-	var colour := Color(0.5, 1.0, 0.6, 0.9) if ok else Color(1.0, 0.35, 0.3, 0.9)
 	(_tile_mark.material_override as ShaderMaterial).set_shader_parameter("color", colour)
 	_show_reach(at, float(world.tower_table(held)["levels"][0]["range"]) * Level.TILE, colour)
+	var hint := ""
+	match state:
+		"ground":
+			hint = "Bare floor only"
+		"taken":
+			hint = "Occupied"
+		"poor":
+			hint = "%s costs %d gold" % [world.tower_table(held)["name"], world.tower_cost(held)]
+	hud.build_hint(hint, _screen(p), state != "ok")
+
+
+## This side's guess at whether a tower of `kind` would rise on `tile`: ok, ground (no floor), taken (a tower
+## stands there) or poor (the purse is short). The server decides; the ghost only guesses.
+func ghost_state(kind: String, tile: Vector2i) -> String:
+	if not world.level.buildable(tile):
+		return "ground"
+	if world.tower_at(tile) != null:
+		return "taken"
+	if world.gold < world.tower_cost(kind):
+		return "poor"
+	return "ok"
+
+
+## A held spell's mark and its cursor hint: a tower-aimed one lights the tower under the cursor, others their ring.
+func _spell_mark(key: String, p: Vector3, tile: Vector2i) -> void:
+	var spell: Dictionary = world.start["spells"][key]
+	if String(spell["aim"]) == "tower":   # the tower under the mouse lights up, its tile marked
+		var t := world.tower_at(tile)
+		_tile_mark.visible = t != null
+		_reach_mark.visible = false
+		if t:
+			_tile_mark.global_position = world.level.tile_pos(tile) + Vector3(0, 0.06, 0)
+			(_tile_mark.material_override as ShaderMaterial).set_shader_parameter("color", Color(Hud.SPELL_TONES[key], 0.95))
+		hud.build_hint("Sing over the %s" % t.title() if t else "Sing over a tower", _screen(p), false)
+		return
+	var radius: float = max(float(spell["radius"]), 0.6) * Level.TILE
+	_tile_mark.visible = false
+	_show_reach(Vector3(p.x, 0, p.z), radius, Color(0.6, 0.8, 1.0, 0.9))
+	if key == "smite":
+		var m := _monster_near(p)
+		hud.build_hint("Smite the %s" % m.title() if m else "Smite a monster", _screen(p), false)
+	elif key == "meteor":
+		hud.build_hint("Burn an area", _screen(p), false)
+	else:
+		hud.build_hint("Aim the %s" % spell["name"], _screen(p), false)
+
+
+## A ground point on the screen, in window pixels for the HUD's cursor tag.
+func _screen(p: Vector3) -> Vector2:
+	return get_viewport().get_final_transform() * rig.cam.unproject_position(p)
 
 
 ## With nothing held, the tower under the mouse shows its reach faintly; the chosen tower's stays bright.
@@ -272,6 +331,7 @@ func _spell(key: String) -> void:
 	choose(null)
 	let_go()
 	held = "spell:" + key
+	hud.set_held(held)
 	Sfx.play("click")
 
 
@@ -286,11 +346,7 @@ func _cast(key: String, p: Vector3, shift: bool) -> void:
 			return
 		ok = await world.order(key, {"tower": t.id})
 	elif key == "smite":
-		var best: Monster = null
-		for m in world.monsters.values():
-			if m.alive() and Vector2(m.global_position.x - p.x, m.global_position.z - p.z).length() < Level.TILE * 1.2 \
-					and (best == null or m.global_position.distance_to(p) < best.global_position.distance_to(p)):
-				best = m
+		var best := _monster_near(p)
 		if best == null:
 			Sfx.play("refuse")
 			world.refused.emit("Smite strikes a monster: click on one.")
@@ -323,3 +379,139 @@ func _order(name: String) -> void:
 				world.order("breach", {"mode": name.substr(7)})
 			elif name.begins_with("spell:"):
 				hold(name)
+
+
+## The living monster nearest a ground point, within a smite's reach of it; or null.
+func _monster_near(p: Vector3) -> Monster:
+	var best: Monster = null
+	for m in world.monsters.values():
+		if m.alive() and Vector2(m.global_position.x - p.x, m.global_position.z - p.z).length() < Level.TILE * 1.2 \
+				and (best == null or m.global_position.distance_to(p) < best.global_position.distance_to(p)):
+			best = m
+	return best
+
+
+## The whole map's buildability as one flat mesh: green on the bare floor, ember on the lanes, nothing elsewhere.
+func _build_field() -> void:
+	var lv := world.level
+	var verts := PackedVector3Array()
+	var colors := PackedColorArray()
+	var idx := PackedInt32Array()
+	for y in lv.height:
+		for x in lv.width:
+			var c := lv.cell(Vector2i(x, y))
+			var tone := Color(0.35, 1.0, 0.5, 0.14) if c == "." else \
+				(Color(1.0, 0.45, 0.15, 0.20) if c == "P" else Color(0, 0, 0, 0))
+			if tone.a <= 0.0:
+				continue
+			var x0 := x * Level.TILE
+			var z0 := y * Level.TILE
+			var x1 := x0 + Level.TILE
+			var z1 := z0 + Level.TILE
+			var base := verts.size()
+			verts.append_array([Vector3(x0, 0.05, z0), Vector3(x0, 0.05, z1), Vector3(x1, 0.05, z1),
+				Vector3(x1, 0.05, z0)])
+			for i in 4:
+				colors.append(tone)
+			idx.append_array([base, base + 1, base + 2, base, base + 2, base + 3])
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = idx
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_field = MeshInstance3D.new()
+	_field.mesh = mesh
+	var m := StandardMaterial3D.new()
+	m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	m.vertex_color_use_as_albedo = true
+	m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	_field.material_override = m
+	_field.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_field.visible = false
+	add_child(_field)
+
+
+## A gold diamond over every gate socket, shown while the gate is held.
+func _build_arches() -> void:
+	for a in world.level.arches:
+		var d := _marker(true)
+		d.rotation.y = PI / 4
+		d.global_position = world.level.tile_pos(a[1]) + Vector3(0, 0.07, 0)
+		(d.material_override as ShaderMaterial).set_shader_parameter("color", Color(1.0, 0.8, 0.4, 0.95))
+		_arch_marks.append(d)
+
+
+func _set_arches(on: bool) -> void:
+	for d in _arch_marks:
+		d.visible = on
+
+
+## A staged moment for captures and tests: "build=arrow@14,7" orders towers ("+" joins several), "ghost=arrow@14,7"
+## holds one with the cursor staged on its tile (a spell's key or "gate" likewise), "choose=@14,7" chooses the
+## tower there. Every order still goes to the server; the ghost is only this side's guess.
+func stage(spec: String) -> void:
+	var kv := spec.split("=", true, 1)
+	if kv.size() < 2:
+		return
+	if kv[0] == "build":
+		_stage_builds(kv[1])
+	elif kv[0] == "ghost":
+		var g := _parse_staging(kv[1])
+		if String(g[0]) == "" or (g[1] as Vector2i).x < 0:
+			return
+		if String(g[0]) in world.start["spells"]:
+			hold("spell:" + String(g[0]))
+		else:
+			hold(String(g[0]))
+		_staged = g[1]
+	elif kv[0] == "choose":
+		_stage_choose(kv[1])
+
+
+## The command line's staged moment: builds first, each awaited, then the hold and the choice.
+func _stage_args() -> void:
+	var builds: Array = []
+	var after: Array = []
+	for a in OS.get_cmdline_user_args():
+		var kv := a.split("=", true, 1)
+		if kv.size() < 2:
+			continue
+		if kv[0] == "build":
+			builds.append(kv[1])
+		elif kv[0] == "ghost" or kv[0] == "choose":
+			after.append(a)
+	if builds.is_empty() and after.is_empty():
+		return
+	for b in builds:
+		await _stage_builds(String(b))
+	for a in after:
+		stage(a)
+		await get_tree().process_frame
+
+
+func _stage_builds(list: String) -> void:
+	for one in list.split("+"):
+		var b := _parse_staging(one)
+		if String(b[0]) != "" and (b[1] as Vector2i).x >= 0:
+			await world.order("build", {"kind": b[0], "tile": [b[1].x, b[1].y]})
+
+
+func _stage_choose(spec: String) -> void:
+	var c := _parse_staging(spec)
+	await get_tree().process_frame
+	await get_tree().process_frame
+	choose(world.tower_at(c[1]))
+
+
+## "arrow@14,7" into [kind, tile]; "@14,7" into ["", tile]; anything else into ["", (-1, -1)].
+func _parse_staging(spec: String) -> Array:
+	var halves := spec.split("@", true, 1)
+	if halves.size() < 2:
+		return ["", Vector2i(-1, -1)]
+	var xy := halves[1].split(",")
+	if xy.size() < 2 or not xy[0].is_valid_int() or not xy[1].is_valid_int():
+		return ["", Vector2i(-1, -1)]
+	return [halves[0], Vector2i(int(xy[0]), int(xy[1]))]

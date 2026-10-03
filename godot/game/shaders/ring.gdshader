@@ -13,11 +13,13 @@ void vertex() {
 }
 
 void fragment() {
+	float pulse = 0.93 + 0.07 * sin(TIME * 2.5);
 	float a;
 	if (square) {
 		vec2 d = abs(local);
 		float e = max(d.x, d.y);
-		a = smoothstep(0.82, 0.95, e) * step(e, 1.0) * 0.9 + 0.12;
+		float edge = smoothstep(0.78, 0.85, e) * (1.0 - smoothstep(0.995, 1.0, e));
+		a = edge * 0.95 + 0.22 * (1.0 - smoothstep(0.9, 1.0, e));
 	} else {
 		float r = length(local);
 		a = smoothstep(radius - 0.12, radius - 0.03, r) * smoothstep(radius + 0.06, radius - 0.02, r);
@@ -25,5 +27,5 @@ void fragment() {
 		a *= 0.75 + 0.25 * sin(atan(local.y, local.x) * 24.0 + TIME * 2.0);
 	}
 	ALBEDO = color.rgb * 1.6;
-	ALPHA = a * color.a;
+	ALPHA = a * color.a * pulse;
 }
