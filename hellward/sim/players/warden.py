@@ -446,7 +446,7 @@ class Warden:
 
     def _family_kind(self, world: World) -> str | None:
         """The hardest-hitting tower of the pursued family, or None when the arsenal holds none unlocked."""
-        kinds = [k for k in world.location.arsenal.towers
+        kinds = [k for k in world.arsenal.towers
                  if k not in world.perks.locked and self._family_ok(TOWERS[k].element.value)]
         return max(kinds, key=_dps) if kinds else None
 
@@ -545,7 +545,7 @@ class Warden:
         world = hands.world
         if not world.monsters:
             return
-        spells = world.location.arsenal.spells
+        spells = world.arsenal.spells
         if "hymn" in spells:
             self._hymn(hands)
         if world.time - self.last_aim < self.aim_gap - 1e-9:
@@ -566,7 +566,7 @@ class Warden:
     def _spill(self, hands: Hands) -> None:
         """The orb is full: a Meteor on a lesser crowd, or a Smite on a leader or the monster it hurts most."""
         world = hands.world
-        spells = world.location.arsenal.spells
+        spells = world.arsenal.spells
         if "meteor" in spells and self._meteor(hands, FULL_BITE):
             return
         if not ready(world, "smite"):
@@ -583,7 +583,7 @@ class Warden:
         coming while the count is short, a Smite still in hand."""
         world = hands.world
         chase = world.wave >= 1 and self.hymns < self.hymn_chase
-        keep = world.spell_cost("smite") if "smite" in world.location.arsenal.spells else 0.0
+        keep = world.spell_cost("smite") if "smite" in world.arsenal.spells else 0.0
         if not ready(world, "hymn", spare=keep):
             return
         best, best_value = None, 0.0
@@ -667,7 +667,7 @@ class Warden:
         """A Meteor where the monsters will stand when it lands, if it would take ``bite`` blows' worth of life."""
         world = hands.world
         cost = world.spell_cost("meteor")
-        reserve = world.spell_cost("smite") if "smite" in world.location.arsenal.spells else 0.0
+        reserve = world.spell_cost("smite") if "smite" in world.arsenal.spells else 0.0
         if not ready(world, "meteor") or (world.mana < cost + reserve and world.mana < world.mana_max - FULL):
             return False
         spec = SPELLS["meteor"]

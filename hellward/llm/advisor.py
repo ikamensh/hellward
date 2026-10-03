@@ -136,7 +136,7 @@ def wave_brief(world: World, wave: int) -> str:
     if leaders:
         tricks.append("leaders: " + ",".join(leaders))
     ranked = []
-    for key in world.location.arsenal.towers:
+    for key in world.arsenal.towers:
         if TOWERS[key].attack in SUPPORT:
             continue
         dealt = dps_vs(world, key, 0, kinds) / world.cost(key)
@@ -161,7 +161,7 @@ def upgrade_value(world: World, tile: tuple[int, int]) -> str:
     now = dps_vs(world, tower.kind.key, tower.level, kinds)
     nxt = dps_vs(world, tower.kind.key, tower.level + 1, kinds)
     options = [(100 * (nxt - now) / cost, f"rank {tower.kind.key} to {tower.level + 2}")]
-    for key in world.location.arsenal.towers:
+    for key in world.arsenal.towers:
         if TOWERS[key].attack in SUPPORT:
             continue
         options.append((100 * dps_vs(world, key, 0, kinds) / world.cost(key), f"new {key}"))

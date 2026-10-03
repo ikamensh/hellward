@@ -60,7 +60,7 @@ class Ordinary:
     def plan(self, world: World) -> None:
         tiles = [tile for _, tile in tile_scores(world)]
         rotation = [kind for kind in self.rotation
-                    if kind in world.location.arsenal.towers and kind not in world.perks.locked]
+                    if kind in world.arsenal.towers and kind not in world.perks.locked]
         self.planned = [(rotation[(i + self.shift) % len(rotation)], tile) for i, tile in enumerate(tiles[:self.towers])]
 
     def skills(self, location: Location, sigils: int) -> frozenset[str]:
@@ -75,7 +75,7 @@ class Ordinary:
             self.plan(world)
         if self.hymn:
             self._hymn(hands)
-        if self.doors and world.location.arsenal.gates and world.wave >= 1:
+        if self.doors and world.arsenal.gates and world.wave >= 1:
             for door in world.doors:
                 if not door.built and not door.rubble and world.gold >= world.door_cost + world.cost("arrow"):
                     try:

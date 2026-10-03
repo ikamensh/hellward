@@ -107,6 +107,15 @@ def test_a_clone_copies_the_derived_perks_and_baked_ranks():
     assert clone.perks == world.perks and clone.tower_levels is world.tower_levels
 
 
+def test_the_kit_deals_the_arsenal_the_world_reads():
+    from hellward.sim.campaign import Arsenal
+    deal = Arsenal(("arrow",), False, ("smite",))
+    world = Kit(LOCATIONS["tristram"], arsenal=deal).world()
+    assert world.arsenal == deal
+    assert world.clone().arsenal == deal
+    assert Kit(LOCATIONS["tristram"]).arsenal == LOCATIONS["tristram"].arsenal
+
+
 def test_a_plan_searched_on_something_else_is_refused(tmp_path, monkeypatch):
     assert planned.check(LOCATIONS["tristram"]).map == planned.fingerprint(LOCATIONS["tristram"])
     monkeypatch.setattr(planned, "PLANS", tmp_path)

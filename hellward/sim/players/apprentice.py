@@ -61,7 +61,7 @@ class Apprentice(Ordinary):
                 except Refused:
                     pass
                 return
-        if ("meteor" in world.location.arsenal.spells and world.mana >= METEOR_SPARE
+        if ("meteor" in world.arsenal.spells and world.mana >= METEOR_SPARE
                 and world.mana >= world.spell_cost("meteor")):
             at = self._crowd(hands)
             if at is not None:
@@ -72,7 +72,7 @@ class Apprentice(Ordinary):
 
     def _hymn(self, hands: Hands) -> None:
         world = hands.world
-        keep = world.spell_cost("smite") if "smite" in world.location.arsenal.spells and world.leaders() else 0.0
+        keep = world.spell_cost("smite") if "smite" in world.arsenal.spells and world.leaders() else 0.0
         if world.mana - keep >= world.spell_cost("hymn"):
             super()._hymn(hands)
 

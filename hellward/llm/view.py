@@ -189,7 +189,7 @@ def status(world: World, *, full: bool = False) -> str:
     """The purse, towers, gates, spells, breach offer and the next wave."""
     lines = [purse(world)]
     lines.append(towers_full(world) if full else towers_brief(world))
-    if world.location.arsenal.gates:
+    if world.arsenal.gates:
         rows = []
         for d in world.doors:
             state = "rubble" if d.rubble else ("gate" if d.built else "empty")
@@ -197,7 +197,7 @@ def status(world: World, *, full: bool = False) -> str:
             rows.append(f"d{d.index}{hp} {state}")
         lines.append("doors: " + "; ".join(rows))
     spells = []
-    for key in world.location.arsenal.spells:
+    for key in world.arsenal.spells:
         left = world.recharge.get(key, 0.0)
         spells.append(f"{key} {'READY' if left < 0.05 else f'{left:.0f}s'}")
     lines.append("spells: " + " ".join(spells))

@@ -27,7 +27,7 @@ from hellward.sim.balance import BALANCE
 from hellward.sim.bonus import Bonus, BonusPack
 from hellward.sim.bonus import EARLY as BONUS_EARLY
 from hellward.sim.breaches import BREACHES
-from hellward.sim.campaign import CATHEDRAL, ORDER, Location
+from hellward.sim.campaign import CATHEDRAL, ORDER, Arsenal, Location
 from hellward.sim.content import (
     BURN_RADIUS, CONTAGION_REACH, CORPSE_RADIUS, CORPSE_SHARE, CURSES, DOOR, EARLY_CALL_GOLD, HURRICANE_RADIUS,
     HURRICANE_SLOW, MANA_START, MAX_POISON_STACKS, MONSTERS, SELL_REFUND, SHATTER_RADIUS, SHATTER_SHARE, SOUL, SPELLS,
@@ -307,8 +307,10 @@ Planner = Callable[["World", int], Any]   # returns a handle with .result() -> D
 class World:
     def __init__(self, location: Location = CATHEDRAL, *, hardness: float = 1.0, perks: Perks = NO_PERKS,
                  seed: int = 0, planner: Planner | None = None, record: bool = True, curse_scale: float = 1.0,
-                 loadout: Loadout = EMPTY_LOADOUT, xp: float = 0.0, xp_level: int = 1) -> None:
+                 loadout: Loadout = EMPTY_LOADOUT, xp: float = 0.0, xp_level: int = 1,
+                 arsenal: Arsenal | None = None) -> None:
         self.location = location
+        self.arsenal = location.arsenal if arsenal is None else arsenal
         self.stage = ORDER.index(location.key)
         self.level = location.level
         self.waves = location.waves
@@ -375,7 +377,7 @@ class World:
     def clone(self) -> World:
         """A private copy to look ahead in: no events, no planner, its own random stream."""
         w = World(self.location, hardness=self.hardness, perks=self.perks, record=False, curse_scale=self.curse_scale,
-                  loadout=self.loadout)
+                  loadout=self.loadout, arsenal=self.arsenal)
         w.tower_levels = self.tower_levels   # the derived ranks are copied, not rebuilt
         w.rng.setstate(self.rng.getstate())
         w.route_rng.setstate(self.route_rng.getstate())
@@ -550,7 +552,7 @@ class World:
 
     def build(self, kind: str, tile: tuple[int, int]) -> Tower:
         tower_kind = TOWERS[kind]
-        if kind not in self.location.arsenal.towers:
+        if kind not in self.arsenal.towers:
             raise Refused(f"No {tower_kind.name} can be raised in {self.location.called}.")
         if kind in self.perks.locked:
             key = UNLOCK[kind]
@@ -627,7 +629,7 @@ class World:
         return gold
 
     def build_door(self, index: int) -> None:
-        if not self.location.arsenal.gates:
+        if not self.arsenal.gates:
             raise Refused(f"There are no arches to ward in {self.location.called}.")
         door = self.doors[index]
         if door.built:
@@ -646,7 +648,7 @@ class World:
         self._emit("door_built", index)
 
     def _spend(self, key: str) -> None:
-        if key not in self.location.arsenal.spells:
+        if key not in self.arsenal.spells:
             raise Refused(f"{SPELLS[key].name} is not yours to cast in {self.location.called}.")
         if key in self.perks.locked:
             raise Refused(f"{SPELLS[key].name} is locked: learn {SKILLS[SPELL_UNLOCK[key]].name} first.")

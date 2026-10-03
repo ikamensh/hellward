@@ -284,7 +284,7 @@ class Planned:
         """The dearest tower with monsters about it, while a Smite stays in hand for a leader."""
         assert self.plan is not None
         world = hands.world
-        keep = self.plan.reserve if "smite" in world.location.arsenal.spells and world.leaders() else 0.0
+        keep = self.plan.reserve if "smite" in world.arsenal.spells and world.leaders() else 0.0
         if not self._can(world, "hymn", keep):
             return
         busy = [t for t in world.towers.values()
@@ -299,7 +299,7 @@ class Planned:
         if not world.monsters or not self._aim_ready(world):
             return
         plan = self.plan
-        spare = plan.reserve if "smite" in world.location.arsenal.spells and world.leaders() else 0.0
+        spare = plan.reserve if "smite" in world.arsenal.spells and world.leaders() else 0.0
         full = world.mana >= world.mana_max - 2.0
         if self._can(world, "orb", spare) and self._save_gate(hands):
             return

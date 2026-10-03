@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from hellward.sim.campaign import ORDER, Location
+from hellward.sim.campaign import ORDER, Arsenal, Location
 from hellward.sim.items import EMPTY_LOADOUT, Loadout
 from hellward.sim.model import START_LIVES, Planner, World
 from hellward.sim.skills import perks
@@ -33,10 +33,13 @@ class Kit:
     xp: float = 0.0         # the run's progress to the next level: the world counts on from here
     level: int = 1          # the run's level: with the curve, the world knows every threshold past it
     xp_next: float = 0.0    # the XP to the next level at the deal, for the client's bar
+    arsenal: Arsenal | None = None   # the defence's towers, gates and spells; the location's unless dealt otherwise
 
     def __post_init__(self) -> None:
         if self.xp_next <= 0:   # reckoned, so the client's bar never reads a bare zero
             object.__setattr__(self, "xp_next", xp_next(self.level))
+        if self.arsenal is None:   # the campaign's arsenal, until a run deals its own
+            object.__setattr__(self, "arsenal", self.location.arsenal)
 
     def world(self, *, hardness: float = 1.0, curse_scale: float = 1.0, record: bool = True,
               planner: Planner | None = None) -> World:
@@ -44,7 +47,7 @@ class Kit:
         stage = ORDER.index(self.location.key)
         world = World(self.location, hardness=hardness, perks=perks(self.learned, stage), seed=self.seed,
                       planner=planner, record=record, curse_scale=curse_scale, loadout=self.loadout,
-                      xp=self.xp, xp_level=self.level)
+                      xp=self.xp, xp_level=self.level, arsenal=self.arsenal)
         world.gold = self.gold
         world.lives = self.lives
         return world

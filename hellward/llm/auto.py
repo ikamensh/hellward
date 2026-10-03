@@ -92,7 +92,7 @@ class Autos:
                 return
 
     def _hymn(self, world: World) -> None:
-        spare = world.spell_cost("smite") if "smite" in world.location.arsenal.spells else 0.0
+        spare = world.spell_cost("smite") if "smite" in world.arsenal.spells else 0.0
         if not ready(world, "hymn", spare=spare):
             return
         best, load = None, HYMN_LOAD

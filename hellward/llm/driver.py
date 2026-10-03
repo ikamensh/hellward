@@ -255,7 +255,7 @@ class Session:
             raise ValueError("`build <kind> <x> <y>`")
         kind = args[0].lower()
         if kind not in TOWERS:
-            raise ValueError(f"no tower {kind!r} (offered: {', '.join(self.world.location.arsenal.towers)})")
+            raise ValueError(f"no tower {kind!r} (offered: {', '.join(self.world.arsenal.towers)})")
         tile = (int(args[1]), int(args[2]))
         self._order("build", {"kind": kind, "tile": [tile[0], tile[1]]})
         tower = self.world.tower_at(tile)
@@ -378,8 +378,8 @@ class Session:
         if args[0] == "up":
             return advisor.upgrade_value(self.world, self._tile(args[1:]))
         kind = args[0].lower()
-        if kind not in TOWERS or kind not in self.world.location.arsenal.towers:
-            raise ValueError(f"no {kind!r} here (offered: {', '.join(self.world.location.arsenal.towers)})")
+        if kind not in TOWERS or kind not in self.world.arsenal.towers:
+            raise ValueError(f"no {kind!r} here (offered: {', '.join(self.world.arsenal.towers)})")
         count = 5 if len(args) == 1 else int(args[1])
         if len(args) > 2 or not 1 <= count <= 10:
             raise ValueError("`advise <kind> [N]`, N 1..10")
@@ -524,13 +524,13 @@ class Session:
         so a digest rarely needs a `status` and an `advise` after it."""
         world = self.world
         gold = world.gold
-        afford = [k for k in world.location.arsenal.towers if world.cost(k) <= gold]
-        if (world.location.arsenal.gates and world.door_cost <= gold
+        afford = [k for k in world.arsenal.towers if world.cost(k) <= gold]
+        if (world.arsenal.gates and world.door_cost <= gold
                 and any(not d.built for d in world.doors)):
             afford.append("gate")
         if not afford:
-            cheapest = min([world.cost(k) for k in world.location.arsenal.towers]
-                           + ([world.door_cost] if world.location.arsenal.gates else []))
+            cheapest = min([world.cost(k) for k in world.arsenal.towers]
+                           + ([world.door_cost] if world.arsenal.gates else []))
             return f"hold ({gold}g; cheapest {cheapest}g)"
         best: tuple[str, str, float] | None = None
         for kind in afford:

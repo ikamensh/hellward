@@ -79,7 +79,7 @@ class Record:
 def ready(world: World, spell: str, spare: float = 0.0) -> bool:
     """Whether a spell can be cast now, as its slot on the panel shows: offered here, its unlock learned,
     gathered again after its last cast, and paid for with ``spare`` mana still in hand."""
-    return (spell in world.location.arsenal.spells and spell not in world.perks.locked
+    return (spell in world.arsenal.spells and spell not in world.perks.locked
             and world.recharge.get(spell, 0.0) <= 0 and world.mana - spare >= world.spell_cost(spell))
 
 

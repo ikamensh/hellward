@@ -97,7 +97,7 @@ def refund(t: Tower) -> int:
 
 def state(world: World) -> dict:
     """The purse, the clocks and what can be done now."""
-    arsenal = world.location.arsenal
+    arsenal = world.arsenal
     breach = None
     if world.breach_spec is not None:
         breach = {"offered": world.breach_offered, "mode": world.breach_mode, "remaining": world.breach_remaining,
@@ -224,7 +224,7 @@ def hits(world: World, kind: MonsterKind) -> dict[str, list[int]]:
     """The hit each rank of every tower offered here that strikes blows deals this kind, as the monster feels it
     (its armor and tags, no other factor): the hover's table, by the simulation's own reckoning."""
     out = {}
-    for key in world.location.arsenal.towers:
+    for key in world.arsenal.towers:
         if key in world.perks.locked:
             continue
         tower = TOWERS[key]

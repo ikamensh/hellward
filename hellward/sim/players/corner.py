@@ -114,7 +114,7 @@ class Corner:
 
     def _plan(self, world: World) -> None:
         """Choose reachable bend plots, then pack each offered damage tower around them."""
-        towers = [k for k in world.location.arsenal.towers if k not in world.perks.locked]
+        towers = [k for k in world.arsenal.towers if k not in world.perks.locked]
         anchor = "frost" if "frost" in towers else towers[0]
         self._bend_tiles = path_corners(world.level, tower_reach(anchor, world))
         for corner in self._bend_tiles:
@@ -126,7 +126,7 @@ class Corner:
         """One round: at each corner, one of each other offered damage tower on the free tile nearest the corner that
         sees the most path, so the gold goes out mixed. Whether it planned anything."""
         level = world.level
-        damage_kinds = [k for k in world.location.arsenal.towers if k not in world.perks.locked
+        damage_kinds = [k for k in world.arsenal.towers if k not in world.perks.locked
                         and TOWERS[k].attack not in ("aura", "amplify") and k != "frost"]
         taken = {tile for _, tile in self._planned} | {t.tile for t in world.towers.values()}
         free = [(x, y) for y in range(level.height) for x in range(level.width)
@@ -172,7 +172,7 @@ class Corner:
             hands.hymn(best.id)
 
     def _gates(self, world: World) -> None:
-        if not world.location.arsenal.gates or world.gold < world.door_cost:
+        if not world.arsenal.gates or world.gold < world.door_cost:
             return
         for door in world.doors:
             if not door.built and not door.rubble:

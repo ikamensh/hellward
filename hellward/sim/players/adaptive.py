@@ -422,7 +422,7 @@ class Adaptive:
         pace = [small[b] / tiles[b] if tiles[b] > 0 else 0.0 for b in range(bins)]
         self.view = View(seconds, near, around, worth, venom, poisonable, room, valued, small, pace)
         self.density = {}
-        for tower_kind in world.location.arsenal.towers:
+        for tower_kind in world.arsenal.towers:
             if tower_kind in world.perks.locked:
                 continue
             for level, stats in enumerate(world.tower_levels[tower_kind]):
@@ -558,7 +558,7 @@ class Adaptive:
         standing = {t.tile for t in world.towers.values()}
         existing_tiles = list(standing)
         radius = max_curse_radius(world.location)
-        for kind in world.location.arsenal.towers:
+        for kind in world.arsenal.towers:
             if kind in world.perks.locked:
                 continue
             stats = world.tower_levels[kind][0]
@@ -692,7 +692,7 @@ class Adaptive:
         return bool(self.firepower) and any(self.firepower[b] > 0 for b in self.study.queue_bins[index])
 
     def _gates(self, world: World) -> None:
-        if not world.location.arsenal.gates or world.gold < world.door_cost:
+        if not world.arsenal.gates or world.gold < world.door_cost:
             return
         for d in world.doors:
             if not d.built and not d.rubble and self._guarded(d.index) and world.gold >= world.door_cost:
@@ -721,7 +721,7 @@ class Adaptive:
 
     def _reserve(self, world: World) -> float:
         """Mana kept for Smite while a leader walks or is still to come in this wave."""
-        if "smite" not in world.location.arsenal.spells:
+        if "smite" not in world.arsenal.spells:
             return 0.0
         coming = any(MONSTERS[key].leader is not None for key, _ in self._to_come(world))
         walking = any(m.kind.leader is not None for m in world.monsters)
@@ -918,7 +918,7 @@ class Study:
             for door in world.doors}
         self._cover: dict[tuple, tuple[tuple[int, float], ...]] = {}
         self.roster = tuple(dict.fromkeys((*world.location.monsters, *(group.kind for group in side_groups))))
-        gates = world.location.arsenal.gates
+        gates = world.arsenal.gates
         counts: dict[tuple[str, str], float] = {}
         groups = (group for wave in world.waves for group in wave.groups)
         for group in (*groups, *side_groups):
