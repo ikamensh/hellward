@@ -17,12 +17,14 @@ from hellward.sim.players.hands import Hands, ready
 from hellward.sim.players.ordinary import Ordinary
 from hellward.sim.skills import SKILLS, can_learn
 
-FIRST = ("adept_fire", "warmth", "adept_cold", "adept_lightning", "holy_shield", "fire_ball",
-         "adept_poison", "adept_arrow", "glacial_spike", "chain_lightning", "soul_harvest",
-         "contagion", "master_fire", "master_cold", "master_lightning", "master_poison", "master_arrow",
-         "blaze", "shatter", "static_field", "lower_resist", "thorns", "spell_mastery",
-         "adept_bone", "corpse_explosion", "master_bone", "life_tap",
-         "adept_nature", "hurricane", "master_nature", "twister")
+FIRST = ("unlock_pyre", "adept_fire", "warmth", "unlock_frost", "adept_cold", "unlock_storm",
+         "adept_lightning", "holy_shield", "fire_ball", "unlock_plague", "adept_poison", "adept_arrow",
+         "unlock_hymn", "glacial_spike", "chain_lightning", "contagion", "master_fire", "master_cold",
+         "master_lightning", "master_poison", "master_arrow", "blaze", "shatter", "static_field",
+         "lower_resist", "thorns", "spell_mastery", "unlock_altar", "adept_bone", "corpse_explosion",
+         "master_bone", "life_tap", "unlock_grove", "adept_nature", "hurricane", "master_nature", "twister",
+         "unlock_ballista", "adept_ballista", "master_ballista", "unlock_hook", "adept_hook", "master_hook",
+         "unlock_knife", "adept_knife", "master_knife", "unlock_orb", "unlock_meteor")
 
 METEOR_CROWD = 4     # others within METEOR_REACH of the aimed monster that make a Meteor worth it
 METEOR_REACH = 1.4   # tiles around the aimed monster

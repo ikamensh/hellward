@@ -19,7 +19,7 @@ from hellward.sim.players.adaptive import ORDERS, Adaptive
 from hellward.sim.players.hands import Hands, defend
 from hellward.sim.players.planned import PLANS, THINK, Plan as PlannedPlan, Planned, load
 from hellward.sim.players.warden import fingerprint, load_plans
-from hellward.sim.skills import SKILLS, can_learn, check, cost
+from hellward.sim.skills import SKILLS, can_learn, check, cost, unlocked
 
 GRAVEYARD_SIGNS = Level("Sign timing", 25, 14, ((0, 10), (10, 10), (10, 3), (24, 3)), ((10, 7),))
 
@@ -43,6 +43,100 @@ def test_the_warden_holds_tristram():
     assert record.landed > 0
 
 
+def test_the_warden_holds_a_wager_back_from_its_build():
+    warden = PLAYERS["warden"](1)
+    warden.reserve = 20
+    world, _ = defend(LOCATIONS["tristram"], warden, seed=1, sigils=0, planner=planner.smart)
+    assert world.outcome == "victory"
+    assert world.gold >= 20
+
+
+def test_the_warden_knows_when_its_build_stands():
+    from hellward.sim.players.warden import Plan as WardenPlan, Warden
+    warden = Warden()
+    assert not warden.built_out
+    warden.skills(LOCATIONS["tristram"], 0)
+    assert warden.built_out == (warden.done >= len(warden.chosen.steps))
+    assert Warden(plan=WardenPlan(frozenset(), ())).built_out is False
+
+
+def test_the_warden_pursuing_a_family_builds_only_its_towers():
+    from hellward.sim.content import TOWERS
+    from hellward.sim.players.warden import Warden
+    warden = Warden(family="physical")
+    events: list = []
+    world, _ = defend(LOCATIONS["tristram"], warden, seed=1, sigils=0, planner=planner.smart,
+                      watch=lambda w: events.extend(w.events))
+    assert world.outcome == "victory"
+    built = [e[2] for e in events if e[0] == "built"]
+    assert built and all(TOWERS[kind].element.value == "physical" for kind in built)
+
+
+def test_the_warden_pursues_a_drawn_family_only_when_its_plan_builds_it():
+    from hellward.sim.players.warden import Plan as WardenPlan, Step, Warden
+    mostly = (Step("build", kind="pyre", tile=(1, 1)), Step("build", kind="pyre", tile=(2, 2)),
+              Step("build", kind="pyre", tile=(3, 3)), Step("build", kind="arrow", tile=(4, 4)))
+    pursuer = Warden(plan=WardenPlan(frozenset({"unlock_pyre"}), mostly), family_goal="fire")
+    pursuer.skills(LOCATIONS["cathedral"], 4)
+    assert pursuer.pursued_family and pursuer.family == "fire"
+    barely = (Step("build", kind="pyre", tile=(1, 1)), Step("build", kind="arrow", tile=(2, 2)),
+              Step("build", kind="arrow", tile=(3, 3)), Step("build", kind="arrow", tile=(4, 4)))
+    forgoer = Warden(plan=WardenPlan(frozenset({"unlock_pyre"}), barely), family_goal="fire")
+    forgoer.skills(LOCATIONS["cathedral"], 4)
+    assert not forgoer.pursued_family and forgoer.family is None
+
+
+def test_the_warden_declines_a_family_of_supports_even_when_its_plan_builds_it():
+    from hellward.sim.players.warden import Plan as WardenPlan, Step, Warden
+    steps = (Step("build", kind="frost", tile=(1, 1)), Step("build", kind="frost", tile=(2, 2)),
+             Step("build", kind="arrow", tile=(3, 3)), Step("build", kind="arrow", tile=(4, 4)))
+    cold = Warden(plan=WardenPlan(frozenset({"unlock_pyre", "unlock_frost"}), steps), family_goal="cold")
+    cold.skills(LOCATIONS["caves"], 9)
+    assert not cold.pursued_family and cold.family is None   # frost alone kills nothing
+    pyre = Warden(plan=WardenPlan(frozenset({"unlock_pyre", "unlock_frost"}), steps), family_goal="!physical")
+    pyre.skills(LOCATIONS["caves"], 9)
+    assert pyre.pursued_family and pyre.family == "!physical"
+
+
+def test_the_warden_abandons_its_family_when_the_defence_bleeds():
+    from hellward.sim.players.warden import FAMILY_BREAK, Warden
+    warden = Warden(family="fire", plans={})
+    events: list = []
+    world, _ = defend(LOCATIONS["cathedral"], warden, seed=1, sigils=4, planner=planner.smart,
+                      watch=lambda w: events.extend(w.events))
+    assert warden.fair_lost >= FAMILY_BREAK
+    assert warden.family is None   # survival builds anything
+    assert {e[2] for e in events if e[0] == "built"} == {"arrow", "pyre"}
+
+
+def test_the_warden_rushing_the_gate_builds_it_before_the_third_wave():
+    from hellward.sim.players.warden import Warden
+    warden = Warden(gate_rush=True)
+    events: list = []
+    world, _ = defend(LOCATIONS["graveyard"], warden, seed=1, sigils=0, planner=planner.smart,
+                      watch=lambda w: events.extend(w.events))
+    assert world.outcome == "victory"
+    first_door = next(i for i, e in enumerate(events) if e[0] == "door_built")
+    third_wave = next(i for i, e in enumerate(events) if e[0] == "wave" and e[1] == 2)
+    assert first_door < third_wave
+    assert warden.rushed
+
+
+def test_the_warden_chasing_the_hymn_casts_past_its_compulsion():
+    from hellward.sim.players.warden import Plan as WardenPlan, Warden, draft_build
+    learned = frozenset({"unlock_pyre", "adept_fire", "unlock_hymn"})
+    casts = []
+    for chase in (0, 5):
+        warden = Warden(plan=WardenPlan(learned, draft_build(LOCATIONS["catacombs"], learned)),
+                        hymn_chase=chase)
+        events: list = []
+        defend(LOCATIONS["catacombs"], warden, seed=1, sigils=10, planner=planner.smart,
+               watch=lambda w: events.extend(w.events))
+        casts.append(sum(1 for e in events if e[0] == "hymn"))
+        assert warden.hymns == casts[-1]
+    assert casts[1] > casts[0]
+
+
 def test_warden_search_starts_at_real_difficulty_when_the_draft_loses():
     assert warden_plans.starting_life(None, [0.0, 0.0, 0.0, 0.0]) == 1.0
     with pytest.raises(ValueError, match="positive"):
@@ -57,6 +151,19 @@ def test_every_stored_warden_plan_is_for_todays_map_and_its_sigils():
         assert plan.map == fingerprint(location), key
         assert cost(plan.skills) <= int(sigils), key
         assert all(s.kind in location.arsenal.towers for s in plan.steps if s.what == "build"), key
+        for step in plan.steps:
+            if step.what == "build":
+                assert unlocked(step.kind, plan.skills), (key, step.kind)
+
+
+def test_every_stored_planned_plan_unlocks_its_builds_first():
+    """A plan whose skills cannot raise its steps' kinds is not played: the unlocks come first."""
+    from hellward.sim.skills import UNLOCK
+    for name in ORDER:
+        plan = load(name)
+        want = {key for kind in {s[1] for s in plan.steps if s[0] == "build"}
+                if (key := UNLOCK[kind]) is not None}
+        assert set(plan.skills[:len(want)]) == want, name
 
 
 def test_warden_plan_is_invalidated_when_the_walkable_hall_changes():
@@ -127,7 +234,7 @@ def test_the_planned_player_holds_temple_with_its_searched_build():
     victories = 0
     failed = []
     for seed in range(1000, 1008):
-        world, _ = defend(LOCATIONS["temple"], PLAYERS["planned"](seed), seed=seed, sigils=33,
+        world, _ = defend(LOCATIONS["temple"], PLAYERS["planned"](seed), seed=seed, sigils=63,
                           planner=planner.smart)
         victories += world.outcome == "victory"
         if world.outcome != "victory":
@@ -281,11 +388,11 @@ def test_plan_search_scores_build_tiles_beside_a_second_entrance():
 def test_planned_player_spends_sigils_only_on_skills_open_at_the_location():
     from hellward.sim.players.planned import Plan, Planned
 
-    plan = Plan(["adept_fire", "master_fire", "fire_ball", "warmth", "soul_harvest"], [], [])
-    early = Planned(plan=plan).skills(LOCATIONS["cathedral"], 6)
-    assert early == frozenset({"adept_fire", "master_fire", "warmth", "soul_harvest"})
-    late = Planned(plan=plan).skills(LOCATIONS["jungle"], 6)
-    assert late == frozenset({"adept_fire", "master_fire", "fire_ball", "warmth"})
+    plan = Plan(["unlock_pyre", "adept_fire", "master_fire", "fire_ball", "warmth"], [], [])
+    early = Planned(plan=plan).skills(LOCATIONS["cathedral"], 16)
+    assert early == frozenset({"unlock_pyre", "adept_fire", "master_fire", "warmth"})
+    late = Planned(plan=plan).skills(LOCATIONS["jungle"], 16)
+    assert late == frozenset({"unlock_pyre", "adept_fire", "master_fire", "fire_ball"})
 
 
 def test_warden_draft_and_search_mutations_cannot_buy_future_skills():
@@ -293,24 +400,23 @@ def test_warden_draft_and_search_mutations_cannot_buy_future_skills():
 
     location = LOCATIONS["cathedral"]
     assert all(SKILLS[key].first_location <= 2 for key in draft_skills(location, 6))
-    chosen = Warden(plan=Plan(frozenset({"adept_fire", "master_fire", "fire_ball"}), ())).skills(location, 6)
-    assert chosen == frozenset({"adept_fire", "master_fire"})
-    mutated = warden_plans.reskill(frozenset({"adept_fire", "master_fire", "fire_ball"}), 6,
+    chosen = Warden(plan=Plan(frozenset({"unlock_pyre", "adept_fire", "master_fire", "fire_ball"}), ())).skills(location, 11)
+    assert chosen == frozenset({"unlock_pyre", "adept_fire", "master_fire"})
+    mutated = warden_plans.reskill(frozenset({"unlock_pyre", "adept_fire", "master_fire", "fire_ball"}), 11,
                                    random.Random(1), stage=2)
     assert all(SKILLS[key].first_location <= 2 for key in mutated)
-    stale = Plan(frozenset({"adept_fire", "master_fire", "fire_ball"}), ())
+    stale = Plan(frozenset({"unlock_pyre", "adept_fire", "master_fire", "fire_ball"}), ())
     assert all(SKILLS[key].first_location <= 2
                for key in warden_plans.mutate(stale, location, 6, random.Random(2)).skills)
 
 
 def test_scripted_players_wait_for_the_local_gate_price(monkeypatch):
-    from hellward.sim.content import DOOR
     from hellward.sim.players.planned import Plan as PlannedPlan, Planned
     from hellward.sim.players.warden import Plan as WardenPlan, Step, Warden
 
     location = LOCATIONS["catacombs"]
     world = World(location)
-    world.gold = DOOR.cost
+    world.gold = world.door_cost - 1
     assert world.gold < world.door_cost
 
     planned = Planned(plan=PlannedPlan([], [("gate", 0)], [100.0] * len(location.waves)))
@@ -458,9 +564,9 @@ def test_a_curse_scale_of_zero_curses_only_the_marked_tile():
     assert [t.tile for t in world.caught(marked, curse_radius(Curse.WEAKEN, MONSTERS["shaman"], world.curse_scale))] == [marked]
 
 
-def test_the_margin_tool_scales_the_locations_own_life_factor(monkeypatch):
+def test_the_margin_tool_scales_every_monsters_life(monkeypatch):
     import margin
     seen = []
-    monkeypatch.setattr(margin, "defend", lambda location, player, **kw: (seen.append(location.life), (type("W", (), {"outcome": "victory"})(), None))[1])
+    monkeypatch.setattr(margin, "defend", lambda location, player, **kw: (seen.append(kw["hp"]), (type("W", (), {"outcome": "victory"})(), None))[1])
     assert margin.wins("apprentice", "graveyard", 1000, 3, "smart", 1.5)
-    assert seen == [LOCATIONS["graveyard"].life * 1.5]
+    assert seen == [1.5]

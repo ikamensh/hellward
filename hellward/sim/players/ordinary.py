@@ -59,7 +59,8 @@ class Ordinary:
 
     def plan(self, world: World) -> None:
         tiles = [tile for _, tile in tile_scores(world)]
-        rotation = [kind for kind in self.rotation if kind in world.location.arsenal.towers]
+        rotation = [kind for kind in self.rotation
+                    if kind in world.location.arsenal.towers and kind not in world.perks.locked]
         self.planned = [(rotation[(i + self.shift) % len(rotation)], tile) for i, tile in enumerate(tiles[:self.towers])]
 
     def skills(self, location: Location, sigils: int) -> frozenset[str]:

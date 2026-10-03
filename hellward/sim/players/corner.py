@@ -92,7 +92,7 @@ class Corner:
                                                          key=lambda k: SKILLS[k].tier)]
         if arsenal.gates:
             order += ["holy_shield", "thorns"]
-        order += ["warmth", "soul_harvest", "spell_mastery"]
+        order += ["warmth", "spell_mastery"]
         learned: frozenset[str] = frozenset()
         for key in [*order, *(k for k in SKILLS if k not in order)]:
             if can_learn(learned, key, sigils, stage):
@@ -114,10 +114,11 @@ class Corner:
 
     def _plan(self, world: World) -> None:
         """Choose reachable bend plots, then pack each offered damage tower around them."""
-        anchor = "frost" if "frost" in world.location.arsenal.towers else world.location.arsenal.towers[0]
+        towers = [k for k in world.location.arsenal.towers if k not in world.perks.locked]
+        anchor = "frost" if "frost" in towers else towers[0]
         self._bend_tiles = path_corners(world.level, tower_reach(anchor, world))
         for corner in self._bend_tiles:
-            if "frost" in world.location.arsenal.towers:
+            if "frost" in towers:
                 self._planned.append(("frost", corner))
             self._pack(world, [corner])
 
@@ -125,8 +126,8 @@ class Corner:
         """One round: at each corner, one of each other offered damage tower on the free tile nearest the corner that
         sees the most path, so the gold goes out mixed. Whether it planned anything."""
         level = world.level
-        damage_kinds = [k for k in world.location.arsenal.towers
-                        if TOWERS[k].attack not in ("aura", "amplify") and k != "frost"]
+        damage_kinds = [k for k in world.location.arsenal.towers if k not in world.perks.locked
+                        and TOWERS[k].attack not in ("aura", "amplify") and k != "frost"]
         taken = {tile for _, tile in self._planned} | {t.tile for t in world.towers.values()}
         free = [(x, y) for y in range(level.height) for x in range(level.width)
                 if level.buildable(x, y) and (x, y) not in taken]

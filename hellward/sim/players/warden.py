@@ -9,10 +9,12 @@ weighed by how much of the host's life its hits can hurt (as the rules feel them
 
 The build is a list of steps (a gate, a tower, a rank) taken in order as the gold comes. A gate that breaks is
 set again as soon as the arch is clear. With the list done, the gold goes to the tower that has had the most
-to shoot at.
+to shoot at. A coming wager's gold can be held back: ``reserve`` keeps that much unspent, though a broken
+gate is still set again (survival spends the savings).
 
 In the fight it watches the leaders: a chanting leader one Smite kills is smitten, its curse dying with it; the
-tower with the most work to do is hymned while a Smite stays in hand; a gate about to break under a crowd gets a
+tower with the most work to do is hymned while a Smite stays in hand; told to pursue a goal, it builds one
+family until the defence bleeds, rushes a gate first, or chants the Hymn past its count; a gate about to break under a crowd gets a
 Frozen Orb; a dense queue gets a Meteor; a monster about to reach the sanctuary with little life left is smitten, and
 a boss draws every Smite a leader can spare. Mana is never left to sit at the top of the orb: a full orb goes on a
 lesser crowd or the monster a Smite hurts most.
@@ -30,7 +32,7 @@ from hellward.sim.content import MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Element, 
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.players.spacing import score_with_spacing
-from hellward.sim.skills import SKILLS, can_learn, kept, perks, tower_levels
+from hellward.sim.skills import SKILLS, UNLOCK, can_learn, kept, perks, tower_levels, unlocked
 
 PLANS = Path(__file__).parent / "plans" / "warden.json"
 THINK = 0.25          # seconds between two looks at the gold
@@ -42,6 +44,9 @@ HYMN_LOAD = 3.0       # monsters in or coming into a tower's reach that make it 
 FULL = 8.0            # mana short of the orb's top at which it is spent on lesser targets rather than wasted
 FULL_BITE = 1.5       # the Meteor's bar then
 QUEUE_FALLOFF = 0.5   # each arch further along the path counts this much less: the first queue fights most
+FAMILY_BREAK = 8      # fair lives lost that abandon a pursued family: survival then builds anything
+FAMILY_BAR = 0.5      # plan build steps already of the drawn family that make it worth pursuing
+FAMILY_DPS = 0.7      # rank-I damage per second the family's best tower deals: a family of supports is declined
 
 
 # -- The build as data ----------------------------------------------------------------------------
@@ -119,7 +124,7 @@ def host(location: Location) -> dict[str, float]:
     life: dict[str, float] = {}
     for wave in location.waves:
         for group in wave.groups:
-            life[group.kind] = life.get(group.kind, 0.0) + group.count * MONSTERS[group.kind].hp * wave.hp
+            life[group.kind] = life.get(group.kind, 0.0) + group.count * MONSTERS[group.kind].hp
     total = sum(life.values())
     return {kind: value / total for kind, value in life.items()}
 
@@ -148,47 +153,76 @@ def small(location: Location) -> float:
     return sum(share for key, share in host(location).items() if MONSTERS[key].small)
 
 
-def draft_skills(location: Location, sigils: int) -> frozenset[str]:
+def draft_skills(location: Location, sigils: int, must: frozenset[str] = frozenset()) -> frozenset[str]:
     """Skills bought in a veteran's order from the columns the location has use for, then the rest of the tree; never
-    one that does nothing here."""
+    one that does nothing here. The ``must`` skills come first: a plan's unlocks, so its steps never wait."""
     arsenal = location.arsenal
     wanted: list[str] = []
     if "pyre" in arsenal.towers:
-        wanted += ["adept_fire", "fire_ball"]
+        wanted += ["unlock_pyre", "adept_fire", "fire_ball"]
     if arsenal.gates:
         wanted += ["holy_shield"]
     if "smite" in arsenal.spells:
         wanted += ["warmth"]
+    if "hymn" in arsenal.spells:
+        wanted += ["unlock_hymn"]
     if "storm" in arsenal.towers and flyers(location) > 0.1:
-        wanted += ["adept_lightning", "chain_lightning"]
+        wanted += ["unlock_storm", "adept_lightning", "chain_lightning"]
     if "ballista" in arsenal.towers and armored(location) > 0.1:
-        wanted += ["adept_arrow"]   # Steel: the Ballistas' second rank
+        wanted += ["unlock_ballista", "adept_ballista"]
     if "frost" in arsenal.towers:
-        wanted += ["adept_cold"]
+        wanted += ["unlock_frost", "adept_cold"]
+    if "arrow" in arsenal.towers:
+        wanted += ["adept_arrow"]
     if "pyre" in arsenal.towers:
         wanted += ["master_fire", "blaze"]
-    if "smite" in arsenal.spells:
-        wanted += ["soul_harvest"]
+    if "hook" in arsenal.towers:
+        wanted += ["unlock_hook", "adept_hook"]
+    if "knife" in arsenal.towers:
+        wanted += ["unlock_knife", "adept_knife"]
     if arsenal.gates:
         wanted += ["thorns"]
     if "storm" in arsenal.towers:
-        wanted += ["adept_lightning", "chain_lightning", "master_lightning", "static_field"]
+        wanted += ["unlock_storm", "adept_lightning", "chain_lightning", "master_lightning", "static_field"]
     if "plague" in arsenal.towers:
-        wanted += ["adept_poison", "contagion", "master_poison", "lower_resist"]
+        wanted += ["unlock_plague", "adept_poison", "contagion", "master_poison", "lower_resist"]
     if "frost" in arsenal.towers:
-        wanted += ["glacial_spike", "master_cold", "shatter"]
+        wanted += ["master_cold", "glacial_spike", "shatter"]
     if "altar" in arsenal.towers:
-        wanted += ["adept_bone", "corpse_explosion", "master_bone", "life_tap"]
+        wanted += ["unlock_altar", "adept_bone", "corpse_explosion", "master_bone", "life_tap"]
     if "grove" in arsenal.towers:
-        wanted += ["adept_nature", "hurricane", "master_nature", "twister"]
+        wanted += ["unlock_grove", "adept_nature", "hurricane", "master_nature", "twister"]
+    if "ballista" in arsenal.towers:
+        wanted += ["unlock_ballista", "adept_ballista", "master_ballista"]
+    if "hook" in arsenal.towers:
+        wanted += ["master_hook"]
+    if "knife" in arsenal.towers:
+        wanted += ["master_knife"]
+    if "arrow" in arsenal.towers:
+        wanted += ["master_arrow"]
     if len(arsenal.spells) > 2:
         wanted += ["spell_mastery"]
+    if "orb" in arsenal.spells:
+        wanted += ["unlock_orb"]
+    if "meteor" in arsenal.spells:
+        wanted += ["unlock_meteor"]
     learned: frozenset[str] = frozenset()
     stage = ORDER.index(location.key)
-    for key in [*wanted, *SKILLS]:
-        if not idle(location, SKILLS[key].needs) and can_learn(learned, key, sigils, stage):
+    for key in [*sorted(must), *wanted, *SKILLS]:
+        if (key in must or not idle(location, SKILLS[key].needs)) and can_learn(learned, key, sigils, stage):
             learned |= {key}
     return learned
+
+
+def _matches(family: str, element: str) -> bool:
+    """An element of the family: the named one, or any but physical."""
+    return element != "physical" if family == "!physical" else element == family
+
+
+def _dps(kind: str) -> float:
+    """A tower kind's rank-I damage per second, before what the host feels of it."""
+    first = TOWERS[kind].levels[0]
+    return first.damage * first.rate
 
 
 def _inside(s: float, spans: tuple[tuple[float, float], ...]) -> bool:
@@ -235,11 +269,11 @@ def draft_build(location: Location, learned: frozenset[str], towers: int = 14) -
     """The build a veteran lays out from the intro: gates, towers on the best tiles by element, then ranks."""
     level = location.level
     p = perks(learned, ORDER.index(location.key))
-    kinds = list(location.arsenal.towers)
+    kinds = [kind for kind in location.arsenal.towers if unlocked(kind, learned)]
     worths = {k: worth(location, k) for k in kinds}
-    share = dict(worths)
+    share = {k: v / tower_levels(k, p)[0].cost for k, v in worths.items()}
     if "frost" in share:
-        share["frost"] = 0.35 * max(worths.values())
+        share["frost"] = 0.35 * max(share.values())
     if "plague" in share:
         share["plague"] *= 0.6
     if "storm" in share:
@@ -293,8 +327,19 @@ class Warden:
     aim_gap: float = AIM_GAP
     plans: dict[str, Plan] = field(default_factory=load_plans)
     plan: Plan | None = None                  # a plan to play instead of the stored one (the search's candidates)
+    redraft_skills: bool = False              # play the stored steps with freshly drafted skills (a weaker read)
     chosen: Plan | None = None                # the plan of this defence, fixed when the skills are learned
     done: int = 0                             # steps of the plan taken
+    reserve: int = 0                        # gold held for a coming wager: the build keeps it unspent
+    family: str | None = None             # the pursued family: builds of this element only ("!physical" = any but)
+    family_goal: str | None = None        # the drawn family, pursued when the plan already builds it
+    pursued_family: bool = False          # the drawn family was worth pursuing, whether it held or not
+    gate_rush: bool = False               # pursue the gate: a gate is the first build
+    hymn_chase: int = 0                   # pursue the hymn: chant until this many hymns are cast
+    hymns: int = 0                        # hymns cast this defence
+    fair_lost: int = 0                    # fair lives lost (outside a bonus pack): the family's break-glass
+    lives_seen: int | None = None         # lives at the last think outside a pack
+    rushed: bool = False                  # the pursued gate stands, or stood
     clock: float = 0.0
     last_aim: float = -1e9
     work: dict[int, float] = field(default_factory=dict)   # per tower: what it has had in reach, summed over time
@@ -305,6 +350,14 @@ class Warden:
         stored = self.plans.get(plan_key(location, sigils))
         if stored is not None and stored.map == fingerprint(location):
             return stored
+        same = [plan for key, plan in self.plans.items() if key.split("/")[0] == location.key
+                and plan.map == fingerprint(location)]
+        if same:
+            if self.redraft_skills:
+                kinds = {s.kind for s in same[0].steps if s.what == "build"}
+                need = frozenset(u for k in kinds if (u := UNLOCK[k]) is not None)
+                return Plan(draft_skills(location, sigils, need), same[0].steps, same[0].early, same[0].map)
+            return same[0]   # one entry a location: played with what's kept, learned or not
         learned = draft_skills(location, sigils)
         return Plan(learned, draft_build(location, learned))
 
@@ -312,7 +365,27 @@ class Warden:
         plan = self.choose(location, sigils)
         learned = kept(plan.skills, sigils, ORDER.index(location.key))
         self.chosen = plan if learned == plan.skills else Plan(learned, plan.steps, plan.early, plan.map)
+        locked = perks(learned, ORDER.index(location.key)).locked
+        if self.family is None and self.family_goal is not None:
+            builds = [s for s in plan.steps if s.what == "build"]
+            share = (sum(1 for s in builds if _matches(self.family_goal, TOWERS[s.kind].element.value))
+                     / len(builds)) if builds else 1.0
+            kinds = [k for k in location.arsenal.towers
+                     if k not in locked and _matches(self.family_goal, TOWERS[k].element.value)]
+            self.pursued_family = share >= FAMILY_BAR and any(_dps(k) >= FAMILY_DPS for k in kinds)
+            if self.pursued_family:
+                self.family = self.family_goal
+        elif self.family is not None:
+            self.pursued_family = any(k not in locked and _matches(self.family, TOWERS[k].element.value)
+                                      for k in location.arsenal.towers)
+            if not self.pursued_family:
+                self.family = None
         return learned
+
+    @property
+    def built_out(self) -> bool:
+        """The plan's build stands: every step taken, only ranks and new towers left to buy."""
+        return self.chosen is not None and self.done >= len(self.chosen.steps)
 
     def act(self, hands: Hands) -> None:
         world = hands.world
@@ -320,6 +393,12 @@ class Warden:
         if world.time < self.clock:
             return
         self.clock = world.time + THINK
+        if world.bonus is None:   # a pack's leaks are the wager's, not the defence's: they spare the family
+            if self.lives_seen is not None and world.lives < self.lives_seen:
+                self.fair_lost += self.lives_seen - world.lives
+            self.lives_seen = world.lives
+        if self.family is not None and self.fair_lost >= FAMILY_BREAK:
+            self.family = None
         self._watch(world)
         self._gates(world)
         self._spend(world)
@@ -347,22 +426,51 @@ class Warden:
             if _clear(world, door.index):
                 world.build_door(door.index)
 
+    def _family_ok(self, element: str) -> bool:
+        """A tower of this element keeps the pursued family: the named one, or any but physical."""
+        return self.family is None or _matches(self.family, element)
+
+    def _family_kind(self, world: World) -> str | None:
+        """The hardest-hitting tower of the pursued family, or None when the arsenal holds none unlocked."""
+        kinds = [k for k in world.location.arsenal.towers
+                 if k not in world.perks.locked and self._family_ok(TOWERS[k].element.value)]
+        return max(kinds, key=_dps) if kinds else None
+
     def _spend(self, world: World) -> None:
         assert self.chosen is not None
         steps = self.chosen.steps
+        if self.gate_rush and not self.rushed and world.doors:
+            arch = next((s.door for s in steps if s.what == "gate"), 0)
+            door = world.doors[arch]
+            if door.built or door.rubble:
+                self.rushed = True
+            elif world.gold >= world.door_cost + self.reserve and _clear(world, arch):
+                world.build_door(arch)
+                self.rushed = True
+            # a blocked arch does not stall the plan: the towers go up, the gate stands when it clears
         while self.done < len(steps):
             step = steps[self.done]
             if step.what == "gate":
                 door = world.doors[step.door]
                 if not door.built and not door.rubble:   # a rubbled arch waits for the wave's end (_gates)
-                    if world.gold < world.door_cost or not _clear(world, door.index):
+                    if world.gold < world.door_cost + self.reserve or not _clear(world, door.index):
                         return
                     world.build_door(step.door)
             elif step.what == "build":
                 if world.tower_at(step.tile) is None:
-                    if world.gold < world.cost(step.kind):
+                    kind = step.kind
+                    if not self._family_ok(TOWERS[kind].element.value):
+                        swapped = self._family_kind(world)
+                        if swapped is None:
+                            self.done += 1
+                            continue
+                        kind = swapped
+                    if kind in world.perks.locked:   # learned too little for this step: never waits, never crashes
+                        self.done += 1
+                        continue
+                    if world.gold < world.cost(kind) + self.reserve:
                         return
-                    world.build(step.kind, step.tile)
+                    world.build(kind, step.tile)
             else:
                 tower = world.tower_at(step.tile)
                 cost = world.upgrade_cost(tower) if tower is not None else None
@@ -370,7 +478,7 @@ class Warden:
                     if world.rank_needs(tower) is not None:
                         self.done += 1
                         continue
-                    if world.gold < cost:
+                    if world.gold < cost + self.reserve:
                         return
                     world.upgrade(tower.id)
             self.done += 1
@@ -384,13 +492,21 @@ class Warden:
             if ranked:
                 tower = max(ranked, key=lambda t: (self.work.get(t.id, 0.0) / t.spent, -t.id))
                 cost = world.upgrade_cost(tower)
-                if cost is None or world.gold < cost:
+                if cost is None or world.gold < cost + self.reserve:
                     return
                 world.upgrade(tower.id)
                 continue
             location = world.location
-            kind = max(location.arsenal.towers, key=lambda k: worth(location, k))
-            if world.gold < world.cost(kind):
+            if self.family is not None:
+                kind = self._family_kind(world)
+                if kind is None:
+                    return
+            else:
+                open_kinds = [k for k in location.arsenal.towers if k not in world.perks.locked]
+                if not open_kinds:
+                    return
+                kind = max(open_kinds, key=lambda k: worth(location, k))
+            if world.gold < world.cost(kind) + self.reserve:
                 return
             reach = world.tower_levels[kind][1].range
             free = [(x, y) for y in range(world.level.height) for x in range(world.level.width)
@@ -448,8 +564,11 @@ class Warden:
         self.last_aim = world.time
 
     def _hymn(self, hands: Hands) -> None:
-        """The tower with the most work in hand or coming, when a crowd is on it, while a Smite stays in hand."""
+        """The tower with the most work in hand or coming, when a crowd is on it, while a Smite stays in hand;
+        chasing the hymn, from the second wave on once the defence stands, every tower with work or
+        coming while the count is short, a Smite still in hand."""
         world = hands.world
+        chase = world.wave >= 1 and self.hymns < self.hymn_chase
         keep = world.spell_cost("smite") if "smite" in world.location.arsenal.spells else 0.0
         if not ready(world, "hymn", spare=keep):
             return
@@ -460,8 +579,9 @@ class Warden:
             value = _tower_value(world, t)
             if value > best_value:
                 best, best_value = t, value
-        if best is not None and _load(world, best) >= HYMN_LOAD:
+        if best is not None and (chase or _load(world, best) >= HYMN_LOAD):
             hands.hymn(best.id)
+            self.hymns += 1
 
     def _kill_chanter(self, hands: Hands) -> bool:
         """A leader whose sign is up that one Smite kills: its curse dies with it."""

@@ -48,7 +48,7 @@ from hellward.sim.content import (
 from hellward.sim.model import DOOR_STOP, HOOK_PAST, HOOK_PULL, JOSTLE, KNIFE_STANDING, Monster, Refused, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.players.spacing import max_curse_radius, score_with_spacing
-from hellward.sim.skills import PHYSICAL, SKILLS, can_learn
+from hellward.sim.skills import SKILLS, can_learn
 
 SAMPLE = 0.25          # seconds between two looks at where the monsters are
 THINK = 0.25           # seconds between two decisions about gold
@@ -80,41 +80,46 @@ ORB_CROWD = 4          # monsters at a gate about to break that are worth a Froz
 
 PLANS = Path(__file__).parent / "plans" / "adaptive.json"
 ORDERS: dict[str, tuple[str, ...]] = {
-    "mixed": ("adept_fire", "adept_cold", "holy_shield", "warmth", "fire_ball", "glacial_spike",
-              "adept_lightning", "chain_lightning", "adept_poison", "contagion",
-              "soul_harvest", "master_fire", "master_cold", "master_lightning", "master_poison",
-              "thorns", "blaze", "shatter", "static_field", "lower_resist", "spell_mastery",
-              "adept_bone", "corpse_explosion", "master_bone", "life_tap",
-              "adept_nature", "hurricane", "master_nature", "twister"),
-    "warden": ("holy_shield", "warmth", "adept_cold", "adept_fire", "adept_poison",
-               "adept_lightning", "fire_ball", "glacial_spike", "chain_lightning", "contagion",
-               "thorns", "soul_harvest", "master_fire", "master_cold", "master_lightning", "master_poison",
-               "adept_bone", "corpse_explosion", "master_bone", "life_tap",
-               "adept_nature", "hurricane", "master_nature", "twister"),
-    "sorcerer": ("warmth", "soul_harvest", "spell_mastery", "holy_shield", "adept_cold", "adept_fire",
-                 "adept_poison", "adept_lightning", "fire_ball", "glacial_spike", "chain_lightning",
+    "mixed": ("unlock_pyre", "adept_fire", "unlock_frost", "adept_cold", "holy_shield", "warmth",
+              "fire_ball", "glacial_spike", "unlock_storm", "adept_lightning", "chain_lightning",
+              "unlock_plague", "adept_poison", "contagion", "master_fire", "master_cold",
+              "master_lightning", "master_poison", "thorns", "blaze", "shatter", "static_field",
+              "lower_resist", "spell_mastery", "unlock_altar", "adept_bone", "corpse_explosion",
+              "master_bone", "life_tap", "unlock_grove", "adept_nature", "hurricane", "master_nature",
+              "twister"),
+    "warden": ("holy_shield", "warmth", "unlock_frost", "adept_cold", "unlock_pyre", "adept_fire",
+               "unlock_plague", "adept_poison", "unlock_storm", "adept_lightning", "fire_ball",
+               "glacial_spike", "chain_lightning", "contagion", "thorns", "master_fire",
+               "master_cold", "master_lightning", "master_poison", "unlock_altar", "adept_bone",
+               "corpse_explosion", "master_bone", "life_tap", "unlock_grove", "adept_nature",
+               "hurricane", "master_nature", "twister"),
+    "sorcerer": ("warmth", "spell_mastery", "holy_shield", "unlock_frost", "adept_cold",
+                 "unlock_pyre", "adept_fire", "unlock_plague", "adept_poison", "unlock_storm",
+                 "adept_lightning", "fire_ball", "glacial_spike", "chain_lightning",
                  "contagion", "master_fire", "master_cold", "master_lightning", "master_poison",
-                 "adept_bone", "corpse_explosion", "master_bone", "life_tap",
-                 "adept_nature", "hurricane", "master_nature", "twister"),
-    "frost": ("adept_cold", "glacial_spike", "holy_shield", "warmth", "master_cold", "shatter",
-              "adept_fire", "adept_poison", "fire_ball", "contagion", "master_fire", "master_poison",
-              "adept_bone", "corpse_explosion", "master_bone", "life_tap",
-              "adept_nature", "hurricane", "master_nature", "twister"),
-    "fire": ("adept_fire", "fire_ball", "holy_shield", "warmth", "adept_cold", "master_fire", "blaze",
-             "glacial_spike", "master_cold",
-             "adept_bone", "corpse_explosion", "master_bone", "life_tap",
-             "adept_nature", "hurricane", "master_nature", "twister"),
-    "storm": ("adept_lightning", "chain_lightning", "holy_shield", "warmth", "adept_cold", "master_lightning",
-              "static_field", "glacial_spike", "master_cold",
-              "adept_bone", "corpse_explosion", "master_bone", "life_tap",
-              "adept_nature", "hurricane", "master_nature", "twister"),
-    "venom": ("adept_poison", "holy_shield", "contagion", "warmth", "adept_cold", "master_poison",
-              "lower_resist", "glacial_spike", "master_cold",
-              "adept_bone", "corpse_explosion", "master_bone", "life_tap",
-              "adept_nature", "hurricane", "master_nature", "twister"),
+                 "unlock_altar", "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+                 "unlock_grove", "adept_nature", "hurricane", "master_nature", "twister"),
+    "frost": ("unlock_frost", "adept_cold", "glacial_spike", "holy_shield", "warmth", "master_cold",
+              "shatter", "unlock_pyre", "adept_fire", "unlock_plague", "adept_poison", "fire_ball",
+              "contagion", "master_fire", "master_poison", "unlock_altar", "adept_bone",
+              "corpse_explosion", "master_bone", "life_tap", "unlock_grove", "adept_nature",
+              "hurricane", "master_nature", "twister"),
+    "fire": ("unlock_pyre", "adept_fire", "fire_ball", "holy_shield", "warmth", "unlock_frost",
+             "adept_cold", "master_fire", "blaze", "glacial_spike", "master_cold",
+             "unlock_altar", "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+             "unlock_grove", "adept_nature", "hurricane", "master_nature", "twister"),
+    "storm": ("unlock_storm", "adept_lightning", "chain_lightning", "holy_shield", "warmth",
+              "unlock_frost", "adept_cold", "master_lightning", "static_field", "glacial_spike",
+              "master_cold", "unlock_altar", "adept_bone", "corpse_explosion", "master_bone",
+              "life_tap", "unlock_grove", "adept_nature", "hurricane", "master_nature", "twister"),
+    "venom": ("unlock_plague", "adept_poison", "holy_shield", "contagion", "warmth", "unlock_frost",
+              "adept_cold", "master_poison", "lower_resist", "glacial_spike", "master_cold",
+              "unlock_altar", "adept_bone", "corpse_explosion", "master_bone", "life_tap",
+              "unlock_grove", "adept_nature", "hurricane", "master_nature", "twister"),
 }
 DEFAULT_ORDER = "mixed"
-TOWER_OF = {"fire": "pyre", "lightning": "storm", "cold": "frost", "poison": "plague",
+TOWER_OF = {"arrow": "arrow", "ballista": "ballista", "hook": "hook", "knife": "knife",
+            "fire": "pyre", "lightning": "storm", "cold": "frost", "poison": "plague",
             "bone": "altar", "nature": "grove"}
 
 
@@ -125,12 +130,10 @@ def useful(location: Location, key: str) -> bool:
     leaders = any(MONSTERS[k].leader is not None for k in location.monsters)
     if skill.column in TOWER_OF:
         return TOWER_OF[skill.column] in arsenal.towers
-    if skill.column == "arrow":
-        return any(kind in arsenal.towers for kind in PHYSICAL)
+    if skill.column == "spells":
+        return any(need in arsenal.spells for need in skill.needs)
     if key in ("holy_shield", "thorns"):
         return arsenal.gates
-    if key == "soul_harvest":
-        return leaders
     if key == "spell_mastery":
         return any(s in arsenal.spells for s in ("smite", "meteor", "orb"))
     return len(arsenal.spells) > 1 or leaders
@@ -420,6 +423,8 @@ class Adaptive:
         self.view = View(seconds, near, around, worth, venom, poisonable, room, valued, small, pace)
         self.density = {}
         for tower_kind in world.location.arsenal.towers:
+            if tower_kind in world.perks.locked:
+                continue
             for level, stats in enumerate(world.tower_levels[tower_kind]):
                 self.density[(tower_kind, level)] = [self._urgency(b) * self._density(world, tower_kind, stats, b) if seconds[b] > 0
                                                 else 0.0 for b in range(bins)]
@@ -554,6 +559,8 @@ class Adaptive:
         existing_tiles = list(standing)
         radius = max_curse_radius(world.location)
         for kind in world.location.arsenal.towers:
+            if kind in world.perks.locked:
+                continue
             stats = world.tower_levels[kind][0]
             for tile in study.tiles:
                 if tile not in standing:
