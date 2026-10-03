@@ -17,6 +17,8 @@ from hellward.sim.content import MONSTERS
 from sagaforge.foley import mono, read_wav
 from sagaforge.synth import SAMPLE_RATE, write_wav
 
+pytestmark = pytest.mark.slow   # the module fixture renders every cue and score (~2 min)
+
 SCENE_CUES = {"click", "refuse", "build", "upgrade", "sell", "door_build", "door_hit", "door_break", "wave", "cleared", "leak",
               "gold", "ponder", "chant", "curse", "fizzle", "arrow_cast", "arrow_hit", "ballista_cast", "ballista_hit",
               "knife_cast", "knife_hit", "hook", "fire_cast", "fire_hit", "fireball", "lightning", "frost", "venom_cast",

@@ -26,6 +26,9 @@ packages = ["hellward"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: renders or plays for minutes; `uv run pytest -q -m 'not slow'` skips it for iteration",
+]
 
 [tool.mypy]
 files = ["hellward/sim"]   # the simulation that hellward/fastsim.py compiles must type-check

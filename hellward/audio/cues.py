@@ -475,6 +475,10 @@ FALLS: dict[str, Fall] = {
     # The painted deaths land well before these long cries end.  Let the body
     # sound meet the fallen sprite, with the last of the voice over its heap.
     "fallen": Fall("fallen_cry", "body_light", gap=-1.0),
+    # The fallen tiers die as the fallen do until their own foley is generated
+    "carver": Fall("fallen_cry", "body_light", gap=-1.0),
+    "devilkin": Fall("fallen_cry", "body_light", gap=-1.0),
+    "dark_one": Fall("fallen_cry", "body_light", gap=-1.0),
     "skeleton": Fall(None, "bones", longest=1.8),
     "zombie": Fall("zombie_cry", "body_wet", gap=-1.0),
     "goatman": Fall("goatman_cry", "body_medium"),
@@ -490,6 +494,7 @@ FALLS: dict[str, Fall] = {
     "spider": Fall("gargoyle_cry", "body_light", body_gain=0.7),
     "bat": Fall("gargoyle_cry", "body_light", body_gain=0.6),
     "hulk": Fall("overlord_cry", "body_heavy", gap=-0.2, body_gain=0.9, boom=0.35),
+    "abomination": Fall("overlord_cry", "body_heavy", gap=-0.25, body_gain=1.0, boom=0.45),
     "drowned": Fall("zombie_cry", "body_wet", gap=-0.2),
     "fetish": Fall("shaman_cry", "body_light", takes=2),
     "inquisitor": Fall("priest_cry", "body_medium", takes=2),
