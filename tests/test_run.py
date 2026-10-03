@@ -65,7 +65,7 @@ def test_every_location_draws_three_distinct_goals_it_qualifies_for():
             if goal.key == "leaders":
                 assert any(MONSTERS[group.kind].leader is not None
                            for wave in location.waves for group in wave.groups)
-                assert MONSTERS[goal.arg].leader is not None
+                assert goal.arg == ""   # every leader: the draw names no kind
 
 
 def test_the_draw_is_by_seed_and_differs_between_runs():
@@ -276,7 +276,7 @@ def test_every_goal_has_its_camp_line():
     assert "by wave 2" in describe(Drawn("gate", ""))
     assert "every tower built is fire" in describe(Drawn("family", "fire"))
     assert "no tower built is physical" in describe(Drawn("family", "!physical"))
-    assert "bone_priest" in describe(Drawn("leaders", "bone_priest"))
+    assert "every leader dies before its first curse lands" in describe(Drawn("leaders", ""))
     assert "3 times" in describe(Drawn("hymn", "3"))
     assert "stake 2 or more" in describe(Drawn("bonus", "2"))
     with pytest.raises(KeyError):
