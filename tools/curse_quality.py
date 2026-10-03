@@ -45,12 +45,18 @@ from hellward.sim.players.ordinary import Ordinary  # noqa: E402
 POLICIES = ("smart", "greedy", "nearest", "random")
 
 
-def moments(count: int, every: int, location: str) -> list[tuple[World, int]]:
-    """Worlds copied at the instant a leader asks, from a few whole defences."""
+def moments(count: int, every: int, location: str, games: int = 40) -> list[tuple[World, int]]:
+    """Worlds copied at the instant a leader asks, from a few whole defences.
+
+    Gives up after ``games`` defences: a location whose leaders never face a real choice of curse
+    (Tristram's one-curse shamans walk past spread towers one at a time) is reported, not played forever.
+    """
     found: list[tuple[World, int]] = []
     seen = 0
     game = 0
     while len(found) < count:
+        if game >= games:
+            raise ValueError(f"{location} offered no two-candidate curse decision in {games} defences")
         def recorder(world: World, leader_id: int) -> planner.Inline:
             nonlocal seen
             seen += 1

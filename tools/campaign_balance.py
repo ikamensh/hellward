@@ -39,7 +39,7 @@ import subprocess
 import sys
 import time
 from concurrent.futures import Executor, ProcessPoolExecutor
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -105,13 +105,13 @@ def leaders_spawned(world: World) -> int:
 
 def play(player: str, location: str, seed: int, sigils: int, *, leaders: str = "smart",
          life: float = 1.0, lives: int | None = None, curse_scale: float = 1.0) -> dict:
-    """One defence, and everything the table and the tuning read from it. ``life`` multiplies the location's own life
-    factor, the tuning knob (the spells grow with it), as tools/margin.py does."""
+    """One defence, and everything the table and the tuning read from it. ``life`` multiplies every monster's
+    life (the spells do not grow with it), as tools/margin.py does."""
     place = campaign.LOCATIONS[location]
     policy = Timed(LEADERS[leaders](seed))
     started = time.process_time()
-    world, record = defend(replace(place, life=place.life * life), PLAYERS[player](seed), seed=seed, sigils=sigils,
-                           planner=policy, lives=lives, curse_scale=curse_scale)
+    world, record = defend(place, PLAYERS[player](seed), seed=seed, sigils=sigils, planner=policy, hp=life,
+                           lives=lives, curse_scale=curse_scale)
     start_lives = START_LIVES if lives is None else lives
     caught = record.towers_caught
     return {
@@ -133,7 +133,7 @@ def play(player: str, location: str, seed: int, sigils: int, *, leaders: str = "
 
 def margin(player: str, location: str, seed: int, sigils: int, curse_scale: float = 1.0,
            leaders: str = "smart") -> tuple[float, list[dict]]:
-    """The largest factor on the location's life at which the player still wins this seed, to 2%, and its runs."""
+    """The largest factor on every monster's life at which the player still wins this seed, to 2%, and its runs."""
     runs: list[dict] = []
 
     def wins(life: float) -> bool:

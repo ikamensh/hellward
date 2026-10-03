@@ -101,7 +101,7 @@ def test_damage_over_time_takes_the_factors_but_no_armor_and_no_rounding():
 
 
 def test_venom_goes_through_armor_in_the_world():
-    world = World(replace(CATACOMBS, waves=(Wave((Group("overlord", 1, 1.0),), 10),), wave_names=("test",), life=1.0))
+    world = World(replace(CATACOMBS, waves=(Wave((Group("overlord", 1, 1.0),), 10),), wave_names=("test",)))
     world.call_wave()
     world.step()
     overlord = world.monsters[0]
@@ -116,7 +116,8 @@ def test_the_monsters_tags_and_armor_follow_the_spec():
     """At most two element tags (a boss may have more), physical never; armor on the heavy kinds and the bosses,
     and an armored kind keeps a vulnerability so an elemental tower has a way in. Nothing is immune."""
     armor = {key: kind.armor for key, kind in MONSTERS.items() if kind.armor}
-    assert armor == {"overlord": 2, "zealot": 2, "hulk": 3, "azazel": 2, "bone_priest": 3}
+    assert armor == {"overlord": 2, "zealot": 2, "hulk": 3, "abomination": 2, "azazel": 2,
+                     "bone_priest": 3}
     assert {key for key, kind in MONSTERS.items() if kind.boss} == {"azazel", "bone_priest"}
     assert (MONSTERS["overlord"].vulnerable, MONSTERS["zealot"].vulnerable, MONSTERS["hulk"].vulnerable) == (
         (Element.LIGHTNING,), (Element.FIRE,), (Element.FIRE,))

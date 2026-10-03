@@ -28,7 +28,8 @@ def test_two_defences_make_table_rows_with_every_column_and_the_second_has_the_s
     assert run["lives"] + run["lost"] == 20
     assert run["chants"] >= run["landed"] > 0 and run["decide_ms"]
     assert run["strikes"] == 0   # no boss here
-    assert len(run["leaks"]) == 5 and sum(run["leaks"]) >= run["lost"]
+    assert len(run["leaks"]) == len(campaign_balance.campaign.LOCATIONS["tristram"].waves)
+    assert sum(run["leaks"]) >= run["lost"]
     assert graveyard[:3] == ["graveyard", "ordinary B*", str(run["earned"])]
     assert runs[1]["sigils"] == run["earned"]
 

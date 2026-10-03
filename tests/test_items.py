@@ -93,7 +93,7 @@ def test_execution_bow_pays_for_slow_fire_with_a_large_leader_hit() -> None:
     def first_hit(loadout: Loadout) -> float:
         location = replace(TRAVINCAL, level=TRISTRAM.level, start_gold=100)
         world = World(location, loadout=loadout)
-        world.build("arrow", (10, 6))
+        world.build("arrow", (9, 12))
         leader = Monster(1001, MONSTERS["shaman"], 0, 0.0, 0.0, 100.0, 0.0)
         leader.s, leader.frozen = 10.0, 10.0
         world.monsters.append(leader)

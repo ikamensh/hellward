@@ -53,7 +53,8 @@ def test_every_monster_and_tower_kind_wears_a_model_or_a_stand_in():
     models = {p.stem for p in (GAME / "assets" / "models").glob("*.glb")}
     for kind in MONSTERS:
         own = f"mon_{kind}" in models
-        assert own or re.search(rf'"{kind}": \["(fallen|shaman|zombie|skeleton)"', monster), kind
+        borrowed = re.search(rf'"{kind}": \["([a-z_]+)"', monster)
+        assert own or (borrowed and f"mon_{borrowed.group(1)}" in models), kind
     for kind in TOWERS:
         own = f"tower_{kind}" in models or f"tower_{kind}_1" in models
         assert own or re.search(rf'"{kind}": \["(arrow|pyre|frost|storm)"', tower), kind

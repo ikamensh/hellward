@@ -31,7 +31,7 @@ def test_a_seeded_salvage_drop_can_be_sold_during_a_break():
     before = world.gold
     world.sell_salvage(1)
     assert world.salvage_held == 0
-    assert world.gold == before + BALANCE.salvage_sale_gold(0)
+    assert world.gold == before + BALANCE.salvage_sale_gold()
     assert world.clone().salvage_sold == 1
 
 

@@ -14,7 +14,6 @@ and the heavy build's is at least 1. It runs the compiled simulation.
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import statistics
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -39,9 +38,8 @@ BUILDS = {"light": (("arrow",), 12), "heavy": (("arrow", "ballista", "arrow", "b
 
 def wins(build: str, key: str, seed: int, life: float) -> bool:
     rotation, towers = BUILDS[build]
-    location = dataclasses.replace(LOCATIONS[key], life=LOCATIONS[key].life * life)
-    world, _ = defend(location, Ordinary(rotation=rotation, towers=towers), seed=seed, sigils=0,
-                      planner=planner.smart)
+    world, _ = defend(LOCATIONS[key], Ordinary(rotation=rotation, towers=towers), seed=seed, sigils=0,
+                      planner=planner.smart, hp=life)
     return world.outcome == "victory"
 
 

@@ -1,5 +1,5 @@
-"""How much more monster life a player can still beat, location by location: what each location's life factor
-(``Location.life``) is tuned with (docs/campaign.md, "Tuning by simulation").
+"""How much more monster life a player can still beat, location by location: what each location's waves
+are tuned with (docs/campaign.md, "Tuning by simulation").
 
     python3 ~/saga/tools/slot.py -- caffeinate -i uv run python tools/margin.py apprentice
     uv run python tools/margin.py veteran --locations tristram --seeds 1000-1001 --jobs 2
@@ -7,8 +7,8 @@
     uv run python tools/margin.py --replay replays/20260101T120000Z-tristram.json   # a person's build, at its
         # location and seed only: how much harder it could still have been won
 
-For every location it bisects, on each seed, the largest factor on every monster's life (by replacing
-``Location.life`` with ``Location.life * k``; the spells grow with it) at which the player still wins, to 2%,
+For every location it bisects, on each seed, the largest factor on every monster's life (the world's
+hardness; the spells do not grow with it) at which the player still wins, to 2%,
 and prints the median and the range. A defence holds whole until the monsters outgrow it and then collapses
 within a few percent, so the margin, not the lives kept, is what tells an easy location from a hard one.
 The player's sigils are the campaign's: three per earlier location, unless ``--sigils`` says otherwise.
@@ -59,10 +59,11 @@ def wins(who: str, key: str, seed: int, sigils: int, leaders: str, life_mult: fl
         elif who == "warden":
             warden.check(LOCATIONS[key], sigils)
     policy = planner.smart if leaders == "smart" else planner.RandomLeaders(seed)
-    loc = dataclasses.replace(LOCATIONS[key], life=LOCATIONS[key].life * life_mult)
+    loc = LOCATIONS[key]
     if waves is not None:
         loc = dataclasses.replace(loc, waves=loc.waves[:waves], wave_names=loc.wave_names[:waves])
-    world, _ = defend(loc, contender(who, seed), seed=seed, sigils=sigils, planner=policy, hp=1.0, curse_scale=curse_scale)
+    world, _ = defend(loc, contender(who, seed), seed=seed, sigils=sigils, planner=policy, hp=life_mult,
+                      curse_scale=curse_scale)
     return world.outcome == "victory"
 
 
@@ -113,7 +114,7 @@ def main() -> None:
         found = list(pool.map(margin, *zip(*jobs)))
     for i, key in enumerate(keys):
         values = found[i * len(seeds):(i + 1) * len(seeds)]
-        print(f"{args.player:10s} {args.leaders:6s} {key:11s} life {LOCATIONS[key].life:4.2f}  M median {statistics.median(values):5.2f}"
+        print(f"{args.player:10s} {args.leaders:6s} {key:11s} M median {statistics.median(values):5.2f}"
               f"  range {min(values):5.2f}-{max(values):5.2f}", flush=True)
 
 
@@ -125,7 +126,7 @@ def ghost_main(args: argparse.Namespace) -> None:
     if args.sigils is not None:
         sigils = args.sigils
     found = margin(f"replay:{args.replay}", key, seed, sigils, args.leaders, args.curse_scale)
-    print(f"{'ghost':10s} {args.leaders:6s} {key:11s} life {LOCATIONS[key].life:4.2f}  M {found:5.2f}", flush=True)
+    print(f"{'ghost':10s} {args.leaders:6s} {key:11s} M {found:5.2f}", flush=True)
 
 
 if __name__ == "__main__":

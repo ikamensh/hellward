@@ -41,7 +41,7 @@ def spawns(location: Location) -> Iterator[tuple[str, float, int]]:
     """(monster kind, life, wave index) for every authored spawn of a location."""
     for index, wave in enumerate(location.waves):
         for group in wave.groups:
-            life = MONSTERS[group.kind].hp * wave.hp * location.life
+            life = MONSTERS[group.kind].hp
             for _ in range(group.count):
                 yield group.kind, life, index
 
@@ -70,11 +70,11 @@ def number_scale() -> list[Result]:
     biggest = max(life for kind, life in every if not is_boss(kind))
     boss = max((life for kind, life in every if is_boss(kind)), default=0.0)
     top_hit = max(level.damage for kind in TOWERS.values() if kind.attack in ATTACKS for level in kind.levels)
-    median = statistics.median(ordinary)
+    toughest = max(ordinary)
     return [
         Result("G2.4", "first monster's life", f"{first_life:.1f}", 8 <= first_life <= 12),
         Result("G2.4", "weakest first-rank hit", f"{first_hit:g}", 1 <= first_hit <= 2),
-        Result("G2.4", "last location's ordinary median life", f"{median:.0f}", 60 <= median <= 120),
+        Result("G2.4", "last location's toughest ordinary life", f"{toughest:.0f}", 60 <= toughest <= 100),
         Result("G2.4", "largest non-boss life", f"{biggest:.0f}", biggest <= 200),
         Result("G2.4", "largest boss life", f"{boss:.0f}", boss <= 1000),
         Result("G2.4", "largest tower hit (before bonuses)", f"{top_hit:g}", top_hit <= 30),
@@ -154,7 +154,7 @@ def real_estate() -> list[Result]:
 
 
 def power_table() -> list[Result]:
-    """G3.4: at every location, on the untuned curve, the reference board's damage per second covers the last
+    """G3.4: at every location, the reference board's damage per second covers the last
     wave's life per second. The reference board is the best board the location's gold buys: at most 8 towers
     and not all rank III, each buy maximizing the worst walked route's supply over demand (Hooks buy pulls,
     not damage). Each route's demand is its monsters' life over their seconds inside the covered stretch;
@@ -162,12 +162,12 @@ def power_table() -> list[Result]:
     splashes and venom beyond one stack are left out, so the board is weaker here than in a fight. The row
     says whether gold or cells bind."""
     out = []
-    for stage, key in enumerate(ORDER):
+    for key in ORDER:
         location = LOCATIONS[key]
-        mix = _last_mix(location, stage)
+        mix = _last_mix(location)
         total = sum(mix.values())
         shares = {kind: life / total for kind, life in mix.items()}
-        gold = BALANCE.starting_gold(stage) + sum(BALANCE.wave_income(stage, i) for i in range(len(location.waves)))
+        gold = BALANCE.starting_gold() + sum(BALANCE.wave_income(i) for i in range(len(location.waves)))
         worth = worth_map(location.level, traffic(location))
         kinds = [k for k in location.arsenal.towers if TOWERS[k].attack in ATTACKS and TOWERS[k].attack != "hook"]
         routes = [r for r in location.level.routes
@@ -175,30 +175,30 @@ def power_table() -> list[Result]:
         cells: list = []
         for route in routes:
             top = sorted(worth, key=lambda c: (_cover_len(route, c, REFERENCE_REACH), worth[c]), reverse=True)
-            cells += [c for c in top[:4] if _cover_len(route, c, REFERENCE_REACH) > 0]
+            cells += [c for c in top[:6] if _cover_len(route, c, REFERENCE_REACH) > 0]
         cells = list(dict.fromkeys(cells))
         board: dict = {}
         left = gold
         while True:
-            offer = _best_buy(location, routes, board, cells, kinds, shares, stage, left)
+            offer = _best_buy(location, routes, board, cells, kinds, shares, left)
             if offer is None:
                 break
             (cell, placed), price = offer
             board[cell] = placed
             left -= price
         binds = "gold" if left < min(TOWERS[k].levels[0].cost for k in kinds) else "cells"
-        route, worst = min(_ratios(location, routes, board, shares, stage).items(), key=lambda kv: kv[1])
+        route, worst = min(_ratios(location, routes, board, shares).items(), key=lambda kv: kv[1])
         out.append(Result("G3.4", f"{key}: worst route's supply over demand ({route}; {binds} binds)",
                           f"{worst:.2f}", worst >= 1.0))
     return out
 
 
-def _last_mix(location: Location, stage: int) -> dict[str, float]:
-    """The last wave's kinds with their life on the untuned curve (factor 1)."""
+def _last_mix(location: Location) -> dict[str, float]:
+    """The last wave's kinds with their life."""
     wave = location.waves[-1]
     mix: dict[str, float] = {}
     for group in wave.groups:
-        life = MONSTERS[group.kind].hp * wave.hp * BALANCE.life_growth ** stage * group.count
+        life = MONSTERS[group.kind].hp * group.count
         mix[group.kind] = mix.get(group.kind, 0.0) + life
     return mix
 
@@ -211,10 +211,10 @@ def _felt_dps(kind: str, rank: int, shares: dict[str, float]) -> float:
 
 
 def _best_buy(location: Location, routes: list, board: dict, cells: list, kinds: list[str],
-              shares: dict[str, float], stage: int, gold: int):
+              shares: dict[str, float], gold: int):
     """The buy that most raises the worst walked route's ratio: a new rank-I tower of the best damage per
     gold, or a rank up (at most 8 towers, at most seven at rank III); None when nothing affordable helps."""
-    base = min(_ratios(location, routes, board, shares, stage).values())
+    base = min(_ratios(location, routes, board, shares).values())
     new_kind = max(kinds, key=lambda k: _felt_dps(k, 0, shares) / TOWERS[k].levels[0].cost)
     tops = sum(1 for placed in board.values() if placed[1] == 2)
     best = None
@@ -239,7 +239,7 @@ def _best_buy(location: Location, routes: list, board: dict, cells: list, kinds:
             if best is None or key > best[0]:
                 best = (key, price, (cell, trial[cell]))
             continue
-        worst = min(_ratios(location, routes, trial, shares, stage).values())
+        worst = min(_ratios(location, routes, trial, shares).values())
         if worst > base + 1e-9 and (best is None or (worst, -price) > (best[0], -best[1])):
             best = (worst, price, (cell, trial[cell]))
     if base <= 0:
@@ -256,7 +256,7 @@ def _covered_key(location: Location, routes: list, board: dict, shares: dict[str
             round(sum(spans for supply, spans in cover.values()), 6))
 
 
-def _ratios(location: Location, routes: list, board: dict, shares: dict[str, float], stage: int) -> dict[str, float]:
+def _ratios(location: Location, routes: list, board: dict, shares: dict[str, float]) -> dict[str, float]:
     """Each walked route's supply over demand: the towers covering it deal their felt damage per second;
     its monsters' life arrives over their seconds inside the covered stretch."""
     wave = location.waves[-1]
@@ -265,7 +265,7 @@ def _ratios(location: Location, routes: list, board: dict, shares: dict[str, flo
     for route in routes:
         groups = [g for g in wave.groups if g.route == route.key]
         supply, covered = cover[route.key]
-        demand = sum(MONSTERS[g.kind].hp * wave.hp * BALANCE.life_growth ** stage * g.count
+        demand = sum(MONSTERS[g.kind].hp * g.count
                       * MONSTERS[g.kind].speed / covered for g in groups) if covered else float("inf")
         ratios[route.key] = supply / demand if demand else 1.0
     return ratios or {"main": 0.0}

@@ -201,7 +201,7 @@ def busy_act2_world() -> World:
     towers = sorted(world.towers.values(), key=lambda t: t.id)
     # Add Act II specific state: a risen flayer and a marking inquisitor
     flayer = MONSTERS["flayer"]
-    flayer_hp = flayer.hp * world.waves[world.wave].hp * world.location.life
+    flayer_hp = flayer.hp
     risen_flayer = Monster(world._id(), flayer, world.wave, 0.0, 0.0, flayer_hp * 0.5, 0.0)
     risen_flayer.s = 15.0
     risen_flayer.risen = True
@@ -210,7 +210,7 @@ def busy_act2_world() -> World:
     world.wave_alive[world.wave] += 1
 
     inquisitor = MONSTERS["inquisitor"]
-    inq_hp = inquisitor.hp * world.waves[world.wave].hp * world.location.life
+    inq_hp = inquisitor.hp
     marking_inq = Monster(world._id(), inquisitor, world.wave, 0.0, 0.0, inq_hp, inquisitor.leader.first_cast)
     marking_inq.s = 20.0
     marking_inq.chant_curse = Curse.WEAKEN

@@ -20,7 +20,7 @@ SPOT = 9.0
 
 def field() -> World:
     location = replace(campaign.DOCKS, level=FIELD, waves=(Wave((Group("fallen", 1, 1.0),), 10),),
-                       wave_names=("test",), life=1.0)
+                       wave_names=("test",))
     world = World(location)
     world.gold = 10_000
     world.wave = 0

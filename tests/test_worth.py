@@ -70,7 +70,7 @@ def test_clearing_costs_one_unit_then_two_then_three_and_opens_the_cell():
     location = bouldered(count=3)
     world = World(location, seed=1)
     assert world.break_left is not None   # the break before wave 1 counts
-    unit = BALANCE.income_unit(world.stage)
+    unit = BALANCE.income_unit()
     tiles = sorted(location.level.boulders)
     assert world.clear(tiles[0]) == unit
     assert world.clear(tiles[1]) == 2 * unit
@@ -102,7 +102,7 @@ def test_a_clear_order_is_logged_and_its_ghost_clears_the_same_cell():
     assert battle.commands == [[0.0, "clear", list(tile)]]
     assert battle.world.buildable(*tile)
     start = battle.start()
-    assert start["boulders"] and start["clear"] == [BALANCE.income_unit(1), 2 * BALANCE.income_unit(1)]
+    assert start["boulders"] and start["clear"] == [BALANCE.income_unit(), 2 * BALANCE.income_unit()]
     assert set(start["worth"]) == set(location.arsenal.towers)
     assert start["worth"]["arrow"]["bare"] and len(start["worth"]["arrow"]["gates"]) == 1
     ghost = Ghost({"version": 2, "location": "graveyard", "seed": 1, "skills": [], "loadout": [],

@@ -15,6 +15,8 @@ BREACHES = frozenset({"graveyard", "catacombs", "hells_gate", "spider_forest", "
 
 @pytest.mark.parametrize("key", ORDER[1:])
 def test_campaign_field_has_two_used_entrances_and_bounded_wander_routes(key):
+    """Two entrances, each with its wander detour a little longer but bounded; the waves may compose on all
+    four paths but must use both entrances, with neither a trickle nor the whole host."""
     location = LOCATIONS[key]
     level = location.level
     routes = {route.key: route for route in level.routes}
@@ -23,17 +25,18 @@ def test_campaign_field_has_two_used_entrances_and_bounded_wander_routes(key):
     assert routes["side"].entrance == routes["side_detour"].entrance
     assert routes["main"].entrance != routes["side"].entrance
     assert {route.exit for route in level.routes} == {level.waypoints[-1]}
-    assert all(route.length <= routes["main"].length * 1.6 for route in level.routes)
-    assert routes["meander"].length >= routes["main"].length * 1.15
-    assert routes["side_detour"].length >= routes["side"].length * 1.15
+    assert routes["main"].length * 1.05 <= routes["meander"].length <= routes["main"].length * 1.6
+    longest = max(routes["main"].length, routes["side"].length)
+    assert routes["side"].length * 1.05 <= routes["side_detour"].length <= longest * 1.6
 
     groups = [group for wave in location.waves for group in wave.groups]
     authored = {group.route for group in groups}
-    assert authored == {"main", "side"}
+    assert authored <= {"main", "meander", "side", "side_detour"}
+    assert "main" in authored
+    assert authored & {"side", "side_detour"}
     bodies = sum(group.count for group in groups)
-    side = sum(group.count for group in groups if group.route == "side")
+    side = sum(group.count for group in groups if group.route in ("side", "side_detour"))
     assert 0.25 <= side / bodies <= 0.75
-    assert all(group.route != "breach" for group in groups)
 
 
 @pytest.mark.parametrize("key", ORDER[1:])

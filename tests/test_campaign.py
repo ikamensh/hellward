@@ -1,6 +1,5 @@
 """The campaign's locations and its order: every map is sound and every location can be reached."""
 
-import importlib
 
 import pytest
 
@@ -51,14 +50,13 @@ def test_sigils_grow_with_the_life_kept_and_a_fall_earns_none():
     assert [sigils("victory", need) for need in SIGIL_LIVES] == [1, 2, 3]
 
 
-def test_the_campaign_uses_one_location_and_wave_growth_curve():
-    for stage, key in enumerate(ORDER):
+def test_the_campaign_uses_one_economy_and_flat_monster_life():
+    for key in ORDER:
         location = LOCATIONS[key]
-        factor = importlib.import_module(f"hellward.sim.locations.{key}").LIFE_FACTOR
-        assert location.start_gold == BALANCE.starting_gold(stage)
-        assert location.life == pytest.approx(BALANCE.life_growth ** stage * factor)
+        assert location.start_gold == BALANCE.starting_gold()
         for wave_index, wave in enumerate(location.waves):
-            assert wave.hp == pytest.approx(BALANCE.wave_growth ** wave_index)
+            bodies = sum(group.count for group in wave.groups)
+            assert wave.bonus == BALANCE.wave_clear_bonus(wave_index, bodies)
 
 
 def test_opening_field_gives_wanderers_three_bounded_approaches():
