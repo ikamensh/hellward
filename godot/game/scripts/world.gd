@@ -25,6 +25,8 @@ var monsters := {}                   # id -> Monster
 var towers := {}                     # id -> Tower
 var doors: Array = []                # [index, hp, built, rubble]
 var hazards: Array = []
+var blight_nodes := {}               # Vector2i -> the taken cell's quad and count below
+var _blight_taught := false
 var gold := 0
 var lives := 20
 var start_lives := 20
@@ -221,6 +223,61 @@ func _take_state(s: Dictionary) -> void:
 	outcome = "" if s["outcome"] == null else String(s["outcome"])
 	if was == "" and outcome != "":
 		_decided()
+	_show_blight(s.get("blighted", []))
+
+
+## Whether a taken cell holds `tile`: no tower stands there while it does.
+func blighted_at(tile: Vector2i) -> bool:
+	return blight_nodes.has(tile)
+
+
+## Taken cells wear their blight and its waves left; freed cells lose both.
+func _show_blight(cells: Array) -> void:
+	var live := {}
+	for c in cells:
+		var tile := Vector2i(int(c[0]), int(c[1]))
+		live[tile] = true
+		var line := "%s, %d %s left" % [String(c[3]).capitalize(), int(c[2]), "wave" if int(c[2]) == 1 else "waves"]
+		if blight_nodes.has(tile):
+			(blight_nodes[tile].get_node("Count") as Label3D).text = line
+		else:
+			blight_nodes[tile] = _blight_cell(tile, String(c[3]), line)
+	for tile in blight_nodes.keys():
+		if not live.has(tile):
+			(blight_nodes[tile] as Node3D).queue_free()
+			blight_nodes.erase(tile)
+
+
+func _blight_cell(tile: Vector2i, past: String, line: String) -> Node3D:
+	var root := Node3D.new()
+	root.position = level.tile_pos(tile)
+	add_child(root)
+	var quad := MeshInstance3D.new()
+	var pm := PlaneMesh.new()
+	pm.size = Vector2(Level.TILE * 0.92, Level.TILE * 0.92)
+	quad.mesh = pm
+	var mat := StandardMaterial3D.new()
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(0.62, 0.66, 0.72, 0.5) if past == "webbed" else Color(0.45, 0.16, 0.5, 0.5)
+	quad.material_override = mat
+	quad.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	quad.position = Vector3(0, 0.05, 0)
+	root.add_child(quad)
+	var label := Label3D.new()
+	label.name = "Count"
+	label.text = line
+	label.font = Style.title_font()
+	label.font_size = 48
+	label.pixel_size = 0.005
+	label.modulate = Color(0.95, 0.9, 0.85)
+	label.outline_modulate = Color(0.05, 0.02, 0.08)
+	label.outline_size = 10
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.position = Vector3(0, 1.1, 0)
+	root.add_child(label)
+	return root
 
 
 func _decided() -> void:
@@ -324,6 +381,18 @@ func _event(e: Array) -> void:
 				t.curse_ends(String(e[2]))
 		"burned":
 			announce.emit("", "The curse burns %d mana." % int(e[2]))
+		"blight_mark":
+			var at := level.tile_pos(Vector2i(int(e[2][0]), int(e[2][1])))
+			Vfx.rune_circle_at(self, at, Level.TILE * 0.7, float(e[3]))
+			Sfx.play("chant", at)
+		"blight":
+			if not _blight_taught:
+				_blight_taught = true
+				announce.emit("The ground is taken", "A %s cell holds no tower while its waves last." % String(e[4]))
+		"blight_fizzle":
+			Sfx.play("fizzle", level.tile_pos(Vector2i(int(e[2][0]), int(e[2][1]))))
+		"blight_clear":
+			pass   # the next frame's state lifts the quad
 		"leak":
 			var m: Monster = monsters.get(int(e[1]))
 			if m:

@@ -23,6 +23,7 @@ func _ready() -> void:
 			test_the_watched_defence_holds_and_ends_with_victory, test_a_campaign_walk_through_every_screen,
 			test_a_run_from_the_long_night_to_its_laying_down, test_the_camp_offers_relics_and_one_is_taken,
 			test_the_bar_offers_the_grind_and_g_skips_it, test_the_card_teaches_strategies_sold_in_the_forge,
+			test_blight_marks_and_takes_a_cell_that_shows_its_waves, test_holding_a_tower_shows_the_cells_worth,
 			test_every_location_lays_out_and_plays]:
 		if only != "" and only not in t.get_method():
 			continue
@@ -618,6 +619,56 @@ func test_the_card_teaches_strategies_sold_in_the_forge() -> void:
 
 ## Every location of both acts lays out (its scenery, its arsenal on the bar) and its battle runs a few seconds,
 ## a scripted player defending: a script error anywhere fails the suite (tools/test.sh).
+## Tristram's shaman marks a cell before it takes it; the taken cell wears its blight and its waves left,
+## and the server refuses a tower there with the reason.
+func test_blight_marks_and_takes_a_cell_that_shows_its_waves() -> void:
+	var m := await start()
+	m.rig.user_control = false
+	var w: World = m.world
+	Engine.time_scale = 8.0
+	var marks := []
+	var lands := []
+	w.happened.connect(func(e: Array):
+		if e[0] == "blight_mark":
+			marks.append(e)
+		elif e[0] == "blight":
+			lands.append(e))
+	for i in 120:
+		if w.can_call():
+			await w.order("call_wave")
+		await seconds(1)
+		if not lands.is_empty() or w.outcome != "":
+			break
+	Engine.time_scale = 1.0
+	check(not marks.is_empty(), "a shaman marks a cell before it takes it")
+	check(not lands.is_empty(), "the mark lands and the cell is taken")
+	if lands.is_empty():
+		return
+	var tile := Vector2i(int(lands[0][2][0]), int(lands[0][2][1]))
+	check(w.blighted_at(tile), "this side knows the cell is taken")
+	var count: Label3D = w.blight_nodes[tile].get_node("Count")
+	check("wave" in count.text.to_lower(), "the cell shows its waves left (%s)" % count.text)
+	var why := []
+	w.refused.connect(func(text: String): why.append(text))
+	await w.order("build", {"kind": "arrow", "tile": [tile.x, tile.y]})
+	check(not why.is_empty() and "wave" in why[0], "a tower there is refused with the reason (%s)" % [why])
+
+
+## Holding an Arrow Tower, the cell under the mouse says how much of the monsters' walk a tower there reaches.
+func test_holding_a_tower_shows_the_cells_worth() -> void:
+	var m := await start()
+	m.rig.user_control = false
+	var w: World = m.world
+	var tile: Vector2i = lane_side(m.level, 1)[0]
+	press(m.get_viewport(), KEY_1)
+	await frames(2)
+	move_mouse(m, m.level.tile_pos(tile))
+	await frames(2)
+	check(m.builder.held == "arrow", "1 holds an Arrow Tower")
+	check(m.builder._worth_mark.visible, "the hovered cell shows its worth")
+	check("tiles of the walk" in m.builder._worth_mark.text, "in tiles of the walk (%s)" % m.builder._worth_mark.text)
+
+
 func test_every_location_lays_out_and_plays() -> void:
 	var view: Dictionary = (await Net.ask("campaign").done)["data"]
 	var seen := {}   # the kinds whose bodies are checked (check_bodies), over every location's battle

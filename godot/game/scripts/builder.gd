@@ -26,6 +26,7 @@ var _ghost: Node3D
 var _ghost_mat: StandardMaterial3D
 var _tile_mark: MeshInstance3D
 var _reach_mark: MeshInstance3D
+var _worth_mark: Label3D             # the hovered cell's worth to the held tower, in tiles of the walk
 var _mouse := Vector2(-1, -1)        # the mouse in the viewport's pixels, as its last motion put it
 
 
@@ -37,6 +38,17 @@ func setup(w: World, h: Hud, r: CameraRig) -> void:
 	hud.order.connect(_order)
 	_tile_mark = _marker(true)
 	_reach_mark = _marker(false)
+	_worth_mark = Label3D.new()
+	_worth_mark.font = Style.title_font()
+	_worth_mark.font_size = 48
+	_worth_mark.pixel_size = 0.005
+	_worth_mark.modulate = Color(0.9, 0.95, 1.0)
+	_worth_mark.outline_modulate = Color(0.02, 0.03, 0.06)
+	_worth_mark.outline_size = 10
+	_worth_mark.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	_worth_mark.no_depth_test = true
+	_worth_mark.visible = false
+	add_child(_worth_mark)
 	_ghost_mat = StandardMaterial3D.new()
 	_ghost_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	_ghost_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -135,12 +147,14 @@ func _process(_delta: float) -> void:
 	var tile := world.level.tile_at(p)
 	hud.hover(null if held != "" and not held.begins_with("spell:") else monster_at(_mouse), _mouse)
 	if held == "" or held == "gate":
+		_worth_mark.visible = false
 		_tile_mark.visible = held == "gate" and _arch_at(tile) >= 0
 		if _tile_mark.visible:
 			_tile_mark.global_position = world.level.tile_pos(tile) + Vector3(0, 0.06, 0)
 		_hover(tile)
 		return
 	if held.begins_with("spell:"):
+		_worth_mark.visible = false
 		var spell: Dictionary = world.start["spells"][held.substr(6)]
 		if String(spell["aim"]) == "tower":   # the tower under the mouse lights up, its tile marked
 			var t := world.tower_at(tile)
@@ -153,7 +167,8 @@ func _process(_delta: float) -> void:
 		var radius: float = max(float(spell["radius"]), 0.6) * Level.TILE
 		_show_reach(Vector3(p.x, 0, p.z), radius, Color(0.6, 0.8, 1.0, 0.9))
 		return
-	var ok := world.level.buildable(tile) and world.tower_at(tile) == null and world.gold >= world.tower_cost(held)
+	var ok := (world.level.buildable(tile) and world.tower_at(tile) == null
+		and not world.blighted_at(tile) and world.gold >= world.tower_cost(held))
 	var at := world.level.tile_pos(tile)
 	_ghost.visible = world.level.cell(tile) != "#"
 	_ghost.global_position = at
@@ -163,6 +178,24 @@ func _process(_delta: float) -> void:
 	var colour := Color(0.5, 1.0, 0.6, 0.9) if ok else Color(1.0, 0.35, 0.3, 0.9)
 	(_tile_mark.material_override as ShaderMaterial).set_shader_parameter("color", colour)
 	_show_reach(at, float(world.tower_table(held)["levels"][0]["range"]) * Level.TILE, colour)
+	_show_worth(tile, at)
+
+
+## The hovered cell's worth to the held tower, from the battle's worth tables: how much of the monsters'
+## walk a tower there reaches, with the gates as they stand.
+func _show_worth(tile: Vector2i, at: Vector3) -> void:
+	var table: Dictionary = (world.start.get("worth", {}) as Dictionary).get(held, {})
+	_worth_mark.visible = _tile_mark.visible and not table.is_empty()
+	if not _worth_mark.visible:
+		return
+	var cells: Dictionary = table["bare"]
+	for d in world.doors:
+		if bool(d[2]):
+			for g in table["gates"]:
+				if int(g["door"]) == int(d[0]):
+					cells = g["cells"]
+	_worth_mark.global_position = at + Vector3(0, 1.6, 0)
+	_worth_mark.text = "%.1f tiles of the walk" % float(cells.get("%d,%d" % [tile.x, tile.y], 0.0))
 
 
 ## With nothing held, the tower under the mouse shows its reach faintly; the chosen tower's stays bright.
