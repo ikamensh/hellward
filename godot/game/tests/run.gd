@@ -21,7 +21,8 @@ func _ready() -> void:
 			test_a_monster_at_the_shrine_strikes_it_and_is_gone, test_the_plate_of_a_monster_under_the_mouse,
 			test_defeat_ends_the_battle_and_its_music,
 			test_the_watched_defence_holds_and_ends_with_victory, test_a_campaign_walk_through_every_screen,
-			test_a_run_from_the_long_night_to_its_laying_down, test_every_location_lays_out_and_plays]:
+			test_a_run_from_the_long_night_to_its_laying_down, test_the_camp_offers_relics_and_one_is_taken,
+			test_every_location_lays_out_and_plays]:
 		if only != "" and only not in t.get_method():
 			continue
 		_main = null
@@ -514,6 +515,36 @@ func test_a_run_from_the_long_night_to_its_laying_down() -> void:
 	check(await until(func(): return _showing(seen, "TitleScreen"), 10.0), "and it ends back at the title (%s)" % [seen])
 	var view = await game.ask("campaign")
 	check(view != null and int(view["runs_lost"]) >= 1, "the runner's campaign counts the lost run")
+	await Net.ask("switch_profile", {"name": "main"}).done
+
+
+## A run's relic: the camp after a held Tristram offers three, and the first key takes one into the run.
+func test_the_camp_offers_relics_and_one_is_taken() -> void:
+	await Net.ask("create_profile", {"name": "relic"}).done
+	var started: Dictionary = await Net.ask("start_run", {"seed": 11}).done
+	check(bool(started["data"]["active"]), "a run starts")
+	check(await win("tristram", "adaptive"), "the campaign's scripted player holds Tristram in the run")
+	await Net.ask("leave", {"again": true}).done   # the reckoning's Onward: the camp may take relics now
+	var view: Dictionary = (await Net.ask("run").done)["data"]
+	check((view["offer"] as Array).size() == 3, "the camp offers three relics")
+	var game: Game = load("res://scenes/game.tscn").instantiate()
+	_main = game
+	var seen: Array = []
+	game.shown.connect(func(s: Screen): seen.append(s.get_script().get_global_name()))
+	add_child(game)
+	check(await until(func(): return _showing(seen, "TitleScreen"), 10.0), "the title shows")
+	game.camp()
+	check(await until(func(): return _showing(seen, "CampScreen"), 10.0), "the camp shows (%s)" % [seen])
+	await frames(20)
+	var held := 0
+	for i in 150:   # the camp lays out after its own ask: knock until it answers
+		press(game.get_viewport(), KEY_1)
+		await frames(2)
+		var after = await game.ask("run")
+		if after != null and (after["relics"] as Array).size() == 1 and (after["offer"] as Array).is_empty():
+			held = 1
+			break
+	check(held == 1, "the first key takes one into the run")
 	await Net.ask("switch_profile", {"name": "main"}).done
 
 

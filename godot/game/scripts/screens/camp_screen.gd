@@ -1,12 +1,14 @@
 class_name CampScreen
 extends Screen
 ## The camp between a run's locations: the pool, the purse, the level and the points, the goals drawn for the
-## place ahead and what the run has held so far. Continue walks into the intro; the tree and the forge open over
-## the camp; laying the run down banks its salvage and ends it. On the first run the way on is marked.
+## place ahead and what the run has held so far, the relics won and the camp's offered choice of one more.
+## Continue walks into the intro; the tree and the forge open over the camp; laying the run down banks its
+## salvage and ends it. On the first run the way on is marked.
 ## data = the run's view (Campaign.run_view).
 
 var _names := {}                      # location keys to their names, from the campaign's view
 var _first := false
+var _page: Control                    # the laid page, so taking a relic lays it again
 
 
 func build() -> void:
@@ -53,7 +55,13 @@ func _lay() -> void:
 	if _first and (data["records"] as Array).is_empty():
 		inner.add_child(Ui.paragraph("Your first run: hold %s. Spend points on the tree before you go." % [at], 22,
 			Style.GOLD, 880, HORIZONTAL_ALIGNMENT_CENTER))
+	for held in data["relics"]:
+		inner.add_child(Ui.paragraph("%s — %s" % [String(held["name"]), String(held["words"])], 20,
+			Style.PALE_GOLD, 880, HORIZONTAL_ALIGNMENT_CENTER))
 	col.add_child(PauseScreen.card(inner, 960))
+	if not (data["offer"] as Array).is_empty():
+		col.add_child(PauseScreen.gap(6))
+		col.add_child(_offer())
 	col.add_child(PauseScreen.gap(10))
 
 	var ways := HBoxContainer.new()
@@ -70,7 +78,35 @@ func _lay() -> void:
 	for b in [ahead, tree, forge, lay]:
 		ways.add_child(b)
 	col.add_child(ways)
-	add_child(PauseScreen.centred(col))
+	_page = PauseScreen.centred(col)
+	add_child(_page)
+
+
+## The camp's offered choice after a held location: each relic's name and words, a finger on each.
+func _offer() -> Control:
+	var inner := VBoxContainer.new()
+	inner.add_theme_constant_override("separation", 8)
+	inner.add_child(PauseScreen.heading("Take one relic", 26, Style.PALE_GOLD))
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	var n := 1
+	for gift in data["offer"]:
+		var take := Ui.button("%s — %s" % [String(gift["name"]), String(gift["words"])], str(n), 280)
+		take.pressed.connect(func(): _take(String(gift["key"])))
+		row.add_child(take)
+		n += 1
+	inner.add_child(row)
+	return PauseScreen.card(inner, 960)
+
+
+func _take(key: String) -> void:
+	var view = await ask("take_relic", {"key": key})
+	if view == null:
+		return
+	data = view
+	_page.queue_free()
+	_lay()
 
 
 func _named(key: String) -> String:

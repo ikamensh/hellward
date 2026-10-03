@@ -429,6 +429,9 @@ func _event(e: Array) -> void:
 				Sfx.play("gold")
 			else:
 				announce.emit("The wager fails", "The bonus pack got through.")
+		"relic":
+			announce.emit(String(e[2]), "A relic fires.")
+			Sfx.play("upgrade")
 		_:
 			push_warning("an event this client does not show: %s" % kind)
 	happened.emit(e)
