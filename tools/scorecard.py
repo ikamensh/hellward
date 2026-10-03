@@ -145,6 +145,28 @@ def hymn_seeks() -> list[Result]:
                    lift >= 1.5 and expected >= 2.0)]
 
 
+def armor_duels() -> list[Result]:
+    """M9: in each act from the Catacombs on, a location a light build loses and a heavy build of equal
+    gold wins (tools/armor.py: pure arrows against pure ballistae at 3:2 counts on shared tiles). The
+    tripwire fights two seeds; tests/test_armor.py fights six."""
+    from tools.armor import capped, duel, full
+    gate_light, gate_heavy, gate_cost = duel("hells_gate", capped, 9, [0, 1])
+    temple_light, temple_heavy, temple_cost = duel("temple", full, 9, [0, 1])
+    caves_light, _, caves_cost = duel("caves", capped, 9, [0, 1])
+    return [
+        Result("M9", "hells_gate: light loses, heavy wins (108 gold)",
+               f"light {' '.join(gate_light)} heavy {' '.join(gate_heavy)}",
+               gate_cost == 108 and all(o.startswith("d") for o in gate_light)
+               and all(o.startswith("v") for o in gate_heavy)),
+        Result("M9", "temple: light loses, heavy wins (300 gold)",
+               f"light {' '.join(temple_light)} heavy {' '.join(temple_heavy)}",
+               temple_cost == 300 and all(o.startswith("d") for o in temple_light)
+               and all(o.startswith("v") for o in temple_heavy)),
+        Result("M9", "caves control: light holds unarmored at 108 gold", " ".join(caves_light),
+               caves_cost == 108 and all(o.startswith("v") for o in caves_light)),
+    ]
+
+
 def tower_kinds() -> list[Result]:
     mechanics = [kind.name for kind in TOWERS.values() if kind.attack not in ATTACKS]
     share = len(mechanics) / len(TOWERS)
@@ -368,12 +390,12 @@ def _union_length(spans: list[tuple[float, float]]) -> float:
 
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
     bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, hymn_seeks, tower_kinds, real_estate,
-    worth_and_cells, blight_kinds, power_table,
+    worth_and_cells, blight_kinds, power_table, armor_duels,
 )
 
 NOT_YET = (
     "G1.1", "G1.2", "G1.3", "G1.4", "G1.5", "G1.6", "G2.2", "G2.5", "G2.6", "G3.1", "G3.2", "G3.3",
-    "M1", "M2", "M3", "M5", "M7", "M9", "M10", "S2", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
+    "M1", "M2", "M3", "M5", "M7", "M10", "S2", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
     "R4", "T2", "T4",
 )
 

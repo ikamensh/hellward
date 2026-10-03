@@ -81,6 +81,11 @@ M7's targets:
 - an attack tower with its ability holds up to 3 charges, one per ~15 s, with a charged-attack cooldown;
 - Foresight wastes ≥ 20% fewer charges and raises the margin.
 
+M9's duels (tools/armor.py, seeds 0-5): hells_gate capped at rank I (9 arrows against 6 ballistae,
+108 gold) goes 0-6 against 6-6; the temple to rank III (300 gold with its gate) goes 0-6 against
+6-6; the unarmored caves at the same capped 108 gold hold 6-6, so it is the armor. Armor 2 bites
+rank I (ranks would let the arrows escape it); armor 3 holds even rank III (4 damage to 1).
+
 ## Global spells
 
 | ID | Criterion | Judge | Target |
