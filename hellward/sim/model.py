@@ -751,7 +751,7 @@ class World:
         saved, self.break_left = self.break_left, None
         self.wave_alive[self.wave] += len(tagged)
         self.bonus = Bonus(pack.stake, pack.wager, pack.profit, pack.xp, pack.life_factor, len(tagged),
-                           saved_break=saved)
+                           fail=pack.fail, saved_break=saved)
         self._emit("bonus", pack.stake, "summoned")
 
     def _start_wave(self) -> None:
@@ -1542,6 +1542,7 @@ class World:
         if pack is not None and pack.alive == 0:
             self.bonus = None
             if pack.leaked:
+                self.lives -= pack.fail   # the ravage, over whatever the pack leaked
                 self._emit("bonus", pack.stake, "failed")
             else:
                 self.gold += pack.wager + pack.profit

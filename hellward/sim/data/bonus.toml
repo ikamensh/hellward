@@ -1,7 +1,9 @@
 # Bonus waves: the stake is a wager on a harder pack, paid only when nothing of it leaks. The profit grows
 # faster than the stake; each further bonus wave at a location pays and gives XP at repeat of the one before.
-# First guesses; tools/runs.py measures them (G3.3).
+# A failed pack ravages the sanctuary over its leaks: the wager's risk. First guesses; tools/runs.py measures
+# them (G3.3).
 
+fail_lives = 8                     # a failed pack's flat cost in sanctuary life, over what it leaked
 units = [1, 2, 3]                  # the wager in income units, by stake
 profit_mult = [2.8, 7.0, 14.0]     # the profit in income units: this times the wager's unit
 repeat = 0.6                       # each further bonus wave at a location pays this of the one before

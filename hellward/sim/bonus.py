@@ -32,6 +32,7 @@ EARLY: Final = tuning.integer("bonus.early")
 AHEAD: Final = tuple(int(a) for a in tuning.numbers("bonus.pack_ahead"))
 LIFE: Final = tuning.numbers("bonus.life_factor")
 EXTRA: Final = tuple(tuning.get("bonus.extra"))
+FAIL: Final = tuning.integer("bonus.fail_lives")
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,7 @@ class BonusPack:
     profit: int                   # gold over the wager back, when nothing leaks
     xp: float
     lives: int                    # what the pack costs the pool if it all leaks
+    fail: int = 0                 # what a failed pack ravages over its leaks (drawn packs: FAIL)
 
     @property
     def pack(self) -> tuple[Group, ...]:
@@ -73,6 +75,7 @@ class Bonus:
     xp: float
     life_factor: float
     alive: int
+    fail: int = 0
     leaked: bool = False
     saved_break: float = 0.0      # the break's remainder when the pack came: the clock resumes here
 
@@ -117,7 +120,7 @@ def draw(location: Location, stake: int, seed: int, index: int, repeats: int = 0
     lives = int_sum(group.count * MONSTERS[group.kind].lives for group in groups)
     if kind is not None:
         lives += MONSTERS[kind].lives
-    return BonusPack(stake, groups, LIFE[stake - 1], kind, wager, profit, xp, lives)
+    return BonusPack(stake, groups, LIFE[stake - 1], kind, wager, profit, xp, lives, FAIL)
 
 
 def preview(pack: BonusPack) -> str:
@@ -126,4 +129,5 @@ def preview(pack: BonusPack) -> str:
                       for group in sorted(pack.pack, key=lambda g: g.kind))
     harder = f", with {pack.life_factor:g}x life" if pack.life_factor != 1.0 else ""
     return (f"Stake {pack.stake} for {pack.wager} gold: {kinds}{harder}. {pack.lives} lives at stake. "
-            f"Clear it with no leak for the wager back and {pack.profit} gold.")
+            f"Clear it with no leak for the wager back and {pack.profit} gold; "
+            f"a leak fails it for the wager and {pack.fail} sanctuary life.")

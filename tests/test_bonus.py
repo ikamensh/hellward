@@ -120,7 +120,16 @@ def test_a_leak_fails_the_pack_and_pays_nothing():
     amble(world)   # no towers: the pack walks out
     assert ("bonus", 1, "failed") in world.events
     assert world.gold == gold and world.xp_total == xp
-    assert world.lives < lives
+    assert world.lives == lives - pack.lives - pack.fail   # every leak, then the ravage
+
+
+def test_the_preview_names_the_fail_cost_beside_the_reward():
+    from hellward.sim.bonus import preview
+
+    world = broken_in()
+    pack = draw(world.location, 3, 1, 0)
+    words = preview(pack)
+    assert str(pack.fail) in words and "sanctuary life" in words
 
 
 def test_a_bonus_kill_pays_no_bounty_and_no_xp_mid_fight():
