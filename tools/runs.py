@@ -293,10 +293,16 @@ def play_run(seed: int, bot: str, locations: tuple[str, ...], immortal: bool,
             summary.setdefault("relics", []).append([key, run.relics[-1]])
         summary["sim_seconds"] += world.time
         summary["reached"] += 1
+        catches = [len(e[4]) for e in events if e[0] == "cursed"]
         summary["locations"][key] = {"won": result.won, "lives_lost": result.lives_lost,
                                      "pool": run.pool, "gold": run.gold, "level": run.level,
                                      "sigils": run.records[-1].sigils,
-                                     "goals": [(d.key, d.arg, v) for d, v in result.goals]}
+                                     "goals": [(d.key, d.arg, v) for d, v in result.goals],
+                                     "towers": len(world.towers), "builds": world.builds,
+                                     "curses": len(catches),
+                                     "caught": round(sum(catches) / len(catches), 2) if catches else 0.0,
+                                     "blights": world.blights,
+                                     "blight_cells": len(world.blighted_cells)}
         for goal, verdict in run.records[-1].goals:
             met, pursued = summary["goals"].get(goal.key, (0, 0))
             if goal.key == "family" and not player.pursued_family:
@@ -408,6 +414,19 @@ def _report(summaries: list[dict], immortal: bool) -> list[str]:
         lines.append("losses: " + ", ".join(f"{key} {count}" for key, count in sorted(losses.items())))
     tree = sum(s["tree"] for s in summaries) / len(summaries)
     lines.append(f"mean tree opened: {tree:.0%}")
+    places = [place for s in summaries for place in s["locations"].values()]
+    towers = [p["towers"] for p in places]
+    lines.append(f"towers standing at a defence's end: mean {sum(towers) / len(towers):.1f} "
+                 f"most {max(towers)} (R4: low with no cap)")
+    curses = sum(p["curses"] for p in places)
+    caught = sum(p["caught"] * p["curses"] for p in places)
+    lines.append(f"landed curses caught {caught / curses:.2f} towers on average over {curses} "
+                 f"(R5: at least 1.5)" if curses else "no curse landed")
+    cells = [(key, p["blight_cells"]) for s in summaries for key, p in s["locations"].items() if p["blight_cells"]]
+    if cells:
+        counts = [c for _, c in cells]
+        lines.append(f"blighted cells a location that has blight: {min(counts)}-{max(counts)} "
+                     f"(R6: 1-5, {len(cells)} defences)")
     minutes = sum(s["sim_seconds"] for s in summaries) / len(summaries) / 60
     lines.append(f"mean run: {minutes:.1f} sim-minutes")
     return lines

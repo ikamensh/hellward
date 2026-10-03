@@ -20,7 +20,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from hellward.sim.balance import BALANCE  # noqa: E402
-from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
+from hellward.sim.campaign import ACTS, LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import MAX_POISON_STACKS, MONSTERS, SPELLS, TOWERS, TowerKind, felt_hit  # noqa: E402
 from hellward.sim.model import World  # noqa: E402
 from tools.maps import (LEAST_CLUSTERED, LEAST_OCCUPIED, MOST_PRIME, REFERENCE_REACH, survey, traffic,  # noqa: E402
@@ -151,6 +151,36 @@ def real_estate() -> list[Result]:
                f"{maps[scattered].clustered_share:.0%} ({scattered})",
                maps[scattered].clustered_share >= LEAST_CLUSTERED),
     ]
+
+
+def worth_and_cells() -> list[Result]:
+    """R2: a battle's start carries every offered kind's per-cell coverage; R7: every frame's state carries
+    each taken cell with its waves left, and each mark with its seconds."""
+    from hellward.server.protocol import battle_start, state
+    world = World(LOCATIONS["tristram"], seed=1)
+    start = battle_start(world, demo=True, breach_claim=None)
+    kinds = set(start["worth"]) == set(LOCATIONS["tristram"].arsenal.towers)
+    bare = bool(start["worth"]["arrow"]["bare"])
+    world.blighted[(3, 4)] = (2, "webbed")
+    found = state(world)
+    taken = found["blighted"] == [[3, 4, 2, "webbed"]] and isinstance(found["blight_marks"], list)
+    return [Result("R2", "per-cell coverage in the battle's start", f"{len(start['worth'])} kinds",
+                   kinds and bare),
+            Result("R7", "a taken cell in the frame's state", str(found["blighted"]), taken)]
+
+
+def blight_kinds() -> list[Result]:
+    """R6's content half: a kind that takes empty cells walks each act's waves, its mark burning at least 1.5 s
+    before it lands, its cells taken for two cleared waves (tests/test_blight.py plays the engine)."""
+    blighters = {key for key, kind in MONSTERS.items() if kind.blight is not None}
+    out = []
+    for act, keys in ACTS.items():
+        walked = {g.kind for key in keys for wave in LOCATIONS[key].waves for g in wave.groups}
+        mine = sorted(blighters & walked)
+        spec = all(MONSTERS[key].blight is not None and MONSTERS[key].blight.telegraph >= 1.5
+                   and MONSTERS[key].blight.waves == 2 for key in mine)
+        out.append(Result("R6", f"act {act}'s cell-takers", ", ".join(mine) or "none", bool(mine) and spec))
+    return out
 
 
 def power_table() -> list[Result]:
@@ -301,13 +331,13 @@ def _union_length(spans: list[tuple[float, float]]) -> float:
 
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
     bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, tower_kinds, real_estate,
-    power_table,
+    worth_and_cells, blight_kinds, power_table,
 )
 
 NOT_YET = (
     "G1.1", "G1.2", "G1.3", "G1.4", "G1.5", "G1.6", "G2.2", "G2.5", "G2.6", "G3.1", "G3.2", "G3.3",
     "M1", "M2", "M3", "M5", "M7", "M9", "M10", "S2", "S3", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
-    "R2", "R4", "R6", "R7", "T2", "T4",
+    "R4", "T2", "T4",
 )
 
 
