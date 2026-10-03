@@ -188,6 +188,8 @@ def battle_beat(location: Location, *, first: bool = False) -> Beat:
     new = list(dict.fromkeys(group.kind for wave in waves for group in wave.groups
                                if born[group.kind] == location.key))  # kinds walking here first
     body = [f"{len(waves)} waves, {bodies} bodies"]
+    # What the client tells the player the fight is for (intro.gd title card, main.gd announce).
+    body.append("objective: Hold the sanctuary until the last wave breaks. (the client's title card)")
     body += [_wave_mix(location, i) for i in range(len(waves))]
     if new:
         marked = [f"{MONSTERS[kind].name} (stand-in)" if not modelled(kind)
@@ -198,6 +200,7 @@ def battle_beat(location: Location, *, first: bool = False) -> Beat:
         pack = ", ".join(f"{MONSTERS[g.kind].name} ×{g.count}" for g in spec.pack)
         body.append(f"breach after w{spec.after_wave + 1}: {spec.name} — {spec.elite_name} "
                     f"({MONSTERS[spec.elite.kind].name}) + {pack}")
+        body.append(f"sealed entrance: {spec.blurb}")  # the briefing screen shows name and blurb
     body.append(f"music: battle_{location.key} — {DUNGEONS[location.key].blurb} (playing since the briefing)")
     walking = list(dict.fromkeys(g.kind for g in waves[-1].groups if MONSTERS[g.kind].boss))
     for kind in walking:

@@ -125,8 +125,16 @@ def test_fights_carry_the_breach_where_one_is_offered():
         if location in BREACHES:
             spec = BREACHES[location]
             assert f"breach after w{spec.after_wave + 1}: {spec.name}" in body, location
+            assert spec.blurb in body, location
         else:
             assert "breach after" not in body, location
+
+
+def test_fights_state_the_client_objective():
+    beats = {beat.key: beat for beat in walk.beats()}
+    for location in ORDER:
+        body = "\n".join(beats[f"{location}/battle"].body)
+        assert "objective: Hold the sanctuary until the last wave breaks." in body, location
 
 
 def test_fights_carry_the_music_and_the_boss_break_in():

@@ -21,8 +21,12 @@ it goes out. [LAMP-2]
 **The lantern.** Akara lights the keeper's lantern from the lamp of Tristram at
 the well, on the first night. From then on the keeper carries the lamp's own
 flame into every fight. [LANT-1] Lamps burn oil; the lantern burns on the
-keeper's keeping. That is why it survives the mother lamp's going out, when
-every oil flame lit from her dies. [LANT-2]
+keeper's keeping. A flame given into keeping burns on keeping from that hour —
+oil cannot starve it afterwards. That is why it survives the mother lamp's
+going out, when every oil flame lit from her dies. [LANT-2]
+
+**The chain.** When the mother lamp goes out, every daughter dies with her;
+when she is relit, they catch again. The chain remakes itself. [MOTH-1]
 
 **The keeping.** The keeping passes from keeper to keeper, night by night;
 tonight it is yours. Akara can mind a lamp, but the old towers answer only the
@@ -85,9 +89,25 @@ flight east, and the draining of the mother lamp a little each night. [PRIEST-1]
 His tells: "your saints" (never "ours"), and "my lamp" (it was his charge; the
 saints were never his people). [PRIEST-2] His arc: certain, annoyed, curious,
 afraid, bargaining — and at the end, seeing the keeper at last, content to be
-dust. [PRIEST-3] The crown in every panel is his own doing: when he stopped
-keeping he crowned himself — keeper no longer, but king of what comes through.
-[CROWN-1]
+dust. [PRIEST-3] Seeing the keeper — the keeping truly held — releases him;
+nine hundred years catch up at once, and he is dust. [REL-1] The crown in
+every panel is his own doing: when he stopped keeping he crowned himself —
+keeper no longer, but king of what comes through. [CROWN-1]
+
+**His voice.** His taunts run ahead of every host, carried by his acolytes on
+the eve of battle; the briefings stage them as his voice. That is how he
+taunts fights he does not attend. [TAUNT-1]
+
+**The flame answers.** The towers answer the flame-bearer. The Council may
+give him the keeping of the lamp, but his hands are empty, and the old towers
+know it. [FLAME-1]
+
+**The leash.** Azazel was the Flayers' lord; dead lords hold no leash. The
+priest holds it now. [LEASH-1]
+
+**The elders.** On the terrace the curse-casters are the elders: "elders" in
+the Travincal words means the leaders the player fights, whatever their kinds.
+Accepted veil — the white-and-gold models carry it. [ELDER-1]
 
 **The Council.** The High Council kept the mother lamp carelessly for years; its
 oil was already low when his letter came. The Zakarum church has fallen — its
@@ -232,31 +252,59 @@ text — verify on a full walk with panels open.)*
 
 ## Open questions
 
-1. Flayers in Tristram waves 3–4: TEASE-1 says bought southern knives. Needs
-   one acknowledging clause in tristram-before or its blurb — or a roster move.
-2. "Ask me your questions at dawn" (tristram-before): answered by the finger
-   bone + tally wall (tristram-after, graveyard-after). Confirm the telling
-   earns it, or rephrase.
-3. Candle on the first step (words) vs. on the altar (panel): reword (cheap,
-   recommended) or repaint?
-4. Churchyard gate: verified on the panel — the iron gates stand ajar, and
-   neither blind watcher flagged it. Dropped; the words stand.
-5. Does the intro's "you wake what the old house still holds" need a
-   raise-sibling for TOWER-1? (Voice/video regen costs; prefer a telling fix
-   in tristram-before over touching the prologue.)
-6. Repaints recommended (plot-critical, words cannot yield): hells_gate-before
-   door barely open; travincal-after + temple-before mother lamp dim;
-   catacombs-after lamp cold; docks necromancer bone armour. Approval + credit
-   needed; words stay as written until painted.
-7. Travincal bargain: mark it a lie in the telling (he knows the mother lamp's
-   death takes Tristram's)? One clause in travincal-before or the taunt.
-8. **CLOSED by this canon:** orb fiction (ORB-1/LANT-1), wake-vs-build
-   (TOWER-1/TOWER-2), priest's motive (PRIEST-1), why the bones never show the
-   keeper (BONES-1: they cannot show the light itself), the lantern's survival
-   (LANT-2: it burns on keeping, not oil), why the keeper is needed
-   (KEEPER-2), his 900 years (KEEP-1), his crown (CROWN-1), the Council's
-   neglect and open service (COUNCIL-1), nearer door first (PLAN-1), the
-   keeper's dead (DEAD-2), breaches (BREACH-1).
+Iteration 1 closed 1–7 (applied + committed 05cb5af; re-check verified the
+core lands). What follows is iteration 2, from the re-check reports (R1 = the
+rule the telling must still earn, with its canon tag).
+
+1. LANT-2 bridge: the lantern is lit as oil-flame but burns oil-less. Needs
+   the transition stated (Akara: keeping feeds it from that hour). [R1/LANT-2]
+2. MOTH-1 plot: the daughters' death and rekindling happen off-page. Needs
+   one dying clause (act2-end-2) and one catching clause (act2-end-4).
+   [R1/MOTH-1]
+3. REL-1: his death needs its cause stated (release: 900 years at once).
+   [R1/REL-1]
+4. FLAME-1: the towers answer the flame, his hands are empty — needs one
+   telling line (travincal-before). [R1/FLAME-1]
+5. LEASH-1: Azazel was the Flayers' lord; the priest holds the leash now.
+   Needs one clause (docks-before). [R1/LEASH-1]
+6. TAUNT-1: taunts run ahead by acolyte on the eve of battle. Needs one line
+   (docks-before). [R1/TAUNT-1]
+7. Cellars vs churchyard (tristram-after): genuine contradiction, needs the
+   two-origin fix. [R1]
+8. Travincal-before: drop "too", mark the bargain spent coin, note the
+   Council's open eyes (COUNCIL-1). [R1]
+9. Candle lit vs "still warm" (cathedral-after): reword to "still burning".
+   [R1]
+10. Caves-after figure unanchored: needs the priest-in-memory clause. [R1]
+11. Spider_forest-after still weakest (both re-checkers): needs the
+    oil-pressing turn (also foreshadows the finale's oil). [R1]
+12. Docks-before armour still reads plate (re-checker B): retry repaint with
+    skeletal shapes; drowned_city-after needs the same for design consistency.
+    [R1]
+13. Travincal-before lamp bright though drained for nights: repaint sickly.
+    [R1]
+14. Flask vs keg (act2-end-3 panel shows a cask): reword both beats to "cask".
+    [R1]
+15. Abomination walks temple w4 wordless: needs one naming clause
+    (temple-before). [R1]
+16. Three single-clause earns: keeping-vs-minding (caves-before, KEEPER-2);
+    Kurast's old temple ground (act1-end-3, TOWER-2); the stolen art spends
+    with the army (docks-after, DEAD-1). [R1]
+17. **Accepted, no telling change:** keeper's origin blank (deliberate,
+    KEEPER-1); "my lamp" first-read (resolves at hells_gate); elders veil
+    (ELDER-1); boat off-frame (moored hulls at act1-end-3's right edge);
+    Azazel's body behind the shut door; gargoyles "hang"→"roost" (trivial,
+    batched); necromancer's thin past (his payoff is the bones' rule);
+    prologue skeletons (both sides raise dead); Blood Bat's small model.
+18. **CLOSED by this canon:** orb fiction (ORB-1/LANT-1), wake-vs-build
+    (TOWER-1/TOWER-2), priest's motive (PRIEST-1), why the bones never show
+    the keeper (BONES-1), the lantern's survival (LANT-2), the chain
+    (MOTH-1), his release (REL-1), his voice (TAUNT-1), the flame answers
+    (FLAME-1), the leash (LEASH-1), the elders (ELDER-1), why the keeper is
+    needed (KEEPER-2), his 900 years (KEEP-1), his crown (CROWN-1), the
+    Council's neglect and open service (COUNCIL-1), nearer door first
+    (PLAN-1), the keeper's dead (DEAD-2), breaches (BREACH-1), gold/mana/gates
+    (COIN-1/GATE-1).
 
 ## Review principles
 
