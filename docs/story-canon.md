@@ -25,8 +25,9 @@ keeper's keeping. A flame given into keeping burns on keeping from that hour —
 oil cannot starve it afterwards. That is why it survives the mother lamp's
 going out, when every oil flame lit from her dies. [LANT-2]
 
-**The chain.** When the mother lamp goes out, every daughter dies with her;
-when she is relit, they catch again. The chain remakes itself. [MOTH-1]
+**The chain.** When the mother lamp goes out, every daughter dies with her.
+Akara's candle burns through the dark on keeping alone, and from it she
+lights Tristram's lamp again once the mother burns. [MOTH-1]
 
 **The keeping.** The keeping passes from keeper to keeper, night by night;
 tonight it is yours. Akara can mind a lamp, but the old towers answer only the
@@ -84,8 +85,10 @@ lamp; dead and not gone. Every night he cast his bones before the door, and
 every night they showed the lamp going out. Somewhere in those years he stopped
 keeping the lamp and began to love the future the bones showed — he serves it
 now, the way he once served the lamp. That is his whole motive: certainty
-become worship. It explains the bargain with Azazel, the host sent upward, the
-flight east, and the draining of the mother lamp a little each night. [PRIEST-1]
+become worship. What he wants is an end: he cannot lay the keeping down
+[KEEP-1] — so he will destroy what it keeps. It explains the bargain with
+Azazel, the host sent upward, the flight east, and the draining of the mother
+lamp a little each night. [PRIEST-1]
 His tells: "your saints" (never "ours"), and "my lamp" (it was his charge; the
 saints were never his people). [PRIEST-2] His arc: certain, annoyed, curious,
 afraid, bargaining — and at the end, seeing the keeper at last, content to be
