@@ -136,7 +136,8 @@ class Campaign:
                         for r in run.records],
             "salvage": run.salvage, "equipped": list(run.equipped),
             "won": run.won, "lost": run.lost,
-            "relics": [{"key": key, "name": RELICS[key].name, "words": RELICS[key].words}
+            "relics": [{"key": key, "name": RELICS[key].name, "words": RELICS[key].words,
+                         "count": dict(run.counters).get(key, 0), "every": RELICS[key].every}
                        for key in run.relics],
             "offer": [{"key": key, "name": RELICS[key].name, "words": RELICS[key].words}
                       for key in run.offer],

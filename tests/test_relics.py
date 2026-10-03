@@ -248,3 +248,167 @@ def test_a_run_with_relics_saves_and_resumes():
     assert back.offer == run.offer
     assert back.counters == run.counters
     assert kit(back).relics == run.relics
+
+
+def test_a_struck_shrine_rings_every_tower_a_charge_and_drains_the_well():
+    world = arena(relics=("bell",))
+    tower = world.build("arrow", floor(world, 1)[0])
+    world.attune(tower.id)
+    world.mana = world.mana_max
+    world.call_wave()
+    while not world.monsters:
+        world.step()
+    tower.charges = 2.9
+    monster = world.monsters[0]
+    monster.s = world.level.route(monster.route).length - 0.01
+    world.step()
+    assert world.leaks == 1
+    assert tower.charges == 3.0
+    assert world.mana == world.mana_max - 15.0
+    assert ("relic", "bell", "The Martyr's Bell") in world.events
+
+
+def test_full_charges_reach_one_further_with_the_seal():
+    world = arena(relics=("hoard",))
+    tower = world.build("arrow", floor(world, 1)[0])
+    world.attune(tower.id)
+    assert world.striking_reach(tower) == tower.reach + 1.0
+    tower.charges = 2.0
+    assert world.striking_reach(tower) == tower.reach
+
+
+def test_every_third_curse_answers_its_caster():
+    from hellward.sim.content import Curse
+    world = arena("shaman", relics=("candle",))
+    tiles = floor(world, 9)
+    for tile in tiles:
+        world.build("arrow", tile)
+    world.call_wave()
+    while not any(m.kind.key == "shaman" for m in world.monsters):
+        world.step()
+    leader = next(m for m in world.monsters if m.kind.key == "shaman")
+    tile = min(world.level.path_tiles, key=lambda t: (t[0] - tiles[0][0]) ** 2 + (t[1] - tiles[0][1]) ** 2)
+    leader.s = world.level.s_of(tile)
+    before = leader.hp
+    for _ in range(3):
+        world._land(leader.id, Curse.WEAKEN, tiles[0])
+    smites = [e for e in world.events if e[0] == "smite" and e[1] == leader.id]
+    assert len(smites) == 1
+    assert leader.hp < before
+    assert world.spells_cast == 1
+
+
+def test_every_sixth_charge_casts_on_the_foremost():
+    world = arena(relics=("volatile",))
+    world.call_wave()
+    while not world.monsters:
+        world.step()
+    foremost = min(world.monsters, key=world.remaining)
+    before = foremost.hp
+    for _ in range(6):
+        world._relic("charge")
+    assert foremost.hp < before
+    assert world.spells_cast == 1
+    assert [e for e in relic_events(world) if e[1] == "volatile"] != []
+
+
+def test_a_given_charge_counts_the_verb():
+    from hellward.sim.model import WELL_EVERY
+    world = arena(relics=("volatile",))
+    well = world.build("well", floor(world, 2)[0])
+    neighbour = world.build("arrow", floor(world, 2)[1])
+    world.attune(neighbour.id)
+    world.call_wave()
+    while not world.monsters:
+        world.step()
+    neighbour.charges = 0.0
+    world.progress.clear()
+    well.timer = WELL_EVERY[0]
+    world.step(0.05)
+    assert ("charge_given", well.id, neighbour.id) in world.events
+    assert world.progress["volatile"] == 1
+
+
+def test_every_third_rank_attunes_free_and_every_fourth_tower_too():
+    from hellward.sim.skills import perks
+    world = arena(relics=("temper", "lodestone"), perks=perks({"adept_arrow"}))
+    one, two, three = floor(world, 3)
+    world.build("arrow", one)
+    world.build("arrow", two)
+    world.build("arrow", three)
+    assert not world.tower_at(one).attuned
+    fourth = world.build("arrow", floor(world, 4)[3])
+    assert fourth.attuned and fourth.charges == 3.0
+    gold = world.gold
+    world.upgrade(world.tower_at(one).id)
+    world.upgrade(world.tower_at(two).id)
+    assert not world.tower_at(one).attuned
+    world.upgrade(world.tower_at(three).id)
+    assert world.tower_at(three).attuned
+    assert world.gold < gold   # ranks paid; only the attunement was free
+
+
+def test_every_fifth_tower_wells_mana_from_a_smaller_well():
+    world = arena(relics=("bellows",))
+    world.mana = 0.0
+    for tile in floor(world, 5):
+        world.build("arrow", tile)
+    assert world.mana == 20.0
+    assert world.mana_max == world.perks.mana_max - 10.0
+
+
+def test_every_fifth_cast_charges_every_attuned_tower():
+    world = arena(relics=("stormglass",))
+    tower = world.build("arrow", floor(world, 1)[0])
+    world.attune(tower.id)
+    tower.charges = 0.0
+    for _ in range(5):
+        world._relic("cast", 0.0)
+    assert tower.charges == 1.0
+
+
+def test_most_relics_read_one_verb_and_write_another():
+    converters = [key for key, spec in RELICS.items() if spec.verb and spec.writes and spec.verb != spec.writes]
+    assert len(converters) / len(RELICS) >= 0.6
+    assert {"bell", "candle", "volatile", "temper", "bellows", "lodestone", "stormglass"} <= set(converters)
+
+
+def test_every_verb_costs_and_some_relic_pays_for_it():
+    # what leaning in costs, and the relics that turn the cost into payoff
+    costs = {"build": "gold", "upgrade": "gold", "cast": "mana", "curse": "tower-time",
+             "leak": "lives", "charge": "attunement gold"}
+    for verb in ("build", "upgrade", "cast", "curse", "leak", "charge"):
+        assert verb in costs
+        assert [key for key, spec in RELICS.items() if spec.verb == verb], verb
+
+
+def test_each_verb_tower_produces_or_consumes_one_verb():
+    # idol, censer, well and effigy are verb engines; altar and grove predate the verb system (auras)
+    engines = {"idol": "cast", "censer": "leak", "well": "charge", "effigy": "curse"}
+    for kind, verb in engines.items():
+        assert TOWERS[kind].attack not in ("bolt", "chain", "nova", "venom", "hook")
+        assert verb in ("build", "upgrade", "cast", "curse", "leak", "charge")
+
+
+def test_relics_fire_on_counts_touch_no_random_and_show_their_counters():
+    import inspect
+
+    from hellward.server.protocol import state
+    from hellward.sim import model
+    assert "random" not in inspect.getsource(model.World._relic)
+    assert "rng" not in inspect.getsource(model.World._relic)
+    for spec in RELICS.values():
+        assert (spec.every > 0) == bool(spec.verb)
+    world = arena(relics=("tithe", "bell"))
+    world.build("arrow", floor(world, 1)[0])
+    found = state(world)
+    assert found["relic_counters"] == {"tithe": 1, "bell": 0}
+    assert {"temper", "lodestone"} <= set(RELICS)   # free attunement: tech beyond the forge's teaching
+
+
+def test_downsides_come_only_with_a_chosen_relic_and_say_so():
+    downsides = {"blood_money", "canticle", "bell", "bellows"}
+    for key in downsides:
+        words = RELICS[key].words
+        assert "loses" in words or "less" in words or "costs" in words, key
+    assert downsides <= set(RELICS)   # every one of them a camp's offer away, never forced

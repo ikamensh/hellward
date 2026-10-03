@@ -31,7 +31,7 @@ from pathlib import Path
 from hellward.sim.campaign import ORDER, Location, idle
 from hellward.sim.content import MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Element, felt_hit
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
-from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
+from hellward.sim.players.hands import AIM_GAP, Hands, REACT, attune_spare, ready
 from hellward.sim.players.spacing import score_with_spacing
 from hellward.sim.skills import SKILLS, UNLOCK, can_learn, kept, perks, tower_levels, unlock_skills, unlocked
 
@@ -506,6 +506,8 @@ class Warden:
                     world.upgrade(tower.id)
             self.done += 1
         self._more(world)
+        while attune_spare(world, self.reserve):
+            pass
 
     def _more(self, world: World) -> None:
         """With the build done: a rank for the tower that has worked hardest, or a new tower on the best tile left."""

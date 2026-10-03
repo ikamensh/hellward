@@ -46,7 +46,7 @@ from hellward.sim.content import (
     CURSES, MONSTERS, SPELLS, TOWERS, Curse, Element, Group, MonsterKind, TowerLevel, felt_hit,
 )
 from hellward.sim.model import DOOR_STOP, HOOK_PAST, HOOK_PULL, JOSTLE, KNIFE_STANDING, Monster, Refused, Tower, World
-from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
+from hellward.sim.players.hands import AIM_GAP, Hands, REACT, attune_spare, ready
 from hellward.sim.players.spacing import max_curse_radius, score_with_spacing
 from hellward.sim.skills import SKILLS, can_learn
 
@@ -638,7 +638,13 @@ class Adaptive:
     # -- Gold ----------------------------------------------------------------------------------------
 
     def _spend(self, world: World) -> None:
-        """Buy the best-priced build or upgrade; when it is out of reach, one nearly as good that is not, else save."""
+        """Buy the best-priced build or upgrade; when it is out of reach, one nearly as good that is not, else save.
+        Spare gold past the saving attunes the hardest-working striker."""
+        self._buy(world)
+        while attune_spare(world, self._keep(world)):
+            pass
+
+    def _buy(self, world: World) -> None:
         while self.prices:
             spare = world.gold - self._keep(world)
             if spare < self.cheapest:

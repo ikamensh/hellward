@@ -57,8 +57,9 @@ def test_the_well_waits_for_a_thirsty_neighbour_and_skips_itself():
         world.step()
     well = world.build("well", CENTRE)
     neighbour = world.build("arrow", (CENTRE[0] - 1, CENTRE[1]))
-    world.attune(well.id)
     world.attune(neighbour.id)
+    well.attuned, well.charges = True, CHARGES_MAX   # attuned by hand: the gate forbids it in play,
+    # yet the watering must skip itself regardless
     well.timer = WELL_EVERY[0]
     world.events.clear()
     world.step(0.05)

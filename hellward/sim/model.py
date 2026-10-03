@@ -38,9 +38,13 @@ from hellward.sim.items import EMPTY_LOADOUT, Loadout, PATTERNS
 from hellward.sim.level import Level
 from hellward.sim.modes import MODES
 from hellward.sim.relics import (
+    BELL_MANA,
+    BELLOWS_MANA,
+    BELLOWS_WELL,
     BLOOD_GOLD,
     BLOOD_LIVES,
     CANTICLE_WELL,
+    HOARD_REACH,
     MARTYR_GOLD,
     MASTERWORK_MANA,
     RELICS,
@@ -59,6 +63,7 @@ if TYPE_CHECKING:
 SIM_DT: Final = 0.05            # the clock's step: not a tuning value (replays and the protocol count steps)
 SKIP_STEPS: Final = 3600        # a grind prediction's and a skip's longest look: three sim-minutes
 ATTUNE_GOLD: Final = 25         # an attunement's price in battle gold, per tower
+ATTUNABLE: Final = ("bolt", "chain", "venom")   # the shots that spend charges; the hook drags and the supports sing, and attunement would idle on them
 CHARGES_MAX: Final = 3.0        # the charges an attuned tower holds
 CHARGE_EVERY: Final = 15.0      # seconds per charge regained
 EMPOWER: Final = 3.0            # an empowered shot's damage
@@ -506,9 +511,17 @@ class World:
         found.sort(key=lambda t: t.id)
         return found
 
+    def striking_reach(self, tower: Tower) -> float:
+        """How far the tower's strikes reach: its own reach, plus the Hoarder's Seal for an attuned tower
+        with full charges."""
+        reach = tower.reach
+        if "hoard" in self.relics and tower.attuned and tower.charges >= CHARGES_MAX:
+            reach += HOARD_REACH
+        return reach
+
     def in_reach(self, tower: Tower, s: float, route: str = "main") -> bool:
-        spans = (self.level.coverage(tower.tile, tower.reach) if route == "main"
-                 else self.level.route(route).coverage(tower.tile, tower.reach))
+        spans = (self.level.coverage(tower.tile, self.striking_reach(tower)) if route == "main"
+                 else self.level.route(route).coverage(tower.tile, self.striking_reach(tower)))
         for a, b in spans:
             if a <= s <= b:
                 return True
@@ -560,7 +573,8 @@ class World:
 
     @property
     def mana_max(self) -> float:
-        return self.perks.mana_max - (CANTICLE_WELL if "canticle" in self.relics else 0.0)
+        return (self.perks.mana_max - (CANTICLE_WELL if "canticle" in self.relics else 0.0)
+                - (BELLOWS_WELL if "bellows" in self.relics else 0.0))
 
     @property
     def spells(self) -> tuple[str, ...]:
@@ -574,8 +588,9 @@ class World:
         """What the Battle Trance makes of every tower's attacks per second."""
         return TRANCE_RATE if self.fervor > 0 else 1.0
 
-    def _relic(self, verb: str, amount: float = 0.0) -> None:
-        """A verb happened: every held relic that reads it counts one, and fires on its count."""
+    def _relic(self, verb: str, amount: float = 0.0, who: Monster | Tower | None = None) -> None:
+        """A verb happened: every held relic that reads it counts one, and fires on its count. `who` is the verb's
+        subject where it has one: the tower raised or ranked, the leader whose curse landed."""
         for key in self.relics:
             spec = RELICS[key]
             if spec.verb != verb:
@@ -603,7 +618,42 @@ class World:
             elif key == "blood_money":
                 self.gold += round(amount) * BLOOD_GOLD
                 self.lives -= BLOOD_LIVES
+            elif key == "bell":
+                for tower in self.towers.values():
+                    if tower.attuned:
+                        tower.charges = min(CHARGES_MAX, tower.charges + 1.0)
+                self.mana = max(0.0, self.mana - BELL_MANA)
+            elif key == "candle":
+                if isinstance(who, Monster) and who.hp > 0:
+                    self._answer(who)
+            elif key == "volatile":
+                foremost: Monster | None = None
+                for monster in self.monsters:
+                    if monster.hp > 0 and (foremost is None or self.remaining(monster) < self.remaining(foremost)):
+                        foremost = monster
+                if foremost is not None:
+                    self._answer(foremost)
+            elif key == "temper" or key == "lodestone":
+                if isinstance(who, Tower) and not who.attuned:
+                    who.attuned = True
+                    who.charges = CHARGES_MAX
+                    self._emit("attuned", who.id)
+            elif key == "bellows":
+                self.mana = min(self.mana_max, self.mana + BELLOWS_MANA)
+            elif key == "stormglass":
+                for tower in self.towers.values():
+                    if tower.attuned:
+                        tower.charges = min(CHARGES_MAX, tower.charges + 1.0)
             self._emit("relic", key, spec.name)
+
+    def _answer(self, monster: Monster) -> None:
+        """A relic's answering smite: free, and a cast that counts, like the idol's rite. No bury: the slain
+        walk no further this step (every phase skips hp <= 0, like the censer's dead) and the step's end
+        buries them — burying here would mutate the monster list the caller walks."""
+        self._emit("smite", monster.id, self.position(monster))
+        self._hurt(monster, felt_hit(SPELLS["smite"].damage * self.power(), None, monster.kind), None)
+        self.spells_cast += 1
+        self._relic("cast", 0.0)
 
     @property
     def gate_life(self) -> float:
@@ -667,7 +717,7 @@ class World:
         tower.spent = cost
         self.towers[tower.id] = tower
         self.builds += 1
-        self._relic("build", cost)
+        self._relic("build", cost, tower)
         self._emit("built", tower.id, kind)
         return tower
 
@@ -702,7 +752,7 @@ class World:
         tower.level += 1
         tower.spent += cost
         self.upgrades += 1
-        self._relic("upgrade", cost)
+        self._relic("upgrade", cost, tower)
         self._emit("upgraded", tower.id)
 
     def sell(self, tower_id: int) -> int:
@@ -1072,7 +1122,7 @@ class World:
                 cursed.append(tower.id)
         if cursed:
             self.curses_landed += 1
-            self._relic("curse")
+            self._relic("curse", 0.0, leader)
             self._emit("cursed", leader_id, spot, curse, tuple(cursed))
             if spec is not None and spec.burn > 0:
                 amount = spec.burn * len(cursed)
@@ -1344,6 +1394,7 @@ class World:
         t.timer -= WELL_EVERY[t.level]
         best.charges = min(CHARGES_MAX, best.charges + 1.0)
         self._emit("charge_given", t.id, best.id)
+        self._relic("charge")
 
     def _immolate(self, t: Tower) -> None:
         """A censer's answer to a leak in its reach: every monster near it burns. Once a wave (the timer
@@ -1464,7 +1515,7 @@ class World:
                 t.cooldown = 0.0
                 continue
             stats = t.levels[t.level]
-            reach = stats.range * t.range_mult() if t.curses else stats.range
+            reach = self.striking_reach(t)
             if reach != t.spans_reach:
                 t.spans, t.spans_reach = level.coverage(t.tile, reach), reach
             spans = t.spans
@@ -1518,6 +1569,7 @@ class World:
                 damage *= EMPOWER
                 t.charges -= 1.0
                 self._emit("spent", t.id, hit[0].id)
+                self._relic("charge")
             rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0) * self._fervor()
             t.cooldown += 1.0 / rate
             if attack == "nova":
@@ -1586,6 +1638,8 @@ class World:
     def attune(self, tower_id: int) -> None:
         """Attune a tower: it holds charges for empowered shots, starting full."""
         tower = self.towers[tower_id]
+        if tower.kind.attack not in ATTUNABLE:
+            raise Refused(f"{tower.kind.name} never spends charges: attunement would idle.")
         if tower.attuned:
             raise Refused(f"{tower.kind.name} is already attuned.")
         if self.gold < ATTUNE_GOLD:

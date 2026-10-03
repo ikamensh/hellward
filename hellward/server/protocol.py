@@ -18,7 +18,7 @@ from typing import Any
 from hellward.sim.balance import BALANCE
 from hellward.sim.campaign import Location
 from hellward.sim.content import CURSES, MONSTERS, SELL_REFUND, SPELLS, TOWERS, MonsterKind, felt_hit
-from hellward.sim.model import SIM_DT, Bolt, Monster, Tower, World
+from hellward.sim.model import ATTUNABLE, SIM_DT, Bolt, Monster, Tower, World
 from hellward.sim.xp import xp_next
 from hellward.sim import worth
 
@@ -84,12 +84,12 @@ def monsters(world: World) -> list[list]:
 
 def towers(world: World) -> list[list]:
     """Every tower: [id, level, reach, curses {curse: seconds left}, Battle Hymn's seconds left, upgrade cost or None,
-    what the next rank needs or None, refund, attuned, charges]."""
+    what the next rank needs or None, refund, attuned, charges, whether its shots spend charges]."""
     out = []
     for t in world.towers.values():
-        out.append([t.id, t.level, round(t.reach, 3), {c.value: round(left, 2) for c, left in t.curses.items()},
+        out.append([t.id, t.level, round(world.striking_reach(t), 3), {c.value: round(left, 2) for c, left in t.curses.items()},
                     round(t.hymn, 2), world.upgrade_cost(t), world.rank_needs(t), refund(t), t.attuned,
-                    round(t.charges, 2)])
+                    round(t.charges, 2), t.kind.attack in ATTUNABLE])
     return out
 
 
@@ -118,6 +118,7 @@ def state(world: World) -> dict:
         "kills": world.kills,
         "blighted": [[x, y, waves, past] for (x, y), (waves, past) in sorted(world.blighted.items())],
         "blight_marks": blight_marks(world),
+        "relic_counters": {key: world.progress.get(key, 0) for key in world.relics},
     }
 
 

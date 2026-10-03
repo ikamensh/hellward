@@ -23,7 +23,7 @@ from pathlib import Path
 from hellward.sim.campaign import ORDER, Location
 from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, TOWERS, Curse, Element, felt_hit
 from hellward.sim.model import DOOR, DOOR_STOP, JOSTLE, Monster, Tower, World
-from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
+from hellward.sim.players.hands import AIM_GAP, Hands, REACT, attune_spare, ready
 from hellward.sim.skills import UNLOCK, can_learn, unlock_skills
 
 PLANS = Path(__file__).parent / "plans"
@@ -254,7 +254,13 @@ class Planned:
         return True
 
     def _spare(self, world: World) -> None:
-        """Gold the plan did not foresee (it is all done): ranks for the towers, the lowest first."""
+        """Gold the plan did not foresee (it is all done): ranks for the towers, the lowest first, then
+        attunement for the highest-ranked striker."""
+        self._ranks(world)
+        while attune_spare(world):
+            pass
+
+    def _ranks(self, world: World) -> None:
         while True:
             ranked = [t for t in world.towers.values()
                       if world.upgrade_cost(t) is not None and world.rank_needs(t) is None]
