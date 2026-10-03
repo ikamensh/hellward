@@ -9,7 +9,7 @@ from hellward.sim.players.ordinary import tile_scores
 from hellward.sim.campaign import g
 from hellward.sim.content import SOUL, MONSTERS, Element, Wave
 from hellward.sim.model import Monster, Refused, SIM_DT, World
-from hellward.sim.skills import COLUMNS, SKILLS, TREE_COST, can_learn, check, perks, unlocked
+from hellward.sim.skills import COLUMNS, SKILLS, TREE_COST, above, can_learn, check, perks, tower_levels, unlocked
 
 
 def world_of(*groups, learned=(), **kwargs) -> World:
@@ -45,6 +45,39 @@ def test_a_skill_needs_the_one_above_it_and_enough_sigils():
         check(frozenset({"blaze", "adept_fire"}))
 
 
+def test_masteries_chain_above_their_master_and_open_late():
+    assert above(SKILLS["arrow_hail"]).key == "arrow_deadeye"
+    assert above(SKILLS["arrow_deadeye"]).key == "master_arrow"
+    assert above(SKILLS["ballista_ruin"]).key == "ballista_siege"
+    assert above(SKILLS["well_overflow"]).key == "well_depth"
+    chain = frozenset({"adept_arrow", "master_arrow"})
+    assert not can_learn(chain, "arrow_deadeye", 20, stage=5)
+    assert can_learn(chain, "arrow_deadeye", 20, stage=6)
+    assert not can_learn(chain | {"arrow_deadeye"}, "arrow_hail", 26, stage=7)
+    assert can_learn(chain | {"arrow_deadeye"}, "arrow_hail", 26, stage=8)
+
+
+def test_masteries_multiply_damage_for_the_physical_and_reach_for_the_auras():
+    bare = perks(frozenset({"adept_arrow", "master_arrow"}))
+    assert bare.might("arrow") == 1.0
+    assert bare.span("well") == 1.0
+    first = perks(frozenset({"adept_arrow", "master_arrow", "arrow_deadeye"}))
+    assert first.might("arrow") == 1.25
+    assert first.might("ballista") == 1.0
+    both = perks(frozenset({"adept_arrow", "master_arrow", "arrow_deadeye", "arrow_hail"}))
+    assert both.might("arrow") == pytest.approx(1.5625)
+    aura = perks(frozenset({"unlock_well", "adept_well", "master_well", "well_depth", "well_overflow"}))
+    assert aura.span("well") == pytest.approx(1.44)
+    assert aura.might("well") == 1.0
+    plain = tower_levels("arrow", bare)
+    trained = tower_levels("arrow", both)
+    assert [r.damage for r in trained] == pytest.approx([r.damage * 1.5625 for r in plain])
+    assert [r.range for r in trained] == pytest.approx([r.range for r in plain])
+    well_plain = tower_levels("well", bare)
+    well_trained = tower_levels("well", aura)
+    assert [r.range for r in well_trained] == pytest.approx([r.range * 1.44 for r in well_plain])
+
+
 def test_a_kind_is_locked_until_its_unlock_is_learned():
     assert unlocked("arrow", frozenset())
     assert not unlocked("pyre", frozenset())
@@ -54,16 +87,16 @@ def test_a_kind_is_locked_until_its_unlock_is_learned():
     assert can_learn(frozenset({"unlock_ballista"}), "adept_ballista", 8)
 
 
-def test_the_tree_costs_two_hundred_forty_six_with_a_column_per_kind():
-    assert TREE_COST == 246
-    assert len(SKILLS) == 60
+def test_the_tree_costs_three_hundred_thirty_four_with_a_column_per_kind():
+    assert TREE_COST == 334
+    assert len(SKILLS) == 76
     assert COLUMNS["arrow"] == "Arrow"
-    assert sum(s.cost for s in SKILLS.values() if s.column == "arrow") == 6
-    assert sum(s.cost for s in SKILLS.values() if s.column == "ballista") == 10
-    assert sum(s.cost for s in SKILLS.values() if s.column == "hook") == 13
-    assert sum(s.cost for s in SKILLS.values() if s.column == "knife") == 12
+    assert sum(s.cost for s in SKILLS.values() if s.column == "arrow") == 17
+    assert sum(s.cost for s in SKILLS.values() if s.column == "ballista") == 21
+    assert sum(s.cost for s in SKILLS.values() if s.column == "hook") == 24
+    assert sum(s.cost for s in SKILLS.values() if s.column == "knife") == 23
     for column in ("idol", "censer", "well", "effigy"):   # mechanics columns are premium: engines cost choices
-        assert sum(s.cost for s in SKILLS.values() if s.column == column) == 16
+        assert sum(s.cost for s in SKILLS.values() if s.column == column) == 27
     for column in ("fire", "lightning", "cold", "poison", "bone", "nature"):
         assert sum(s.cost for s in SKILLS.values() if s.column == column) == 20
     assert sum(s.cost for s in SKILLS.values() if s.column == "warding") == 5

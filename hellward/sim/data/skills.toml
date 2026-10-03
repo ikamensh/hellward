@@ -39,6 +39,24 @@ cost = 4
 blurb = "Arrows can be raised to the third rank."
 needs = ["arrow"]
 
+[skills.arrow_deadeye]
+name = "Deadeye"
+column = "arrow"
+tier = 3
+cost = 5
+blurb = "+25% Arrow damage."
+needs = ["arrow"]
+first_location = 6
+
+[skills.arrow_hail]
+name = "Hail"
+column = "arrow"
+tier = 4
+cost = 6
+blurb = "+25% Arrow damage."
+needs = ["arrow"]
+first_location = 8
+
 [skills.unlock_ballista]
 name = "Unlock Ballista"
 column = "ballista"
@@ -63,6 +81,24 @@ tier = 3
 cost = 4
 blurb = "Ballistas can be raised to the third rank."
 needs = ["ballista"]
+
+[skills.ballista_siege]
+name = "Siege"
+column = "ballista"
+tier = 4
+cost = 5
+blurb = "+25% Ballista damage."
+needs = ["ballista"]
+first_location = 6
+
+[skills.ballista_ruin]
+name = "Ruin"
+column = "ballista"
+tier = 5
+cost = 6
+blurb = "+25% Ballista damage."
+needs = ["ballista"]
+first_location = 8
 
 [skills.unlock_hook]
 name = "Unlock Hook Tower"
@@ -89,6 +125,24 @@ cost = 6
 blurb = "Hook Towers can be raised to the third rank."
 needs = ["hook"]
 
+[skills.hook_rend]
+name = "Rend"
+column = "hook"
+tier = 4
+cost = 5
+blurb = "+25% Hook damage."
+needs = ["hook"]
+first_location = 6
+
+[skills.hook_gore]
+name = "Gore"
+column = "hook"
+tier = 5
+cost = 6
+blurb = "+25% Hook damage."
+needs = ["hook"]
+first_location = 8
+
 [skills.unlock_knife]
 name = "Unlock Knife Post"
 column = "knife"
@@ -113,6 +167,24 @@ tier = 3
 cost = 6
 blurb = "Knife Posts can be raised to the third rank."
 needs = ["knife"]
+
+[skills.knife_shred]
+name = "Shred"
+column = "knife"
+tier = 4
+cost = 5
+blurb = "+25% Knife damage."
+needs = ["knife"]
+first_location = 6
+
+[skills.knife_cruelty]
+name = "Cruelty"
+column = "knife"
+tier = 5
+cost = 6
+blurb = "+25% Knife damage."
+needs = ["knife"]
+first_location = 8
 
 [skills.unlock_pyre]
 name = "Unlock Pyre"
@@ -451,6 +523,24 @@ cost = 7
 blurb = "Idols can be raised to the third rank."
 needs = ["idol"]
 
+[skills.idol_vigil]
+name = "Vigil"
+column = "idol"
+tier = 4
+cost = 5
+blurb = "+20% Idol reach."
+needs = ["idol"]
+first_location = 6
+
+[skills.idol_dominion]
+name = "Dominion"
+column = "idol"
+tier = 5
+cost = 6
+blurb = "+20% Idol reach."
+needs = ["idol"]
+first_location = 8
+
 [skills.unlock_censer]
 name = "Unlock Martyr's Censer"
 column = "censer"
@@ -475,6 +565,24 @@ tier = 3
 cost = 7
 blurb = "Censers can be raised to the third rank."
 needs = ["censer"]
+
+[skills.censer_fumes]
+name = "Fumes"
+column = "censer"
+tier = 4
+cost = 5
+blurb = "+20% Censer reach."
+needs = ["censer"]
+first_location = 6
+
+[skills.censer_choke]
+name = "Choke"
+column = "censer"
+tier = 5
+cost = 6
+blurb = "+20% Censer reach."
+needs = ["censer"]
+first_location = 8
 
 [skills.unlock_well]
 name = "Unlock Moon Well"
@@ -501,6 +609,24 @@ cost = 7
 blurb = "Wells can be raised to the third rank."
 needs = ["well"]
 
+[skills.well_depth]
+name = "Depth"
+column = "well"
+tier = 4
+cost = 5
+blurb = "+20% Well reach."
+needs = ["well"]
+first_location = 6
+
+[skills.well_overflow]
+name = "Overflow"
+column = "well"
+tier = 5
+cost = 6
+blurb = "+20% Well reach."
+needs = ["well"]
+first_location = 8
+
 [skills.unlock_effigy]
 name = "Unlock Effigy"
 column = "effigy"
@@ -525,3 +651,21 @@ tier = 3
 cost = 7
 blurb = "Effigies can be raised to the third rank."
 needs = ["effigy"]
+
+[skills.effigy_omen]
+name = "Omen"
+column = "effigy"
+tier = 4
+cost = 5
+blurb = "+20% Effigy reach."
+needs = ["effigy"]
+first_location = 6
+
+[skills.effigy_doom]
+name = "Doom"
+column = "effigy"
+tier = 5
+cost = 6
+blurb = "+20% Effigy reach."
+needs = ["effigy"]
+first_location = 8

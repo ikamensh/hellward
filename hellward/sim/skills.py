@@ -75,6 +75,22 @@ def _ranks() -> dict[str, tuple[str, str]]:
 RANK_SKILL: Final[dict[str, tuple[str, str]]] = _ranks()
 
 
+MASTERY_MIGHT: Final[dict[str, tuple[str, str]]] = {
+    "arrow": ("arrow_deadeye", "arrow_hail"),
+    "ballista": ("ballista_siege", "ballista_ruin"),
+    "hook": ("hook_rend", "hook_gore"),
+    "knife": ("knife_shred", "knife_cruelty"),
+}   # each physical kind's mastery pair: +25% damage apiece, above its master
+
+
+MASTERY_SPAN: Final[dict[str, tuple[str, str]]] = {
+    "idol": ("idol_vigil", "idol_dominion"),
+    "censer": ("censer_fumes", "censer_choke"),
+    "well": ("well_depth", "well_overflow"),
+    "effigy": ("effigy_omen", "effigy_doom"),
+}   # each aura kind's mastery pair: +20% reach apiece, above its master
+
+
 def _unlocks() -> dict[str, str | None]:
     """Each tower kind's `unlock_` skill, if it has one: the Arrow is free."""
     found: dict[str, str | None] = {}
@@ -164,6 +180,8 @@ class Perks:
     """Every number and rule the learned skills change; the defaults are the untrained game."""
 
     ranks: tuple[tuple[str, int], ...] = ()
+    mights: tuple[tuple[str, float], ...] = ()   # each mastered physical kind's damage multiplier
+    spans: tuple[tuple[str, float], ...] = ()    # each mastered aura kind's range multiplier
     fire_ball: bool = False
     blaze: bool = False
     extra_leaps: int = 0
@@ -195,6 +213,20 @@ class Perks:
                 return rank
         return 0
 
+    def might(self, kind: str) -> float:
+        """The tower kind's damage multiplier from its masteries (1 when unmastered)."""
+        for name, mult in self.mights:
+            if name == kind:
+                return mult
+        return 1.0
+
+    def span(self, kind: str) -> float:
+        """The tower kind's range multiplier from its masteries (1 when unmastered)."""
+        for name, mult in self.spans:
+            if name == kind:
+                return mult
+        return 1.0
+
 
 NO_PERKS: Final = Perks()
 
@@ -217,6 +249,28 @@ def perks(learned: Iterable[str], stage: int | None = None) -> Perks:
             tops[kind] = 2
     if tops:
         p = replace(p, ranks=tuple(sorted(tops.items())))
+    mights: dict[str, float] = {}
+    for kind, (first, second) in MASTERY_MIGHT.items():
+        mult = 1.0
+        if first in chosen:
+            mult *= 1.25
+        if second in chosen:
+            mult *= 1.25
+        if mult != 1.0:
+            mights[kind] = mult
+    if mights:
+        p = replace(p, mights=tuple(sorted(mights.items())))
+    spans: dict[str, float] = {}
+    for kind, (first, second) in MASTERY_SPAN.items():
+        mult = 1.0
+        if first in chosen:
+            mult *= 1.2
+        if second in chosen:
+            mult *= 1.2
+        if mult != 1.0:
+            spans[kind] = mult
+    if spans:
+        p = replace(p, spans=tuple(sorted(spans.items())))
     if "fire_ball" in chosen:
         p = replace(p, fire_ball=True)
     if "blaze" in chosen:
@@ -283,8 +337,11 @@ def tower_levels(kind: str, p: Perks, loadout: Loadout = EMPTY_LOADOUT) -> tuple
     else:
         raise KeyError(kind)
     pattern = loadout.for_family(kind)
-    if pattern is None:
-        return trained
-    return tuple(replace(r, damage=r.damage + pattern.damage_delta[i], splash=r.splash + pattern.splash_delta[i],
-                         chains=r.chains + pattern.chain_delta[i], rate=r.rate * pattern.rate_factor,
-                         leader_bonus=pattern.leader_damage_bonus) for i, r in enumerate(trained))
+    if pattern is not None:
+        trained = tuple(replace(r, damage=r.damage + pattern.damage_delta[i], splash=r.splash + pattern.splash_delta[i],
+                                chains=r.chains + pattern.chain_delta[i], rate=r.rate * pattern.rate_factor,
+                                leader_bonus=pattern.leader_damage_bonus) for i, r in enumerate(trained))
+    mult, span = p.might(kind), p.span(kind)
+    if mult != 1.0 or span != 1.0:
+        trained = tuple(replace(r, damage=r.damage * mult, range=r.range * span) for r in trained)
+    return trained
