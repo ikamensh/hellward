@@ -55,6 +55,7 @@ if TYPE_CHECKING:
     from hellward.sim.planner import Decision
 
 SIM_DT: Final = 0.05            # the clock's step: not a tuning value (replays and the protocol count steps)
+SKIP_STEPS: Final = 3600        # a grind prediction's and a skip's longest look: three sim-minutes
 DOOR_STOP: Final = tuning.number("battle.door_stop")
 JOSTLE: Final = tuning.number("battle.jostle")
 CHAIN_JUMP: Final = tuning.number("battle.chain_jump")
@@ -792,6 +793,40 @@ class World:
             raise Refused("The next wave cannot be called yet.")
         self.gold += self.early_call_bonus
         self._start_wave()
+
+    def predict_clean(self) -> bool:
+        """Whether the wave now fighting ends with no losses and no orders: a clone with the leaders'
+        planner steps it to its clearing. Only while a fully spawned wave fights, no pack and no breach."""
+        if (self.outcome is not None or self.wave < 0 or self.break_left is not None or self.schedule
+                or self.bonus is not None or self.breach_remaining > 0):
+            return False
+        twin = self.clone()
+        twin.planner = self.planner
+        lives = twin.lives
+        for _ in range(SKIP_STEPS):
+            twin.step(SIM_DT)
+            if twin.lives < lives:
+                return False
+            if not twin.monsters and not twin.schedule and \
+                    (twin.break_left is not None or twin.outcome is not None):
+                return True
+        return False
+
+    def skip_grind(self) -> int:
+        """Step the fought wave to its clearing, now: the prediction come true, and the bonus gold paid.
+        Refused if a life is lost on the way (the offer was stale)."""
+        lives = self.lives
+        for _ in range(SKIP_STEPS):
+            self.step(SIM_DT)
+            if self.lives < lives:
+                raise Refused("The wave was not clean: a life was lost on the way.")
+            if not self.monsters and not self.schedule and \
+                    (self.break_left is not None or self.outcome is not None):
+                break
+        bonus = BALANCE.income_unit()
+        self.gold += bonus
+        self._emit("skipped", self.wave, bonus)
+        return bonus
 
     def summon(self, pack: BonusPack) -> None:
         """Wager the pack's gold on its monsters: they spawn while the break clock stops, and a clear with no
