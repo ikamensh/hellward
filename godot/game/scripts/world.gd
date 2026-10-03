@@ -439,6 +439,8 @@ func _event(e: Array) -> void:
 			var taught: Tower = towers.get(int(e[1]))
 			if taught != null:
 				taught.mode = String(e[2])
+		"attuned", "spent":
+			pass   # the frames carry the charges; the empowered shot's flash is still to paint
 		_:
 			push_warning("an event this client does not show: %s" % kind)
 	happened.emit(e)

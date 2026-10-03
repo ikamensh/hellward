@@ -568,7 +568,7 @@ func test_the_bar_offers_the_grind_and_g_skips_it() -> void:
 
 ## Strategies on the card and in the forge: no button with only Foremost taught, the aim's button with two,
 ## and M sends the teaching as an order (refused here: the profile taught nothing); the forge's last slot sells
-## the four aims for salvage.
+## the four aims and the attunement for salvage.
 func test_the_card_teaches_strategies_sold_in_the_forge() -> void:
 	var m := await start()
 	m.rig.user_control = false
@@ -588,6 +588,14 @@ func test_the_card_teaches_strategies_sold_in_the_forge() -> void:
 	press(m.get_viewport(), KEY_M)
 	check(await until(func(): return not why.is_empty(), 3.0), "M sends the teaching as an order")
 	check(why.size() > 0 and "not taught" in why[0], "refused: the profile taught nothing (%s)" % [why])
+	check(not m.hud._attune.visible, "attunement untaught: no button on the card")
+	w.start["attune"] = {"unlocked": true, "gold": 25}
+	m.hud.refresh()
+	check(m.hud._attune.visible and "25" in m.hud._attune.text, "taught, the card offers it for its price")
+	why.clear()
+	press(m.get_viewport(), KEY_T)
+	check(await until(func(): return not why.is_empty(), 3.0), "T sends the attunement as an order")
+	check(why.size() > 0 and "not taught" in why[0], "refused: the profile taught nothing (%s)" % [why])
 	_main.queue_free()
 	await frames(2)
 	_main = null
@@ -605,7 +613,7 @@ func test_the_card_teaches_strategies_sold_in_the_forge() -> void:
 	for b in forge.find_children("*", "Button", true, false):
 		if (b as Button).text == "Need more salvage":
 			poor += 1
-	check(poor == 4, "its last slot sells the four aims for salvage (%d)" % poor)
+	check(poor == 5, "its last slot sells the four aims and the attunement (%d)" % poor)
 
 
 ## Every location of both acts lays out (its scenery, its arsenal on the bar) and its battle runs a few seconds,

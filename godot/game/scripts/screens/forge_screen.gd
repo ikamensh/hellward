@@ -78,7 +78,7 @@ func _slot(i: int, total: int) -> Rect2:
 	return Rect2(Vector2(x, TOP + row * (CARD.y + GAP)), CARD)
 
 
-## The strategies' card in the grid's last slot: each aim, its price, and its Teach button.
+## The teachings' card in the grid's last slot: each aim and the attunement, their prices, their Teach buttons.
 func _strategies(box: Rect2) -> void:
 	var slot := Control.new()
 	slot.position = box.position
@@ -86,19 +86,19 @@ func _strategies(box: Rect2) -> void:
 	slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_stage.add_child(slot)
 	slot.add_child(SkillsScreen.plate(box.size, Style.BRONZE, Color(0, 0, 0, 0), 0.0, 0.0, 0.0, 16.0))
-	var title := SkillsScreen.words("Tower Strategies", Style.title_font(), 32, Style.GOLD)
-	title.position = Vector2(22, 16)
-	title.size = Vector2(box.size.x - 44, 42)
+	var title := SkillsScreen.words("Tower Teachings", Style.title_font(), 28, Style.GOLD)
+	title.position = Vector2(22, 10)
+	title.size = Vector2(box.size.x - 44, 38)
 	slot.add_child(title)
-	var y := 68.0
+	var y := 56.0
 	for gift in data["strategies"]:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
 		row.position = Vector2(22, y)
-		row.size = Vector2(box.size.x - 44, 56)
+		row.size = Vector2(box.size.x - 44, 50)
 		slot.add_child(row)
 		var words := SkillsScreen.words("%s — %s" % [String(gift["name"]), String(gift["price"])],
-			Style.text_font(), 20, Style.BONE if bool(gift["enabled"]) else Color(0.5, 0.47, 0.43))
+			Style.text_font(), 19, Style.BONE if bool(gift["enabled"]) else Color(0.5, 0.47, 0.43))
 		words.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		words.tooltip_text = "%s %s" % [String(gift["words"]), String(gift["why"])]
 		row.add_child(words)
@@ -108,7 +108,7 @@ func _strategies(box: Rect2) -> void:
 		var key := String(gift["key"])
 		act.pressed.connect(func(): _teach(key))
 		row.add_child(act)
-		y += 64.0
+		y += 55.0
 
 
 func _teach(key: String) -> void:

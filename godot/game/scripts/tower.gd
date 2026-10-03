@@ -17,6 +17,8 @@ var world: World
 var id := 0
 var kind: String
 var mode := "first"               # its strategy, from its facts and the mode event
+var attuned := false              # whether it holds charges, from its frames
+var charges := 0.0
 var tile: Vector2i
 var rank := 0
 var spent := 0
@@ -175,6 +177,8 @@ func sync(entry: Array) -> void:
 	upgrade_cost = entry[5]
 	needs = entry[6]
 	refund = int(entry[7])
+	attuned = bool(entry[8])
+	charges = float(entry[9])
 	_sing(hymn > 0.0)
 
 
