@@ -66,6 +66,7 @@ ATTUNE_GOLD: Final = 25         # an attunement's price in battle gold, per towe
 ATTUNABLE: Final = ("bolt", "chain", "venom")   # the shots that spend charges; the hook drags and the supports sing, and attunement would idle on them
 CHARGES_MAX: Final = 3.0        # the charges an attuned tower holds
 CHARGE_EVERY: Final = 15.0      # seconds per charge regained
+CHARGED_COOLDOWN: Final = 3.0   # seconds after an empowered shot before the next
 EMPOWER: Final = 3.0            # an empowered shot's damage
 IDOL_EVERY: Final = (45.0, 32.0, 22.0)   # the idol's rite, seconds per rank: a free smite
 CENSER_HURT: Final = (30.0, 60.0, 100.0)   # the immolation's damage, per rank
@@ -173,7 +174,7 @@ class Monster:
 
 class Tower:
     __slots__ = ("id", "kind", "levels", "level", "tile", "cooldown", "curses", "hymn", "spent", "spans", "spans_reach",
-                 "timer", "mode", "attuned", "charges")
+                 "timer", "mode", "attuned", "charges", "charged_at")
 
     def __init__(self, id: int, kind: TowerKind, levels: tuple[TowerLevel, ...], tile: tuple[int, int]) -> None:
         self.id = id
@@ -191,6 +192,7 @@ class Tower:
         self.mode = "first"                   # its strategy: foremost until taught otherwise
         self.attuned = False                  # whether it holds charges for empowered shots
         self.charges = 0.0                    # charges held, to CHARGES_MAX, one per CHARGE_EVERY seconds
+        self.charged_at = -1e9                # when it last spent a charge: the cooldown starts here
 
     def copy(self) -> Tower:
         t = Tower(self.id, self.kind, self.levels, self.tile)
@@ -198,6 +200,7 @@ class Tower:
         t.hymn, t.spent, t.spans, t.spans_reach = self.hymn, self.spent, self.spans, self.spans_reach
         t.timer, t.mode = self.timer, self.mode
         t.attuned, t.charges = self.attuned, self.charges
+        t.charged_at = self.charged_at
         return t
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -350,7 +353,7 @@ class World:
                  seed: int = 0, planner: Planner | None = None, record: bool = True, curse_scale: float = 1.0,
                  loadout: Loadout = EMPTY_LOADOUT, xp: float = 0.0, xp_level: int = 1,
                  arsenal: Arsenal | None = None, relics: tuple[str, ...] = (),
-                 counters: tuple[tuple[str, int], ...] = ()) -> None:
+                 counters: tuple[tuple[str, int], ...] = (), foresight: bool = True) -> None:
         self.location = location
         self.arsenal = location.arsenal if arsenal is None else arsenal
         self.relics = relics   # the run's relics, won a location at a time
@@ -413,6 +416,8 @@ class World:
         self.kills = 0
         self.curses_landed = 0
         self.spells_cast = 0
+        self.wasted_charges = 0   # empowered shots a plain one would have killed with
+        self.foresight = foresight   # the forge's teaching: spend a charge only where it kills
         self.blighted: dict[tuple[int, int], tuple[int, str]] = {}   # taken cells: cleared waves left, what it is
         self.blights = 0                  # cells taken this defence, for the run's settling
         self.blighted_cells: set[tuple[int, int]] = set()   # every cell taken this defence
@@ -454,6 +459,7 @@ class World:
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
         w.leaked_life, w.forced, w.outcome, w.kills, w._next_id = self.leaked_life, [], self.outcome, self.kills, self._next_id
         w.curses_landed, w.spells_cast = self.curses_landed, self.spells_cast
+        w.wasted_charges, w.foresight = self.wasted_charges, self.foresight
         w.blighted, w.blights, w.blighted_cells = dict(self.blighted), self.blights, set(self.blighted_cells)
         w.relics = self.relics
         w.progress = dict(self.progress)
@@ -1565,9 +1571,13 @@ class World:
             aura = self.aura_mult(t)
             damage = stats.damage * (t.damage_mult() if t.curses else 1.0)   # the hit; the aura is a factor
             if attack in ("bolt", "chain", "venom") and t.attuned and t.charges >= 1.0 \
-                    and self._worth_charge(t, hit[0], spans, reach, stats, damage * aura):
+                    and self.time - t.charged_at >= CHARGED_COOLDOWN \
+                    and (not self.foresight or self._worth_charge(t, hit[0], damage * aura)):
+                if hit[0].hp <= damage * aura:
+                    self.wasted_charges += 1   # the plain shot would have killed with it
                 damage *= EMPOWER
                 t.charges -= 1.0
+                t.charged_at = self.time
                 self._emit("spent", t.id, hit[0].id)
                 self._relic("charge")
             rate = stats.rate * (t.rate_mult() if t.curses or t.hymn > 0 else 1.0) * self._fervor()
@@ -1650,22 +1660,12 @@ class World:
         tower.spent += ATTUNE_GOLD
         self._emit("attuned", tower.id)
 
-    def _worth_charge(self, t: Tower, target: Monster, spans: tuple[tuple[float, float], ...], reach: float,
-                      stats: TowerLevel, damage: float) -> bool:
-        """Whether the empowered shot is worth its charge: the normal shot does not kill, and under
-        normal fire the target walks out of this tower's reach alive, but not with this shot empowered.
-        Armor and hymns are beneath the reckoning: a wise guess, not a promise."""
-        if target.hp <= damage:
-            return False
-        if target.route == "main":
-            left = 0.0
-            for a, b in spans:
-                if target.s < b:
-                    left = max(left, b - max(target.s, a))
-        else:
-            left = reach
-        shots = left / max(target.speed, 1e-6) * stats.rate + 1.0   # this shot and the volley after it
-        return target.hp > damage * shots and target.hp <= damage * (EMPOWER + shots - 1.0)
+    def _worth_charge(self, t: Tower, target: Monster, damage: float) -> bool:
+        """Whether the empowered shot is worth its charge: everything but the obvious waste. A kill a
+        plain shot takes is held for the next target; a full tower cannot draw, so it spends even then.
+        What is left spends, even what plain fire would fell in time: killing faster frees the tower for
+        the queue behind, and a spent charge draws its replacement."""
+        return target.hp > damage or t.charges >= CHARGES_MAX
 
     def _hook_target(self, t: Tower, spans: tuple[tuple[float, float], ...], reach: float, near: float,
                      single_route: bool) -> Monster | None:

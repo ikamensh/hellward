@@ -32,7 +32,7 @@ from hellward.sim.campaign import (
 )
 from hellward.sim.content import CURSES, MONSTERS, SPELLS, START_LIVES, TOWERS, Curse, Element, MonsterKind, felt_hit
 from hellward.sim.items import PATTERNS
-from hellward.sim.modes import ATTUNE, MODES
+from hellward.sim.modes import ATTUNE, FORESIGHT, MODES
 from hellward.sim.kit import Kit
 from hellward.sim.model import Planner, World
 from hellward.sim.players import PLAYERS
@@ -471,6 +471,7 @@ class Campaign:
         strategies = []
         teachings = [(key, mode, key in p.modes) for key, mode in MODES.items() if key != "first"]
         teachings.append((ATTUNE.key, ATTUNE, p.attune))
+        teachings.append((FORESIGHT.key, FORESIGHT, p.foresight))
         for key, mode, owned in teachings:
             affordable = p.salvage >= mode.salvage_cost
             if owned:
@@ -490,7 +491,7 @@ class Campaign:
         """A card's one button: forge and equip, equip, or unequip; a teaching's: teach it."""
         p = self.progress
         try:
-            if key in MODES or key == ATTUNE.key:
+            if key in MODES or key == ATTUNE.key or key == FORESIGHT.key:
                 p.teach(key)
                 return self.forge_view()
             pattern = PATTERNS[key]
@@ -530,7 +531,8 @@ class Campaign:
                                  run_seed=run.seed, run_index=run.index, drawn=run.drawn,
                                  on_save=None if scripted is not None else self._save_battle,
                                  modes=self.progress.modes,
-                                 attune_unlocked=self.progress.attune)
+                                 attune_unlocked=self.progress.attune,
+                                 foresight_taught=self.progress.foresight)
             if scripted is None:   # a scripted defence leaves no log: only a person's resumes
                 self._save_battle()
             return self.battle
@@ -541,7 +543,7 @@ class Campaign:
                              player=PLAYERS[player](self.seed) if player is not None else None,
                              breach_claim=p.breach_claims.get(loc.key), replays=self.data / "replays",
                              on_outcome=self._keep, modes=p.modes,
-                             attune_unlocked=p.attune)
+                             attune_unlocked=p.attune, foresight_taught=p.foresight)
         return self.battle
 
     def _save_battle(self) -> None:
@@ -570,7 +572,8 @@ class Campaign:
                              replays=self.data / "replays", on_outcome=self._keep_run, kit=dealt,
                              run_seed=self.run.seed, run_index=self.run.index, drawn=self.run.drawn,
                              on_save=self._save_battle, modes=self.progress.modes,
-                             attune_unlocked=self.progress.attune)
+                             attune_unlocked=self.progress.attune,
+                             foresight_taught=self.progress.foresight)
         self.battle.resume_from(saved["state"]["log"], self.planner)
         return self.battle
 

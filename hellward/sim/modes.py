@@ -30,4 +30,7 @@ MODES: Final[Mapping[str, Mode]] = MappingProxyType({m.key: m for m in (
 )})
 
 ATTUNE: Final = Mode("attune", "Attunement",
-                     "Towers may hold 3 charges: empowered shots, spent where they kill.", 8)
+                     "Towers may hold 3 charges: empowered shots, spent as they come.", 8)
+
+FORESIGHT: Final = Mode("foresight", "Foresight",
+                        "Attuned towers spend a charge only where it kills: never into the already-dying.", 10)

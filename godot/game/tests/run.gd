@@ -614,7 +614,7 @@ func test_the_card_teaches_strategies_sold_in_the_forge() -> void:
 	for b in forge.find_children("*", "Button", true, false):
 		if (b as Button).text == "Need more salvage":
 			poor += 1
-	check(poor == 5, "its last slot sells the four aims and the attunement (%d)" % poor)
+	check(poor == 6, "its last slot sells the four aims, the attunement and foresight (%d)" % poor)
 
 
 ## Every location of both acts lays out (its scenery, its arsenal on the bar) and its battle runs a few seconds,

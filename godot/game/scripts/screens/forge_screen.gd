@@ -78,7 +78,7 @@ func _slot(i: int, total: int) -> Rect2:
 	return Rect2(Vector2(x, TOP + row * (CARD.y + GAP)), CARD)
 
 
-## The teachings' card in the grid's last slot: each aim and the attunement, their prices, their Teach buttons.
+## The teachings' card in the grid's last slot: each aim, the attunement and foresight, their prices, their Teach buttons.
 func _strategies(box: Rect2) -> void:
 	var slot := Control.new()
 	slot.position = box.position

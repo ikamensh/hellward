@@ -107,12 +107,13 @@ class Ghost:
 
     def __init__(self, path_or_dict: str | Path | dict[str, Any]) -> None:
         data: dict[str, Any] = path_or_dict if isinstance(path_or_dict, dict) else json.loads(Path(path_or_dict).read_text())
-        if data.get("version") != 2:
-            raise ValueError(f"a ghost only replays a version 2 log, not {data.get('version')!r}")
+        if data.get("version") not in (2, 3):
+            raise ValueError(f"a ghost only replays a version 2 or 3 log, not {data.get('version')!r}")
         self.location: str = str(data["location"])
         self.seed: int = int(data["seed"])
         self.learned: frozenset[str] = frozenset(str(key) for key in data["skills"])
         self.loadout = Loadout(tuple(data["loadout"]))
+        self.foresight = bool(data.get("foresight", True))   # version 2 never said: it always spent wisely
         self.commands: list[tuple[float, str, tuple[Any, ...]]] = [
             (float(entry[0]), str(entry[1]), tuple(entry[2:])) for entry in data["commands"]]
         self.name = f"ghost:{Path(path_or_dict).stem}" if not isinstance(path_or_dict, dict) else "ghost"
@@ -128,6 +129,7 @@ class Ghost:
 
     def act(self, hands: Hands) -> None:
         world = hands.world
+        world.foresight = self.foresight   # the logged teaching, before the first order goes out
         if self._pending is not None:
             if self._issue(hands, self._pending):
                 self._pending = None

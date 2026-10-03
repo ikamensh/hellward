@@ -73,7 +73,8 @@ class Battle:
                  on_outcome: Callable[[World], dict] | None = None, kit: Kit | None = None,
                  run_seed: int | None = None, run_index: int | None = None,
                  drawn: tuple[Drawn, ...] = (), on_save: Callable[[], None] | None = None,
-                 modes: frozenset[str] = frozenset(), attune_unlocked: bool = False) -> None:
+                 modes: frozenset[str] = frozenset(), attune_unlocked: bool = False,
+                 foresight_taught: bool = False) -> None:
         if kit is not None:   # a run's defence: the Kit deals everything, down to the pool as its lives
             location, learned, loadout, seed = kit.location, kit.learned, kit.loadout, kit.seed
         self.location = location
@@ -81,6 +82,7 @@ class Battle:
         self.player = player
         self.modes = modes | {"first"}   # the profile's taught strategies, foremost always among them
         self.attune_unlocked = attune_unlocked
+        self.foresight_taught = foresight_taught
         if player is not None:
             learned = player.draft(location, 3 * ORDER.index(location.key))
             loadout = getattr(player, "loadout", EMPTY_LOADOUT)
@@ -91,6 +93,7 @@ class Battle:
         else:
             self.world = World(location, perks=perks(learned, ORDER.index(location.key)), seed=seed, planner=planner,
                                loadout=loadout)
+        self.world.foresight = foresight_taught   # the profile's teaching, or eager spending without it
         if player is not None:
             self.hands = Hands(self.world, react_for(seed, getattr(player, "reaction", REACT)),
                                getattr(player, "aim_gap", AIM_GAP))
@@ -394,9 +397,9 @@ class Battle:
 
     def replay(self) -> dict:
         world = self.world
-        return {"version": 2, "location": self.location.key, "seed": self.seed, "skills": sorted(self.learned),
+        return {"version": 3, "location": self.location.key, "seed": self.seed, "skills": sorted(self.learned),
                 "loadout": list(world.loadout.equipped), "outcome": world.outcome, "lives": world.lives,
-                "time": world.time, "commands": self.commands}
+                "time": world.time, "foresight": world.foresight, "commands": self.commands}
 
     def _write_replay(self) -> None:
         """The moment a person's defence is decided: their orders as one JSON file in the replays folder.
