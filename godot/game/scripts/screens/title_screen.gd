@@ -83,7 +83,8 @@ func build() -> void:
 	menu.add_child(PauseScreen.gap(4))
 	var descend := PauseScreen.primary(Ui.button("Descend", "Enter", 440))
 	descend.add_theme_font_size_override("font_size", 24)
-	for way in [[descend, game.descend, true], [Ui.button("Campaign profiles", "P", 440), game.profiles, true],
+	for way in [[descend, game.descend, true], [Ui.button("The Long Night", "R", 440), game.run_or_camp, true],
+			[Ui.button("Campaign profiles", "P", 440), game.profiles, true],
 			[Ui.button("Chronicle", "C", 440), game.chronicle, true],
 			[Ui.button("Watch the leaders at work", "D", 440), game.demo, true],
 			[Ui.button("Settings", "S", 440), game.settings, false], [Ui.button("Leave", "Q", 440), game.leave, false]]:

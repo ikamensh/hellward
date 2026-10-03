@@ -365,6 +365,10 @@ func _place(p: Dictionary) -> void:
 		var pips := Ui.pips(int(p["best"]), 9.0)
 		pips.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		col.add_child(pips)
+	if p.has("threats"):
+		var label := Ui.caps(_threats_line(p["threats"]), 15, Color(0.72, 0.6, 0.52))
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		col.add_child(label)
 	spot.add_child(plaque)
 	var side: float = ASIDE.get(key, 0.0)
 	var hang := func():
@@ -382,6 +386,23 @@ func _place(p: Dictionary) -> void:
 		c.gui_input.connect(func(e: InputEvent): _pressed(e, key, opened))
 		c.mouse_entered.connect(func(): _hover(medal, sb, opened, true))
 		c.mouse_exited.connect(func(): _hover(medal, sb, opened, false))
+
+
+## One line of what a place threatens: its thickest armor, wings, its boss and its curses.
+func _threats_line(threats: Dictionary) -> String:
+	var bits: Array = []
+	if int(threats["armor"]) > 0:
+		bits.append("Armor %d" % int(threats["armor"]))
+	if not (threats["flyers"] as Array).is_empty():
+		bits.append("flies")
+	if threats["boss"] != null:
+		bits.append(String(threats["boss"]))
+	var curses := (threats["curses"] as Array).size()
+	if curses > 0:
+		bits.append("%d curse%s" % [curses, "" if curses == 1 else "s"])
+	if bits.is_empty():
+		bits.append("the host")
+	return " · ".join(bits)
 
 
 func _hover(medal: Control, sb: StyleBoxFlat, opened: bool, on: bool) -> void:

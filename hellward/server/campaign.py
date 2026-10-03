@@ -371,7 +371,8 @@ class Campaign:
         if loc is not None:
             heading += f"  ·  greyed: no effect in {loc.called}"
         return {"columns": [{"key": k, "name": v} for k, v in COLUMNS.items()], "nodes": nodes,
-                "sigils": budget, "free": free, "reskill": reskill, "heading": heading, "any": bool(learned)}
+                "sigils": budget, "free": free, "reskill": reskill, "heading": heading, "any": bool(learned),
+                "run": self.run is not None}
 
     def learn(self, key: str, location: str | None = None) -> dict:
         if key not in SKILLS:
