@@ -414,6 +414,9 @@ def _report(summaries: list[dict], immortal: bool) -> list[str]:
         lines.append("losses: " + ", ".join(f"{key} {count}" for key, count in sorted(losses.items())))
     tree = sum(s["tree"] for s in summaries) / len(summaries)
     lines.append(f"mean tree opened: {tree:.0%}")
+    top = max(s["level"] for s in summaries)
+    lines.append(f"tree over a perfect run's points: {tree.TREE_COST}/{72 + top} = "
+                 f"{tree.TREE_COST / (72 + top):.2f}x (M4: at least 2.5x)")
     places = [place for s in summaries for place in s["locations"].values()]
     towers = [p["towers"] for p in places]
     lines.append(f"towers standing at a defence's end: mean {sum(towers) / len(towers):.1f} "

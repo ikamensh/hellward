@@ -133,7 +133,28 @@ def tower_kinds() -> list[Result]:
     mechanics = [kind.name for kind in TOWERS.values() if kind.attack not in ATTACKS]
     share = len(mechanics) / len(TOWERS)
     return [Result("M4", "tower kinds", str(len(TOWERS)), len(TOWERS) >= 14),
-            Result("M6", "share of mechanics towers", f"{share:.0%}", share >= 0.4)]
+            Result("M6", "share of mechanics towers", f"{share:.0%}", share >= 0.4),
+            tree_too_dear()]
+
+
+def tree_too_dear() -> Result:
+    """M4's floor: the whole tree costs at least 2.5x a perfect run's points without packs — every sigil
+    (three for lives, three for goals, a location) plus the levels the campaign's kills and clears reach.
+    Packs pay more (bounded: three a location for the bots, decaying repeats for a person); tools/runs.py
+    quotes the true ratio, strong-30's tree over 72 plus its highest level."""
+    from hellward.sim.skills import TREE_COST
+    from hellward.sim.xp import XP_NEXT_BASE, XP_NEXT_GROWTH, clear_xp, kill_xp
+    total = sum(sum(group.count * kill_xp(MONSTERS[group.kind].hp) for group in wave.groups)
+                + clear_xp(number)
+                for location in LOCATIONS.values() for number, wave in enumerate(location.waves, start=1))
+    level, need = 1, XP_NEXT_BASE
+    while total >= need:
+        total -= need
+        level += 1
+        need = XP_NEXT_BASE + XP_NEXT_GROWTH * (level - 1) * (level - 1)
+    perfect = 6 * len(LOCATIONS) + level
+    return Result("M4", "tree over a packless perfect run's points",
+                  f"{TREE_COST}/{perfect} = {TREE_COST / perfect:.2f}x", TREE_COST >= 2.5 * perfect)
 
 
 def real_estate() -> list[Result]:
