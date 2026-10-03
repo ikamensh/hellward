@@ -556,6 +556,10 @@ void fragment() {
 	nrm = mix(nrm, mn, worn);
 	col = mix(col, ca, court);
 	nrm = mix(nrm, cn, court);
+	// a soft dark seam where the street meets the mud: dirt shadowing the setts' feet, seating the lane
+	float verge = (1.0 - lane) * (1.0 - court) * smoothstep(0.0, 0.35, m.r);
+	col *= 1.0 - 0.22 * verge;
+	col *= 1.0 + (n2 - 0.5) * 0.1 * (1.0 - lane);   // fine grain breaking the mud's flatness up close
 	col = mix(col, col * 0.3, puddle);
 	float scorch = clamp(m.b + (n2 - 0.5) * 0.6, 0.0, 1.0);
 	col *= mix(1.0, 0.25, scorch);

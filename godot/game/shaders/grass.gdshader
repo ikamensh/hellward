@@ -10,6 +10,7 @@ void vertex() {
 	vec3 world = (MODEL_MATRIX * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
 	float gust = sin(world.x * 0.15 + TIME * 1.3) * 0.5 + 0.5;
 	float sway = sin(TIME * 2.4 + world.x * 0.7 + world.z * 0.5) * (0.06 + 0.1 * gust);
+	sway += sin(TIME * 5.1 + world.z * 2.0 + world.x * 1.3) * 0.015;
 	VERTEX.x += sway * tipness * tipness;
 	VERTEX.z += sway * 0.5 * tipness * tipness;
 }
@@ -17,6 +18,8 @@ void vertex() {
 void fragment() {
 	vec3 base = COLOR.rgb;
 	ALBEDO = mix(base * 0.35, base * 1.1, tipness);
+	float rim = abs(UV.x - 0.5) * 2.0;
+	ALBEDO += base * rim * tipness * 0.18;   // thin blades catch the light at their edges
 	ROUGHNESS = 0.9;
 	SPECULAR = 0.2;
 	BACKLIGHT = vec3(0.12, 0.1, 0.04);
