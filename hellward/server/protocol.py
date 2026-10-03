@@ -53,8 +53,10 @@ def event(world: World, e: tuple) -> list:
     out = plain(e)
     if e[0] == "spawn":
         m = world.monster(e[1])
-        out.append(None if m is None else monster_facts(m))   # None: it died in the step it came
-    elif e[0] in ("built", "upgraded"):
+        out[2] = None if m is None else monster_facts(m)   # the facts stand where the sim's kind stood
+    elif e[0] == "built":
+        out[2] = tower_facts(world.towers[e[1]])
+    elif e[0] == "upgraded":
         out.append(tower_facts(world.towers[e[1]]))
     return out
 
@@ -107,9 +109,9 @@ def state(world: World) -> dict:
         "can_call": world.can_call_wave, "early_bonus": world.early_call_bonus,
         "recharge": {k: round(v, 2) for k, v in world.recharge.items()},
         "salvage": world.salvage_held, "breach": breach, "outcome": world.outcome,
-        "cost": {kind: world.cost(kind) for kind in arsenal.towers},
+        "cost": {kind: world.cost(kind) for kind in arsenal.towers if kind not in world.perks.locked},
         "door_cost": world.door_cost if arsenal.gates else None,
-        "spell_cost": {key: world.spell_cost(key) for key in arsenal.spells},
+        "spell_cost": {key: world.spell_cost(key) for key in arsenal.spells if key not in world.perks.locked},
         "kills": world.kills,
     }
 
@@ -147,23 +149,29 @@ def battle_start(world: World, *, demo: bool, breach_claim: str | None) -> dict:
         "grid": ["".join(level.tile(x, y).value for x in range(level.width)) for y in range(level.height)],
         "routes": [{"key": r.key, "points": [list(p) for p in r.waypoints], "length": r.length} for r in level.routes],
         "doors": [{"index": d.index, "tile": list(d.tile), "s": d.s} for d in world.doors],
-        "waves": [{"name": name, "bonus": w.bonus, "hp": w.hp,
+        "waves": [{"name": name, "bonus": w.bonus,
                    "groups": [{"kind": g.kind, "count": g.count, "interval": g.interval, "start": g.start,
                                "route": g.route} for g in w.groups]}
                   for name, w in zip(location.wave_names, world.waves)],
-        "arsenal": {"towers": list(location.arsenal.towers), "gates": location.arsenal.gates,
-                    "spells": list(location.arsenal.spells)},
-        "towers": {kind: tower_table(world, kind) for kind in location.arsenal.towers},
-        "worth": {kind: worth_table(world, kind) for kind in location.arsenal.towers},
-        "boulders": [{"tile": list(tile), "worth": {kind: _worth(world, kind, tile) for kind in location.arsenal.towers}}
+        "arsenal": {"towers": [k for k in location.arsenal.towers if k not in world.perks.locked],
+                    "gates": location.arsenal.gates,
+                    "spells": [k for k in location.arsenal.spells if k not in world.perks.locked]},
+        "towers": {kind: tower_table(world, kind) for kind in location.arsenal.towers
+                   if kind not in world.perks.locked},
+        "worth": {kind: worth_table(world, kind) for kind in location.arsenal.towers
+                  if kind not in world.perks.locked},
+        "boulders": [{"tile": list(tile), "worth": {kind: _worth(world, kind, tile)
+                                                   for kind in location.arsenal.towers
+                                                   if kind not in world.perks.locked}}
                      for tile in sorted(level.boulders)],
-        "clear": [BALANCE.income_unit(world.stage) * n for n in range(1, len(level.boulders) + 1)],
+        "clear": [BALANCE.income_unit() * n for n in range(1, len(level.boulders) + 1)],
         "monsters": {kind: monster_table(world, kind) for kind in kinds},
         "curses": {c.value: {"name": s.name, "duration": s.duration, "radius": s.radius, "blurb": s.blurb}
                    for c, s in CURSES.items()},
         "spells": {key: {"name": s.name, "aim": s.aim, "blurb": s.blurb, "radius": s.radius, "delay": s.delay,
                          "lasting": s.lasting, "recharge": s.recharge}
-                   for key, s in SPELLS.items() if key in location.arsenal.spells},
+                   for key, s in SPELLS.items()
+                   if key in location.arsenal.spells and key not in world.perks.locked},
         "gate": {"life": world.gate_life, "blurb": "Bars an arch: walkers must break it; flyers pass over."}
         if location.arsenal.gates else None,
         "breach": None if world.breach_spec is None else breach_table(world, breach_claim),
@@ -176,7 +184,7 @@ def tower_table(world: World, kind: str) -> dict:
     t = TOWERS[kind]
     return {"name": t.name, "element": t.element.value, "attack": t.attack, "blurb": t.blurb,
             "bolt_speed": t.bolt_speed,
-            "levels": [{"cost": world._price(lv.cost), "damage": lv.damage, "rate": lv.rate, "range": lv.range,
+            "levels": [{"cost": lv.cost, "damage": lv.damage, "rate": lv.rate, "range": lv.range,
                         "splash": lv.splash, "chains": lv.chains, "chill": lv.chill, "chill_time": lv.chill_time,
                         "poison": lv.poison, "poison_time": lv.poison_time}
                        for lv in world.tower_levels[kind]]}
@@ -217,6 +225,8 @@ def hits(world: World, kind: MonsterKind) -> dict[str, list[int]]:
     (its armor and tags, no other factor): the hover's table, by the simulation's own reckoning."""
     out = {}
     for key in world.location.arsenal.towers:
+        if key in world.perks.locked:
+            continue
         tower = TOWERS[key]
         if tower.attack not in HITLESS:
             out[key] = [felt_hit(lv.damage, tower.element, kind) for lv in world.tower_levels[key]]

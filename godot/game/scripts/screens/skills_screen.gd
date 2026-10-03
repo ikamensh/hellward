@@ -1,19 +1,21 @@
 class_name SkillsScreen
 extends Screen
-## The skill tree, over the map or a location's intro: nine columns (seven tower kinds, Warding, Sorcery) of up to
-## four skills, each needing the one above it, bought with sigils. The server's `skills` view is what it shows; a
-## click on a skill asks to learn it and the reply is the new view. Opened from an intro (`location`), the skills
-## that do nothing there are greyed. Unlearn all (U) gives every sigil back; Close (Esc).
+## The skill tree, over the map or a location's intro: thirteen columns (ten tower kinds, Warding, Sorcery,
+## Battle Magic) of up to five skills, each needing the one above it, bought with sigils. The server's `skills`
+## view is what it shows; a click on a skill asks to learn it and the reply is the new view. Opened from an
+## intro (`location`), the skills that do nothing there are greyed. Unlearn all (U) gives every sigil back; Close (Esc).
 ##
 ## The forge builds with this screen's kit too: the stage, the heading, the iron plates, the element sigils, the
 ## backdrop's gradients and frame.
 
 const TONES := {"arrow": Color(0.86, 0.72, 0.48), "fire": Color(1.0, 0.5, 0.18), "lightning": Color(0.68, 0.7, 1.0),
 	"cold": Color(0.5, 0.85, 1.0), "poison": Color(0.66, 0.93, 0.25), "bone": Color(0.9, 0.86, 0.74),
-	"nature": Color(0.38, 0.82, 0.42), "warding": Color(1.0, 0.84, 0.48), "sorcery": Color(0.45, 0.55, 1.0)}
-const NODE := Vector2(186, 186)
-const PITCH := 196.0                  # from one column's centre to the next
-const TIER_Y := [244.0, 448.0, 652.0, 856.0]   # the last row ends above the frame's inner line (1057)
+	"nature": Color(0.38, 0.82, 0.42), "warding": Color(1.0, 0.84, 0.48), "sorcery": Color(0.45, 0.55, 1.0),
+	"ballista": Color(0.72, 0.74, 0.8), "hook": Color(0.85, 0.55, 0.3), "knife": Color(0.6, 0.75, 0.85),
+	"spells": Color(0.75, 0.55, 1.0)}
+const NODE := Vector2(140, 150)
+const PITCH := 146.0                  # from one column's centre to the next
+const TIER_Y := [244.0, 407.0, 570.0, 733.0, 896.0]   # the last row ends above the frame's inner line (1057)
 const HEAD_Y := 160.0                 # the columns' sigils
 const MARGIN := 26.0                  # a plate's glow reaches this far past it
 const PLATE_SHADER := """
@@ -256,7 +258,7 @@ func _header() -> void:
 	# the purse: the sigils free to spend, in a gilt ring
 	var free: int = int(data["free"])
 	var purse := Control.new()
-	purse.position = Vector2(_column_x(8) - 44, 62)   # its larger captions clear of the frame on the right
+	purse.position = Vector2(Ui.W - 220, 62)   # its larger captions clear of the frame on the right
 	purse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	purse.draw.connect(func(): _draw_purse(purse, free))
 	_stage.add_child(purse)
@@ -656,20 +658,20 @@ func _legend() -> void:
 		_stage.add_child(l)
 
 
-## Unlearn all and Close, under Warding and Sorcery, whose trees end at their third skill.
+## Unlearn all and Close, under Warding and Sorcery, whose trees end at their second skill.
 func _orders() -> void:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 14)
-	var x := (_column_x(7) + _column_x(8)) / 2
-	col.position = Vector2(x - 160, TIER_Y[3] + 30)
-	col.size = Vector2(320, 0)
+	var x := (_column_x(10) + _column_x(11)) / 2
+	col.position = Vector2(x - 120, TIER_Y[2] + 30)
+	col.size = Vector2(240, 0)
 	_stage.add_child(col)
-	var unlearn := Ui.button("Unlearn all", "U", 320)
+	var unlearn := Ui.button("Unlearn all", "U", 240)
 	unlearn.disabled = not bool(data["any"])
 	unlearn.tooltip_text = "Every sigil back, to spend again." if bool(data["any"]) else "Nothing is learned yet."
 	unlearn.pressed.connect(_unlearn)
 	col.add_child(unlearn)
-	var close := Ui.button("Close", "Esc", 320)
+	var close := Ui.button("Close", "Esc", 240)
 	close.pressed.connect(back)
 	col.add_child(close)
 
