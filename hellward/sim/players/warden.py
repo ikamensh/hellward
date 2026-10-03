@@ -33,7 +33,7 @@ from hellward.sim.content import MONSTERS, SPELLS, TOWERS, WAVE_BREAK, Element, 
 from hellward.sim.model import DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
 from hellward.sim.players.spacing import score_with_spacing
-from hellward.sim.skills import SKILLS, UNLOCK, can_learn, kept, perks, tower_levels, unlocked
+from hellward.sim.skills import SKILLS, UNLOCK, can_learn, kept, perks, tower_levels, unlock_skills, unlocked
 
 PLANS = Path(__file__).parent / "plans" / "warden.json"
 THINK = 0.25          # seconds between two looks at the gold
@@ -95,13 +95,19 @@ def plan_key(location: Location, sigils: int) -> str:
     return f"{location.key}/{sigils}"
 
 
-def fingerprint(location: Location) -> str:
-    """The map and arsenal a plan was searched on: a stored plan for a map that has changed since is not played."""
+def fingerprint(location: Location, unlocks: frozenset[str]) -> str:
+    """The map, arsenal and unlock set a plan was searched on: a stored plan for a map that has changed
+    since is not played."""
     level, arsenal = location.level, location.arsenal
     text = repr((level.width, level.height, level.waypoints, level.extra_routes, level.doors,
                  sorted(level.walkable_tiles), sorted(level.obstacles), sorted(level.pools),
-                 sorted(level.boulders), arsenal.towers, arsenal.gates, arsenal.spells))
+                 sorted(level.boulders), arsenal.towers, arsenal.gates, arsenal.spells, sorted(unlocks)))
     return hashlib.sha1(text.encode()).hexdigest()[:12]
+
+
+def sealed(plan: Plan, location: Location) -> bool:
+    """The stored plan's seal holds: its map is the fingerprint of this map and its own unlock set."""
+    return plan.map == fingerprint(location, unlock_skills(plan.skills))
 
 
 def load_plans() -> dict[str, Plan]:
@@ -113,7 +119,7 @@ def load_plans() -> dict[str, Plan]:
 def check(location: Location, sigils: int) -> None:
     """Refuse a stored plan searched on another map; with no stored plan the draft plays, which is allowed."""
     stored = load_plans().get(plan_key(location, sigils))
-    if stored is not None and stored.map != fingerprint(location):
+    if stored is not None and not sealed(stored, location):
         raise ValueError(f"the warden {plan_key(location, sigils)} plan was searched on another map")
 
 
@@ -357,13 +363,13 @@ class Warden:
         if self.plan is not None:
             return self.plan
         stored = self.plans.get(plan_key(location, sigils))
-        if stored is not None and stored.map == fingerprint(location) and not self.redraft_skills:
+        if stored is not None and sealed(stored, location) and not self.redraft_skills:
             return stored
         same = [plan for key, plan in self.plans.items() if key.split("/")[0] == location.key
-                and plan.map == fingerprint(location)]
+                and sealed(plan, location)]
         if same:
             if self.redraft_skills:
-                base = stored if stored is not None and stored.map == fingerprint(location) else same[0]
+                base = stored if stored is not None and sealed(stored, location) else same[0]
                 kinds = {s.kind for s in base.steps if s.what == "build"}
                 need = frozenset(u for k in kinds if (u := UNLOCK[k]) is not None)
                 want = tuple(s for s in sorted(base.skills - need, key=lambda s: (SKILLS[s].tier, s))

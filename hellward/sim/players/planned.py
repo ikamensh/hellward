@@ -24,7 +24,7 @@ from hellward.sim.campaign import ORDER, Location
 from hellward.sim.content import CURSES, SELL_REFUND, SPELLS, TOWERS, Curse, Element, felt_hit
 from hellward.sim.model import DOOR, DOOR_STOP, JOSTLE, Monster, Tower, World
 from hellward.sim.players.hands import AIM_GAP, Hands, REACT, ready
-from hellward.sim.skills import can_learn
+from hellward.sim.skills import UNLOCK, can_learn, unlock_skills
 
 PLANS = Path(__file__).parent / "plans"
 THINK = 0.25          # seconds between two looks at the build and the next wave
@@ -92,26 +92,37 @@ def load(location: str) -> Plan:
     return Plan.from_json(json.loads(plan_path(location).read_text()))
 
 
-def fingerprint(location: Location) -> str:
-    """The map, waves and prices a plan was searched on: a stored plan for a location that has changed
-    since is not played."""
+def fingerprint(location: Location, unlocks: frozenset[str]) -> str:
+    """The map, waves, prices and unlock set a plan was searched on: a stored plan for a location that has
+    changed since is not played."""
     prices = tuple((kind, tuple(level.cost for level in TOWERS[kind].levels)) for kind in sorted(TOWERS))
     level, arsenal = location.level, location.arsenal
     text = repr((level.width, level.height, level.waypoints, level.extra_routes, level.doors,
                  sorted(level.walkable_tiles), sorted(level.obstacles), sorted(level.pools),
                  sorted(level.boulders), arsenal.towers, arsenal.gates, arsenal.spells,
-                 location.waves, location.start_gold, prices, DOOR.cost))
+                 location.waves, location.start_gold, prices, DOOR.cost, sorted(unlocks)))
     return hashlib.sha1(text.encode()).hexdigest()[:12]
 
 
-def check(location: Location) -> Plan:
-    """The stored plan for a location, refused when it is missing or was searched on something else."""
+def needs(plan: Plan) -> frozenset[str]:
+    """The unlock skills the plan's steps need: their tower kinds'."""
+    return frozenset(u for step in plan.steps if step[0] == "build"
+                     for u in [UNLOCK[step[1]]] if u is not None)
+
+
+def check(location: Location, learned: frozenset[str] | None = None) -> Plan:
+    """The stored plan for a location, refused when it is missing, was searched on something else, or needs
+    unlocks the learned skills lack: a plan is played only where a Kit holds its unlock set."""
     path = plan_path(location.key)
     if not path.exists():
         raise ValueError(f"no plan searched for {location.key} yet")
     plan = Plan.from_json(json.loads(path.read_text()))
-    if plan.map != fingerprint(location):
-        raise ValueError(f"the {location.key} plan was searched on another map, waves or prices")
+    if plan.map != fingerprint(location, unlock_skills(plan.skills)):
+        raise ValueError(f"the {location.key} plan was searched on another map, waves, prices or unlocks")
+    if learned is not None:
+        missing = needs(plan) - unlock_skills(learned)
+        if missing:
+            raise ValueError(f"the {location.key} plan needs {sorted(missing)} to raise its steps")
     return plan
 
 
@@ -131,12 +142,19 @@ class Planned:
     def draft(self, location: Location, sigils: int) -> frozenset[str]:
         if self.plan is None:
             self.plan = check(location)
-        return self.plan.learn(sigils, ORDER.index(location.key))
+        learned = self.plan.learn(sigils, ORDER.index(location.key))
+        missing = needs(self.plan) - unlock_skills(learned)
+        if missing:
+            raise ValueError(f"the {location.key} plan needs {sorted(missing)} to raise its steps")
+        return learned
 
     def act(self, hands: Hands) -> None:
         world = hands.world
         if self.plan is None:
             self.plan = check(world.location)
+            kinds = {step[1] for step in self.plan.steps if step[0] == "build"}
+            if kinds & world.perks.locked:
+                raise ValueError(f"the {world.location.key} plan's steps are locked in this defence")
         self._answer(hands)
         if world.time >= self.look:
             self.look = world.time + LOOK

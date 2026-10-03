@@ -49,7 +49,7 @@ from hellward.sim.model import DOOR_STOP, JOSTLE, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 from hellward.sim.players.planned import Plan, Planned, fingerprint, load, plan_path  # noqa: E402
-from hellward.sim.skills import SKILLS, column_of  # noqa: E402
+from hellward.sim.skills import SKILLS, column_of, unlock_skills  # noqa: E402
 
 
 
@@ -505,7 +505,7 @@ def main() -> None:
             print(f"{key}:", flush=True)
             plan = climb(pool, key, args.generations, args.children, args.per, args.confirm, args.resume,
                          lambda line: print(line, flush=True))
-            plan.map = fingerprint(LOCATIONS[key])
+            plan.map = fingerprint(LOCATIONS[key], unlock_skills(plan.skills))
             path = plan_path(key)
             path.parent.mkdir(exist_ok=True)
             path.write_text(dumps(plan))

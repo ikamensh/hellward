@@ -117,7 +117,9 @@ def test_the_kit_deals_the_arsenal_the_world_reads():
 
 
 def test_a_plan_searched_on_something_else_is_refused(tmp_path, monkeypatch):
-    assert planned.check(LOCATIONS["tristram"]).map == planned.fingerprint(LOCATIONS["tristram"])
+    from hellward.sim.skills import unlock_skills
+    stored = planned.check(LOCATIONS["tristram"])
+    assert stored.map == planned.fingerprint(LOCATIONS["tristram"], unlock_skills(stored.skills))
     monkeypatch.setattr(planned, "PLANS", tmp_path)
     with pytest.raises(ValueError):
         planned.check(LOCATIONS["tristram"])

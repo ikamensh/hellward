@@ -39,10 +39,11 @@ from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 from hellward.sim.players.warden import (  # noqa: E402
-    PLANS, Plan, Step, Warden, draft_build, draft_skills, fingerprint, plan_key, tile_value,
+    PLANS, Plan, Step, Warden, draft_build, draft_skills, fingerprint, plan_key, sealed,
+    tile_value,
 )
 from hellward.sim.skills import (  # noqa: E402
-    SKILLS, UNLOCK, above, can_learn, cost, kept, perks, tower_levels, unlocked,
+    SKILLS, UNLOCK, above, can_learn, cost, kept, perks, tower_levels, unlock_skills, unlocked,
 )
 from tools.tuning import life_margin  # noqa: E402
 
@@ -195,14 +196,15 @@ def stored(key: str, sigils: int) -> tuple[dict, dict]:
     rows = json.loads(PLANS.read_text()) if PLANS.exists() else {}
     location = LOCATIONS[key]
     found = rows.get(plan_key(location, sigils))
-    if found is not None and found["map"] == fingerprint(location):
+    if found is not None and sealed(Plan.of(found), location):
         return rows, found
     return rows, draft(location, sigils).row()
 
 
 def draft(location: Location, sigils: int) -> Plan:
     learned = draft_skills(location, sigils)
-    return Plan(learned, draft_build(location, learned), map=fingerprint(location))
+    return Plan(learned, draft_build(location, learned),
+                map=fingerprint(location, unlock_skills(learned)))
 
 
 def score(pool: ProcessPoolExecutor, rows: list[dict], key: str, sigils: int, seeds: list[int],
@@ -231,8 +233,8 @@ def search(args: argparse.Namespace) -> None:
     best = draft(location, sigils) if args.fresh else Plan.of(row)
     used = {s.kind for s in best.steps if s.what == "build"}
     must = frozenset(u for k in used if (u := UNLOCK[k]) is not None)
-    best = Plan(kept(must | best.skills, sigils, ORDER.index(key)), best.steps, best.early,
-                fingerprint(location))
+    learned = kept(must | best.skills, sigils, ORDER.index(key))
+    best = Plan(learned, best.steps, best.early, fingerprint(location, unlock_skills(learned)))
     evaluated = 0
     started = time.time()
     with ProcessPoolExecutor(args.jobs) as pool:

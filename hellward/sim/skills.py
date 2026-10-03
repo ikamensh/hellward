@@ -94,6 +94,11 @@ def unlocked(kind: str, learned: frozenset[str] | set[str]) -> bool:
     return key is None or key in learned
 
 
+def unlock_skills(learned: Iterable[str]) -> frozenset[str]:
+    """The unlock skills among these: what a plan's fingerprint seals, and what a Kit must hold to play it."""
+    return frozenset(s for s in learned if s.startswith("unlock_"))
+
+
 def _spell_unlocks() -> dict[str, str]:
     """Each gated spell's `unlock_` skill: Smite and Cleanse are free."""
     found: dict[str, str] = {}

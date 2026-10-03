@@ -18,8 +18,8 @@ from hellward.sim.players import PLAYERS
 from hellward.sim.players.adaptive import ORDERS, Adaptive
 from hellward.sim.players.hands import Hands, defend, reference_kit
 from hellward.sim.players.planned import PLANS, THINK, Plan as PlannedPlan, Planned, load
-from hellward.sim.players.warden import fingerprint, load_plans
-from hellward.sim.skills import SKILLS, can_learn, check, cost, unlocked
+from hellward.sim.players.warden import fingerprint, load_plans, sealed
+from hellward.sim.skills import SKILLS, can_learn, check, cost, unlock_skills, unlocked
 
 GRAVEYARD_SIGNS = Level("Sign timing", 25, 14, ((0, 10), (10, 10), (10, 3), (24, 3)), ((10, 7),))
 
@@ -153,7 +153,7 @@ def test_every_stored_warden_plan_is_for_todays_map_and_its_sigils():
     for key, plan in load_plans().items():
         name, sigils = key.split("/")
         location = LOCATIONS[name]
-        assert plan.map == fingerprint(location), key
+        assert sealed(plan, location), key
         assert cost(plan.skills) <= int(sigils), key
         assert all(s.kind in location.arsenal.towers for s in plan.steps if s.what == "build"), key
         for step in plan.steps:
@@ -178,7 +178,7 @@ def test_warden_plan_is_invalidated_when_the_walkable_hall_changes():
     extra = next((x, y) for y in range(1, level.height - 1) for x in range(1, level.width - 1)
                  if level.buildable(x, y))
     revised = replace(level, halls=level.walkable_tiles | {extra})
-    assert fingerprint(replace(location, level=revised)) != fingerprint(location)
+    assert fingerprint(replace(location, level=revised), frozenset()) != fingerprint(location, frozenset())
 
 
 def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():
@@ -406,6 +406,33 @@ def test_planned_player_spends_sigils_only_on_skills_open_at_the_location():
     assert early == frozenset({"unlock_pyre", "adept_fire", "master_fire", "warmth"})
     late = Planned(plan=plan).draft(LOCATIONS["jungle"], 16)
     assert late == frozenset({"unlock_pyre", "adept_fire", "master_fire", "fire_ball"})
+
+
+def test_a_plan_is_played_only_where_its_steps_unlocks_hold():
+    from hellward.sim.players.planned import Plan, Planned, check, needs
+
+    plan = Plan(["unlock_pyre", "adept_fire"], [("build", "pyre", (1, 1))], [])
+    assert needs(plan) == frozenset({"unlock_pyre"})
+    assert Planned(plan=plan).draft(LOCATIONS["cathedral"], 16) >= {"unlock_pyre"}
+    with pytest.raises(ValueError, match="unlock_pyre"):
+        Planned(plan=plan).draft(LOCATIONS["cathedral"], 0)
+    with pytest.raises(ValueError, match="unlock_pyre"):
+        check(LOCATIONS["cathedral"], frozenset())
+    assert check(LOCATIONS["cathedral"], frozenset({"unlock_pyre"})).map
+    from hellward.sim.skills import perks
+    bare = World(LOCATIONS["cathedral"], perks=perks(frozenset(), 5))
+    with pytest.raises(ValueError, match="locked"):
+        Planned().act(Hands(bare, react=0.0))
+
+
+def test_a_stored_warden_plan_edited_since_its_search_loses_its_seal():
+    from dataclasses import replace
+
+    from hellward.sim.players.warden import Plan
+    key, plan = next((k, p) for k, p in load_plans().items() if unlock_skills(p.skills))
+    assert sealed(plan, LOCATIONS[key.split("/")[0]])
+    edited = plan.skills - unlock_skills(plan.skills)   # the unlock set it was searched on, gone
+    assert not sealed(replace(plan, skills=edited), LOCATIONS[key.split("/")[0]])
 
 
 def test_warden_draft_and_search_mutations_cannot_buy_future_skills():

@@ -1,7 +1,7 @@
 {
  "catacombs/16": {
   "early": 0.7,
-  "map": "cd5db104e3d3",
+  "map": "6270fc900370",
   "searched": {
    "leaders": "greedy",
    "life": 1.325,
@@ -78,7 +78,7 @@
  },
  "cathedral/11": {
   "early": 0.9,
-  "map": "33938fb86f8e",
+  "map": "323c95ee4d02",
   "searched": {
    "leaders": "greedy",
    "life": 1.384,
@@ -181,7 +181,7 @@
  },
  "caves/20": {
   "early": 0.9,
-  "map": "93499c57f75a",
+  "map": "65af5100a891",
   "searched": {
    "leaders": "greedy",
    "life": 1.0,
@@ -270,7 +270,7 @@
  },
  "docks/33": {
   "early": 0.9,
-  "map": "b2d4e6284b25",
+  "map": "76e612853d98",
   "searched": {
    "leaders": "greedy",
    "life": 1.269,
@@ -346,7 +346,7 @@
  },
  "drowned_city/53": {
   "early": 0.7,
-  "map": "7518bf57ef76",
+  "map": "500266ead7cf",
   "searched": {
    "leaders": "greedy",
    "life": 1.022,
@@ -441,7 +441,7 @@
  },
  "graveyard/5": {
   "early": 0.7,
-  "map": "cef13b0483d2",
+  "map": "72aabb3e60cb",
   "searched": {
    "leaders": "greedy",
    "life": 1.354,
@@ -524,7 +524,7 @@
  },
  "hells_gate/27": {
   "early": 0.7,
-  "map": "de6eef796e8e",
+  "map": "b8571c66035e",
   "searched": {
    "leaders": "greedy",
    "life": 1.103,
@@ -603,7 +603,7 @@
  },
  "jungle/45": {
   "early": 0.9,
-  "map": "62d58973b346",
+  "map": "78d807bf336f",
   "searched": {
    "leaders": "greedy",
    "life": 1.102,
@@ -672,7 +672,7 @@
  },
  "spider_forest/37": {
   "early": 0.9,
-  "map": "02640c394be2",
+  "map": "75b6a8f5e7b6",
   "searched": {
    "leaders": "greedy",
    "life": 1.526,
@@ -728,7 +728,7 @@
  },
  "temple/63": {
   "early": 0.5,
-  "map": "564b6e81a638",
+  "map": "d1bc03961d4c",
   "searched": {
    "leaders": "greedy",
    "life": 1.022,
@@ -813,7 +813,7 @@
  },
  "travincal/56": {
   "early": 0.7,
-  "map": "5b4f45f48212",
+  "map": "99c1f3716981",
   "searched": {
    "leaders": "greedy",
    "life": 1.0,
@@ -896,7 +896,7 @@
  },
  "tristram/0": {
   "early": 0.7,
-  "map": "6ef0a422465d",
+  "map": "6ce692f7210e",
   "searched": {
    "leaders": "greedy",
    "life": 1.593,
