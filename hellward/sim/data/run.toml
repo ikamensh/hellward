@@ -1,0 +1,17 @@
+# Stage 3's run: one pool of sanctuary life across all twelve locations, XP and levels, skill points, and
+# gold carried from location to location. First guesses; tools/runs.py measures them (G3.1-G3.3, M2, M3).
+
+life = 30                # the pool at a run's start; a leak costs the monster's lives
+camp_heal = 0.65         # share of the missing life a camp restores, rounded up
+gold_floor = 0.8         # start gold tops carried gold up to this share of the location's stage-2 stipend
+dismantle_refund = 0.7   # share of every standing tower's cost that comes back as carried gold
+xp_life = 10.0           # a kill gives its monster's life divided by this
+xp_clear = 5.0           # a cleared wave gives this times its number
+xp_next_base = 18.0      # the XP from level 1 to 2; Tristram's first wave gives 10, its second 20 more
+xp_next_growth = 0.8     # each level past the first needs this much more; the campaign's ~2193 XP reach ~55
+reskill_every = 4        # every fourth level gives a reskill point
+sigil_lost = [5, 2, 0]   # lives lost at a location for one, two and three lives sigils
+
+[goals]
+lean_n = 7               # A lean defence: at most this many towers stand at any moment
+hymn_n = 2               # A fragile hymn: this many clean Battle Hymns

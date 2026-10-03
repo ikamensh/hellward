@@ -1,0 +1,11 @@
+# Bonus waves: the stake is a wager on a harder pack, paid only when nothing of it leaks. The profit grows
+# faster than the stake; each further bonus wave at a location pays and gives XP at repeat of the one before.
+# First guesses; tools/runs.py measures them (G3.3).
+
+units = [1, 2, 3]                  # the wager in income units, by stake
+profit_mult = [2.8, 7.0, 14.0]     # the profit in income units: this times the wager's unit
+repeat = 0.6                       # each further bonus wave at a location pays this of the one before
+early = 2                          # summoned from the break after this wave on (1-based)
+pack_ahead = [1, 2, 2]              # whose pack each stake fights: this many waves past the latest cleared, capped at the last
+life_factor = [1.0, 1.0, 1.0]      # the pack's life, times this (the pack and the extra carry the ladder)
+extra = ["none", "elite", "leader"]    # the one monster the pack gains

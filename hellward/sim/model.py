@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import math
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Callable, Final
 
 from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
+from hellward.sim.bonus import Bonus, BonusPack
+from hellward.sim.bonus import EARLY as BONUS_EARLY
 from hellward.sim.breaches import BREACHES
 from hellward.sim.campaign import CATHEDRAL, ORDER, Location
 from hellward.sim.content import (
@@ -34,7 +36,8 @@ from hellward.sim.content import (
 )
 from hellward.sim.items import EMPTY_LOADOUT, Loadout, PATTERNS
 from hellward.sim.level import Level
-from hellward.sim.skills import NO_PERKS, RANK_SKILL, SKILLS, Perks, baked
+from hellward.sim.skills import NO_PERKS, RANK_SKILL, SKILLS, SPELL_UNLOCK, UNLOCK, Perks, baked
+from hellward.sim.xp import clear_xp, kill_xp, xp_next
 
 if TYPE_CHECKING:
     from hellward.sim.planner import Decision
@@ -65,11 +68,11 @@ class Monster:
     __slots__ = ("id", "kind", "hp", "max_hp", "s", "route", "bounty", "salvage", "breach", "elite_name", "speed_factor",
                  "lane", "jostle", "chill", "chill_left", "frozen", "poison", "wave",
                  "cooldown", "asking", "ask_left", "chant_curse", "chant_spot", "chant_left", "door",
-                 "amplified", "amplify", "risen", "marking", "moved", "strikes")
+                 "amplified", "amplify", "risen", "marking", "moved", "strikes", "bonus")
 
     def __init__(self, id: int, kind: MonsterKind, wave: int, lane: float, jostle: float, hp: float, cooldown: float,
                  route: str = "main", bounty: int | None = None, salvage: int = 0, breach: bool = False,
-                 elite_name: str = "", speed_factor: float = 1.0) -> None:
+                 elite_name: str = "", speed_factor: float = 1.0, bonus: bool = False) -> None:
         self.id = id
         self.kind = kind
         self.hp = hp
@@ -101,11 +104,12 @@ class Monster:
         self.marking = False                  # is this leader currently marking (instead of chanting)
         self.moved = 0                        # a bit per mover kind that has moved it back (HOOK)
         self.strikes = 0                      # a boss's strikes at the shrine
+        self.bonus = bonus                    # a summoned pack's monster: no bounty, no XP, its leak fails the pack
 
     def copy(self) -> Monster:
         """Everything but a leader's pending question to its planner."""
         m = Monster(self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown, self.route,
-                    self.bounty, self.salvage, self.breach, self.elite_name, self.speed_factor)
+                    self.bounty, self.salvage, self.breach, self.elite_name, self.speed_factor, self.bonus)
         m.max_hp, m.s, m.chill, m.chill_left, m.frozen = self.max_hp, self.s, self.chill, self.chill_left, self.frozen
         m.poison = [stack[:] for stack in self.poison]
         m.chant_curse, m.chant_spot, m.chant_left, m.door = self.chant_curse, self.chant_spot, self.chant_left, self.door
@@ -115,7 +119,8 @@ class Monster:
 
     def __reduce__(self) -> tuple[Any, ...]:
         return Monster, (self.id, self.kind, self.wave, self.lane, self.jostle, self.hp, self.cooldown, self.route,
-                         self.bounty, self.salvage, self.breach, self.elite_name, self.speed_factor), self.__getstate__()
+                         self.bounty, self.salvage, self.breach, self.elite_name, self.speed_factor,
+                         self.bonus), self.__getstate__()
 
     @property
     def speed(self) -> float:
@@ -302,7 +307,7 @@ Planner = Callable[["World", int], Any]   # returns a handle with .result() -> D
 class World:
     def __init__(self, location: Location = CATHEDRAL, *, hardness: float = 1.0, perks: Perks = NO_PERKS,
                  seed: int = 0, planner: Planner | None = None, record: bool = True, curse_scale: float = 1.0,
-                 loadout: Loadout = EMPTY_LOADOUT) -> None:
+                 loadout: Loadout = EMPTY_LOADOUT, xp: float = 0.0, xp_level: int = 1) -> None:
         self.location = location
         self.stage = ORDER.index(location.key)
         self.level = location.level
@@ -330,6 +335,9 @@ class World:
         self.gold = location.start_gold
         self.lives = START_LIVES
         self.mana = min(MANA_START, perks.mana_max)
+        self.xp = xp                    # the run's progress to the next level, counted on from here
+        self.xp_level = xp_level        # the run's level (``level`` is the map): each level-up refills the mana
+        self.xp_total = 0.0             # every point earned this defence, for the run's settling
         self.towers: dict[int, Tower] = {}
         self.cleared: set[tuple[int, int]] = set()   # boulders cleared, now open floor
         self.doors = [Door(i, tile, s) for i, (tile, s) in enumerate(zip(self.level.doors, self.level.door_s))]
@@ -342,6 +350,8 @@ class World:
         self.gold_schedule: list[int] = []     # each scheduled spawn's allocated gold, soonest last
         self.breach_schedule: list[bool] = []
         self.elite_schedule: list[bool] = []
+        self.bonus_schedule: list[bool] = []
+        self.bonus: Bonus | None = None        # the summoned pack, while it lives
         self.breach_spec = BREACHES.get(location.key)
         self.breach_mode: str | None = None
         self.breach_remaining = 0
@@ -372,6 +382,7 @@ class World:
         w.loot_ordinals, w.spawn_ordinal = self.loot_ordinals, self.spawn_ordinal
         w.salvage_held, w.salvage_sold = self.salvage_held, self.salvage_sold
         w.time, w.gold, w.lives, w.mana = self.time, self.gold, self.lives, self.mana
+        w.xp, w.xp_level, w.xp_total = self.xp, self.xp_level, self.xp_total
         w.towers = {i: t.copy() for i, t in self.towers.items()}
         w.cleared = set(self.cleared)
         w.doors = [d.copy() for d in self.doors]
@@ -383,6 +394,8 @@ class World:
         w.wave, w.schedule, w.wave_time, w.break_left = self.wave, list(self.schedule), self.wave_time, self.break_left
         w.gold_schedule = list(self.gold_schedule)
         w.breach_schedule, w.elite_schedule = list(self.breach_schedule), list(self.elite_schedule)
+        w.bonus_schedule = list(self.bonus_schedule)
+        w.bonus = None if self.bonus is None else replace(self.bonus)
         w.breach_mode, w.breach_remaining = self.breach_mode, self.breach_remaining
         w.breach_failed, w.breach_cleared = self.breach_failed, self.breach_cleared
         w.wave_alive, w.unpaid = dict(self.wave_alive), list(self.unpaid)
@@ -397,6 +410,16 @@ class World:
     def _emit(self, *event: Any) -> None:
         if self.record:
             self.events.append(event)
+
+    def _earn(self, amount: float) -> None:
+        """Count XP: each level crossed refills the mana orb and is told to the view."""
+        self.xp_total += amount
+        self.xp += amount
+        while self.xp + 1e-9 >= xp_next(self.xp_level):
+            self.xp -= xp_next(self.xp_level)
+            self.xp_level += 1
+            self.mana = self.mana_max
+            self._emit("level_up", self.xp_level)
 
     # -- Queries ------------------------------------------------------------------------
 
@@ -452,7 +475,8 @@ class World:
 
     @property
     def can_call_wave(self) -> bool:
-        return self.outcome is None and not self.schedule and self.wave + 1 < len(self.waves)
+        return (self.outcome is None and not self.schedule and self.wave + 1 < len(self.waves)
+                and self.bonus is None)
 
     @property
     def early_call_bonus(self) -> int:
@@ -488,24 +512,21 @@ class World:
 
     @property
     def gate_life(self) -> float:
-        return self.perks.gate_life * BALANCE.life_growth ** self.stage
-
-    def _price(self, opening_cost: int) -> int:
-        return round(opening_cost * BALANCE.gold_unit(self.stage) / BALANCE.base_gold_unit)
+        return self.perks.gate_life
 
     @property
     def door_cost(self) -> int:
-        return self._price(DOOR.cost)
+        return DOOR.cost
 
     def spell_cost(self, key: str) -> float:
         return SPELLS[key].mana * self.perks.spell_cost
 
     def power(self) -> float:
-        """How hard a spell strikes: with the monsters' life now, and with Spell Mastery."""
-        return self.waves[max(self.wave, 0)].hp * self.location.life * self.perks.spell_power
+        """How hard a spell strikes: its authored damage, with Spell Mastery."""
+        return self.perks.spell_power
 
     def cost(self, kind: str) -> int:
-        return self._price(self.tower_levels[kind][0].cost)
+        return self.tower_levels[kind][0].cost
 
     def buildable(self, x: int, y: int) -> bool:
         """Whether a tower can stand here now: the bare floor, or a boulder cleared this defence."""
@@ -517,7 +538,7 @@ class World:
             raise Refused("Boulders can be cleared only during a wave break.")
         if tile not in self.level.boulders or tile in self.cleared:
             raise Refused("No boulder stands there.")
-        price = BALANCE.income_unit(self.stage) * (len(self.cleared) + 1)
+        price = BALANCE.income_unit() * (len(self.cleared) + 1)
         if self.gold < price:
             raise Refused(f"Clearing costs {price} gold.")
         self.gold -= price
@@ -531,6 +552,10 @@ class World:
         tower_kind = TOWERS[kind]
         if kind not in self.location.arsenal.towers:
             raise Refused(f"No {tower_kind.name} can be raised in {self.location.called}.")
+        if kind in self.perks.locked:
+            key = UNLOCK[kind]
+            assert key is not None
+            raise Refused(f"The {tower_kind.name} is locked: learn {SKILLS[key].name} first.")
         if not self.buildable(*tile):
             raise Refused("Towers stand on the bare floor, not on the path, the walls or the pits.")
         if self.tower_at(tile) is not None:
@@ -543,13 +568,13 @@ class World:
         tower = Tower(self._id(), tower_kind, levels, tile)
         tower.spent = cost
         self.towers[tower.id] = tower
-        self._emit("built", tower.id)
+        self._emit("built", tower.id, kind)
         return tower
 
     def upgrade_cost(self, tower: Tower) -> int | None:
         if tower.level + 1 >= len(tower.levels):
             return None
-        return self._price(tower.levels[tower.level + 1].cost)
+        return tower.levels[tower.level + 1].cost
 
     def rank_needs(self, tower: Tower) -> str | None:
         """The skill that would allow the tower's next rank, or None when it may be bought (or is at its top)."""
@@ -594,7 +619,7 @@ class World:
             raise Refused("Salvage can be sold only during a wave break.")
         if type(count) is not int or count <= 0 or count > self.salvage_held:
             raise Refused("You do not hold that much salvage.")
-        gold = count * BALANCE.salvage_sale_gold(self.stage)
+        gold = count * BALANCE.salvage_sale_gold()
         self.salvage_held -= count
         self.salvage_sold += count
         self.gold += gold
@@ -623,6 +648,8 @@ class World:
     def _spend(self, key: str) -> None:
         if key not in self.location.arsenal.spells:
             raise Refused(f"{SPELLS[key].name} is not yours to cast in {self.location.called}.")
+        if key in self.perks.locked:
+            raise Refused(f"{SPELLS[key].name} is locked: learn {SKILLS[SPELL_UNLOCK[key]].name} first.")
         left = self.recharge.get(key, 0.0)
         if left > 0:
             raise Refused(f"{SPELLS[key].name} gathers itself again: {math.ceil(left)} s.")
@@ -694,6 +721,39 @@ class World:
         self.gold += self.early_call_bonus
         self._start_wave()
 
+    def summon(self, pack: BonusPack) -> None:
+        """Wager the pack's gold on its monsters: they spawn while the break clock stops, and a clear with no
+        leak pays the wager back with the profit and the XP. The stake rides in the pack, drawn by
+        :func:`hellward.sim.bonus.draw`."""
+        if self.outcome is not None:
+            raise Refused("The defence is decided.")
+        if self.bonus is not None:
+            raise Refused("A bonus pack already fights.")
+        if self.break_left is None:
+            raise Refused("A bonus wave is summoned during a break.")
+        if self.wave + 1 < BONUS_EARLY:
+            raise Refused(f"Bonus waves open from wave {BONUS_EARLY}'s break.")
+        if self.gold < pack.wager:
+            raise Refused(f"Stake {pack.stake} takes {pack.wager} gold.")
+        self.gold -= pack.wager
+        tagged: list[tuple[float, str, str]] = []
+        for group in pack.pack:
+            self.level.route(group.route)   # a drawn pack must name a route on this map
+            for i in range(group.count):
+                tagged.append((group.start + i * group.interval, group.kind, group.route))
+        tagged.sort(reverse=True)
+        self.schedule = [(when, kind, route) for when, kind, route in tagged]
+        self.breach_schedule = [False] * len(tagged)
+        self.elite_schedule = [False] * len(tagged)
+        self.bonus_schedule = [True] * len(tagged)
+        self.gold_schedule = [0] * len(tagged)
+        self.wave_time = 0.0
+        saved, self.break_left = self.break_left, None
+        self.wave_alive[self.wave] += len(tagged)
+        self.bonus = Bonus(pack.stake, pack.wager, pack.profit, pack.xp, pack.life_factor, len(tagged),
+                           saved_break=saved)
+        self._emit("bonus", pack.stake, "summoned")
+
     def _start_wave(self) -> None:
         if self.breach_offered:
             self.choose_breach("decline")
@@ -717,10 +777,11 @@ class World:
         self.schedule = [(when, kind, route) for when, kind, route, _, _ in tagged]
         self.breach_schedule = [side for _, _, _, side, _ in tagged]
         self.elite_schedule = [elite for _, _, _, _, elite in tagged]
+        self.bonus_schedule = [False] * len(tagged)
         ordinary_weights = tuple(MONSTERS[kind].bounty for _, kind, _, side, _ in reversed(tagged) if not side)
         side_weights = tuple(MONSTERS[kind].bounty for _, kind, _, side, _ in reversed(tagged) if side)
-        ordinary_gold = BALANCE.wave_payouts(self.stage, self.wave, ordinary_weights)
-        side_gold = BALANCE.breach_payouts(self.stage, side_weights)
+        ordinary_gold = BALANCE.wave_payouts(self.wave, ordinary_weights)
+        side_gold = BALANCE.breach_payouts(side_weights)
         ordinary_index = 0
         side_index = 0
         payouts: list[int] = []
@@ -779,8 +840,9 @@ class World:
             bounty = self.gold_schedule.pop()
             side = self.breach_schedule.pop()
             elite = self.elite_schedule.pop()
+            is_bonus = self.bonus_schedule.pop()
             salvage = 0
-            if not side:
+            if not side and not is_bonus:
                 salvage = int(self.spawn_ordinal in self.loot_ordinals)
                 self.spawn_ordinal += 1
             kind = MONSTERS[key]
@@ -795,11 +857,14 @@ class World:
             hp_factor = spec.elite_hp_factor if elite and spec is not None else 1.0
             speed_factor = spec.elite_speed_factor if elite and spec is not None else 1.0
             elite_name = spec.elite_name if elite and spec is not None else ""
+            pack = self.bonus
+            if is_bonus and pack is not None:
+                hp_factor *= pack.life_factor
             m = Monster(self._id(), kind, self.wave, self.rng.uniform(-0.28, 0.28), self.rng.uniform(0.0, JOSTLE),
-                        kind.hp * self.waves[self.wave].hp * self.location.life * self.hardness * hp_factor, cooldown,
-                        route_key, bounty, salvage, side, elite_name, speed_factor)
+                        kind.hp * self.hardness * hp_factor, cooldown,
+                        route_key, bounty, salvage, side, elite_name, speed_factor, bonus=is_bonus)
             self.monsters.append(m)
-            self._emit("spawn", m.id)
+            self._emit("spawn", m.id, kind.key)
             if elite:
                 self._emit("breach_elite", m.id, elite_name)
 
@@ -920,6 +985,8 @@ class World:
                 if s >= route.length:   # it strikes the shrine
                     self.lives -= m.kind.lives
                     self.leaked_life += m.max_hp * LEAK_WEIGHT
+                    if m.bonus and self.bonus is not None:
+                        self.bonus.leaked = True   # a strike or a leak fails the pack, boss or no boss
                     if m.kind.boss:   # struck back to its portal, with its life and afflictions, to walk again
                         m.s, m.door = 0.0, -1
                         m.strikes += 1
@@ -1376,6 +1443,8 @@ class World:
 
         self.gold += m.bounty
         self.kills += 1
+        if not m.bonus:   # a bonus kill pays no bounty and no XP: the clean clear pays instead
+            self._earn(kill_xp(m.max_hp))
         where = self.position(m)
         self._emit("death", m.id, m.kind.key, element, where, m.bounty)
         if m.salvage:
@@ -1423,6 +1492,8 @@ class World:
 
     def _count_off(self, m: Monster) -> None:
         self.wave_alive[m.wave] -= 1
+        if m.bonus and self.bonus is not None:
+            self.bonus.alive -= 1
         if m.breach:
             self.breach_remaining -= 1
             if m.hp > 0:
@@ -1434,7 +1505,7 @@ class World:
                     self.breach_cleared = True
                     self._emit("breach_cleared", self.breach_mode)
                     if self.breach_mode == "cash":
-                        cache = BALANCE.breach_cache(self.stage)
+                        cache = BALANCE.breach_cache()
                         self.gold += cache
                         self._emit("breach_cash", cache)
 
@@ -1462,10 +1533,22 @@ class World:
                 self.unpaid.remove(w)
                 bonus = self.waves[w].bonus
                 self.gold += bonus
+                self._earn(clear_xp(w + 1))
                 for d in self.doors:
                     if d.built:
                         d.hp += (self.gate_life - d.hp) * self.perks.gate_mend
                 self._emit("cleared", w, bonus)
+        pack = self.bonus
+        if pack is not None and pack.alive == 0:
+            self.bonus = None
+            if pack.leaked:
+                self._emit("bonus", pack.stake, "failed")
+            else:
+                self.gold += pack.wager + pack.profit
+                self._earn(pack.xp)
+                self._emit("bonus", pack.stake, "cleared")
+            if self.outcome is None:
+                self.break_left = pack.saved_break
         if self.schedule or self.monsters or self.break_left is not None or self.unpaid:
             return
         if self.wave + 1 >= len(self.waves):

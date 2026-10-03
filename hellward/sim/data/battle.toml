@@ -1,9 +1,9 @@
 # One defence's clocks, purse and rules (hellward/sim/content.py and hellward/sim/model.py read these).
 
 start_lives = 20              # the sanctuary's life at the start of a defence
-mana_max = 100.0
-mana_start = 60.0
-mana_regen = 1.5              # mana per second
+mana_max = 85.0               # lowered for the level-ups, which refill the orb about once a wave
+mana_start = 51.0
+mana_regen = 1.0              # mana per second
 wave_break = 25.0             # seconds between a cleared wave and the next, unless called early
 first_wave_break = 30.0       # seconds before the first wave comes on its own
 early_call_seconds_per_unit = 120.0   # calling a wave early pays one gold unit per this many seconds of break left
@@ -30,7 +30,7 @@ hook_past = 1.0               # a hook takes only a monster at least this far pa
 
 [gate]
 cost_units = 1.0              # a warded gate's price, in gold units
-life_hp = 10.0                # its life, in base_hp
+life = 100.0                  # its life, the same at every location
 repair = 0.5                  # share of its missing life a standing gate regains when a wave is cleared
 
 [skills]                      # the numbers the skill tree's rules use
