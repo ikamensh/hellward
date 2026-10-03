@@ -64,6 +64,7 @@ CHARGE_EVERY: Final = 15.0      # seconds per charge regained
 EMPOWER: Final = 3.0            # an empowered shot's damage
 IDOL_EVERY: Final = (45.0, 32.0, 22.0)   # the idol's rite, seconds per rank: a free smite
 CENSER_HURT: Final = (30.0, 60.0, 100.0)   # the immolation's damage, per rank
+WELL_EVERY: Final = (20.0, 15.0, 11.0)   # the well's watering, seconds per rank: a charge given
 DOOR_STOP: Final = tuning.number("battle.door_stop")
 JOSTLE: Final = tuning.number("battle.jostle")
 CHAIN_JUMP: Final = tuning.number("battle.chain_jump")
@@ -1061,9 +1062,14 @@ class World:
             self._emit("fizzle", leader_id, spot)
             return
         cursed: list[int] = []
-        for tower in self.caught(spot, curse_radius(curse, leader.kind, self.curse_scale)):
-            tower.curses[curse] = CURSES[curse].duration
-            cursed.append(tower.id)
+        rod = self._effigy(spot)
+        if rod is not None:   # a warding effigy stands unsullied near the spot: the curse goes to it instead
+            rod.curses[curse] = CURSES[curse].duration
+            cursed.append(rod.id)
+        else:
+            for tower in self.caught(spot, curse_radius(curse, leader.kind, self.curse_scale)):
+                tower.curses[curse] = CURSES[curse].duration
+                cursed.append(tower.id)
         if cursed:
             self.curses_landed += 1
             self._relic("curse")
@@ -1077,6 +1083,21 @@ class World:
         else:
             self._emit("fizzle", leader_id, spot)
         leader.marking = False
+
+    def _effigy(self, spot: tuple[int, int]) -> Tower | None:
+        """The nearest effigy holding no curse whose reach covers the spot, if one stands."""
+        cx, cy = spot[0] + 0.5, spot[1] + 0.5
+        best: Tower | None = None
+        nearest = 0.0
+        for t in self.towers.values():
+            if t.kind.key != "effigy" or t.curses:
+                continue
+            dx, dy = t.tile[0] + 0.5 - cx, t.tile[1] + 0.5 - cy
+            reach = t.levels[t.level].range
+            if dx * dx + dy * dy <= reach * reach and (best is None or dx * dx + dy * dy < nearest
+                                                       or (dx * dx + dy * dy == nearest and t.id < best.id)):
+                best, nearest = t, dx * dx + dy * dy
+        return best
 
     def _blight(self, dt: float) -> None:
         for m in self.monsters:
@@ -1302,6 +1323,28 @@ class World:
         self._relic("cast", 0.0)
         self._bury()   # what it killed must not walk on into the rest of this step
 
+    def _well(self, t: Tower, dt: float) -> None:
+        """The well's watering: every so often it gives a charge to the attuned neighbour with the fewest,
+        if one holds less than full."""
+        t.timer += dt
+        if t.timer < WELL_EVERY[t.level]:
+            return
+        ix, iy = t.tile[0] + 0.5, t.tile[1] + 0.5
+        radius = t.levels[t.level].range
+        best: Tower | None = None
+        for o in self.towers.values():
+            if o.id == t.id or not o.attuned or o.charges >= CHARGES_MAX:
+                continue
+            dx, dy = o.tile[0] + 0.5 - ix, o.tile[1] + 0.5 - iy
+            if dx * dx + dy * dy <= radius * radius and (best is None or o.charges < best.charges
+                                                         or (o.charges == best.charges and o.id < best.id)):
+                best = o
+        if best is None:
+            return
+        t.timer -= WELL_EVERY[t.level]
+        best.charges = min(CHARGES_MAX, best.charges + 1.0)
+        self._emit("charge_given", t.id, best.id)
+
     def _immolate(self, t: Tower) -> None:
         """A censer's answer to a leak in its reach: every monster near it burns. Once a wave (the timer
         keeps the wave it answered, one-based: never answered is 0); the dead are buried at the step's end,
@@ -1414,6 +1457,8 @@ class World:
             if attack == "aura":   # support never attacks; its timer waits while silenced (above)
                 if t.kind.key == "idol":
                     self._idol(t, dt)
+                elif t.kind.key == "well":
+                    self._well(t, dt)
                 elif t.kind.key == "grove":
                     self._twister(t, dt)
                 t.cooldown = 0.0

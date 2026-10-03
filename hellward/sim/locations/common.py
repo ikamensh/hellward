@@ -101,7 +101,7 @@ def water(*blocks: tuple[int, int, int, int]) -> frozenset[tuple[int, int]]:
 
 
 ALL_TOWERS_II = ("arrow", "pyre", "storm", "frost", "plague", "ballista", "altar", "hook", "knife",
-                 "idol", "censer")
+                 "idol", "censer", "well")
 EVERY_TOWER = ("arrow", "pyre", "storm", "frost", "plague", "ballista", "altar", "hook", "knife", "grove",
-               "idol", "censer")
+               "idol", "censer", "well", "effigy")
 

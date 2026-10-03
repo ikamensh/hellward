@@ -11,6 +11,8 @@ hook = "Hook"
 knife = "Knife"
 idol = "Idol"
 censer = "Censer"
+well = "Well"
+effigy = "Effigy"
 fire = "Fire"
 lightning = "Lightning"
 cold = "Cold"
@@ -75,7 +77,7 @@ first_location = 6
 name = "Adept of Hooks"
 column = "hook"
 tier = 2
-cost = 2
+cost = 3
 blurb = "Hook Towers can be raised to the second rank."
 needs = ["hook"]
 
@@ -83,7 +85,7 @@ needs = ["hook"]
 name = "Master of Hooks"
 column = "hook"
 tier = 3
-cost = 4
+cost = 6
 blurb = "Hook Towers can be raised to the third rank."
 needs = ["hook"]
 
@@ -108,7 +110,7 @@ needs = ["knife"]
 name = "Master of Knives"
 column = "knife"
 tier = 3
-cost = 4
+cost = 6
 blurb = "Knife Posts can be raised to the third rank."
 needs = ["knife"]
 
@@ -428,7 +430,7 @@ first_location = 10
 name = "Unlock Sentinel Idol"
 column = "idol"
 tier = 1
-cost = 4
+cost = 6
 blurb = "Idols can be raised: a free smite, again and again."
 needs = ["idol"]
 first_location = 3
@@ -437,7 +439,7 @@ first_location = 3
 name = "Adept of Idols"
 column = "idol"
 tier = 2
-cost = 2
+cost = 3
 blurb = "Idols can be raised to the second rank."
 needs = ["idol"]
 
@@ -445,7 +447,7 @@ needs = ["idol"]
 name = "Master of Idols"
 column = "idol"
 tier = 3
-cost = 4
+cost = 7
 blurb = "Idols can be raised to the third rank."
 needs = ["idol"]
 
@@ -453,7 +455,7 @@ needs = ["idol"]
 name = "Unlock Martyr's Censer"
 column = "censer"
 tier = 1
-cost = 4
+cost = 6
 blurb = "Censers can be raised: a leak near one immolates the field."
 needs = ["censer"]
 first_location = 4
@@ -462,7 +464,7 @@ first_location = 4
 name = "Adept of Censers"
 column = "censer"
 tier = 2
-cost = 2
+cost = 3
 blurb = "Censers can be raised to the second rank."
 needs = ["censer"]
 
@@ -470,6 +472,56 @@ needs = ["censer"]
 name = "Master of Censers"
 column = "censer"
 tier = 3
-cost = 4
+cost = 7
 blurb = "Censers can be raised to the third rank."
 needs = ["censer"]
+
+[skills.unlock_well]
+name = "Unlock Moon Well"
+column = "well"
+tier = 1
+cost = 6
+blurb = "Wells can be raised: charges for the attuned neighbours."
+needs = ["well"]
+first_location = 6
+
+[skills.adept_well]
+name = "Adept of Wells"
+column = "well"
+tier = 2
+cost = 3
+blurb = "Wells can be raised to the second rank."
+needs = ["well"]
+
+[skills.master_well]
+name = "Master of Wells"
+column = "well"
+tier = 3
+cost = 7
+blurb = "Wells can be raised to the third rank."
+needs = ["well"]
+
+[skills.unlock_effigy]
+name = "Unlock Effigy"
+column = "effigy"
+tier = 1
+cost = 6
+blurb = "Effigies can be raised: curses land on them instead."
+needs = ["effigy"]
+first_location = 7
+
+[skills.adept_effigy]
+name = "Adept of Effigies"
+column = "effigy"
+tier = 2
+cost = 3
+blurb = "Effigies can be raised to the second rank."
+needs = ["effigy"]
+
+[skills.master_effigy]
+name = "Master of Effigies"
+column = "effigy"
+tier = 3
+cost = 7
+blurb = "Effigies can be raised to the third rank."
+needs = ["effigy"]
