@@ -96,6 +96,11 @@ S2's targets:
 - spells make ≤ 15% of its kills;
 - Smite finishes a small ordinary monster (life 16 or less) at 60% life.
 
+S3's seeking holds where the fight is hard and the hymned tower is in reach (caves: smart 1.9x over
+52 chants against random 1.2x; pooled over three locations 1.6x at +2sd). Where the defence wins
+easily the leaders' utility is flat (cathedral: 1.2x, noise), and where the hymned tower is rarely in
+reach when the leaders chant it is unmeasurable (spider_forest: 2% in-reach base rate).
+
 ## Verbs, relics and predictability
 
 | ID | Criterion | Judge | Target |

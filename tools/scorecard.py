@@ -129,6 +129,22 @@ def no_dispel() -> Result:
     return Result("S1", "spells that lift a curse or break a chant", ", ".join(dispels) or "none", not dispels)
 
 
+def hymn_seeks() -> list[Result]:
+    """S3: Battle Hymn doubles a tower's rate for 6 s, and the leaders' curses go for the boosted tower:
+    eight smart defences of the caves, the hymned share of the aimed towers against the hymned share in
+    reach at each chant (tools/balance.py). The lift isolates the choice itself (a random curser reads
+    1.0x by construction); the planner prices a tower at its hymned rate, so the seeking is emergent."""
+    from tools.balance import chant_lift, match
+    hymn = SPELLS["hymn"]
+    chants = [c for i in range(8) for c in match("smart", i, 8, "caves")["chants"]]
+    lift, hymned, expected = chant_lift(chants)
+    return [Result("S3", "hymn's rate and lasting", f"x{hymn.rate:g} for {hymn.lasting:g} s",
+                   hymn.rate == 2.0 and hymn.lasting == 6.0),
+            Result("S3", "leaders' hymn lift over eight smart caves defences",
+                   f"{lift:.1f}x ({hymned}/{expected:.1f} over {len(chants)} chants)",
+                   lift >= 1.5 and expected >= 2.0)]
+
+
 def tower_kinds() -> list[Result]:
     mechanics = [kind.name for kind in TOWERS.values() if kind.attack not in ATTACKS]
     share = len(mechanics) / len(TOWERS)
@@ -351,13 +367,13 @@ def _union_length(spans: list[tuple[float, float]]) -> float:
 
 
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
-    bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, tower_kinds, real_estate,
+    bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, hymn_seeks, tower_kinds, real_estate,
     worth_and_cells, blight_kinds, power_table,
 )
 
 NOT_YET = (
     "G1.1", "G1.2", "G1.3", "G1.4", "G1.5", "G1.6", "G2.2", "G2.5", "G2.6", "G3.1", "G3.2", "G3.3",
-    "M1", "M2", "M3", "M5", "M7", "M9", "M10", "S2", "S3", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
+    "M1", "M2", "M3", "M5", "M7", "M9", "M10", "S2", "V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8",
     "R4", "T2", "T4",
 )
 
