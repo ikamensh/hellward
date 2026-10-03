@@ -8,7 +8,8 @@ extends Node3D
 # every kind has a model of its own; a kind without one would wear the nearest, tinted and sized (STAND_INS)
 const HEIGHTS := {"fallen": 1.2, "shaman": 1.95, "zombie": 1.9, "skeleton": 1.85, "goatman": 1.9, "gargoyle": 1.7,
 	"azazel": 2.6, "flayer": 1.15, "bat": 0.7, "hulk": 2.2, "drowned": 1.9, "fetish": 1.38, "inquisitor": 2.0,
-	"bone_priest": 2.5, "overlord": 2.2, "priest": 1.85, "witch": 1.8, "zealot": 1.85, "spider": 0.75}
+	"bone_priest": 2.5, "overlord": 2.2, "priest": 1.85, "witch": 1.8, "zealot": 1.85, "spider": 0.75,
+	"carver": 1.2, "devilkin": 1.2, "dark_one": 1.2, "abomination": 2.1}
 const BODY := 1.3                    # bodies a size up from life, so they read from the battle camera
 # each kind's rim (and its x-ray behind a tower): Fallen ember, Shaman crimson (the leader's violet is its skull's
 # eyes and its ring, never on its hide), Zombie grave-green, Skeleton bone (dimmer: a bright rim on every thin bone
@@ -19,18 +20,18 @@ const RIM := {"fallen": Color(1.3, 0.4, 0.12), "shaman": Color(1.25, 0.26, 0.22)
 	"hulk": Color(0.6, 0.7, 0.3), "drowned": Color(0.35, 0.7, 0.75), "fetish": Color(1.2, 0.3, 0.15),
 	"inquisitor": Color(1.1, 0.9, 0.45), "bone_priest": Color(0.45, 1.0, 0.4), "overlord": Color(1.35, 0.3, 0.08),
 	"priest": Color(0.55, 0.85, 0.6), "witch": Color(1.3, 0.18, 0.3), "zealot": Color(0.95, 0.9, 0.75),
-	"spider": Color(0.7, 1.0, 0.25)}
+	"spider": Color(0.7, 1.0, 0.25), "carver": Color(1.35, 0.55, 0.18), "devilkin": Color(0.55, 0.45, 1.25),
+	"dark_one": Color(1.25, 0.12, 0.18), "abomination": Color(0.5, 1.0, 0.35)}
 const KINDGLOW := 0.25              # how strongly that rim lights a living body at any distance
 # how fast each walk cycle carries the body at speed_scale 1 (m/s): the walk plays faster as the body speeds up
 # (tools/blender/audit.py measures it off the feet; the witch glides with her feet off the ground, so hers is the
 # capture's own rate); a flyer's wingbeat keeps its own rate
 const WALK := {"fallen": 0.89, "shaman": 0.94, "zombie": 0.44, "skeleton": 0.89, "goatman": 1.17, "azazel": 1.52,
 	"flayer": 0.65, "hulk": 0.94, "drowned": 0.6, "fetish": 0.69, "inquisitor": 1.15, "bone_priest": 0.77,
-	"overlord": 1.09, "priest": 0.79, "witch": 1.04, "zealot": 0.69, "spider": 0.79}
+	"overlord": 1.09, "priest": 0.79, "witch": 1.04, "zealot": 0.69, "spider": 0.79,
+	"carver": 0.86, "devilkin": 0.86, "dark_one": 0.86, "abomination": 0.92}
 # a kind without a model: [the model it borrows, its tint]; its height follows its size in the rules
-const STAND_INS := {"carver": ["fallen", Color(1.2, 0.36, 0.12)],
-	"devilkin": ["fallen", Color(1.1, 0.32, 0.14)], "dark_one": ["fallen", Color(1.0, 0.28, 0.16)],
-	"abomination": ["hulk", Color(0.7, 0.9, 0.5)]}
+const STAND_INS := {}
 # beyond this the legs blur; the feet slide a little instead (the Flayer runs its captured run at 3.4 to keep up
 # with the rules)
 const MAX_STRIDE := 3.6
