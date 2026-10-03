@@ -95,6 +95,9 @@ EMPOWER: Final = 3.0            # an empowered shot's damage
 IDOL_EVERY = (45.0, 32.0, 22.0)   # the idol's rite, seconds per rank: a free smite. Not Final:
 CENSER_HURT = (30.0, 60.0, 100.0)   # the immolation's damage, per rank. mypyc miscompiles a Final tuple read by a
 WELL_EVERY = (20.0, 15.0, 11.0)   # the well's watering, seconds per rank: a charge given. variable subscript.
+GROVE_EVERY: Final = 20.0   # the grove's drink, seconds between: a charge spent from an attuned neighbour
+GROVE_POWER: Final = 6.0   # the drink's empowerment, seconds of doubled lending
+GROVE_MULT: Final = 2.0   # the empowered grove's lending
 OVERLOAD: Final = 1.5   # a venom-overload burst's poison damage per stack consumed
 VENOM_RADIUS: Final = 1.5   # the burst's circle
 DOOR_STOP: Final = tuning.number("battle.door_stop")
@@ -218,7 +221,7 @@ class Tower:
         self.mode = "first"                   # its strategy: foremost until taught otherwise
         self.attuned = False                  # whether it holds charges for empowered shots
         self.charges = 0.0                    # charges held, to CHARGES_MAX, one per CHARGE_EVERY seconds
-        self.charged_at = -1e9                # when it last spent a charge: the cooldown starts here
+        self.charged_at = -1e9                # when it last spent a charge: the cooldown starts here; a grove's last drink
 
     def copy(self) -> Tower:
         t = Tower(self.id, self.kind, self.levels, self.tile)
@@ -1423,6 +1426,8 @@ class World:
             dx, dy = g.tile[0] + 0.5 - tx, g.tile[1] + 0.5 - ty
             if dx * dx + dy * dy <= stats.range * stats.range:
                 bonus = stats.damage * (g.damage_mult() if g.curses else 1.0)
+                if self.time - g.charged_at < GROVE_POWER:
+                    bonus *= GROVE_MULT
                 if bonus > best:
                     best = bonus
         return 1.0 + best
@@ -1448,6 +1453,29 @@ class World:
             best.frozen = max(best.frozen, TWISTER_HELD)
             best.door = -1
             self._emit("twister", t.id, best.id)
+
+    def _drink(self, t: Tower) -> None:
+        """The grove's drink: every so often it spends a charge from the attuned neighbour holding
+        the most, and lends double for a while — a charge consumed, for the relics that read it.
+        Its clock is its last drink, so a silence eats the empowerment, and the grove drinks as it wakes."""
+        if self.time - t.charged_at < GROVE_EVERY:
+            return
+        ix, iy = t.tile[0] + 0.5, t.tile[1] + 0.5
+        radius = t.levels[t.level].range
+        best: Tower | None = None
+        for o in self.towers.values():
+            if o.id == t.id or not o.attuned or o.charges < 1.0:
+                continue
+            dx, dy = o.tile[0] + 0.5 - ix, o.tile[1] + 0.5 - iy
+            if dx * dx + dy * dy <= radius * radius and (best is None or o.charges > best.charges
+                                                         or (o.charges == best.charges and o.id < best.id)):
+                best = o
+        if best is None:
+            return
+        best.charges -= 1.0
+        t.charged_at = self.time
+        self._emit("drink", t.id, best.id, GROVE_POWER)
+        self._relic("charge")
 
     def _idol(self, t: Tower, dt: float) -> None:
         """The idol's rite: every so often it smites the foremost monster in reach, free — a cast
@@ -1614,6 +1642,7 @@ class World:
                     self._well(t, dt)
                 elif t.kind.key == "grove":
                     self._twister(t, dt)
+                    self._drink(t)
                 t.cooldown = 0.0
                 continue
             stats = t.levels[t.level]

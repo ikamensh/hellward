@@ -125,6 +125,8 @@ rate = [0.0, 0.0, 0.0]
 range = [1.5, 1.5, 2.3]
 bolt_speed = 9.0
 blurb = "Its aura makes every tower within reach strike harder. Groves do not stack."
+verb = "charge"            # its drink spends an attuned neighbour's charge to lend double: charges it consumes
+verb_role = "consume"
 
 [idol]
 name = "Sentinel Idol"

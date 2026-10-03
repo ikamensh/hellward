@@ -434,6 +434,10 @@ func _event(e: Array) -> void:
 			var m: Monster = monsters.get(int(e[2]))
 			if t and m:
 				Vfx.burst(self, m.chest(), Color(0.55, 0.9, 0.4), 40)
+		"drink":
+			var t: Tower = towers.get(int(e[1]))
+			if t:
+				Vfx.burst(self, t.global_position + Vector3(0, 1.0, 0), Color(0.55, 0.9, 0.4), 40)
 		"amplify":
 			var t: Tower = towers.get(int(e[1]))
 			if t:

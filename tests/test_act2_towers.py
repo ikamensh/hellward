@@ -141,6 +141,57 @@ def test_dim_vision_does_nothing_to_an_aura():
     assert first_bolt(world).factor == pytest.approx(1 + grove.stats.damage)
 
 
+def test_a_grove_drinks_a_charge_and_lends_double_for_a_while():
+    world = act2_world(g("fallen", 1))
+    spawned(world, 1)   # towers idle with no monsters; this one waits out of reach, frozen
+    world.monsters[0].frozen = 1e9
+    pyre = world.build("pyre", (4, 3))
+    grove = world.build("grove", (5, 3))
+    world.attune(pyre.id)
+    before = pyre.charges
+    world.step()   # the grove drinks at once: a charge spent, the verb counted, the event out
+    assert pyre.charges == pytest.approx(before - 1.0, abs=0.01)
+    assert world.verb_count.get("charge", 0) == 1
+    drink = [e for e in world.events if e[0] == "drink"]
+    assert len(drink) == 1 and drink[0][1] == grove.id and drink[0][2] == pyre.id
+    assert drink[0][3] == 6.0   # the empowerment's seconds, for the client to show
+    assert world.aura_mult(pyre) == pytest.approx(1 + grove.stats.damage * 2)
+    run(world, 7)   # the empowerment lapses; the next drink waits for its twenty seconds
+    assert world.aura_mult(pyre) == pytest.approx(1 + grove.stats.damage)
+    assert world.verb_count.get("charge", 0) == 1
+    run(world, 14)   # past twenty seconds the grove drinks again; the idle pyre's charges refilled
+    assert world.verb_count.get("charge", 0) == 2
+
+
+def test_a_grove_with_no_charged_neighbour_drinks_nothing():
+    world = act2_world(g("fallen", 1))
+    spawned(world, 1)
+    world.monsters[0].frozen = 1e9
+    pyre = world.build("pyre", (4, 3))
+    grove = world.build("grove", (5, 3))
+    run(world, 25)
+    assert world.verb_count.get("charge", 0) == 0
+    assert world.aura_mult(pyre) == pytest.approx(1 + grove.stats.damage)
+
+
+def test_a_grove_drinks_from_the_attuned_neighbour_holding_the_most():
+    world = act2_world(g("fallen", 1))
+    spawned(world, 1)
+    world.monsters[0].frozen = 1e9
+    full = world.build("pyre", (4, 3))
+    world.attune(full.id)
+    low = world.build("pyre", (6, 3))
+    world.attune(low.id)
+    low.charges = 1.0
+    world.build("grove", (5, 3))
+    before = full.charges
+    world.step()
+    drink = [e for e in world.events if e[0] == "drink"]
+    assert len(drink) == 1 and drink[0][2] == full.id
+    assert full.charges == pytest.approx(before - 1.0, abs=0.01)
+    assert low.charges == pytest.approx(1.0, abs=0.01)
+
+
 def test_corpse_explosion_bursts_once_and_does_not_chain():
     world = act2_world(g("fallen", 3, 0.1),
                        learned=("unlock_altar", "adept_bone", "master_bone", "life_tap", "corpse_explosion"))
