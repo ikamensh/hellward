@@ -189,7 +189,7 @@ def battle_beat(location: Location, *, first: bool = False) -> Beat:
                                if born[group.kind] == location.key))  # kinds walking here first
     body = [f"{len(waves)} waves, {bodies} bodies"]
     # What the client tells the player the fight is for (intro.gd title card, main.gd announce).
-    body.append("objective: Hold the sanctuary until the last wave breaks. (the client's title card)")
+    body.append("objective: Hold the sanctuary — where your lantern burns — until the last wave breaks. (the client's title card)")
     body += [_wave_mix(location, i) for i in range(len(waves))]
     if new:
         marked = [f"{MONSTERS[kind].name} (stand-in)" if not modelled(kind)

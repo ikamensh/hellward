@@ -70,13 +70,16 @@ STORIES: dict[str, Story] = {s.key: s for s in (
     Story("tristram/before", 1, _page(
         "tristram-before",
         "A village burning at night; small red-skinned Fallen demons pour out of cellar doors with knives and torches. "
-        "In the foreground, seen from behind at the village well, the keeper holds up the lantern.",
-        "The lamp guttered at midnight, and now Tristram burns. Its keeper had stopped keeping it. The Fallen come up "
+        "In the foreground at the village well stand TWO figures side by side: the keeper, seen from behind, holding "
+        "up the lantern, and beside them Akara, a robed priestess holding a lit candle. Behind the demons walk the "
+        "village dead, gaunt humans still in their Sunday clothes.",
+        "The lamp guttered at midnight, and now Tristram burns. Below, the door had begun to open. The Fallen come up "
         "through the cellars with knives and "
-        "torches, red southern knives among them, and behind them walk the village dead, still in their Sunday clothes.",
-        "Akara finds you at the well. From her candle she lights your lantern — one flame of the lamp's own. "
+        "torches, red southern knives among them, drawn by a shaman's singing, and behind them walk the village dead, "
+        "still in their Sunday clothes.",
+        "Akara, a priestess, finds you at the well. From her candle she lights your lantern — one flame of the lamp's own. "
         "\"The old towers answer whoever keeps the lamp,\" she says. \"Wake what sleeps, and raise where nothing sleeps. "
-        "Keep it tonight, and keeping will feed it. It will show you true dreams. Ask me your questions at dawn.\"",
+        "Keep it tonight, and keeping will feed it. It will show you a true dream. Ask me your questions at dawn.\"",
         refs=("you",))),
     Story("tristram/after", 1, _page(
         "tristram-after",
@@ -153,13 +156,13 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "feet.",
         "Every night for nine hundred years the keeper came down here and cast his bones before the door, and every "
         "night they showed the lamp going out. Somewhere in those years he stopped keeping it, and died of it — but "
-        "the keeping would not let him go. He crowned himself, and began to wait — as if he waited on these steps "
-        "still.")),
+        "the keeping would not let him go. The lamp burned on without him, on all those years of keeping. He "
+        "crowned himself, and began to wait — as if he waited on these steps still.")),
     Story("hells_gate/before", 1, _page(
         "hells_gate-before",
-        "A colossal door in the rock, firmly shut except for a single hand's-width crack; hellfire blazing through that "
-        "thin crack with a vast horned shape inside the fire; at the threshold, the Bone Priest turns toward the viewer.",
-        "The door the saints built on stands open a hand's width. Through the gap you see fire, and the shape of "
+        "A colossal door in the rock, firmly shut except for one door-leaf ajar; hellfire blazing through the gap "
+        "with a vast horned shape filling it; at the threshold, the Bone Priest turns toward the viewer.",
+        "The door the saints built on stands ajar. Through the gap you see fire, and the shape of "
         "Azazel the Flayer.",
         "The Bone Priest waits at the threshold, crowned, and turns to face you. \"Nine hundred years I kept your "
         "saints' lamp,\" he says. \"I promised him this hour, as a master promises a hound. Tonight I let it go "
@@ -188,7 +191,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
              ("A ship with black sails left the coast last night with one passenger and no crew, sailing east.",
               "\"Go,\" said Akara. \"I will keep this one. Take its flame, and the old towers will know you — Kurast is "
               "old temple ground, and the saints' works sleep there too.\" You held the lantern to the lamp until its "
-              "flame stood straight, and went down to the sea, where a boat waited. The crossing took six nights."),
+              "flame stood straight, and went down to the sea to find a boat. The crossing took six nights."),
              ("you", "akara")),
     )),
     # -- Act II, The Drowned Temples ----------------------------------------------------------------
@@ -200,10 +203,10 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "wait on foot; a swamp city of gold "
         "roofs and rotting wooden piers rises in tiers.",
         "Kurast rises out of the swamp in tiers of gold and rotting wood. The harbour is empty of pilgrims. Along the "
-        "piers the Flayers are waiting, lordless since Azazel fell, and their shaman is already singing.",
+        "piers the Flayers are waiting, lordless since Azazel fell, and their shaman is already singing. Zealots hold the far end of the piers, and the drowned walk out of the low tide.",
         "A pale man in bone armour watches you land. \"I am a priest of Rathma,\" he says. \"Your enemy stole our "
         "art. Let me lend it back to you as the Bone Altar.\"",
-        "The Bone Priest's acolytes carry his words ahead of every host.",
+        "The Bone Priest's acolytes run ahead of every host, carrying his words.",
         refs=("necromancer",))),
     Story("docks/after", 2, _page(
         "docks-after",
@@ -266,6 +269,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "\"The mother lamp's.\"",
         "\"He is not putting it out. He is draining it, a little each night, so the city will not notice until it is "
         "dark.\"",
+        "He would go no further with you; the drowned dead were his order's business.",
         refs=("necromancer",))),
     Story("travincal/before", 2, _page(
         "travincal-before",
@@ -293,7 +297,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "A vast golden temple interior gone almost dark; the mother lamp hangs over the altar with its flame sunk to a "
         "last red ember, the great glass nearly black; beneath it the Bone Priest, grown huge, bones in his open hand, "
         "violet fire around him. No candles, no other light.",
-        "Under the mother lamp the Bone Priest waits, his new Abominations among the dead, and for the first time he "
+        "Under the mother lamp the Bone Priest waits, his new Abominations, raised on the stolen art, among the dead, and for the first time he "
         "will fight you himself.",
         "\"Every night since Tristram I have cast these bones,\" he says. \"They show me every stone of this "
         "temple, every demon in it, every tower you will build. They have never shown me you. So let me look.\"",
@@ -318,7 +322,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
              "the mother flame catches and rises gold, lighting the whole temple.",
              ("You held it up to the great lamp: Tristram's flame, lit from this one nine hundred years ago. The eldest "
               "druid poured oil from his wooden cask, pressed from the grove's oaks, and the mother flame caught, and "
-              "rose gold — and far away, every daughter lamp caught with her.",),
+              "rose gold — and far away, every daughter lamp caught with her. The eldest druid stayed to keep it.",),
              ("you", "druid", "mother_lamp")),
         Page("act2-end-4",
              "Dawn through tall cathedral windows; the red lamp of Tristram burns straight; Akara looks up at it from "

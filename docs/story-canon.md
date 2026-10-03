@@ -35,7 +35,9 @@ tonight it is yours. Akara can mind a lamp, but the old towers answer only the
 keeper. [KEEPER-2] The keeping holds its keeper past death: it held him long
 while he lived — nine hundred years alive — and when he stopped keeping, he
 died of it, but the keeping would not let him go. That is why he walks still,
-a skeleton who cannot lay the office down. [KEEP-1]
+a skeleton who cannot lay the office down. [KEEP-1] And nine hundred years of
+keeping kept Tristram's lamp burning after his death — until tonight, when
+the door below began to open and the flame guttered. [KEEP-2]
 
 **What each defence defends.** Every map ends at a sanctuary chapel, and the
 keeper sets the lantern down burning in it while working. The red orb is that
@@ -172,8 +174,9 @@ one step deeper. [DESCENT-1]
 - **Caves.** Gargoyles over lava; Akara stays to keep the lamp. After: the worn
   steps — every night for nine hundred years he cast his bones here, and
   somewhere he stopped keeping and began to wait. (Motive, shown not told.)
-- **Hell's Gate.** The door stands open a hand's width; Azazel waits in the
-  fire. The priest speaks his defiance. After (act ending): Azazel falls, the
+- **Hell's Gate.** The door stands ajar, one leaf open, Azazel's bulk
+  filling the gap; too narrow yet for him to come through. The priest speaks
+  his defiance. After (act ending): Azazel falls, the
   door shuts; the bones never showed the keeper; the priest goes east; the
   mother lamp is named; the keeper takes Tristram's flame east. (Promises
   closed: the door, the dare's first half. Opened: the mother lamp.)
@@ -313,7 +316,7 @@ already-fixed text and are marked [STALE] where they would have appeared.
     uniform objectives (genre; per-fight objectives would be a game change);
     lessons teach mechanics by design (drowned briefing); Abominations
     off-panel at the stair (words may exceed the panel).
-18. **Iterations 4–5 (337cd79, e3dc839):** docks-after bone repaint;
+18. **Iterations 4–6:** I4 (337cd79): docks-after bone repaint;
     caves-after crowned waiter; docks-before wingless Flayers; KEEP-1
     (died of stopping, keeping holds him); MOTH-1 (daughters catch with
     mother, Akara witnesses); TAUNT-1 bluff clause; CURSE-1 (prologue beam
@@ -322,9 +325,20 @@ already-fixed text and are marked [STALE] where they would have appeared.
     seniority; own door; jungle taunt silence-fix; died-of-stopping;
     inciting cause; Abominations among the dead; temple floor; black sails;
     crossing nights; a set of bones; "let me look"; Tristram kept by him
-    (travincal taunt). I5: 3 quote fixes + balance test; carrier narrowed;
+    (travincal taunt). I5 (e3dc839): 3 quote fixes + balance test; carrier narrowed;
 outage owns the doors; bribe reframed as seizure; open-eyes cut (Council
 duped, church fallen); renunciation cut; doors nearly shut; fallen hymns.
+I6: KEEP-2 (stored keeping coasts the lamp until tonight's assault);
+inciting cause corrected to the door's opening; travincal taunt rewritten
+as a true threat (third attempt); docks-before names Zealots + Drowned;
+"mana" → "prayer" (temple lesson); sanctuary glossed in the objective line;
+Akara given her role; necromancer farewelled; druid keeps the mother;
+Abominations raised on the stolen art; dream singular; acolytes run ahead;
+southern knives drawn by the shaman's song; boat unfound-yet ("to find");
+door ajar (panel rules); tristram-before repainted with Akara + dead.
+Accepted, no telling change: caves-after's narrated biography (standard
+game narration); prologue/lamp's anticipatory caption (ember pays off at
+once); temple Abominations off-panel (words may exceed the panel).
 19. **CLOSED by this canon:** orb fiction (ORB-1/LANT-1), wake-vs-build
     (TOWER-1/TOWER-2), priest's motive (PRIEST-1), why the bones never show
     the keeper (BONES-1), the lantern's survival (LANT-2), the chain

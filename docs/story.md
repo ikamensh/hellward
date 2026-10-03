@@ -64,5 +64,5 @@ gauge. `stills` re-renders the stills into `hellward/assets/story/` after visual
 | The Spider Forest | The old trees have taken your side. Stand close to them, then. One curse will find you all. |
 | The Flayer Jungle | My inquisitors do not chant. You will know their curse when the ground burns under your towers, and no chant before it. |
 | The Drowned City | The Hulks were drowned men once. They do not tire, and your gates are cloth to them. |
-| Travincal | Turn back, and when the mother dies I will take Tristram's little lamp for my own. No one would miss it. |
+| Travincal | Turn back, keeper. The mother's oil is all but spent — go home and keep your own lamp through its last night. |
 | The Temple of Light | Come, keeper. Let me look at you myself, while the temple still stands. |
