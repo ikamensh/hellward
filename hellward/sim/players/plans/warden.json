@@ -1,284 +1,471 @@
 {
- "catacombs/9": {
+ "catacombs/16": {
   "early": 0.7,
-  "map": "5c550ca448e7",
+  "map": "cd5db104e3d3",
   "searched": {
    "leaders": "greedy",
-   "life": 1.947,
-   "lost": 10,
-   "plans": 300,
-   "seeds": "0-3"
+   "life": 1.325,
+   "lost": 26,
+   "plans": 100,
+   "seeds": "0-2"
   },
   "skills": [
-   "adept_bone",
-   "adept_cold",
-   "adept_fire",
-   "adept_lightning",
-   "adept_nature",
-   "glacial_spike",
-   "holy_shield",
+   "spell_mastery",
+   "unlock_ballista",
+   "unlock_hymn",
+   "unlock_pyre",
    "warmth"
   ],
   "steps": [
    [
     "build",
-    "ballista",
-    25,
-    16
-   ],
-   [
-    "build",
-    "ballista",
-    25,
-    12
-   ],
-   [
-    "build",
-    "ballista",
-    7,
-    5
-   ],
-   [
-    "build",
-    "ballista",
+    "pyre",
     29,
     15
    ],
    [
-    "up",
-    25,
-    12
+    "build",
+    "ballista",
+    9,
+    8
    ],
    [
     "build",
-    "pyre",
+    "ballista",
     3,
     5
    ],
    [
     "build",
-    "ballista",
-    25,
-    6
-   ],
-   [
-    "build",
-    "pyre",
-    24,
-    12
-   ],
-   [
-    "up",
-    7,
-    5
-   ],
-   [
-    "build",
-    "pyre",
-    21,
-    16
-   ],
-   [
-    "build",
-    "frost",
-    21,
-    4
-   ],
-   [
-    "build",
-    "ballista",
-    24,
-    16
-   ],
-   [
-    "up",
-    21,
-    16
-   ],
-   [
-    "up",
-    7,
-    5
-   ],
-   [
-    "build",
-    "ballista",
-    26,
-    6
-   ],
-   [
-    "build",
-    "ballista",
-    25,
-    4
-   ],
-   [
-    "up",
-    29,
-    15
-   ],
-   [
-    "up",
-    25,
-    4
-   ],
-   [
-    "build",
     "arrow",
-    25,
-    5
-   ],
-   [
-    "gate",
-    0
+    3,
+    2
    ],
    [
     "build",
     "arrow",
     7,
     1
+   ],
+   [
+    "build",
+    "arrow",
+    8,
+    12
+   ],
+   [
+    "build",
+    "ballista",
+    26,
+    5
+   ],
+   [
+    "up",
+    7,
+    1
+   ],
+   [
+    "build",
+    "ballista",
+    2,
+    4
+   ],
+   [
+    "gate",
+    0
    ]
   ]
  },
- "cathedral/6": {
-  "early": 1.01,
-  "map": "f93eb41ece92",
+ "cathedral/11": {
+  "early": 0.9,
+  "map": "33938fb86f8e",
   "searched": {
    "leaders": "greedy",
-   "life": 1.05,
-   "lost": 2,
-   "plans": 300,
-   "seeds": "0-3"
+   "life": 1.384,
+   "lost": 42,
+   "plans": 100,
+   "seeds": "0-2"
   },
   "skills": [
-   "adept_bone",
-   "adept_lightning",
-   "adept_nature",
-   "adept_poison",
    "holy_shield",
+   "unlock_hymn",
+   "unlock_pyre",
    "warmth"
   ],
   "steps": [
+   [
+    "build",
+    "pyre",
+    16,
+    11
+   ],
+   [
+    "build",
+    "pyre",
+    16,
+    12
+   ],
+   [
+    "build",
+    "arrow",
+    14,
+    7
+   ],
+   [
+    "build",
+    "arrow",
+    29,
+    10
+   ],
+   [
+    "build",
+    "pyre",
+    2,
+    11
+   ],
+   [
+    "up",
+    16,
+    12
+   ],
+   [
+    "up",
+    29,
+    10
+   ],
+   [
+    "build",
+    "pyre",
+    14,
+    2
+   ],
+   [
+    "up",
+    16,
+    12
+   ],
+   [
+    "build",
+    "pyre",
+    30,
+    10
+   ],
+   [
+    "up",
+    14,
+    2
+   ],
+   [
+    "build",
+    "pyre",
+    20,
+    7
+   ],
+   [
+    "build",
+    "pyre",
+    11,
+    12
+   ],
+   [
+    "up",
+    14,
+    7
+   ],
+   [
+    "up",
+    11,
+    12
+   ]
+  ]
+ },
+ "caves/20": {
+  "early": 0.9,
+  "map": "93499c57f75a",
+  "searched": {
+   "leaders": "greedy",
+   "life": 1.0,
+   "lost": 12,
+   "plans": 100,
+   "seeds": "0-2"
+  },
+  "skills": [
+   "adept_arrow",
+   "adept_poison",
+   "holy_shield",
+   "unlock_ballista",
+   "unlock_frost",
+   "unlock_plague",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "build",
+    "plague",
+    15,
+    4
+   ],
+   [
+    "build",
+    "plague",
+    16,
+    11
+   ],
+   [
+    "build",
+    "arrow",
+    29,
+    8
+   ],
+   [
+    "up",
+    29,
+    8
+   ],
+   [
+    "build",
+    "arrow",
+    15,
+    3
+   ],
+   [
+    "build",
+    "arrow",
+    7,
+    13
+   ],
+   [
+    "up",
+    15,
+    3
+   ],
    [
     "gate",
     0
    ],
    [
     "build",
-    "arrow",
-    15,
-    6
-   ],
-   [
-    "build",
-    "arrow",
-    26,
-    10
-   ],
-   [
-    "build",
-    "arrow",
-    22,
-    14
-   ],
-   [
-    "build",
-    "pyre",
-    23,
-    14
-   ],
-   [
-    "build",
-    "arrow",
-    11,
-    9
-   ],
-   [
-    "up",
-    15,
-    6
-   ],
-   [
-    "build",
-    "arrow",
-    17,
-    14
-   ],
-   [
-    "up",
-    22,
-    14
-   ],
-   [
-    "up",
-    11,
-    9
-   ],
-   [
-    "build",
-    "pyre",
-    15,
-    9
-   ],
-   [
-    "build",
-    "pyre",
-    24,
-    14
-   ],
-   [
-    "up",
-    15,
-    6
-   ],
-   [
-    "build",
-    "arrow",
-    26,
-    14
-   ],
-   [
-    "build",
-    "arrow",
-    28,
-    14
+    "frost",
+    27,
+    12
    ],
    [
     "build",
     "arrow",
     4,
-    8
+    16
    ],
    [
     "build",
-    "pyre",
-    27,
+    "ballista",
+    15,
     10
+   ],
+   [
+    "up",
+    16,
+    11
    ]
   ]
  },
- "caves/12": {
-  "early": 0.7,
-  "map": "739b2720481e",
+ "docks/33": {
+  "early": 0.9,
+  "map": "b2d4e6284b25",
   "searched": {
    "leaders": "greedy",
-   "life": 1.664,
-   "lost": 13,
-   "plans": 300,
-   "seeds": "0-3"
+   "life": 1.269,
+   "lost": 31,
+   "plans": 100,
+   "seeds": "0-2"
   },
   "skills": [
-   "adept_bone",
-   "adept_fire",
-   "adept_lightning",
-   "adept_nature",
    "adept_poison",
    "holy_shield",
-   "soul_harvest",
    "thorns",
+   "unlock_ballista",
+   "unlock_frost",
+   "unlock_hook",
+   "unlock_hymn",
+   "unlock_plague",
+   "unlock_pyre",
+   "unlock_storm",
    "warmth"
   ],
   "steps": [
+   [
+    "build",
+    "plague",
+    15,
+    4
+   ],
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "ballista",
+    31,
+    6
+   ],
+   [
+    "build",
+    "plague",
+    24,
+    6
+   ],
+   [
+    "build",
+    "ballista",
+    12,
+    10
+   ],
+   [
+    "build",
+    "storm",
+    30,
+    6
+   ],
+   [
+    "up",
+    24,
+    6
+   ],
+   [
+    "build",
+    "plague",
+    1,
+    2
+   ],
+   [
+    "up",
+    1,
+    2
+   ]
+  ]
+ },
+ "drowned_city/53": {
+  "early": 0.7,
+  "map": "7518bf57ef76",
+  "searched": {
+   "leaders": "greedy",
+   "life": 1.022,
+   "lost": 5,
+   "plans": 100,
+   "seeds": "0-2"
+  },
+  "skills": [
+   "adept_arrow",
+   "adept_ballista",
+   "adept_fire",
+   "adept_lightning",
+   "holy_shield",
+   "master_ballista",
+   "master_lightning",
+   "thorns",
+   "unlock_ballista",
+   "unlock_frost",
+   "unlock_hook",
+   "unlock_hymn",
+   "unlock_knife",
+   "unlock_orb",
+   "unlock_plague",
+   "unlock_pyre",
+   "unlock_storm",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "build",
+    "storm",
+    21,
+    3
+   ],
+   [
+    "build",
+    "ballista",
+    27,
+    2
+   ],
+   [
+    "build",
+    "ballista",
+    29,
+    2
+   ],
+   [
+    "up",
+    27,
+    2
+   ],
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "plague",
+    26,
+    2
+   ],
+   [
+    "up",
+    21,
+    3
+   ],
+   [
+    "build",
+    "knife",
+    15,
+    15
+   ],
+   [
+    "build",
+    "storm",
+    25,
+    10
+   ],
+   [
+    "build",
+    "arrow",
+    9,
+    10
+   ],
+   [
+    "build",
+    "frost",
+    26,
+    1
+   ]
+  ]
+ },
+ "graveyard/5": {
+  "early": 0.7,
+  "map": "cef13b0483d2",
+  "searched": {
+   "leaders": "greedy",
+   "life": 1.354,
+   "lost": 55,
+   "plans": 100,
+   "seeds": "0-2"
+  },
+  "skills": [
+   "holy_shield",
+   "thorns"
+  ],
+  "steps": [
+   [
+    "build",
+    "arrow",
+    28,
+    3
+   ],
+   [
+    "build",
+    "arrow",
+    10,
+    9
+   ],
    [
     "gate",
     0
@@ -286,88 +473,8 @@
    [
     "build",
     "arrow",
-    23,
-    7
-   ],
-   [
-    "build",
-    "pyre",
-    30,
-    8
-   ],
-   [
-    "build",
-    "plague",
-    20,
-    13
-   ],
-   [
-    "build",
-    "arrow",
-    30,
-    3
-   ],
-   [
-    "build",
-    "ballista",
-    18,
-    4
-   ],
-   [
-    "up",
-    30,
-    8
-   ],
-   [
-    "up",
-    20,
-    13
-   ],
-   [
-    "build",
-    "arrow",
     10,
-    11
-   ],
-   [
-    "build",
-    "plague",
-    14,
-    2
-   ],
-   [
-    "build",
-    "plague",
-    19,
-    4
-   ],
-   [
-    "build",
-    "plague",
-    28,
-    3
-   ],
-   [
-    "up",
-    30,
-    8
-   ],
-   [
-    "up",
-    14,
-    2
-   ],
-   [
-    "build",
-    "arrow",
-    14,
     10
-   ],
-   [
-    "build",
-    "pyre",
-    14,
-    1
    ],
    [
     "up",
@@ -377,96 +484,24 @@
    [
     "build",
     "arrow",
-    2,
-    9
-   ],
-   [
-    "build",
-    "pyre",
-    26,
-    16
+    27,
+    7
    ],
    [
     "up",
-    30,
+    28,
     3
    ],
    [
     "up",
-    26,
-    16
-   ]
-  ]
- },
- "graveyard/3": {
-  "early": 0.5,
-  "map": "d2a7c22045ba",
-  "searched": {
-   "leaders": "greedy",
-   "life": 1.216,
-   "lost": 5,
-   "plans": 300,
-   "seeds": "0-3"
-  },
-  "skills": [
-   "adept_lightning",
-   "adept_poison",
-   "warmth"
-  ],
-  "steps": [
-   [
-    "build",
-    "arrow",
-    1,
-    6
-   ],
-   [
-    "build",
-    "arrow",
-    14,
-    10
-   ],
-   [
-    "build",
-    "arrow",
     27,
     7
    ],
    [
     "build",
     "arrow",
-    21,
-    7
-   ],
-   [
-    "build",
-    "arrow",
-    27,
-    3
-   ],
-   [
-    "build",
-    "arrow",
-    24,
-    7
-   ],
-   [
-    "build",
-    "arrow",
-    30,
-    3
-   ],
-   [
-    "build",
-    "arrow",
     30,
     7
-   ],
-   [
-    "build",
-    "arrow",
-    10,
-    5
    ],
    [
     "build",
@@ -476,148 +511,258 @@
    ],
    [
     "up",
-    21,
-    7
-   ],
-   [
-    "build",
-    "arrow",
-    18,
-    7
-   ],
-   [
-    "up",
-    30,
-    3
-   ],
-   [
-    "build",
-    "arrow",
     10,
-    10
+    9
    ],
    [
     "build",
     "arrow",
-    14,
-    8
-   ],
-   [
-    "up",
     27,
-    7
-   ],
-   [
-    "build",
-    "arrow",
-    5,
-    1
+    2
    ]
   ]
  },
- "hells_gate/15": {
-  "early": 0.9,
-  "map": "14d150702817",
+ "hells_gate/27": {
+  "early": 0.7,
+  "map": "de6eef796e8e",
   "searched": {
    "leaders": "greedy",
    "life": 1.103,
-   "lost": 3,
-   "plans": 300,
-   "seeds": "0-3"
+   "lost": 30,
+   "plans": 100,
+   "seeds": "0-2"
   },
   "skills": [
-   "adept_bone",
-   "adept_cold",
    "adept_fire",
-   "adept_lightning",
-   "adept_nature",
    "adept_poison",
    "holy_shield",
-   "hurricane",
-   "soul_harvest",
-   "thorns",
+   "unlock_ballista",
+   "unlock_frost",
+   "unlock_hymn",
+   "unlock_plague",
+   "unlock_pyre",
+   "unlock_storm",
    "warmth"
   ],
   "steps": [
    [
     "build",
     "arrow",
-    11,
-    8
-   ],
-   [
-    "build",
-    "plague",
-    26,
-    15
-   ],
-   [
-    "up",
-    11,
-    8
+    10,
+    7
    ],
    [
     "build",
     "ballista",
-    10,
-    5
+    28,
+    14
    ],
    [
     "build",
-    "arrow",
+    "ballista",
     29,
     15
    ],
    [
     "build",
     "plague",
-    20,
+    1,
+    2
+   ],
+   [
+    "build",
+    "plague",
+    2,
+    11
+   ],
+   [
+    "build",
+    "plague",
+    14,
+    7
+   ],
+   [
+    "build",
+    "ballista",
+    31,
     10
    ],
    [
     "build",
     "arrow",
-    15,
-    7
+    5,
+    6
+   ],
+   [
+    "build",
+    "plague",
+    12,
+    2
+   ]
+  ]
+ },
+ "jungle/45": {
+  "early": 0.9,
+  "map": "62d58973b346",
+  "searched": {
+   "leaders": "greedy",
+   "life": 1.102,
+   "lost": 8,
+   "plans": 100,
+   "seeds": "0-2"
+  },
+  "skills": [
+   "adept_ballista",
+   "adept_cold",
+   "adept_fire",
+   "adept_nature",
+   "holy_shield",
+   "master_nature",
+   "spell_mastery",
+   "thorns",
+   "unlock_altar",
+   "unlock_ballista",
+   "unlock_frost",
+   "unlock_grove",
+   "unlock_hymn",
+   "unlock_plague",
+   "unlock_pyre",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "ballista",
+    14,
+    14
    ],
    [
     "up",
-    26,
-    15
+    14,
+    14
+   ],
+   [
+    "build",
+    "plague",
+    9,
+    5
+   ],
+   [
+    "build",
+    "ballista",
+    13,
+    4
+   ],
+   [
+    "up",
+    14,
+    14
+   ],
+   [
+    "build",
+    "ballista",
+    28,
+    14
+   ]
+  ]
+ },
+ "spider_forest/37": {
+  "early": 0.9,
+  "map": "02640c394be2",
+  "searched": {
+   "leaders": "greedy",
+   "life": 1.526,
+   "lost": 50,
+   "plans": 100,
+   "seeds": "0-2"
+  },
+  "skills": [
+   "adept_arrow",
+   "adept_cold",
+   "adept_lightning",
+   "adept_poison",
+   "holy_shield",
+   "master_cold",
+   "thorns",
+   "unlock_altar",
+   "unlock_frost",
+   "unlock_hymn",
+   "unlock_plague",
+   "unlock_pyre",
+   "unlock_storm",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "gate",
+    0
+   ],
+   [
+    "build",
+    "plague",
+    14,
+    7
    ],
    [
     "build",
     "pyre",
-    11,
-    5
+    20,
+    13
    ],
    [
     "build",
     "storm",
-    25,
-    15
-   ],
-   [
-    "build",
-    "plague",
-    16,
-    10
-   ],
-   [
-    "build",
-    "ballista",
-    27,
-    10
+    30,
+    16
    ],
    [
     "up",
-    29,
-    15
-   ],
+    30,
+    16
+   ]
+  ]
+ },
+ "temple/63": {
+  "early": 0.5,
+  "map": "564b6e81a638",
+  "searched": {
+   "leaders": "greedy",
+   "life": 1.022,
+   "lost": 32,
+   "plans": 100,
+   "seeds": "0-2"
+  },
+  "skills": [
+   "adept_ballista",
+   "adept_cold",
+   "adept_fire",
+   "fire_ball",
+   "holy_shield",
+   "master_ballista",
+   "master_fire",
+   "spell_mastery",
+   "thorns",
+   "unlock_altar",
+   "unlock_ballista",
+   "unlock_frost",
+   "unlock_hymn",
+   "unlock_knife",
+   "unlock_meteor",
+   "unlock_orb",
+   "unlock_plague",
+   "unlock_pyre",
+   "unlock_storm",
+   "warmth"
+  ],
+  "steps": [
    [
     "build",
-    "ballista",
-    26,
+    "storm",
+    31,
     10
    ],
    [
@@ -626,57 +771,158 @@
    ],
    [
     "build",
-    "storm",
-    5,
-    15
-   ],
-   [
-    "up",
-    25,
-    15
+    "ballista",
+    11,
+    4
    ],
    [
     "build",
     "arrow",
-    2,
-    9
+    7,
+    2
    ],
    [
     "build",
-    "storm",
-    15,
-    9
+    "pyre",
+    1,
+    15
+   ],
+   [
+    "build",
+    "plague",
+    20,
+    13
+   ],
+   [
+    "build",
+    "arrow",
+    7,
+    3
    ],
    [
     "up",
-    16,
+    20,
+    13
+   ],
+   [
+    "up",
+    31,
     10
+   ]
+  ]
+ },
+ "travincal/56": {
+  "early": 0.7,
+  "map": "5b4f45f48212",
+  "searched": {
+   "leaders": "greedy",
+   "life": 1.0,
+   "lost": 5,
+   "plans": 160,
+   "seeds": "0-2"
+  },
+  "skills": [
+   "adept_arrow",
+   "adept_ballista",
+   "adept_cold",
+   "adept_fire",
+   "adept_knife",
+   "adept_poison",
+   "fire_ball",
+   "holy_shield",
+   "master_fire",
+   "spell_mastery",
+   "unlock_ballista",
+   "unlock_frost",
+   "unlock_hymn",
+   "unlock_knife",
+   "unlock_meteor",
+   "unlock_orb",
+   "unlock_plague",
+   "unlock_pyre",
+   "warmth"
+  ],
+  "steps": [
+   [
+    "build",
+    "plague",
+    24,
+    12
+   ],
+   [
+    "gate",
+    0
    ],
    [
     "build",
-    "storm",
-    2,
-    7
+    "plague",
+    4,
+    12
+   ],
+   [
+    "build",
+    "plague",
+    5,
+    8
+   ],
+   [
+    "up",
+    24,
+    12
+   ],
+   [
+    "up",
+    4,
+    12
+   ],
+   [
+    "build",
+    "arrow",
+    21,
+    6
+   ],
+   [
+    "build",
+    "plague",
+    7,
+    12
+   ],
+   [
+    "up",
+    5,
+    8
    ]
   ]
  },
  "tristram/0": {
   "early": 0.7,
-  "map": "3c7d02072da3",
+  "map": "6ef0a422465d",
   "searched": {
    "leaders": "greedy",
-   "life": 1.304,
-   "lost": 63,
-   "plans": 300,
-   "seeds": "0-3"
+   "life": 1.593,
+   "lost": 58,
+   "plans": 100,
+   "seeds": "0-2"
   },
   "skills": [],
   "steps": [
    [
     "build",
     "arrow",
-    10,
-    6
+    2,
+    10
+   ],
+   [
+    "build",
+    "arrow",
+    9,
+    12
+   ],
+   [
+    "build",
+    "arrow",
+    19,
+    7
    ],
    [
     "build",
@@ -687,54 +933,48 @@
    [
     "build",
     "arrow",
-    16,
-    7
+    15,
+    11
+   ],
+   [
+    "build",
+    "arrow",
+    29,
+    11
    ],
    [
     "up",
     30,
     11
+   ],
+   [
+    "build",
+    "arrow",
+    21,
+    3
+   ],
+   [
+    "up",
+    29,
+    11
+   ],
+   [
+    "build",
+    "arrow",
+    2,
+    4
    ],
    [
     "build",
     "arrow",
     18,
-    11
+    12
    ],
    [
     "build",
     "arrow",
-    31,
-    7
-   ],
-   [
-    "build",
-    "arrow",
-    8,
-    6
-   ],
-   [
-    "build",
-    "arrow",
-    7,
-    10
-   ],
-   [
-    "build",
-    "arrow",
-    28,
-    11
-   ],
-   [
-    "up",
-    10,
-    6
-   ],
-   [
-    "build",
-    "arrow",
-    12,
-    10
+    20,
+    16
    ]
   ]
  }
