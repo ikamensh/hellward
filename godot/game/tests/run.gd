@@ -257,6 +257,8 @@ func test_a_curse_lands_on_a_tower() -> void:
 func test_r_sings_battle_hymn_over_a_tower() -> void:
 	await Net.ask("create_profile", {"name": "singer"}).done
 	check(await win("tristram", "adaptive"), "the campaign's scripted player holds Tristram, opening the Graveyard")
+	var learned: Dictionary = await Net.ask("learn", {"key": "unlock_hymn"}).done
+	check(bool(learned["ok"]), "Tristram's sigils learn Battle Hymn's unlock")
 	var m := await start({"location": "graveyard"})
 	m.rig.user_control = false
 	var w: World = m.world
