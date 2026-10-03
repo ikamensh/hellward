@@ -49,7 +49,7 @@ class Ghost:
         self._pending: tuple[str, tuple[Any, ...]] | None = None
         self._since = 0.0
 
-    def skills(self, location: Location, sigils: int) -> frozenset[str]:
+    def draft(self, location: Location, sigils: int) -> frozenset[str]:
         """The log's skills, all of them: a ghost trims nothing to fit, so too few sigils is an error."""
         if cost(self.learned) > sigils:
             raise ValueError(f"{self.name} learned {cost(self.learned)} sigils' worth of skills with {sigils}")

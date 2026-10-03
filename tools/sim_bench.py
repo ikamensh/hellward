@@ -45,7 +45,7 @@ from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER  # noqa: E402
 from hellward.sim.model import World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
-from hellward.sim.players.hands import defend  # noqa: E402
+from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 
 SEED = 1
 #: What a world carries that is not its state: fixed for the defence (by name), or deliberately not cloned.
@@ -104,8 +104,9 @@ def play(key: str, seed: int = SEED) -> tuple[World, list[tuple[float, list[tupl
         if world.events:
             events.append((world.time, list(world.events)))
 
-    world, _ = defend(LOCATIONS[key], PLAYERS["ordinary"](seed), seed=seed, sigils=0, planner=planner.smart,
-                      watch=watch)
+    player = PLAYERS["ordinary"](seed)
+    world, _ = defend(reference_kit(LOCATIONS[key], player.draft(LOCATIONS[key], 0), seed),
+                      player, planner=planner.smart, watch=watch)
     return world, events
 
 
@@ -153,7 +154,9 @@ def decision_times(key: str, seed: int = SEED) -> list[float]:
         finally:
             took.append(time.perf_counter() - started)
 
-    defend(LOCATIONS[key], PLAYERS["adaptive"](seed), seed=seed, sigils=3 * ORDER.index(key), planner=timing)
+    player = PLAYERS["adaptive"](seed)
+    defend(reference_kit(LOCATIONS[key], player.draft(LOCATIONS[key], 3 * ORDER.index(key)), seed),
+           player, planner=timing)
     return took
 
 

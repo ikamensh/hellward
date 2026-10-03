@@ -84,7 +84,7 @@ class Corner:
     _last_aim: float = -1e9
     THINK: float = 0.5
 
-    def skills(self, location: Location, sigils: int) -> frozenset[str]:
+    def draft(self, location: Location, sigils: int) -> frozenset[str]:
         stage = ORDER.index(location.key)
         arsenal = location.arsenal
         kinds = (["frost"] if "frost" in arsenal.towers else []) + [k for k in arsenal.towers if k != "frost"]

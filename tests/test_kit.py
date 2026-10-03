@@ -19,7 +19,7 @@ from hellward.sim.model import SIM_DT, START_LIVES, Refused, World
 from hellward.sim.xp import xp_next
 from hellward.sim.players import planned, warden
 from hellward.sim.players.ghost import Ghost
-from hellward.sim.players.hands import Hands, defend, react_for
+from hellward.sim.players.hands import Hands, defend, react_for, reference_kit
 from tools.margin import wins
 
 
@@ -32,7 +32,7 @@ class Recorder:
         self.commands: list = []
         self.tiles: list[tuple[int, int]] | None = None
 
-    def skills(self, location, sigils):
+    def draft(self, location, sigils):
         return frozenset()
 
     def act(self, hands):
@@ -62,8 +62,8 @@ def kinds(world: World) -> list:
 def test_a_world_from_a_kit_replays_to_the_same_events():
     recorder = Recorder()
     seen: list = []
-    original, _ = defend(LOCATIONS["tristram"], recorder, seed=1, sigils=0, planner=planner.smart,
-                         watch=lambda w: seen.extend(kinds(w)))
+    original, _ = defend(reference_kit(LOCATIONS["tristram"], recorder.draft(LOCATIONS["tristram"], 0), 1),
+                         recorder, planner=planner.smart, watch=lambda w: seen.extend(kinds(w)))
     log = {"version": 2, "location": "tristram", "seed": 1, "skills": [], "loadout": [],
            "commands": recorder.commands}
     kit = Kit(LOCATIONS["tristram"], frozenset(), EMPTY_LOADOUT, LOCATIONS["tristram"].start_gold,

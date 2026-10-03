@@ -22,11 +22,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from hellward.sim.campaign import ORDER, Location
+from hellward.sim.campaign import Location
 from hellward.sim.content import Curse
-from hellward.sim.items import EMPTY_LOADOUT
-from hellward.sim.model import SIM_DT, Planner, Refused, World, curse_radius
-from hellward.sim.skills import cost, perks
+from hellward.sim.items import EMPTY_LOADOUT, Loadout
+from hellward.sim.kit import Kit
+from hellward.sim.model import SIM_DT, START_LIVES, Planner, Refused, World, curse_radius
 from hellward.sim.sums import int_sum
 
 REACT = (0.5, 0.8)    # a person answers a leader's sign this long after it appears, drawn per seed
@@ -39,8 +39,9 @@ class Player(Protocol):
 
     name: str
 
-    def skills(self, location: Location, sigils: int) -> frozenset[str]:
-        """The skills it learns for this defence, costing at most ``sigils`` (unlearning is free)."""
+    def draft(self, location: Location, sigils: int) -> frozenset[str]:
+        """The skills it would learn for this location with ``sigils``: the dealers' question when they build
+        its Kit. What it defends with is the Kit's learned, which may be anything."""
 
     def act(self, hands: Hands) -> None:
         """Called before every step of the world; a player decides as often as it likes."""
@@ -178,26 +179,31 @@ class Hands:
         self.record.spells[spell] += 1
 
 
-def defend(location: Location, player: Player, *, seed: int, sigils: int,
-           planner: Planner | None, hp: float = 1.0, lives: int | None = None, limit: float = 3000.0,
-           curse_scale: float = 1.0,
+def reference_kit(location: Location, learned: frozenset[str], seed: int, *,
+                loadout: Loadout = EMPTY_LOADOUT, gold: int | None = None,
+                lives: int | None = None) -> Kit:
+    """The Kit today's convention deals: the location's start gold and sanctuary lives, the learned skills,
+    and the seed. The per-location tools deal from here, so one defence then and now starts the same."""
+    return Kit(location=location, learned=learned, loadout=loadout, seed=seed,
+               gold=location.start_gold if gold is None else gold,
+               lives=START_LIVES if lives is None else lives)
+
+
+def defend(kit: Kit, player: Player, *, planner: Planner | None, hardness: float = 1.0,
+           lives: int | None = None, limit: float = 3000.0, curse_scale: float = 1.0,
            watch: Callable[[World], None] | None = None) -> tuple[World, Record]:
-    """One defence played to its end by a player. ``hp`` scales every monster's life, leaving the spells as
-    they are (the balance tools' margin); ``lives`` replaces the sanctuary's (the balance tools set it huge
-    to count every life lost); *watch* sees the world after every step, with that step's events. A defence
-    still undecided after ``limit`` seconds is a bug. ``curse_scale`` multiplies every curse radius (0 = only the marked tile)."""
-    learned = player.skills(location, sigils)
-    if cost(learned) > sigils:
-        raise ValueError(f"{player.name} learned {cost(learned)} sigils' worth of skills with {sigils}")
-    world = World(location, hardness=hp, perks=perks(learned, ORDER.index(location.key)), seed=seed, planner=planner,
-                  curse_scale=curse_scale, loadout=getattr(player, "loadout", EMPTY_LOADOUT))
-    world.record = True
+    """One defence played to its end by a player, from its Kit. ``hardness`` scales every monster's life,
+    leaving the spells as they are (the balance tools' margin); ``lives`` replaces the sanctuary's (the
+    balance tools set it huge to count every life lost); *watch* sees the world after every step, with that
+    step's events. A defence still undecided after ``limit`` seconds is a bug. ``curse_scale`` multiplies
+    every curse radius (0 = only the marked tile)."""
+    world = kit.world(hardness=hardness, planner=planner, record=True, curse_scale=curse_scale)
     if lives is not None:
         world.lives = lives
-    react = react_for(seed, getattr(player, 'reaction', REACT))
+    react = react_for(kit.seed, getattr(player, 'reaction', REACT))
     aim_gap = getattr(player, 'aim_gap', AIM_GAP)
     hands = Hands(world, react, aim_gap)
-    hands.record.skills = learned
+    hands.record.skills = kit.learned
     while world.outcome is None and world.time < limit:
         player.act(hands)
         world.step(SIM_DT)
@@ -206,6 +212,6 @@ def defend(location: Location, player: Player, *, seed: int, sigils: int,
         hands.observe(world.events)
         world.events.clear()
     if world.outcome is None:
-        where = f"{location.key}, seed {seed}"
+        where = f"{kit.location.key}, seed {kit.seed}"
         raise RuntimeError(f"{player.name} on {where}: undecided after {world.time:.0f} s")
     return world, hands.record

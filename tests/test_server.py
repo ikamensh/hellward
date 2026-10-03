@@ -22,7 +22,7 @@ from hellward.sim.content import MONSTERS, TOWERS, felt_hit
 from hellward.sim.model import World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.ghost import Ghost
-from hellward.sim.players.hands import defend
+from hellward.sim.players.hands import defend, reference_kit
 from hellward.sim.skills import perks
 
 
@@ -33,8 +33,9 @@ def direct(location: str, player, seed: int) -> tuple[World, list]:
     def watch(world: World) -> None:
         sent.extend(event(world, e) for e in world.events)
 
-    world, _ = defend(LOCATIONS[location], player, seed=seed, sigils=3 * ORDER.index(location),
-                      planner=planner.smart, watch=watch)
+    loc = LOCATIONS[location]
+    world, _ = defend(reference_kit(loc, player.draft(loc, 3 * ORDER.index(location)), seed),
+                      player, planner=planner.smart, watch=watch)
     return world, json.loads(json.dumps(sent))
 
 

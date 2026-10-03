@@ -28,7 +28,7 @@ if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of it
 
 from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS  # noqa: E402
-from hellward.sim.players.hands import defend  # noqa: E402
+from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 from hellward.sim.players.ordinary import Ordinary  # noqa: E402
 from tools.margin import LOW, HIGH, STEP, seed_list  # noqa: E402
 from tools.tuning import life_margin  # noqa: E402
@@ -38,8 +38,9 @@ BUILDS = {"light": (("arrow",), 12), "heavy": (("arrow", "ballista", "arrow", "b
 
 def wins(build: str, key: str, seed: int, life: float) -> bool:
     rotation, towers = BUILDS[build]
-    world, _ = defend(LOCATIONS[key], Ordinary(rotation=rotation, towers=towers), seed=seed, sigils=0,
-                      planner=planner.smart, hp=life)
+    player = Ordinary(rotation=rotation, towers=towers)
+    world, _ = defend(reference_kit(LOCATIONS[key], player.draft(LOCATIONS[key], 0), seed),
+                      player, planner=planner.smart, hardness=life)
     return world.outcome == "victory"
 
 

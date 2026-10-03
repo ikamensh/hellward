@@ -10,7 +10,7 @@ from hellward.sim.content import Wave
 from hellward.sim.locations.common import g
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.players import PLAYERS
-from hellward.sim.players.hands import defend
+from hellward.sim.players.hands import defend, reference_kit
 from hellward.sim.xp import clear_xp, kill_xp, xp_next
 
 
@@ -67,8 +67,9 @@ def test_the_levels_crossed_do_not_evaporate_from_the_total():
 
 def test_a_real_defence_counts_kills_clears_and_levels():
     seen: list = []
-    world, _ = defend(LOCATIONS["tristram"], PLAYERS["warden"](1), seed=1, sigils=0,
-                      planner=planner.smart, watch=lambda w: seen.extend(w.events))
+    player = PLAYERS["warden"](1)
+    world, _ = defend(reference_kit(LOCATIONS["tristram"], player.draft(LOCATIONS["tristram"], 0), 1),
+                      player, planner=planner.smart, watch=lambda w: seen.extend(w.events))
     assert world.outcome == "victory"
     assert world.xp > clear_xp(1)
     assert world.xp_level >= 2

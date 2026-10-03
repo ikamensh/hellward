@@ -29,7 +29,7 @@ from hellward.sim.items import Loadout  # noqa: E402
 from hellward.sim.model import Refused, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players.ghost import Ghost  # noqa: E402
-from hellward.sim.players.hands import defend  # noqa: E402
+from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 
 SEED = 1
 BOSSES = ("azazel", "bone_priest")
@@ -71,8 +71,10 @@ def first(log: dict, wanted: Callable[[World, tuple], bool]) -> tuple[tuple, flo
                 raise Found(e, world.time)
 
     try:
-        world, _ = defend(LOCATIONS[location], Ghost(log), seed=int(log["seed"]), sigils=3 * ORDER.index(location),
-                          planner=planner.smart, watch=watch)
+        ghost, loc = Ghost(log), LOCATIONS[location]
+        world, _ = defend(reference_kit(loc, ghost.draft(loc, 3 * ORDER.index(location)), int(log["seed"]),
+                                        loadout=ghost.loadout),
+                          ghost, planner=planner.smart, watch=watch)
     except Found as found:
         return found.event, found.time
     raise LookupError(f"the moment never came at {location} ({world.outcome} at {world.time:.0f} s)")
@@ -133,8 +135,9 @@ def recorded(location: str, player_name: str, until: Callable[[World], bool]) ->
         setattr(World, name, wrap(name))
     World.step = inner("step")  # type: ignore[method-assign]
     try:
-        world, _ = defend(LOCATIONS[location], player, seed=SEED, sigils=3 * ORDER.index(location),
-                          planner=planner.smart, watch=watch)
+        loc = LOCATIONS[location]
+        world, _ = defend(reference_kit(loc, player.draft(loc, 3 * ORDER.index(location)), SEED),
+                          player, planner=planner.smart, watch=watch)
         time = world.time
     except Found as found:
         time = found.time
@@ -142,7 +145,7 @@ def recorded(location: str, player_name: str, until: Callable[[World], bool]) ->
         for name, fn in originals.items():
             setattr(World, name, fn)
     log = ghost(location, commands)
-    log["skills"] = sorted(player.skills(LOCATIONS[location], 3 * ORDER.index(location)))
+    log["skills"] = sorted(player.draft(LOCATIONS[location], 3 * ORDER.index(location)))
     log["loadout"] = list(getattr(player, "loadout", Loadout()).equipped)
     return log, time
 
@@ -155,8 +158,10 @@ def replayed(log: dict, time: float) -> World:
 
     location = str(log["location"])
     try:
-        defend(LOCATIONS[location], Ghost(log), seed=int(log["seed"]), sigils=3 * ORDER.index(location),
-               planner=planner.smart, watch=stop)
+        ghost, loc = Ghost(log), LOCATIONS[location]
+        defend(reference_kit(loc, ghost.draft(loc, 3 * ORDER.index(location)), int(log["seed"]),
+                             loadout=ghost.loadout),
+               ghost, planner=planner.smart, watch=stop)
     except Found as found:
         return found.event[0]
     raise LookupError(f"the replay ended before {time:.1f} s")

@@ -39,7 +39,7 @@ class Battle:
         self.location = location
         self.player = player
         if player is not None:
-            learned = player.skills(location, 3 * ORDER.index(location.key))
+            learned = player.draft(location, 3 * ORDER.index(location.key))
             loadout = getattr(player, "loadout", EMPTY_LOADOUT)
         self.learned = learned
         self.seed = seed

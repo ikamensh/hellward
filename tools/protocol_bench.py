@@ -29,7 +29,7 @@ from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER  # noqa: E402
 from hellward.sim.model import World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
-from hellward.sim.players.hands import defend  # noqa: E402
+from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 
 PLAYER = "veteran"
 
@@ -58,8 +58,10 @@ def encode_times(location: str, seed: int) -> list[float]:
         json.dumps(protocol.frame(world, step[0], world.events), separators=(",", ":"))
         took.append(time.perf_counter() - started)
 
-    defend(LOCATIONS[location], PLAYERS[PLAYER](seed), seed=seed, sigils=3 * ORDER.index(location),
-           planner=planner.smart, watch=watch)
+    player = PLAYERS[PLAYER](seed)
+    loc = LOCATIONS[location]
+    defend(reference_kit(loc, player.draft(loc, 3 * ORDER.index(location)), seed),
+           player, planner=planner.smart, watch=watch)
     return took
 
 

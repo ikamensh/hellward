@@ -16,7 +16,7 @@ from hellward.sim.level import Level, Route
 from hellward.sim.model import SIM_DT, World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.adaptive import ORDERS, Adaptive
-from hellward.sim.players.hands import Hands, defend
+from hellward.sim.players.hands import Hands, defend, reference_kit
 from hellward.sim.players.planned import PLANS, THINK, Plan as PlannedPlan, Planned, load
 from hellward.sim.players.warden import fingerprint, load_plans
 from hellward.sim.skills import SKILLS, can_learn, check, cost, unlocked
@@ -31,14 +31,18 @@ import warden_plans  # noqa: E402
 @pytest.mark.parametrize("key", list(LOCATIONS))
 def test_the_ordinary_player_defends_every_location_to_its_end_against_smart_leaders(key):
     location = LOCATIONS[key]
-    world, record = defend(location, PLAYERS["ordinary"](1), seed=1, sigils=0, planner=planner.smart)
+    player = PLAYERS["ordinary"](1)
+    world, record = defend(reference_kit(location, player.draft(location, 0), 1), player,
+                           planner=planner.smart)
     assert world.outcome in ("victory", "defeat")
     assert world.outcome == "defeat" or world.wave == len(location.waves) - 1
     assert record.chants >= record.landed   # it may fall before a leader comes, or before its towers kill anything
 
 
 def test_the_warden_holds_tristram():
-    world, record = defend(LOCATIONS["tristram"], PLAYERS["warden"](1), seed=1, sigils=0, planner=planner.smart)
+    player = PLAYERS["warden"](1)
+    world, record = defend(reference_kit(LOCATIONS["tristram"], player.draft(LOCATIONS["tristram"], 0), 1),
+                           player, planner=planner.smart)
     assert world.outcome == "victory"
     assert record.landed > 0
 
@@ -46,7 +50,8 @@ def test_the_warden_holds_tristram():
 def test_the_warden_holds_a_wager_back_from_its_build():
     warden = PLAYERS["warden"](1)
     warden.reserve = 20
-    world, _ = defend(LOCATIONS["tristram"], warden, seed=1, sigils=0, planner=planner.smart)
+    world, _ = defend(reference_kit(LOCATIONS["tristram"], warden.draft(LOCATIONS["tristram"], 0), 1),
+                      warden, planner=planner.smart)
     assert world.outcome == "victory"
     assert world.gold >= 20
 
@@ -55,7 +60,7 @@ def test_the_warden_knows_when_its_build_stands():
     from hellward.sim.players.warden import Plan as WardenPlan, Warden
     warden = Warden()
     assert not warden.built_out
-    warden.skills(LOCATIONS["tristram"], 0)
+    warden.draft(LOCATIONS["tristram"], 0)
     assert warden.built_out == (warden.done >= len(warden.chosen.steps))
     assert Warden(plan=WardenPlan(frozenset(), ())).built_out is False
 
@@ -65,8 +70,8 @@ def test_the_warden_pursuing_a_family_builds_only_its_towers():
     from hellward.sim.players.warden import Warden
     warden = Warden(family="physical")
     events: list = []
-    world, _ = defend(LOCATIONS["tristram"], warden, seed=1, sigils=0, planner=planner.smart,
-                      watch=lambda w: events.extend(w.events))
+    world, _ = defend(reference_kit(LOCATIONS["tristram"], warden.draft(LOCATIONS["tristram"], 0), 1),
+                      warden, planner=planner.smart, watch=lambda w: events.extend(w.events))
     assert world.outcome == "victory"
     built = [e[2] for e in events if e[0] == "built"]
     assert built and all(TOWERS[kind].element.value == "physical" for kind in built)
@@ -77,12 +82,12 @@ def test_the_warden_pursues_a_drawn_family_only_when_its_plan_builds_it():
     mostly = (Step("build", kind="pyre", tile=(1, 1)), Step("build", kind="pyre", tile=(2, 2)),
               Step("build", kind="pyre", tile=(3, 3)), Step("build", kind="arrow", tile=(4, 4)))
     pursuer = Warden(plan=WardenPlan(frozenset({"unlock_pyre"}), mostly), family_goal="fire")
-    pursuer.skills(LOCATIONS["cathedral"], 4)
+    pursuer.draft(LOCATIONS["cathedral"], 4)
     assert pursuer.pursued_family and pursuer.family == "fire"
     barely = (Step("build", kind="pyre", tile=(1, 1)), Step("build", kind="arrow", tile=(2, 2)),
               Step("build", kind="arrow", tile=(3, 3)), Step("build", kind="arrow", tile=(4, 4)))
     forgoer = Warden(plan=WardenPlan(frozenset({"unlock_pyre"}), barely), family_goal="fire")
-    forgoer.skills(LOCATIONS["cathedral"], 4)
+    forgoer.draft(LOCATIONS["cathedral"], 4)
     assert not forgoer.pursued_family and forgoer.family is None
 
 
@@ -91,10 +96,10 @@ def test_the_warden_declines_a_family_of_supports_even_when_its_plan_builds_it()
     steps = (Step("build", kind="frost", tile=(1, 1)), Step("build", kind="frost", tile=(2, 2)),
              Step("build", kind="arrow", tile=(3, 3)), Step("build", kind="arrow", tile=(4, 4)))
     cold = Warden(plan=WardenPlan(frozenset({"unlock_pyre", "unlock_frost"}), steps), family_goal="cold")
-    cold.skills(LOCATIONS["caves"], 9)
+    cold.draft(LOCATIONS["caves"], 9)
     assert not cold.pursued_family and cold.family is None   # frost alone kills nothing
     pyre = Warden(plan=WardenPlan(frozenset({"unlock_pyre", "unlock_frost"}), steps), family_goal="!physical")
-    pyre.skills(LOCATIONS["caves"], 9)
+    pyre.draft(LOCATIONS["caves"], 9)
     assert pyre.pursued_family and pyre.family == "!physical"
 
 
@@ -102,8 +107,8 @@ def test_the_warden_abandons_its_family_when_the_defence_bleeds():
     from hellward.sim.players.warden import FAMILY_BREAK, Warden
     warden = Warden(family="fire", plans={})
     events: list = []
-    world, _ = defend(LOCATIONS["cathedral"], warden, seed=1, sigils=4, planner=planner.smart,
-                      watch=lambda w: events.extend(w.events))
+    world, _ = defend(reference_kit(LOCATIONS["cathedral"], warden.draft(LOCATIONS["cathedral"], 4), 1),
+                      warden, planner=planner.smart, watch=lambda w: events.extend(w.events))
     assert warden.fair_lost >= FAMILY_BREAK
     assert warden.family is None   # survival builds anything
     assert {e[2] for e in events if e[0] == "built"} == {"arrow", "pyre"}
@@ -113,8 +118,8 @@ def test_the_warden_rushing_the_gate_builds_it_before_the_third_wave():
     from hellward.sim.players.warden import Warden
     warden = Warden(gate_rush=True)
     events: list = []
-    world, _ = defend(LOCATIONS["graveyard"], warden, seed=1, sigils=0, planner=planner.smart,
-                      watch=lambda w: events.extend(w.events))
+    world, _ = defend(reference_kit(LOCATIONS["graveyard"], warden.draft(LOCATIONS["graveyard"], 0), 1),
+                      warden, planner=planner.smart, watch=lambda w: events.extend(w.events))
     assert world.outcome == "victory"
     first_door = next(i for i, e in enumerate(events) if e[0] == "door_built")
     third_wave = next(i for i, e in enumerate(events) if e[0] == "wave" and e[1] == 2)
@@ -130,8 +135,8 @@ def test_the_warden_chasing_the_hymn_casts_past_its_compulsion():
         warden = Warden(plan=WardenPlan(learned, draft_build(LOCATIONS["catacombs"], learned)),
                         hymn_chase=chase)
         events: list = []
-        defend(LOCATIONS["catacombs"], warden, seed=1, sigils=10, planner=planner.smart,
-               watch=lambda w: events.extend(w.events))
+        defend(reference_kit(LOCATIONS["catacombs"], warden.draft(LOCATIONS["catacombs"], 10), 1),
+               warden, planner=planner.smart, watch=lambda w: events.extend(w.events))
         casts.append(sum(1 for e in events if e[0] == "hymn"))
         assert warden.hymns == casts[-1]
     assert casts[1] > casts[0]
@@ -205,7 +210,9 @@ def test_a_leaders_sign_reaches_a_player_only_a_persons_reaction_later():
 
 def test_a_defence_still_undecided_at_the_limit_is_an_error():
     with pytest.raises(RuntimeError, match="undecided"):
-        defend(LOCATIONS["tristram"], PLAYERS["ordinary"](1), seed=1, sigils=0, planner=None, limit=5.0)
+        player = PLAYERS["ordinary"](1)
+        defend(reference_kit(LOCATIONS["tristram"], player.draft(LOCATIONS["tristram"], 0), 1),
+               player, planner=None, limit=5.0)
 
 
 FORBIDDEN = (".asking", ".ask_left", ".chant_", ".cooldown", "planner", ".clone(", ".forced", ".rng", "decide(", "rollout(")
@@ -224,8 +231,9 @@ def test_a_player_reads_no_leaders_mind_and_no_future(path):
 def test_the_planned_player_holds_tristram_with_its_searched_build():
     """The stored build wins on evaluation seeds it did not see during its search."""
     for seed in range(1000, 1008):
-        world, _ = defend(LOCATIONS["tristram"], PLAYERS["planned"](seed), seed=seed, sigils=0,
-                          planner=planner.smart)
+        player = PLAYERS["planned"](seed)
+        world, _ = defend(reference_kit(LOCATIONS["tristram"], player.draft(LOCATIONS["tristram"], 0), seed),
+                          player, planner=planner.smart)
         assert world.outcome == "victory", seed
 
 
@@ -234,8 +242,9 @@ def test_the_planned_player_holds_temple_with_its_searched_build():
     victories = 0
     failed = []
     for seed in range(1000, 1008):
-        world, _ = defend(LOCATIONS["temple"], PLAYERS["planned"](seed), seed=seed, sigils=63,
-                          planner=planner.smart)
+        player = PLAYERS["planned"](seed)
+        world, _ = defend(reference_kit(LOCATIONS["temple"], player.draft(LOCATIONS["temple"], 63), seed),
+                          player, planner=planner.smart)
         victories += world.outcome == "victory"
         if world.outcome != "victory":
             failed.append(seed)
@@ -324,13 +333,17 @@ def test_planned_player_skips_the_rank_of_a_tower_sold_during_the_final_stretch(
 
 
 def test_the_adaptive_player_holds_tristram():
-    world, record = defend(LOCATIONS["tristram"], PLAYERS["adaptive"](1), seed=1, sigils=0, planner=planner.smart)
+    player = PLAYERS["adaptive"](1)
+    world, record = defend(reference_kit(LOCATIONS["tristram"], player.draft(LOCATIONS["tristram"], 0), 1),
+                           player, planner=planner.smart)
     assert world.outcome == "victory"
     assert world.lives >= 10   # the open-field opening still earns at least two sigils
 
 
 def test_the_apprentice_holds_tristram():
-    world, _ = defend(LOCATIONS["tristram"], PLAYERS["apprentice"](1), seed=1, sigils=0, planner=planner.smart)
+    player = PLAYERS["apprentice"](1)
+    world, _ = defend(reference_kit(LOCATIONS["tristram"], player.draft(LOCATIONS["tristram"], 0), 1),
+                      player, planner=planner.smart)
     assert world.outcome == "victory"
 
 
@@ -389,9 +402,9 @@ def test_planned_player_spends_sigils_only_on_skills_open_at_the_location():
     from hellward.sim.players.planned import Plan, Planned
 
     plan = Plan(["unlock_pyre", "adept_fire", "master_fire", "fire_ball", "warmth"], [], [])
-    early = Planned(plan=plan).skills(LOCATIONS["cathedral"], 16)
+    early = Planned(plan=plan).draft(LOCATIONS["cathedral"], 16)
     assert early == frozenset({"unlock_pyre", "adept_fire", "master_fire", "warmth"})
-    late = Planned(plan=plan).skills(LOCATIONS["jungle"], 16)
+    late = Planned(plan=plan).draft(LOCATIONS["jungle"], 16)
     assert late == frozenset({"unlock_pyre", "adept_fire", "master_fire", "fire_ball"})
 
 
@@ -400,7 +413,7 @@ def test_warden_draft_and_search_mutations_cannot_buy_future_skills():
 
     location = LOCATIONS["cathedral"]
     assert all(SKILLS[key].first_location <= 2 for key in draft_skills(location, 6))
-    chosen = Warden(plan=Plan(frozenset({"unlock_pyre", "adept_fire", "master_fire", "fire_ball"}), ())).skills(location, 11)
+    chosen = Warden(plan=Plan(frozenset({"unlock_pyre", "adept_fire", "master_fire", "fire_ball"}), ())).draft(location, 11)
     assert chosen == frozenset({"unlock_pyre", "adept_fire", "master_fire"})
     mutated = warden_plans.reskill(frozenset({"unlock_pyre", "adept_fire", "master_fire", "fire_ball"}), 11,
                                    random.Random(1), stage=2)
@@ -466,7 +479,7 @@ def test_scripted_players_wait_for_the_local_gate_price(monkeypatch):
     planned = Planned(plan=PlannedPlan([], [("gate", 0)], [100.0] * len(location.waves)))
     planned._build(world)
     warden = Warden(plan=WardenPlan(frozenset(), (Step("gate", door=0),)))
-    warden.skills(location, 0)
+    warden.draft(location, 0)
     warden._spend(world)
 
     adaptive = Adaptive("mixed")
@@ -537,7 +550,7 @@ def test_the_adaptive_player_learns_within_its_sigils_and_the_tree(order):
     for stage, location_key in enumerate(ORDER):
         location = LOCATIONS[location_key]
         for sigils in range(0, 37):
-            learned = Adaptive(order).skills(location, sigils)
+            learned = Adaptive(order).draft(location, sigils)
             check(learned)
             assert cost(learned) <= sigils
             assert all(SKILLS[key].first_location <= stage for key in learned)
@@ -553,7 +566,8 @@ def test_every_player_plays_an_act_two_location_with_its_towers_to_an_outcome(na
     player = PLAYERS[name](1)
     if name == "planned":
         player.plan = load("docks")   # the short waves are not what the stored plan was searched on
-    world, _ = defend(short, player, seed=1, sigils=18, planner=planner.smart)
+    world, _ = defend(reference_kit(short, player.draft(short, 18), 1), player,
+                      planner=planner.smart)
     assert world.outcome in ("victory", "defeat")
 
 
@@ -561,7 +575,8 @@ def test_the_veteran_holds_tristram_and_sees_a_sign_no_sooner_than_a_person_slow
     from hellward.sim.players.hands import react_for
     veteran = PLAYERS["veteran"](1)
     assert all(0.8 <= react_for(seed, veteran.reaction) <= 1.2 for seed in range(50))
-    world, _ = defend(LOCATIONS["tristram"], veteran, seed=1, sigils=0, planner=planner.smart)
+    world, _ = defend(reference_kit(LOCATIONS["tristram"], veteran.draft(LOCATIONS["tristram"], 0), 1),
+                      veteran, planner=planner.smart)
     assert world.outcome == "victory"
 
 
@@ -569,14 +584,15 @@ def test_the_veteran_drafts_its_build_and_never_reads_the_wardens_stored_plans()
     from hellward.sim.players.warden import draft_skills
     veteran = PLAYERS["veteran"](1)
     assert veteran.plans == {}
-    assert veteran.skills(LOCATIONS["cathedral"], 6) == draft_skills(LOCATIONS["cathedral"], 6)
+    assert veteran.draft(LOCATIONS["cathedral"], 6) == draft_skills(LOCATIONS["cathedral"], 6)
 
 
 def test_the_corner_player_builds_arrows_that_cover_tristrams_bends():
     """The wide monster halls leave plots beside bends for the corner player's opening."""
     corner = PLAYERS["corner"](1)
     location = LOCATIONS["tristram"]
-    world, _ = defend(location, corner, seed=1, sigils=0, planner=planner.smart)
+    world, _ = defend(reference_kit(location, corner.draft(location, 0), 1), corner,
+                      planner=planner.smart)
     arrows = [t for t in world.towers.values() if t.kind.key == "arrow"]
     bends = [tile for route in location.level.routes for tile in route.waypoints[1:-1]]
     assert arrows
@@ -611,6 +627,6 @@ def test_a_curse_scale_of_zero_curses_only_the_marked_tile():
 def test_the_margin_tool_scales_every_monsters_life(monkeypatch):
     import margin
     seen = []
-    monkeypatch.setattr(margin, "defend", lambda location, player, **kw: (seen.append(kw["hp"]), (type("W", (), {"outcome": "victory"})(), None))[1])
+    monkeypatch.setattr(margin, "defend", lambda kit, player, **kw: (seen.append(kw["hardness"]), (type("W", (), {"outcome": "victory"})(), None))[1])
     assert margin.wins("apprentice", "graveyard", 1000, 3, "smart", 1.5)
     assert seen == [1.5]

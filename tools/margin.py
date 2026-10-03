@@ -36,10 +36,11 @@ if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of it
 
 from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER  # noqa: E402
+from hellward.sim.items import EMPTY_LOADOUT  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
 from hellward.sim.players import planned, warden  # noqa: E402
 from hellward.sim.players.ghost import Ghost  # noqa: E402
-from hellward.sim.players.hands import Player, defend  # noqa: E402
+from hellward.sim.players.hands import Player, defend, reference_kit  # noqa: E402
 from hellward.sim.skills import cost  # noqa: E402
 from tools.tuning import life_margin  # noqa: E402
 
@@ -62,8 +63,10 @@ def wins(who: str, key: str, seed: int, sigils: int, leaders: str, life_mult: fl
     loc = LOCATIONS[key]
     if waves is not None:
         loc = dataclasses.replace(loc, waves=loc.waves[:waves], wave_names=loc.wave_names[:waves])
-    world, _ = defend(loc, contender(who, seed), seed=seed, sigils=sigils, planner=policy, hp=life_mult,
-                      curse_scale=curse_scale)
+    player = contender(who, seed)
+    world, _ = defend(reference_kit(loc, player.draft(loc, sigils), seed,
+                                    loadout=getattr(player, "loadout", EMPTY_LOADOUT)),
+                      player, planner=policy, hardness=life_mult, curse_scale=curse_scale)
     return world.outcome == "victory"
 
 

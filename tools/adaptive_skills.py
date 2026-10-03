@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER  # noqa: E402
 from hellward.sim.players.adaptive import ORDERS, PLANS, Adaptive, learn  # noqa: E402
-from hellward.sim.players.hands import defend  # noqa: E402
+from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 
 TRAINING = range(0, 100)
 
@@ -34,7 +34,9 @@ def score(job: tuple[str, str, int, int, float]) -> float:
     """Lives kept at a victory; a fall scores minus the waves it never saw."""
     location, order, sigils, seed, hp = job
     player = Adaptive(order=order)
-    world, _ = defend(LOCATIONS[location], player, seed=seed, sigils=sigils, planner=planner.smart, hp=hp)
+    loc = LOCATIONS[location]
+    world, _ = defend(reference_kit(loc, player.draft(loc, sigils), seed), player,
+                      planner=planner.smart, hardness=hp)
     if world.outcome == "victory":
         return float(world.lives)
     return float(world.wave - len(LOCATIONS[location].waves))

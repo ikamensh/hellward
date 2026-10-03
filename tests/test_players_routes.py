@@ -11,7 +11,7 @@ from hellward.sim.model import Monster, World
 from hellward.sim.players import PLAYERS
 from hellward.sim.players.adaptive import Study
 from hellward.sim.players.corner import path_corners, tile_value_for_kind
-from hellward.sim.players.hands import defend
+from hellward.sim.players.hands import defend, reference_kit
 from hellward.sim.players.ordinary import Ordinary, tile_scores
 from hellward.sim.players.planned import _busy
 from hellward.sim.players.warden import tile_value
@@ -107,7 +107,8 @@ def test_players_finish_a_defence_with_wandering_side_route_enemies(player):
                 routes.add(monster.route)
 
     defender = PLAYERS[player](3)
-    world, _ = defend(location, defender, seed=3, sigils=0, planner=None, watch=watch, limit=150.0)
+    world, _ = defend(reference_kit(location, defender.draft(location, 0), 3), defender,
+                      planner=None, watch=watch, limit=150.0)
 
     assert world.outcome in ("victory", "defeat")
     assert routes == {"north", "detour"}

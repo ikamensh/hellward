@@ -47,7 +47,7 @@ from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import MONSTERS, TOWERS, felt_hit  # noqa: E402
 from hellward.sim.model import DOOR_STOP, JOSTLE, World  # noqa: E402
 from hellward.sim.players import PLAYERS  # noqa: E402
-from hellward.sim.players.hands import defend  # noqa: E402
+from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 from hellward.sim.players.planned import Plan, Planned, fingerprint, load, plan_path  # noqa: E402
 from hellward.sim.skills import SKILLS, column_of  # noqa: E402
 
@@ -86,8 +86,10 @@ def score(world: World) -> float:
 
 
 def play(plan: dict, location: str, sigils: int, seed: int, hp: float, leaders: str) -> float:
-    world, _ = defend(LOCATIONS[location], Planned(plan=Plan.from_json(plan)), seed=seed, sigils=sigils,
-                      planner=LEADERS[leaders], hp=hp)
+    player = Planned(plan=Plan.from_json(plan))
+    loc = LOCATIONS[location]
+    world, _ = defend(reference_kit(loc, player.draft(loc, sigils), seed), player,
+                      planner=LEADERS[leaders], hardness=hp)
     return score(world)
 
 
@@ -449,8 +451,9 @@ def climb(pool: ProcessPoolExecutor, location_key: str, generations: int, childr
 
 
 def table_row(player: str, location: str, sigils: int, seed: int) -> dict:
-    world, record = defend(LOCATIONS[location], PLAYERS[player](seed), seed=seed, sigils=sigils,
-                           planner=planner.smart)
+    who = PLAYERS[player](seed)
+    world, record = defend(reference_kit(LOCATIONS[location], who.draft(LOCATIONS[location], sigils), seed),
+                           who, planner=planner.smart)
     return {"player": player, "location": location, "seed": seed, "outcome": world.outcome,
             "lives": world.lives, "spells": dict(record.spells), "landed": record.landed, "strikes": record.strikes}
 

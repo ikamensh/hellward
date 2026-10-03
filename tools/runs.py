@@ -45,7 +45,7 @@ from hellward.sim.balance import BALANCE  # noqa: E402
 from hellward.sim.bonus import EARLY, UNITS, draw  # noqa: E402
 from hellward.sim.campaign import ACT_ENDS, LOCATIONS, ORDER  # noqa: E402
 from hellward.sim.model import Refused  # noqa: E402
-from hellward.sim.players.hands import defend  # noqa: E402
+from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 from hellward.sim.players.warden import Warden, draft_skills  # noqa: E402
 
 BOTS = ("middling", "strong")
@@ -278,8 +278,9 @@ def play_run(seed: int, bot: str, locations: tuple[str, ...], immortal: bool,
                 summary["bonus_net"] -= pack.wager
                 summary["summons"].append((_key, stake))
 
-        world, _ = defend(played.location, player, seed=played.seed,
-                          sigils=_sigils(bot, run, key, stored), planner=planner.smart,
+        dealt = reference_kit(played.location, player.draft(played.location, _sigils(bot, run, key, stored)),
+                              played.seed)
+        world, _ = defend(dealt, player, planner=planner.smart,
                           lives=IMMORTAL_LIVES if immortal else run.pool, watch=watch)
         world.events = events
         lives = IMMORTAL_LIVES if immortal else None

@@ -37,7 +37,7 @@ if __name__ in ("__main__", "__mp_main__"):   # run as a program or as one of it
 
 from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER, Location  # noqa: E402
-from hellward.sim.players.hands import defend  # noqa: E402
+from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 from hellward.sim.players.warden import (  # noqa: E402
     PLANS, Plan, Step, Warden, draft_build, draft_skills, fingerprint, plan_key, tile_value,
 )
@@ -62,16 +62,18 @@ def lost(row: dict, key: str, sigils: int, seed: int, hp: float, leaders: str) -
     """Lives a plan loses in one defence with every monster's life times ``hp``, counted past a fall."""
     if seed not in TRAINING:
         raise ValueError(f"seed {seed} is not a training seed")
-    world, _ = defend(LOCATIONS[key], Warden(plan=Plan.of(row)), seed=seed, sigils=sigils,
-                      planner=LEADERS[leaders], hp=hp, lives=UNCAPPED, limit=LIMIT)
+    player = Warden(plan=Plan.of(row))
+    world, _ = defend(reference_kit(LOCATIONS[key], player.draft(LOCATIONS[key], sigils), seed),
+                      player, planner=LEADERS[leaders], hardness=hp, lives=UNCAPPED, limit=LIMIT)
     return UNCAPPED - world.lives
 
 
 def won(row: dict, key: str, sigils: int, seed: int, hp: float, leaders: str) -> bool:
     if seed not in TRAINING:
         raise ValueError(f"seed {seed} is not a training seed")
-    world, _ = defend(LOCATIONS[key], Warden(plan=Plan.of(row)), seed=seed, sigils=sigils,
-                      planner=LEADERS[leaders], hp=hp)
+    player = Warden(plan=Plan.of(row))
+    world, _ = defend(reference_kit(LOCATIONS[key], player.draft(LOCATIONS[key], sigils), seed),
+                      player, planner=LEADERS[leaders], hardness=hp)
     return world.outcome == "victory"
 
 

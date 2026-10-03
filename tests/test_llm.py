@@ -16,7 +16,7 @@ from hellward.sim.content import MONSTERS
 from hellward.sim.model import World
 from hellward.sim.players.adaptive import Adaptive
 from hellward.sim.players.ghost import Ghost
-from hellward.sim.players.hands import defend
+from hellward.sim.players.hands import defend, reference_kit
 
 
 def campaign_at(data: Path, profile: str = "llm") -> Campaign:
@@ -228,8 +228,10 @@ def test_a_logged_defence_replays_identically() -> None:
     def watch(world: World) -> None:
         replayed.extend(protocol.event(world, e) for e in world.events)
 
-    world, _ = defend(LOCATIONS["tristram"], Ghost(log), seed=log["seed"], sigils=0, planner=None,
-                      watch=watch)
+    ghost = Ghost(log)
+    world, _ = defend(reference_kit(LOCATIONS["tristram"], ghost.draft(LOCATIONS["tristram"], 0), log["seed"],
+                                    loadout=ghost.loadout),
+                      ghost, planner=None, watch=watch)
     assert (world.outcome, world.lives, world.time) == (log["outcome"], log["lives"], log["time"])
     assert json.loads(json.dumps(replayed)) == sent
 

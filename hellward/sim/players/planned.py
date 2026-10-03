@@ -128,7 +128,7 @@ class Planned:
     look: float = 0.0
     last_aim: float = -1e9
 
-    def skills(self, location: Location, sigils: int) -> frozenset[str]:
+    def draft(self, location: Location, sigils: int) -> frozenset[str]:
         if self.plan is None:
             self.plan = check(location)
         return self.plan.learn(sigils, ORDER.index(location.key))

@@ -375,7 +375,7 @@ class Warden:
         learned = draft_skills(location, sigils)
         return Plan(learned, draft_build(location, learned))
 
-    def skills(self, location: Location, sigils: int) -> frozenset[str]:
+    def draft(self, location: Location, sigils: int) -> frozenset[str]:
         plan = self.choose(location, sigils)
         learned = kept(plan.skills, sigils, ORDER.index(location.key))
         self.chosen = plan if learned == plan.skills else Plan(learned, plan.steps, plan.early, plan.map)

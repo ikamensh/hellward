@@ -14,7 +14,7 @@ from hellward.sim.campaign import LOCATIONS
 from hellward.sim.content import WAVE_BREAK
 from hellward.sim.model import SIM_DT, Refused, World
 from hellward.sim.players.ghost import Ghost
-from hellward.sim.players.hands import Hands, defend, react_for
+from hellward.sim.players.hands import Hands, defend, react_for, reference_kit
 from hellward.sim.skills import perks
 
 
@@ -27,7 +27,7 @@ class Recorder:
         self.commands: list = []
         self.tiles: list[tuple[int, int]] | None = None
 
-    def skills(self, location, sigils):
+    def draft(self, location, sigils):
         return frozenset()
 
     def act(self, hands):
@@ -53,11 +53,15 @@ class Recorder:
 
 def test_a_ghost_replays_a_logged_tristram_defence_the_same_way():
     recorder = Recorder()
-    original, _ = defend(LOCATIONS["tristram"], recorder, seed=1, sigils=0, planner=planner.smart)
+    original, _ = defend(reference_kit(LOCATIONS["tristram"], recorder.draft(LOCATIONS["tristram"], 0), 1),
+                         recorder, planner=planner.smart)
     log = {"version": 2, "location": "tristram", "seed": 1, "skills": [], "loadout": [],
            "outcome": original.outcome, "lives": original.lives, "time": original.time,
            "commands": recorder.commands}
-    replayed, _ = defend(LOCATIONS["tristram"], Ghost(log), seed=1, sigils=0, planner=planner.smart, hp=1.0)
+    ghost = Ghost(log)
+    replayed, _ = defend(reference_kit(LOCATIONS["tristram"], ghost.draft(LOCATIONS["tristram"], 0), 1,
+                                       loadout=ghost.loadout),
+                         ghost, planner=planner.smart, hardness=1.0)
     assert replayed.outcome == original.outcome
     assert replayed.lives == original.lives and replayed.time == original.time
 
@@ -86,6 +90,6 @@ def test_a_ghost_learns_its_logs_skills_or_says_they_cost_too_much():
     log = {"version": 2, "location": "tristram", "seed": 1, "skills": ["adept_arrow"], "loadout": [],
            "outcome": "victory", "lives": 20, "time": 0.0, "commands": []}
     ghost = Ghost(log)
-    assert ghost.skills(LOCATIONS["tristram"], 3) == frozenset({"adept_arrow"})
+    assert ghost.draft(LOCATIONS["tristram"], 3) == frozenset({"adept_arrow"})
     with pytest.raises(ValueError):
-        ghost.skills(LOCATIONS["tristram"], 0)
+        ghost.draft(LOCATIONS["tristram"], 0)
