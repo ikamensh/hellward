@@ -70,19 +70,26 @@ STORIES: dict[str, Story] = {s.key: s for s in (
     Story("tristram/before", 1, _page(
         "tristram-before",
         "A village burning at night; small red-skinned Fallen demons pour out of cellar doors with knives and torches. "
-        "In the foreground, seen from behind at the village well, the keeper holds up the lantern.",
-        "The lamp guttered at midnight, and now Tristram burns. The Fallen come up through the cellars with knives and "
-        "torches, and behind them walk the village dead, still in their Sunday clothes.",
-        "Akara finds you at the well. \"The old towers answer whoever keeps the lamp,\" she says. \"Keep it tonight. "
-        "Ask me your questions at dawn.\"",
+        "In the foreground at the village well stand TWO figures side by side: the keeper, seen from behind, holding "
+        "up the lantern, and beside them Akara, a robed priestess holding a lit candle. Behind the demons walk the "
+        "village dead, gaunt humans still in their Sunday clothes.",
+        "The lamp guttered at midnight, and now Tristram burns. Below, the door had begun to open. The Fallen come up "
+        "through the cellars with knives and "
+        "torches, red southern knives among them, drawn by a shaman's singing, and behind them walk the village dead, "
+        "still in their Sunday clothes.",
+        "Akara, a priestess, finds you at the well. From her candle she lights your lantern — one flame of the lamp's own. "
+        "\"The old towers answer whoever keeps the lamp,\" she says. \"Wake what sleeps, and raise where nothing sleeps. "
+        "Keep it tonight, and keeping will feed it. It will show you a true dream. Ask me your questions at dawn.\"",
         refs=("you",))),
     Story("tristram/after", 1, _page(
         "tristram-after",
         "Grey dawn over the ashes of the village; in the upper middle of the frame, a hand holds up a small finger bone "
         "carved with the cathedral's seal.",
-        "Dawn came grey over the ashes. Among the dead shaman's charms lay a finger bone, carved with the cathedral's "
-        "seal. It was a priest's gift.",
-        "The Fallen had not come on their own. Someone had sent them up from the churchyard.",
+        "Dawn came grey over the ashes. Akara turned the dead shaman's charms over, one by one, and held up a finger "
+        "bone carved with the cathedral's seal. \"Dawn, keeper,\" she said. \"Here is your answer. It was a priest's "
+        "gift.\"",
+        "The Fallen had not climbed on their own, and the dead had not walked. Someone had sent them up — through the "
+        "cellars, out of the churchyard.",
         refs=("seal",))),
     Story("graveyard/before", 1, _page(
         "graveyard-before",
@@ -90,6 +97,8 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "the headstones stands the Bone Priest, still, watching; hooded acolytes raise their hands over the graves.",
         "The churchyard gate stands open and every grave is empty. The Bone Priest stands among the stones while his "
         "acolytes call the buried by name. He christened most of them. He buried all of them.",
+        "Last night you dreamed the nave: a torn carpet, dark arches, the lamp high above.",
+        "One crypt is still sealed. Its gold is yours if you break the seal — and whatever walks out with it.",
         refs=("priest",))),
     Story("graveyard/after", 1, _page(
         "graveyard-after",
@@ -104,15 +113,15 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "cathedral-before",
         "A gothic nave: a torn red carpet down the aisle, horned goatmen kneeling in the pews, a Blood Witch in red "
         "singing from the pulpit; high above, the red lamp.",
-        "The nave is as you dreamed it: the torn carpet, the three arches, the lamp high above. But the goatmen have "
+        "The nave is as you dreamed it: the torn carpet, the arches, the lamp high above. But the goatmen have "
         "come down from the hills to kneel in the pews, and a Blood Witch sings vespers from the pulpit.",
         "The priest has invited guests.",
         refs=("lamp",))),
     Story("cathedral/after", 1, _page(
         "cathedral-after",
         "Behind a stone altar, a narrow stair goes down into darkness; on its first step, a guttering candle stub.",
-        "The lamp still burned. Beneath the altar a stair you had never seen went down into cold air, and on its first "
-        "step stood a candle stub, still warm.",
+        "The lamp still burned. Beneath the altar a stair you had never seen went down into cold air, and on the altar "
+        "above it stood a candle stub, still burning.",
         "He had gone down ahead of you, unhurried, the way a priest goes down to a funeral.")),
     Story("catacombs/before", 1, _page(
         "catacombs-before",
@@ -120,50 +129,54 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "Overlord breaks through a barred door.",
         "Under the cathedral lie nine hundred years of the faithful, stacked to the ceiling. Tonight they are "
         "unstacking themselves.",
-        "The Overlords came up from somewhere deeper. The priest opened the old doors for them, and taught them to "
-        "break the new ones.",
+        "The Overlords came up from the deep below, nearer the door. The priest unbarred the old crypt doors for them, "
+        "and taught them to break the new ones.",
         refs=())),
     Story("catacombs/after", 1, _page(
         "catacombs-after",
-        "A bare stone cell with a cot and a cold lamp; on the floor, violet-glowing bones laid end to end as a long "
-        "winding path, and its last stretch bare stone.",
-        "In the deepest ossuary you found his cell: a cot, a cold lamp, and his bones, laid out on the floor as a "
-        "winding path through every room you have fought in.",
+        "A bare stone cell with a cot and a cold black lamp, long unlit; on the floor, violet-glowing bones laid end to "
+        "end as a long winding path, and its last stretch bare stone. No other light.",
+        "In the deepest ossuary you found his cell: a cot, a cold lamp, and a set of bones, laid out on the floor "
+        "as a winding path through every room you have fought in.",
         "Its last stretch was bare. It led to the door.")),
     Story("caves/before", 1, _page(
         "caves-before",
         "A vast cavern lit red from below by a lava lake; stone gargoyles hang from the vault like bats; at the edge "
         "of the light, Akara turns back with her candle.",
-        "The catacombs open onto a cavern lit from below. Lava crawls across its floor, and gargoyles hang in the "
+        "The catacombs open onto a cavern lit from below. Lava crawls across its floor, and gargoyles roost in the "
         "vault, waiting for the heat to lift them.",
-        "Akara will go no further. \"Someone must keep the lamp while you are below,\" she says. \"Past the lava is "
-        "the door the saints built on, and he is waiting at it.\"",
+        "Akara will go no further. \"The keeping is yours tonight, but someone must mind the lamp while you are below,\" "
+        "she says. \"Past the lava is the door the saints built on, and he is waiting at it.\"",
         refs=("akara",))),
     Story("caves/after", 1, _page(
         "caves-after",
         "Steps cut into black rock at the edge of a lava flow, each step worn into a deep hollow by feet; red light "
-        "from below.",
+        "from below; a hooded skeletal figure waits on the steps, a dull crown gleaming on his brow.",
         "At the lava's edge the rock had been cut into steps, and the steps were worn into hollows by one pair of "
         "feet.",
         "Every night for nine hundred years the keeper came down here and cast his bones before the door, and every "
-        "night they showed the lamp going out. Somewhere in those years he stopped keeping it, and began to wait.")),
+        "night they showed the lamp going out. Somewhere in those years he stopped keeping it, and died of it — but "
+        "the keeping would not let him go. The lamp burned on without him, on all those years of keeping. He "
+        "crowned himself, and began to wait — as if he waited on these steps still.")),
     Story("hells_gate/before", 1, _page(
         "hells_gate-before",
-        "A colossal door in the rock, open a hand's width, hellfire blazing through the gap with a vast horned shape "
-        "inside the fire; at the threshold, the Bone Priest turns toward the viewer.",
-        "The door the saints built on stands open a hand's width. Through the gap you see fire, and the shape of "
+        "A colossal door in the rock, firmly shut except for one door-leaf ajar; hellfire blazing through the gap "
+        "with a vast horned shape filling it; at the threshold, the Bone Priest turns toward the viewer.",
+        "The door the saints built on stands ajar. Through the gap you see fire, and the shape of "
         "Azazel the Flayer.",
-        "The Bone Priest waits at the threshold. \"Nine hundred years I kept your saints' lamp,\" he says. \"Tonight "
-        "I let it go out.\"",
+        "The Bone Priest waits at the threshold, crowned, and turns to face you. \"Nine hundred years I kept your "
+        "saints' lamp,\" he says. \"I promised him this hour, as a master promises a hound. Tonight I let it go "
+        "out. I cannot lay it down — so I will put it out.\"",
         refs=("priest",))),
     Story("act1/end", 1, (
         Page("act1-end-1",
              "The Bone Priest kneels on a threshold casting violet-glowing bones onto the stone, again and again; "
              "behind him, out of focus, a colossal door shut.",
-             ("Azazel fell in the doorway, and the door swung shut on him.",
+             ("Azazel fell in the doorway, and the door swung shut on him — a hand's width from the night he wanted.",
               "The Bone Priest cast his bones on the threshold, again and again. They showed him every stone, every "
               "tower, every demon, as they always had. They had never once shown him you.",
-              "He stepped back from the door, into the dark, and went east. Above you, the lamp of Tristram burned."),
+              "His own door shut against him; he stepped back into the dark and went east. Above you, the lamp of "
+             "Tristram burned."),
              ("priest",)),
         Page("act1-end-2",
              "The same stained-glass window: the saints now light many small red lamps from one great golden flame "
@@ -175,27 +188,35 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         Page("act1-end-3",
              "A night harbour; far out, a ship with black sails leaves under the moon. On the quay, seen from behind, "
              "the keeper holds up the lantern, and Akara stands beside him with her candle.",
-             ("A ship left the coast last night with one passenger and no crew, sailing east.",
-              "\"Go,\" said Akara. \"I will keep this one. Take its flame, and the old towers will know you.\" You lit "
-              "your lantern from the lamp of Tristram, and went down to the sea."),
+             ("A ship with black sails left the coast last night with one passenger and no crew, sailing east.",
+              "\"Go,\" said Akara. \"I will keep this one. Take its flame, and the old towers will know you — Kurast is "
+              "old temple ground, and the saints' works sleep there too.\" You held the lantern to the lamp until its "
+              "flame stood straight, and went down to the sea to find a boat. The crossing took six nights."),
              ("you", "akara")),
     )),
     # -- Act II, The Drowned Temples ----------------------------------------------------------------
     Story("docks/before", 2, _page(
         "docks-before",
-        "On a harbour wall stands the necromancer, looking down at the viewer; behind him a swamp city of gold roofs and "
-        "rotting wooden piers rises in tiers.",
+        "On a harbour wall stands the necromancer, looking down at the viewer, his armour grown from the skeleton "
+        "itself: a ribcage cuirass, spine-ridge pauldrons, skull motifs at shoulder and knee, matte yellowed bone, "
+        "nothing plate-like anywhere; on the far piers behind him, tiny distant wingless red Flayers with knives "
+        "wait on foot; a swamp city of gold "
+        "roofs and rotting wooden piers rises in tiers.",
         "Kurast rises out of the swamp in tiers of gold and rotting wood. The harbour is empty of pilgrims. Along the "
-        "piers the Flayers are waiting, and their shaman is already singing.",
+        "piers the Flayers are waiting, lordless since Azazel fell, and their shaman is already singing. Zealots hold the far end of the piers, and the drowned walk out of the low tide.",
         "A pale man in bone armour watches you land. \"I am a priest of Rathma,\" he says. \"Your enemy stole our "
-        "art. Let me lend it back to you.\"",
+        "art. Let me lend it back to you as the Bone Altar.\"",
+        "The Bone Priest's acolytes run ahead of every host, carrying his words.",
         refs=("necromancer",))),
     Story("docks/after", 2, _page(
         "docks-after",
-        "The necromancer kneels on a wet pier among small dead jungle fiends, closing their eyes with two fingers.",
-        "The shaman's song stopped. The necromancer knelt among the Flayers and closed their eyes. \"He raised them "
-        "twice,\" he said. \"Each time, fewer of them came back.",
-        "\"He is not raising an army. He is spending one.\"",
+        "The necromancer kneels on a wet pier among small dead jungle fiends, closing their eyes with two fingers, "
+        "wearing ribcage bone armour with skull motifs, matte yellowed bone, nothing plate-like.",
+        "The shaman's song stopped. The necromancer knelt among the Flayers and closed their eyes. \"Twice his shaman "
+        "raised them on the priest's stolen art,\" he said. \"Each time, fewer of them came back.\"",
+        "\"He is not raising the dead. He is spending them.\"",
+        "\"And his bones will never show him you. They show all that is settled — every stone, every tower, every "
+        "demon. They cannot show the light itself — unless the light chooses to be shown.\"",
         refs=("necromancer",))),
     Story("spider_forest/before", 2, _page(
         "spider_forest-before",
@@ -212,23 +233,25 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "water.",
         "The grove held. Where the spiders fell, the oaks were already putting down roots.",
         "The eldest druid pointed east, to where the jungle turns to black water. \"He passed here three nights ago. "
-        "The trees did not like him.\"",
+        "The oaks remember the lamps being lit — and they do not like him.\"",
+        "Already the druid's folk were pressing oil from fallen oak. \"For the lamp that gutters,\" he said.",
         refs=("druid",))),
     Story("jungle/before", 2, _page(
         "jungle-before",
         "A jungle path under green gloom; zealots in white and gold march in file; an inquisitor raises a hand, and a "
         "violet rune circle burns on the ground ahead of him.",
-        "The jungle closes over the path. Zealots of the fallen church march through it in white and gold, and their "
-        "inquisitors curse without a word of prayer.",
-        "There will be no chant to warn you. When the ground burns violet under your towers, it is already too late "
-        "to strike first. Keep your wards ready.",
+        "The jungle closes over the path. Zealots of the fallen Zakarum church march through it in white and gold, and "
+        "their inquisitors curse without a word of prayer. They sang the old hymns as they marched, to words you did "
+        "not know.",
+        "There will be no chant to warn you — only the mark on the ground, long before the curse falls.",
         refs=())),
     Story("jungle/after", 2, _page(
         "jungle-after",
         "A gloved hand holds a folded letter; its wax seal, stamped with the cathedral's seal, is broken.",
         "Among the inquisitors' dead you found the seal of the High Council, and a letter in the Bone Priest's hand: "
         "Your lamp gutters, as mine did. Let me keep it for you.",
-        "The Council let him in.",
+        "The Council let him in, and gave him oil for the keeping.",
+        "The lamp had been low for years. No one in Kurast had truly kept it.",
         refs=("seal",))),
     Story("drowned_city/before", 2, _page(
         "drowned_city-before",
@@ -240,62 +263,73 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         refs=())),
     Story("drowned_city/after", 2, _page(
         "drowned_city-after",
-        "A flooded shrine; the water glows warm red; the necromancer lifts wet fingers to his lips.",
+        "A flooded shrine; the water glows warm red; the necromancer lifts wet fingers to his lips, wearing ribcage "
+        "bone armour with skull motifs at shoulder and knee, matte yellowed bone, nothing plate-like.",
         "In a flooded shrine the water was warm and red. The necromancer tasted it and spat. \"Lamp oil,\" he said. "
-        "\"The mother lamp's.",
-        "\"He is not putting it out. He is draining it, a little each night, so that no one notices until it is "
+        "\"The mother lamp's.\"",
+        "\"He is not putting it out. He is draining it, a little each night, so the city will not notice until it is "
         "dark.\"",
+        "He would go no further with you; the drowned dead were his order's business.",
         refs=("necromancer",))),
     Story("travincal/before", 2, _page(
         "travincal-before",
         "A temple terrace at night; a row of elders in gold robes stands facing the viewer, each holding a violet curse "
-        "glowing in his hand; high above them hangs the mother lamp, dim.",
+        "glowing in his hand; high above them hangs the mother lamp, dying: its glass nearly black, only a thin red "
+        "ember line still burning inside. No candles, no other light.",
         "The High Council meets on the temple terrace under the mother lamp: a row of elders in gold, and every one of "
         "them curses.",
-        "They have waited for you. The Bone Priest has told them how this night ends. He told Azazel the same.",
+        "They have waited for you. The Bone Priest has told them you come to put the lamp out. He promised Azazel "
+        "an hour, and Azazel is dust in a shut door.",
+        "The Council gave him the keeping of the lamp. But the old towers answer the flame, and his hands are empty.",
         refs=("mother_lamp",))),
     Story("travincal/after", 2, _page(
         "travincal-after",
-        "Great temple doors swinging shut on their own; through the narrowing gap, the dim mother lamp and the glint "
-        "of violet light on a gold floor.",
+        "Great temple doors nearly closed on their own, only a hand's-width gap remaining between them; through that "
+        "thin gap, the mother lamp sunk to a red ember in dark glass and the glint of violet light on a gold floor. No "
+        "candles, no other light.",
         "The last elder fell on the temple stairs. Above them the mother lamp hung dim and red, its oil almost gone. "
-        "The temple doors swung shut by themselves.",
+        "The temple doors swung nearly shut by themselves.",
         "Behind them, on the temple floor, you could hear bones being cast, again and again.",
+        "Behind you, up the temple road, the eldest druid was coming with his cask of oil.",
         refs=("mother_lamp",))),
     Story("temple/before", 2, _page(
         "temple-before",
-        "A vast golden temple interior; the mother lamp hangs dim over an altar; beneath it the Bone Priest, grown huge, "
-        "bones in his open hand, violet fire around him.",
-        "Under the mother lamp the Bone Priest waits, and for the first time he will fight you himself.",
-        "\"Ten thousand times since Tristram I have cast these bones,\" he says. \"They show me every stone of this "
-        "temple, every demon in it, every tower you will build. They have never shown me you. So I have come to "
-        "look.\"",
+        "A vast golden temple interior gone almost dark; the mother lamp hangs over the altar with its flame sunk to a "
+        "last red ember, the great glass nearly black; beneath it the Bone Priest, grown huge, bones in his open hand, "
+        "violet fire around him. No candles, no other light.",
+        "Under the mother lamp the Bone Priest waits, his new Abominations, raised on the stolen art, among the dead, and for the first time he "
+        "will fight you himself.",
+        "\"Every night since Tristram I have cast these bones,\" he says. \"They show me every stone of this "
+        "temple, every demon in it, every tower you will build. They have never shown me you. So let me look.\"",
         refs=("priest", "mother_lamp"))),
     Story("act2/end", 2, (
         Page("act2-end-1",
-             "Violet bones scattered across a gold floor; above them a ghostly vision in gold light: a shadow with a "
+             "Violet bones scattered across a grey stone floor; above them a ghostly vision in gold light: a shadow "
              "lantern standing beside a burning lamp.",
-             ("The bones fell from his hand and scattered across the gold floor, and above them, for the first time, "
-              "the vision held you: a shadow with a lantern, and the lamp still burning.",
-              "\"There you are,\" he said, and was dust."),
+             ("The bones fell from his hand and scattered across the temple floor. You lifted the lantern — and above "
+              "them, for the first time, the vision held you: a shadow with a lantern, its flame still burning.",
+              "\"There you are,\" he said, and was dust — nine hundred years, all at once."),
              ("you",), base="bones"),
         Page("act2-end-2",
              "A vast dark temple; the mother lamp hangs cold and black; the only light is the keeper's small red "
              "lantern, seen from behind.",
-             ("When he was dust, the mother lamp guttered and went out, and the temple was dark but for your "
-              "lantern.",),
+             ("The last of the oil burned out, and the mother lamp guttered and went out, and the temple was dark but "
+              "for your lantern — which burns on keeping, not oil. Across the sea, every daughter lamp went out with "
+              "her. The dark was brief; the doors barely stirred.",),
              ("you", "mother_lamp")),
         Page("act2-end-3",
              "The keeper holds the lantern up to the great lamp while the eldest druid pours oil from a wooden flask; "
              "the mother flame catches and rises gold, lighting the whole temple.",
              ("You held it up to the great lamp: Tristram's flame, lit from this one nine hundred years ago. The eldest "
-              "druid poured oil pressed from the grove's oaks, and the mother flame caught, and rose gold.",),
+              "druid poured oil from his wooden cask, pressed from the grove's oaks, and the mother flame caught, and "
+              "rose gold — and far away, every daughter lamp caught with her. The eldest druid stayed to keep it.",),
              ("you", "druid", "mother_lamp")),
         Page("act2-end-4",
              "Dawn through tall cathedral windows; the red lamp of Tristram burns straight; Akara looks up at it from "
              "below with her candle.",
-             ("Across the sea, in a cathedral built on a door to hell, Akara watched a small red flame stand straight "
-              "again.",
+             ("Across the sea, in a cathedral built on a door to hell, the small red flame caught with its mother, "
+              "and stood straight.",
+              "Beside it, Akara's candle burned on — it had burned through the dark on keeping alone.",
               "Keep it burning."),
              ("akara", "lamp")),
     )),
