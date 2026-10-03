@@ -19,11 +19,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from hellward.run import Drawn
+from hellward.run import describe as describe_goal
+from hellward.run import make as make_goal
 from hellward.server import protocol
+from hellward.sim import tuning
 from hellward.sim.balance import BALANCE
+from hellward.sim.bonus import draw as draw_pack
 from hellward.sim.campaign import ORDER, Location, first_offering, offers
 from hellward.sim.content import SPELLS
 from hellward.sim.items import EMPTY_LOADOUT, Loadout
+from hellward.sim.kit import Kit
 from hellward.sim.model import SIM_DT, Planner, Refused, World
 from hellward.sim.players.hands import AIM_GAP, REACT, Hands, Player, react_for
 from hellward.sim.skills import perks
@@ -35,16 +41,24 @@ class Battle:
     def __init__(self, location: Location, *, learned: frozenset[str] = frozenset(), loadout: Loadout = EMPTY_LOADOUT,
                  seed: int = 0, planner: Planner | None, player: Player | None = None,
                  breach_claim: str | None = None, replays: Path | None = None,
-                 on_outcome: Callable[[World], dict] | None = None) -> None:
+                 on_outcome: Callable[[World], dict] | None = None, kit: Kit | None = None,
+                 run_seed: int | None = None, run_index: int | None = None,
+                 drawn: tuple[Drawn, ...] = (), on_save: Callable[[], None] | None = None) -> None:
+        if kit is not None:   # a run's defence: the Kit deals everything, down to the pool as its lives
+            location, learned, loadout, seed = kit.location, kit.learned, kit.loadout, kit.seed
         self.location = location
+        self.kit = kit
         self.player = player
         if player is not None:
             learned = player.draft(location, 3 * ORDER.index(location.key))
             loadout = getattr(player, "loadout", EMPTY_LOADOUT)
         self.learned = learned
         self.seed = seed
-        self.world = World(location, perks=perks(learned, ORDER.index(location.key)), seed=seed, planner=planner,
-                           loadout=loadout)
+        if kit is not None:
+            self.world = kit.world(planner=planner)
+        else:
+            self.world = World(location, perks=perks(learned, ORDER.index(location.key)), seed=seed, planner=planner,
+                               loadout=loadout)
         if player is not None:
             self.hands = Hands(self.world, react_for(seed, getattr(player, "reaction", REACT)),
                                getattr(player, "aim_gap", AIM_GAP))
@@ -58,6 +72,19 @@ class Battle:
         self.paused = False
         self.steps = 0
         self.commands: list[list] = []      # the person's accepted orders, [time, name, args...]
+        self.run_seed, self.run_index = run_seed, run_index
+        self.repeats = 0                    # bonus waves summoned: the draw counts them down in price
+        self.drawn = drawn
+        self.folds = [make_goal(goal) for goal in drawn]
+        if kit is not None:
+            for fold in self.folds:
+                fold.start(kit)
+        self.all_events: list[tuple] = []   # every event, for the run's settling at the outcome
+        self.log: dict = {"commands": self.commands, "decisions": {}, "marks": []}
+        self.on_save = on_save
+        self._dirty = False                 # the log grew since the last save
+        self._warnings: list[str] = []
+        self._second = -1
 
     def start(self) -> dict:
         message = protocol.battle_start(self.world, demo=self.player is not None and self.on_outcome is None,
@@ -66,6 +93,11 @@ class Battle:
         message["salvage_sale_gold"] = BALANCE.salvage_sale_gold()
         message["breach_cash"] = BALANCE.breach_cache()
         message["skills"] = sorted(self.learned)
+        message["run"] = self.kit is not None
+        message["boss_strike_lives"] = tuning.integer("battle.boss_strike_lives")
+        message["goals"] = [{"key": goal.key, "arg": goal.arg, "line": describe_goal(goal),
+                             "verdict": fold.verdict()}
+                            for goal, fold in zip(self.drawn, self.folds)]
         return message
 
     # -- The clock ------------------------------------------------------------------------------
@@ -87,12 +119,49 @@ class Battle:
     def _flush(self, dt: float) -> dict:
         world = self.world
         self.hands.observe(world.events, dt=dt)
-        message = protocol.frame(world, self.steps, world.events)
-        world.events.clear()
+        if self.kit is not None:
+            self.all_events.extend(world.events)
+            if int(world.time) > self._second:   # a step mark at least once a second, for the resume
+                self._second = int(world.time)
+                world.events.append(("step", round(world.time, 3)))
+                self.all_events.append(world.events[-1])
+                self.log["marks"].append(round(world.time, 3))
+                self._dirty = True
+            for e in world.events:
+                if e[0] == "plan":
+                    by_leader = self.log["decisions"].setdefault(e[1], [])
+                    cast = e[2].cast
+                    by_leader.append({"cast": None if cast is None else [cast.curse.value, list(cast.spot)],
+                                      "retry": e[2].retry})
+                    self._dirty = True
+                elif e[0] == "wave":
+                    self._dirty = True   # the save is written at every wave's start
+            synth: list[tuple] = []
+            for goal, fold in zip(self.drawn, self.folds):
+                before = fold.verdict()
+                for e in world.events:
+                    fold.observe(e)
+                if fold.verdict() != before:
+                    synth.append(("goal", goal.key, fold.verdict()))
+            world.events.extend(synth)
+            self.all_events.extend(synth)
+            message = protocol.frame(world, self.steps, world.events)
+            world.events.clear()
+        else:
+            message = protocol.frame(world, self.steps, world.events)
+            world.events.clear()
+        if self._warnings:
+            message["warnings"] = self._warnings
+            self._warnings = []
         if world.outcome is not None and self.result is None:
+            if self.kit is not None:
+                world.events = self.all_events   # the settling replays the whole defence
             self.result = self.on_outcome(world) if self.on_outcome is not None else {}
             self._write_replay()
             message["result"] = self.result
+        elif self._dirty and self.on_save is not None:
+            self.on_save()
+            self._dirty = False
         return message
 
     # -- Orders ---------------------------------------------------------------------------------
@@ -106,12 +175,16 @@ class Battle:
         handler = getattr(self, f"_{name}", None)
         if handler is None or name.startswith("_"):
             raise ValueError(f"unknown battle order {name!r}")
+        self._warnings = [warned for fold in self.folds
+                          if (warned := fold.warn(name, args)) is not None]
         try:
             logged = handler(**args)
         except Refused as refusal:
+            self._warnings = []
             return str(refusal), None
         if logged is not None:
             self.commands.append([self.world.time, name, *logged])
+            self._dirty = True   # every accepted order joins the resume's log
         return None, self._flush(0.0)
 
     def _tower(self, tower: int):
@@ -191,6 +264,16 @@ class Battle:
     def _pause(self, paused: bool) -> None:
         self.paused = bool(paused)
         return None
+
+    def _summon(self, stake: int) -> list:
+        """Wager the stake's bonus wave: a run's bet, drawn from its seed."""
+        if self.kit is None or self.run_seed is None or self.run_index is None:
+            raise Refused("Bonus waves are a run's wager.")
+        pack = draw_pack(self.location, int(stake), self.run_seed, self.run_index, self.repeats,
+                         self.world.wave)
+        self.world.summon(pack)
+        self.repeats += 1
+        return [int(stake)]
 
     def _ready(self, key: str) -> None:
         """An aimed spell is cast in the fight's own time, and only where it is offered; the world refuses the rest

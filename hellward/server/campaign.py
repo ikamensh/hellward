@@ -11,10 +11,14 @@ from __future__ import annotations
 
 import random
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
-from hellward.run import LIFE, Run, camp, describe, from_json, start, to_json
+from hellward.run import LIFE, MET, Run, camp, describe, from_json, kit, observe_world, start, to_json
+from hellward.run import finish as settle
 from hellward.run import learn as learn_skill
+from hellward.run import bonus_preview
 from hellward.run import unlearn as unlearn_skill
+from hellward.sim.bonus import draw as draw_pack
 from hellward.server.battle import Battle
 from hellward.server.progress import Progress, campaign_profiles, slot_for_profile, slot_for_run
 from hellward.server.protocol import HITLESS
@@ -460,8 +464,25 @@ class Campaign:
 
     def defend(self, location: str, player: str | None = None) -> Battle:
         """The profile's defence of a location: its result goes into the campaign. A named scripted player may defend
-        it in the person's place (a playtest's shortcut, and the tests' way to win honestly)."""
+        it in the person's place (a playtest's shortcut, and the tests' way to win honestly). In a run, the run's
+        location is defended from the run's Kit, and only it."""
         loc = self._location(location)
+        if self.run is not None:
+            run = self.run
+            if self.battle is not None:
+                raise Refusal("Finish the defence first.")
+            if run.lost or run.won:
+                raise Refusal("This run is over. Abandon it and start another.")
+            if loc.key != run.location.key:
+                raise Refusal(f"The run is at {run.location.called}.")
+            dealt = kit(run)
+            self.battle = Battle(loc, seed=dealt.seed, planner=self.planner,
+                                 player=PLAYERS[player](dealt.seed) if player is not None else None,
+                                 replays=self.data / "replays", on_outcome=self._keep_run, kit=dealt,
+                                 run_seed=run.seed, run_index=run.index, drawn=run.drawn,
+                                 on_save=self._save_battle)
+            self._save_battle()
+            return self.battle
         if not self.progress.opened(loc):
             raise Refusal(f"The way to {loc.called} is not open yet.")
         p = self.progress
@@ -470,6 +491,27 @@ class Campaign:
                              breach_claim=p.breach_claims.get(loc.key), replays=self.data / "replays",
                              on_outcome=self._keep)
         return self.battle
+
+    def _save_battle(self) -> None:
+        """The run save mid-defence: the Run, the defence's Kit, and the log so far."""
+        assert self.run is not None and self.battle is not None and self.battle.kit is not None
+        self.saves.save(slot_for_run(self.progress.profile),
+                        {"run": to_json(self.run), "kit": self.battle.kit.to_json(), "log": self.battle.log},
+                        "Run", summary={"at": self.run.location.key, "pool": self.run.pool})
+
+    def summon_preview(self) -> dict:
+        """Every stake's bonus wave on the table now: its pack, its wager, and what a clean clear pays."""
+        if self.run is None or self.battle is None or self.battle.kit is None:
+            raise Refusal("Bonus waves are a run's wager, wagered in a fight.")
+        battle = self.battle
+        assert battle.run_seed is not None and battle.run_index is not None
+        stakes = []
+        for stake in (1, 2, 3):
+            pack = draw_pack(battle.location, stake, battle.run_seed, battle.run_index, battle.repeats,
+                             battle.world.wave)
+            stakes.append({"stake": stake, "words": bonus_preview(pack), "wager": pack.wager,
+                           "profit": pack.profit, "lives": pack.lives, "fail": pack.fail})
+        return {"stakes": stakes, "repeats": battle.repeats}
 
     def demo(self, location: str | None = None, player: str | None = None, replay: dict | None = None) -> Battle:
         """The title's "Watch the leaders at work": the strongest scripted player defends (the Cathedral unless told
@@ -523,14 +565,68 @@ class Campaign:
                 "location": loc.name, "lines": lines, "earned": earned, "gained": reward.sigils, "note": note,
                 "extra": extra}
 
+    def _keep_run(self, world: World) -> dict:
+        """The moment a run's defence is decided: settle it into the run, keep what the profile keeps, and say
+        how it went. A loss ends the run and banks its salvage; a win at the last location wins it."""
+        assert self.run is not None and self.battle is not None and self.battle.kit is not None
+        run = self.run
+        result = observe_world(self.battle.kit, world, run.drawn)
+        level = run.level
+        run = settle(run, result)
+        loc = world.location
+        if result.won:
+            reward = self.progress.record_run(loc.key, result.lives_lost, world.breach_mode,
+                                              world.breach_cleared)
+        else:
+            reward = None
+            self.progress.runs_lost += 1
+            self.progress.salvage += run.salvage
+            run = replace(run, salvage=0)
+            self.progress.save()
+        if run.won:
+            self.progress.runs_won += 1
+            self.progress.salvage += run.salvage
+            run = replace(run, salvage=0)
+            self.progress.save()
+        self.run = run
+        self._save_run()
+        record = run.records[-1]
+        met = [describe(goal) for goal, verdict in record.goals if verdict == MET]
+        missed = [describe(goal) for goal, verdict in record.goals if verdict != MET]
+        lines = [f"Waves withstood: {world.wave + (1 if result.won else 0)} of {len(world.waves)}",
+                 f"Monsters slain: {world.kills}",
+                 f"Pool left: {run.pool} of {LIFE}",
+                 f"Curses the leaders laid on your towers: {world.curses_landed}."]
+        if result.won:
+            assert reward is not None
+            note = (f"{record.sigils} sigils: {record.lives_sigils} for the lives kept"
+                    f"{f', {len(met)} for the goals met' if met else ''}.")
+            if level != run.level:
+                note += f" Level {run.level}: {run.level - level} points for the camp."
+        else:
+            note = "The run ends here. Its salvage stays in your purse."
+        extra = []
+        if result.won and reward is not None and reward.trophy:
+            assert world.breach_spec is not None
+            extra.append(["unique", f"The {world.breach_spec.name} trophy is yours. Rare patterns need trophies."])
+        self.last = {"location": loc.key, "outcome": world.outcome, "run": True}
+        return {"won": result.won, "title": "The Sanctuary Holds" if result.won else "The Sanctuary Has Fallen",
+                "location": loc.name, "lines": lines, "earned": record.sigils, "gained": record.sigils,
+                "note": note, "extra": extra, "met": met, "missed": missed, "run": self.run_view()}
+
     def leave(self, again: bool) -> dict:
         """Leaving the reckoning by either button: after a victory the act ending (at the last location) or the
         location's after page plays first when unseen, then the button's way: ``intro`` (the location again),
-        ``map``, or ``act2`` (Act II's map, its lantern walking to the Docks)."""
+        ``map``, or ``act2`` (Act II's map, its lantern walking to the Docks). A run's reckoning leads to the
+        ``camp``, or to the ``summary`` when the run ended."""
         last = self.last
         self.battle = None
         if last is None:
             return {"story": None, "then": "map"}
+        if last.get("run"):
+            assert self.run is not None
+            then = "camp" if last["outcome"] == "victory" and not self.run.won else "summary"
+            return {"story": None, "then": then, "location": last["location"], "run": self.run_view()}
         loc = LOCATIONS[last["location"]]
         then = "intro" if again else "map"
         if last["outcome"] == "victory":

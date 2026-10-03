@@ -19,6 +19,7 @@ from hellward.sim.balance import BALANCE
 from hellward.sim.campaign import Location
 from hellward.sim.content import CURSES, MONSTERS, SELL_REFUND, SPELLS, TOWERS, MonsterKind, felt_hit
 from hellward.sim.model import SIM_DT, Bolt, Monster, Tower, World
+from hellward.sim.xp import xp_next
 from hellward.sim import worth
 
 # monster flags, one bit each
@@ -104,6 +105,7 @@ def state(world: World) -> dict:
                   "failed": world.breach_failed, "cleared": world.breach_cleared}
     return {
         "gold": world.gold, "lives": world.lives, "mana": round(world.mana, 3), "mana_max": world.mana_max,
+        "xp": round(world.xp, 1), "xp_level": world.xp_level, "xp_next": xp_next(world.xp_level),
         "wave": world.wave, "waves": len(world.waves),
         "break_left": None if world.break_left is None else round(world.break_left, 3),
         "can_call": world.can_call_wave, "early_bonus": world.early_call_bonus,

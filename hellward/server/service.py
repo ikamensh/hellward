@@ -11,7 +11,8 @@ campaign side      ``profiles``, ``create_profile`` (name), ``switch_profile`` (
                    ``forge_view``, ``forge`` (key)
 a run            ``start_run`` (seed?), ``run``, ``camp``, ``abandon``
 battles            ``defend`` (location) and ``demo`` (location?) answer with the battle's start;
-                   ``order`` (name, ...); ``advance`` (steps); ``abandon``; ``leave`` (again) after the reckoning
+                   ``order`` (name, ...); ``advance`` (steps); ``abandon``; ``leave`` (again) after the reckoning;
+                   in a run, the ``summon`` order (stake) and ``summon_preview``
 =================  ==============================================================================
 """
 
@@ -23,7 +24,8 @@ from hellward.server.battle import Battle
 from hellward.server.campaign import Campaign, Refusal
 
 REQUESTS = ("profiles", "create_profile", "switch_profile", "campaign", "seen", "chronicle", "briefing", "skills",
-            "learn", "unlearn", "unlearn_all", "forge_view", "forge", "leave", "start_run", "camp", "abandon")
+            "learn", "unlearn", "unlearn_all", "forge_view", "forge", "leave", "start_run", "camp", "abandon",
+            "summon_preview")
 
 
 class Service:

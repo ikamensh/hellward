@@ -110,6 +110,108 @@ def test_the_briefing_at_the_runs_location_names_goals_worst_case_and_answers(tm
     assert elsewhere["goals"] == [] and elsewhere["worst"] is None
 
 
+def test_a_runs_defence_settles_into_the_run_through_the_wire(client):
+    client.request("start_run", seed=11)
+    started = client.request("defend", location="tristram", player="warden")
+    assert started["run"] is True and len(started["goals"]) == 3
+    assert started["state"]["lives"] == LIFE
+    result = None
+    while result is None:
+        for frame in client.advance(200):
+            result = frame.get("result", result)
+    assert result["won"] is True
+    assert set(result) >= {"met", "missed", "run"}
+    view = client.request("run")
+    assert (view["index"], view["location"]) == (1, "graveyard")
+    assert view["records"] and view["records"][0]["location"] == "tristram"
+    assert client.request("leave", again=False)["then"] == "camp"
+
+
+def test_defend_in_a_run_guards_its_location_and_its_fight(client):
+    client.request("start_run", seed=11)
+    with pytest.raises(WireRefused, match="run is at"):
+        client.request("defend", location="caves")
+    with pytest.raises(WireRefused, match="run's wager"):
+        client.request("summon_preview")
+    client.request("defend", location="tristram")
+    with pytest.raises(WireRefused, match="Finish the defence"):
+        client.request("defend", location="tristram")
+    assert len(client.request("summon_preview")["stakes"]) == 3
+    assert client.request("abandon") == {"banked": 0}
+    assert client.request("run") == {"active": False}
+
+
+def test_the_bonus_preview_names_every_stake_and_summoning_too_early_refuses(tmp_path):
+    campaign = campaign_at(tmp_path / "data")
+    campaign.start_run(seed=11)
+    battle = campaign.defend("tristram")
+    table = campaign.summon_preview()
+    assert [s["stake"] for s in table["stakes"]] == [1, 2, 3]
+    assert all(s["wager"] > 0 and s["profit"] > 0 and "Stake" in s["words"] for s in table["stakes"])
+    why, _ = battle.order("summon", {"stake": 1})
+    assert why is not None   # no break is open yet
+
+
+def test_a_lost_defence_ends_the_run_and_banks_its_salvage(tmp_path):
+    from hellward.sim.model import World
+    campaign = campaign_at(tmp_path / "data")
+    campaign.start_run(seed=11)
+    battle = campaign.defend("tristram")
+    world = battle.world
+    assert isinstance(world, World)
+    world.lives, world.outcome = 0, "defeat"
+    result = campaign._keep_run(world)
+    assert result["won"] is False and campaign.run.lost
+    assert campaign.progress.runs_lost == 1
+    assert campaign.leave(False)["then"] == "summary"
+
+
+def test_goal_events_reach_the_client_as_verdicts_change(tmp_path):
+    campaign = campaign_at(tmp_path / "data")
+    campaign.start_run(seed=11)
+    battle = campaign.defend("tristram", player="warden")
+    goals = []
+    while battle.world.outcome is None:
+        for frame in battle.advance(200):
+            goals.extend(e for e in frame["events"] if e[0] == "goal")
+    assert goals   # the warden's many towers fail the lean goal, live
+    assert battle.result is not None and "met" in battle.result
+
+
+def test_an_order_that_would_fail_a_goal_warns_first(tmp_path):
+    from dataclasses import replace as dc_replace
+
+    from hellward.run import kit as deal_kit
+    from hellward.run.goals import Drawn
+    from hellward.server.battle import Battle
+    campaign = campaign_at(tmp_path / "data")
+    campaign.start_run(seed=11)
+    assert campaign.run is not None
+    campaign.run = dc_replace(campaign.run, drawn=(Drawn("lean", "0"),))
+    dealt = deal_kit(campaign.run)
+    battle = Battle(dealt.location, planner=planner.smart, kit=dealt, run_seed=11, run_index=0,
+                    drawn=campaign.run.drawn)
+    tile = next((x, y) for y in range(dealt.location.level.height) for x in range(dealt.location.level.width)
+                if dealt.location.level.buildable(x, y))
+    why, frame = battle.order("build", {"kind": "arrow", "tile": list(tile)})
+    assert why is None
+    assert any("at most 0 towers" in w for w in frame.get("warnings", []))
+    assert ["goal", "lean", "failed"] in frame["events"]
+
+
+def test_the_save_mid_defence_holds_the_kit_and_the_log(tmp_path):
+    from hellward.server.saves import Saves
+    data = tmp_path / "data"
+    campaign = campaign_at(data)
+    campaign.start_run(seed=11)
+    battle = campaign.defend("tristram")
+    battle.advance(250)   # past the first second mark
+    saved = Saves(data / "saves").load("run")
+    assert saved is not None
+    assert saved["state"]["kit"] is not None and saved["state"]["kit"]["location"] == "tristram"
+    assert saved["state"]["log"]["marks"]
+
+
 def test_the_worst_case_counts_the_roster_and_a_bosss_strikes():
     assert worst_line(LOCATIONS["tristram"], 30).startswith("Worst case: ")
     assert "strikes at 5" in worst_line(LOCATIONS["temple"], 30)

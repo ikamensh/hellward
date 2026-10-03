@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from hellward.run import lives_sigils
 from hellward.server.saves import Saves
 from hellward.sim.breaches import BREACHES
 from hellward.sim.campaign import ACTS, LOCATIONS, ORDER, Location, sigils
@@ -63,6 +64,8 @@ class Progress:
     trophies: frozenset[str] = frozenset()   # unspent trophy IDs, each the breach location's key
     patterns: frozenset[str] = frozenset()   # forged patterns, owned permanently
     loadout: Loadout = field(default_factory=Loadout)
+    runs_won: int = 0
+    runs_lost: int = 0
     profile: str = "main"
     saves: Saves | None = field(default=None, repr=False, compare=False)
 
@@ -88,6 +91,7 @@ class Progress:
                        salvage_best=dict(state.get("salvage_best", {})), salvage=state.get("salvage", 0),
                        breach_claims=dict(state.get("breach_claims", {})),
                        trophies=frozenset(state.get("trophies", ())), patterns=owned, loadout=loadout,
+                       runs_won=state.get("runs_won", 0), runs_lost=state.get("runs_lost", 0),
                        profile=profile, saves=saves)
         check(progress.learned)
         return progress
@@ -97,7 +101,8 @@ class Progress:
             state = {"won": self.won, "learned": sorted(self.learned), "at": self.at, "seen": sorted(self.seen),
                      "salvage_best": self.salvage_best, "salvage": self.salvage,
                      "breach_claims": self.breach_claims, "trophies": sorted(self.trophies),
-                     "patterns": sorted(self.patterns), "loadout": list(self.loadout.equipped)}
+                     "patterns": sorted(self.patterns), "loadout": list(self.loadout.equipped),
+                     "runs_won": self.runs_won, "runs_lost": self.runs_lost}
             self.saves.save(slot_for_profile(self.profile), state, "Progress",
                             summary={"sigils": self.sigils, "at": self.at})
 
@@ -167,6 +172,27 @@ class Progress:
         self.at = location
         self.save()
         return RewardGain(gained, salvage_gained, trophy_gained)
+
+    def record_run(self, location: str, lives_lost: int, breach_mode: str | None,
+                   breach_cleared: bool) -> RewardGain:
+        """Keep a run defence's win: the best lives sigils there, and a first breach trophy. The run's
+        salvage stays in the run until it ends; only the profile's purse outlives it."""
+        if location not in LOCATIONS:
+            raise KeyError(location)
+        earned = lives_sigils(lives_lost)
+        gained = max(0, earned - self.best(location))
+        if gained:
+            self.won[location] = earned
+        trophy_gained = None
+        if breach_cleared and location not in self.breach_claims:
+            assert breach_mode in ("cash", "trophy")
+            self.breach_claims[location] = breach_mode
+            if breach_mode == "trophy":
+                self.trophies = self.trophies | {location}
+                trophy_gained = location
+        self.at = location
+        self.save()
+        return RewardGain(gained, 0, trophy_gained)
 
     def next_location(self, act: int) -> Location | None:
         """The first location in the given act that is open and not yet held."""
