@@ -36,6 +36,7 @@ from hellward.sim.content import (
 )
 from hellward.sim.items import EMPTY_LOADOUT, Loadout, PATTERNS
 from hellward.sim.level import Level
+from hellward.sim.modes import MODES
 from hellward.sim.relics import (
     BLOOD_GOLD,
     BLOOD_LIVES,
@@ -149,7 +150,7 @@ class Monster:
 
 class Tower:
     __slots__ = ("id", "kind", "levels", "level", "tile", "cooldown", "curses", "hymn", "spent", "spans", "spans_reach",
-                 "timer")
+                 "timer", "mode")
 
     def __init__(self, id: int, kind: TowerKind, levels: tuple[TowerLevel, ...], tile: tuple[int, int]) -> None:
         self.id = id
@@ -164,12 +165,13 @@ class Tower:
         self.spans: tuple[tuple[float, float], ...] = ()   # the path it reaches, for the reach it had last
         self.spans_reach = -1.0
         self.timer = 0.0                      # a grove's twister clock
+        self.mode = "first"                   # its strategy: foremost until taught otherwise
 
     def copy(self) -> Tower:
         t = Tower(self.id, self.kind, self.levels, self.tile)
         t.level, t.cooldown, t.curses = self.level, self.cooldown, dict(self.curses)
         t.hymn, t.spent, t.spans, t.spans_reach = self.hymn, self.spent, self.spans, self.spans_reach
-        t.timer = self.timer
+        t.timer, t.mode = self.timer, self.mode
         return t
 
     def __reduce__(self) -> tuple[Any, ...]:
@@ -1300,18 +1302,8 @@ class World:
                         if not hit:
                             hit = [m]
             else:
-                hit = []
-                for m in monsters:
-                    if single_route and m.s < near:
-                        break
-                    if m.hp > 0 and self._tower_covers(t, m, spans, reach):
-                        if not hit:
-                            hit = [m]
-                            if not (static and attack == "chain") or m.kind.leader is not None:
-                                break
-                        elif m.kind.leader is not None:   # Static Field: a leader in reach draws the first strike
-                            hit = [m]
-                            break
+                picked = self._pick(t, monsters, spans, reach, near, single_route, static, attack)
+                hit = [picked] if picked is not None else []
             if not hit:
                 t.cooldown = 0.0
                 continue
@@ -1342,6 +1334,45 @@ class World:
                             stats.leader_bonus, aura)
                 self.bolts.append(bolt)
                 self._emit("bolt", bolt)
+
+    def _pick(self, t: Tower, monsters: list[Monster], spans: tuple[tuple[float, float], ...], reach: float,
+              near: float, single_route: bool, static: bool, attack: str) -> Monster | None:
+        """The default choice of one target: foremost, unless the tower's strategy says otherwise. Ties
+        go foremost; a taught tower scans all it covers, since the answer may stand anywhere in reach."""
+        if t.mode == "first" and not (static and attack == "chain"):
+            for m in monsters:
+                if single_route and m.s < near:
+                    break
+                if m.hp > 0 and self._tower_covers(t, m, spans, reach):
+                    return m
+            return None
+        best: Monster | None = None
+        for m in monsters:
+            if m.hp <= 0 or not self._tower_covers(t, m, spans, reach):
+                continue
+            if best is None:
+                best = m
+            elif t.mode == "strong" and m.hp > best.hp:
+                best = m
+            elif t.mode == "weak" and m.hp < best.hp:
+                best = m
+            elif t.mode == "fast" and m.speed > best.speed:
+                best = m
+            elif t.mode == "last":
+                best = m   # nearest the sanctuary first: the last covered stands nearest the portal
+            elif static and attack == "chain" and m.kind.leader is not None and best.kind.leader is None:
+                best = m   # Static Field: a leader in reach draws the first strike
+        return best
+
+    def set_mode(self, tower_id: int, mode: str) -> None:
+        """Teach a tower its strategy; an unknown one is refused."""
+        if mode not in MODES:
+            raise Refused(f"No strategy {mode!r} is taught.")
+        tower = self.towers[tower_id]
+        if tower.mode == mode:
+            return
+        tower.mode = mode
+        self._emit("mode", tower.id, mode)
 
     def _hook_target(self, t: Tower, spans: tuple[tuple[float, float], ...], reach: float, near: float,
                      single_route: bool) -> Monster | None:
