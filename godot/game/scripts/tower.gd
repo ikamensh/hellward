@@ -5,8 +5,7 @@ extends Node3D
 ## shown from its muzzle. It turns to face what it last shot at.
 
 # a family without a model of its own wears another's, tinted, until it has one
-const STAND_INS := {"idol": ["frost", Color(0.75, 0.88, 1.0)],   # kind -> [model, tint], while its own is not built
-	"censer": ["pyre", Color(1.0, 0.55, 0.45)], "well": ["frost", Color(0.55, 0.75, 0.95)],
+const STAND_INS := {"well": ["frost", Color(0.55, 0.75, 0.95)],   # kind -> [model, tint], while its own is not built
 	"effigy": ["pyre", Color(0.6, 0.55, 0.7)]}
 const LOOKS := {"arrow": "arrow", "ballista": "ballista", "knife": "knife", "pyre": "fire", "frost": "frost",
 	"plague": "frost", "altar": "fire", "grove": "fire"}
