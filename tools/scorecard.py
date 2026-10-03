@@ -23,7 +23,7 @@ from hellward.sim.balance import BALANCE  # noqa: E402
 from hellward.sim.campaign import ACTS, LOCATIONS, ORDER, Location  # noqa: E402
 from hellward.sim.content import CURSES, MAX_POISON_STACKS, MONSTERS, SPELLS, START_LIVES, TOWERS, TowerKind, felt_hit  # noqa: E402
 from hellward.sim.model import ATTUNE_GOLD, World  # noqa: E402
-from hellward.sim.relics import RELICS, VERBS  # noqa: E402
+from hellward.sim.relics import DOWNSIDES, ENABLES, RELICS, VERBS, draw  # noqa: E402
 from tools.maps import (LEAST_CLUSTERED, LEAST_OCCUPIED, MOST_PRIME, REFERENCE_REACH, survey, traffic,  # noqa: E402
                         worth_map)
 
@@ -233,6 +233,29 @@ def tower_verbs() -> Result:
     value = ", ".join(tagged) + (f" (bare: {', '.join(bare)})" if bare else "")
     return Result("V4", "mechanics towers with one verb", value or "none",
                   not bare and bool(tagged))
+
+
+def relic_pool() -> list[Result]:
+    """V5: most relics read one verb and write another. V7: the pool holds forty, a quarter of
+    them open tech the run has not reached, and every one of them — the pacts with their
+    downsides loudest — arrives as the camp's offered choice, never forced (take_relic refuses
+    anything unoffered; tests/test_run_server.py holds the refusal)."""
+    converters = [key for key, spec in RELICS.items() if spec.verb in VERBS and spec.writes]
+    offered: set[str] = set()
+    for seed in range(200):
+        offered.update(draw(seed, 0, ()))
+    pacts = sorted(DOWNSIDES)
+    return [
+        Result("V5", "relics reading one verb and writing another",
+               f"{len(converters)}/{len(RELICS)}", len(converters) / len(RELICS) >= 0.6),
+        Result("V7", "the pool holds forty relics", str(len(RELICS)), len(RELICS) == 40),
+        Result("V7", "a quarter of the pool enables unreached tech",
+               f"{len(ENABLES)}/{len(RELICS)}: {', '.join(sorted(ENABLES))}",
+               set(ENABLES) <= set(RELICS) and len(ENABLES) / len(RELICS) >= 0.25),
+        Result("V7", "every relic is offered somewhere, pacts as choices",
+               f"{len(offered)}/{len(RELICS)} offered; pacts: {', '.join(pacts)}",
+               offered == set(RELICS) and all(p in offered for p in pacts)),
+    ]
 
 
 def verb_set() -> list[Result]:
@@ -470,6 +493,7 @@ def _union_length(spans: list[tuple[float, float]]) -> float:
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
     bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, hymn_seeks, tower_kinds, real_estate,
     worth_and_cells, blight_kinds, power_table, armor_duels, verb_rates, verb_costs, tower_verbs, verb_set,
+    relic_pool,
 )
 
 NOT_YET = (

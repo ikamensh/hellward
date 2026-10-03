@@ -41,13 +41,33 @@ from hellward.sim.relics import (
     BELL_MANA,
     BELLOWS_MANA,
     BELLOWS_WELL,
+    ALTARCH_GOLD,
+    ASH_GOLD,
     BLOOD_GOLD,
     BLOOD_LIVES,
+    BONECH_MANA,
+    BONECH_SHARE,
+    BREATH_MANA,
     CANTICLE_WELL,
     CHARNEL_GOLD,
     CHARNEL_SHARE,
+    GROVECH_GOLD,
     HOAR_MANA,
     HOARD_REACH,
+    HOOKCH_MANA,
+    LASTHYMN_MANA,
+    LASTHYMN_WELL,
+    OSS_GOLD,
+    PENITENT_GOLD,
+    PENITENT_WELL,
+    PLAGUECH_GOLD,
+    QUARTER_GOLD,
+    QUARTER_WELL,
+    SKY_GOLD,
+    STORMCH_GOLD,
+    WAR_GOLD,
+    WIDOW_GOLD,
+    WIDOW_LIVES,
     MARTYR_GOLD,
     MASTERWORK_MANA,
     RELICS,
@@ -593,14 +613,20 @@ class World:
     @property
     def mana_max(self) -> float:
         return (self.perks.mana_max - (CANTICLE_WELL if "canticle" in self.relics else 0.0)
-                - (BELLOWS_WELL if "bellows" in self.relics else 0.0))
+                - (BELLOWS_WELL if "bellows" in self.relics else 0.0)
+                - (PENITENT_WELL if "penitent" in self.relics else 0.0)
+                - (LASTHYMN_WELL if "last_hymn" in self.relics else 0.0)
+                - (QUARTER_WELL if "quartermaster" in self.relics else 0.0))
 
     @property
     def spells(self) -> tuple[str, ...]:
-        """The spells offered: the arsenal's unlocked, and the Canticle's Hymn where neither holds it."""
+        """The spells offered: the arsenal's unlocked, the Canticle's Hymn and the Sky Charter's
+        Meteor and Orb where neither arsenal nor skill holds them."""
         offered = tuple(k for k in self.arsenal.spells if k not in self.perks.locked)
         if "canticle" in self.relics and "hymn" not in offered:
             offered += ("hymn",)
+        if "sky_charter" in self.relics:
+            offered += tuple(k for k in ("meteor", "orb") if k not in offered)
         return offered
 
     def _fervor(self) -> float:
@@ -669,6 +695,47 @@ class World:
                 self.gold += CHARNEL_GOLD
             elif key == "hoarfrost":
                 self.mana = min(self.mana_max, self.mana + HOAR_MANA)
+            elif key == "war_tithe":
+                self.gold += WAR_GOLD
+            elif key == "quartermaster":
+                self.gold += QUARTER_GOLD
+            elif key == "ossuary":
+                self.gold += OSS_GOLD
+            elif key == "penitent":
+                self.gold += PENITENT_GOLD
+            elif key == "ash_tithe":
+                self.gold += ASH_GOLD
+            elif key == "widows_tithe":
+                self.gold += WIDOW_GOLD
+                self.lives -= WIDOW_LIVES
+            elif key == "sky_charter":
+                self.gold += SKY_GOLD
+            elif key == "storm_charter":
+                self.gold += STORMCH_GOLD
+            elif key == "plague_charter":
+                self.gold += PLAGUECH_GOLD
+            elif key == "grove_charter":
+                self.gold += GROVECH_GOLD
+            elif key == "altar_charter":
+                self.gold += ALTARCH_GOLD
+            elif key == "last_breath":
+                self.mana = min(self.mana_max, self.mana + BREATH_MANA)
+            elif key == "last_hymn":
+                self.mana = min(self.mana_max, self.mana + LASTHYMN_MANA)
+            elif key == "bone_charter":
+                self.mana = min(self.mana_max, self.mana + BONECH_MANA)
+            elif key == "hook_charter":
+                self.mana = min(self.mana_max, self.mana + HOOKCH_MANA)
+            elif key == "standard" or key == "crucible":
+                for tower in self.towers.values():
+                    if tower.attuned:
+                        tower.charges = min(CHARGES_MAX, tower.charges + 1.0)
+            elif key == "anvil" or key == "bone_tithe":
+                first = self._foremost_unattuned()
+                if first is not None:
+                    first.attuned = True
+                    first.charges = CHARGES_MAX
+                    self._emit("attuned", first.id)
             self._emit("relic", key, spec.name)
 
     def _answer(self, monster: Monster) -> None:
@@ -720,9 +787,13 @@ class World:
 
     def build(self, kind: str, tile: tuple[int, int]) -> Tower:
         tower_kind = TOWERS[kind]
-        if kind not in self.arsenal.towers:
+        chartered = (kind == "storm" and "storm_charter" in self.relics
+                     or kind in ("hook", "knife") and "hook_charter" in self.relics
+                     or kind in ("grove", "effigy") and "grove_charter" in self.relics
+                     or kind == "altar" and "altar_charter" in self.relics)
+        if kind not in self.arsenal.towers and not chartered:
             raise Refused(f"No {tower_kind.name} can be raised in {self.location.called}.")
-        if kind in self.perks.locked:
+        if kind in self.perks.locked and not chartered:
             key = UNLOCK[kind]
             assert key is not None
             raise Refused(f"The {tower_kind.name} is locked: learn {SKILLS[key].name} first.")
@@ -755,6 +826,8 @@ class World:
         """The skill that would allow the tower's next rank, or None when it may be bought (or is at its top)."""
         nxt = tower.level + 1
         if nxt >= len(tower.levels):
+            return None
+        if nxt <= 1 and "journeyman" in self.relics:
             return None
         if nxt <= self.perks.top(tower.kind.key):
             return None
@@ -823,9 +896,11 @@ class World:
         self._emit("door_built", index)
 
     def _spend(self, key: str) -> None:
-        if key not in self.arsenal.spells and not (key == "hymn" and "canticle" in self.relics):
+        charter = (key == "hymn" and "canticle" in self.relics
+                   or key in ("meteor", "orb") and "sky_charter" in self.relics)
+        if key not in self.arsenal.spells and not charter:
             raise Refused(f"{SPELLS[key].name} is not yours to cast in {self.location.called}.")
-        if key in self.perks.locked and not (key == "hymn" and "canticle" in self.relics):
+        if key in self.perks.locked and not charter:
             raise Refused(f"{SPELLS[key].name} is locked: learn {SKILLS[SPELL_UNLOCK[key]].name} first.")
         left = self.recharge.get(key, 0.0)
         if left > 0:
@@ -1666,6 +1741,18 @@ class World:
         tower.mode = mode
         self._emit("mode", tower.id, mode)
 
+    def _foremost_unattuned(self) -> Tower | None:
+        """The unattuned striker nearest the portal: the anvil's and the tithe's pick."""
+        gate = self.level.waypoints[0]
+        first, best = None, 0
+        for tower in self.towers.values():
+            if tower.attuned or tower.kind.attack not in ATTUNABLE:
+                continue
+            near = (tower.tile[0] - gate[0]) ** 2 + (tower.tile[1] - gate[1]) ** 2
+            if first is None or near < best:
+                first, best = tower, near
+        return first
+
     def attune(self, tower_id: int) -> None:
         """Attune a tower: it holds charges for empowered shots, starting full."""
         tower = self.towers[tower_id]
@@ -1888,7 +1975,8 @@ class World:
         # A monster its kind's shaman stands near rises once, unless a burst tore it apart: one killed it (bursts is
         # False), or its own death bursts (Shatter, Corpse Explosion), which leaves nothing to raise
         chilled = m.chill_left > 0 and (self.perks.shatter or "charnel" in self.relics)
-        bursting = bursts and (chilled or (self.perks.corpse_explosion and m.amplified > 0))
+        gored = m.amplified > 0 and (self.perks.corpse_explosion or "bone_charter" in self.relics)
+        bursting = bursts and (chilled or gored)
         if bursts and not bursting and not m.risen and m.kind.leader is None:
             raise_kind = m.kind.key
             for leader in self.monsters:
@@ -1927,8 +2015,8 @@ class World:
             self.mana = min(self.mana_max, self.mana + m.bounty / 5)
         if m.kind.leader is not None and self.perks.soul_harvest:
             self.mana = min(self.mana_max, self.mana + SOUL)
-        if self.perks.contagion and m.poison:
-            self._spread(m, where)
+        if m.poison and (self.perks.contagion or "plague_charter" in self.relics):
+            self._spread(m, where, one="plague_charter" in self.relics and not self.perks.contagion)
         if bursts and chilled:
             around = [o for o in self._around(where[0], where[1], SHATTER_RADIUS, flyers=True) if o is not m]
             self._emit("shatter", m.id, where)
@@ -1937,16 +2025,18 @@ class World:
             share = SHATTER_SHARE if self.perks.shatter else CHARNEL_SHARE
             for o in around:   # a death burst takes no factor and no armor; a monster it kills does not burst in turn
                 self._hurt(o, m.max_hp * share, Element.COLD, quiet=True, bursts=False)
-        if bursts and self.perks.corpse_explosion and amplified:
+        if bursts and gored:
             around = [o for o in self._around(where[0], where[1], CORPSE_RADIUS, flyers=True) if o is not m]
             self._emit("corpse_explosion", where[0], where[1])
             self._relic("corpse")
+            share = CORPSE_SHARE if self.perks.corpse_explosion else BONECH_SHARE
             for o in around:   # a monster a burst kills does not burst in turn
-                self._hurt(o, m.max_hp * CORPSE_SHARE, None, quiet=True, bursts=False)
+                self._hurt(o, m.max_hp * share, None, quiet=True, bursts=False)
         # Venom dies with its monster; overloads burst while it lives, shatters on its chill.
 
-    def _spread(self, m: Monster, where: tuple[float, float]) -> None:
-        """Contagion: a dead monster's venom goes to the nearest living monster it can poison."""
+    def _spread(self, m: Monster, where: tuple[float, float], one: bool = False) -> None:
+        """Contagion: a dead monster's venom goes to the nearest living monster it can poison;
+        the Plague Charter's share is one stack, not the whole dose."""
         best, best_d = None, CONTAGION_REACH * CONTAGION_REACH
         for o in self.monsters:
             if o is m or o.hp <= 0:
@@ -1957,7 +2047,7 @@ class World:
                 best, best_d = o, d
         if best is None:
             return
-        for dps, left in m.poison:
+        for dps, left in m.poison[:1] if one else m.poison:
             self._poison(best, dps, left)
         self._emit("contagion", m.id, best.id)
 

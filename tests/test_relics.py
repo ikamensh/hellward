@@ -4,13 +4,16 @@ import ast
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 from hellward.run import camp, finish, from_json, kit, observe_world, start, take_relic, to_json
 from hellward.sim import campaign
 from hellward.sim.campaign import LOCATIONS
-from hellward.sim.content import SPELLS, TOWERS, Group, Wave
+from hellward.sim.content import SPELLS, TOWERS, Element, Group, Wave
 from hellward.sim.level import Level
 from hellward.sim.model import Refused, World
-from hellward.sim.relics import RELICS, draw
+from hellward.sim.skills import perks
+from hellward.sim.relics import DOWNSIDES, RELICS, draw
 
 ARENA = Level("Relic field", 25, 14,
               ((0, 2), (9, 2), (9, 8), (19, 8), (19, 11), (24, 11)), ((9, 5),))
@@ -409,7 +412,7 @@ def test_relics_fire_on_counts_touch_no_random_and_show_their_counters():
 
 
 def test_downsides_come_only_with_a_chosen_relic_and_say_so():
-    downsides = {"blood_money", "canticle", "bell", "bellows"}
+    downsides = DOWNSIDES
     for key in downsides:
         words = RELICS[key].words
         assert "loses" in words or "less" in words or "costs" in words, key
@@ -429,3 +432,197 @@ def test_no_relic_firing_touches_the_random_stream():
         touched |= {kid.attr for kid in ast.walk(node) if isinstance(kid, ast.Attribute)
                     if kid.attr in ("rng", "route_rng", "Random", "choice", "randint", "sample")}
     assert not touched   # counts fire relics; the camp's offer alone is drawn, and drawn seeded
+
+
+def test_the_war_tithe_pays_for_casts():
+    world = arena(relics=("war_tithe",))
+    gold = world.gold
+    for _ in range(5):
+        world._relic("cast")
+    assert world.gold == gold
+    world._relic("cast")
+    assert world.gold == gold + 10
+
+
+def test_the_sky_anvil_attunes_the_foremost_striker():
+    world = arena(relics=("anvil",))
+    gate = world.level.waypoints[0]
+    near, far = sorted(floor(world, 6), key=lambda t: (t[0] - gate[0]) ** 2 + (t[1] - gate[1]) ** 2)[:2]
+    first = world.build("arrow", near)
+    second = world.build("arrow", far)
+    for _ in range(7):
+        world._relic("cast")
+    assert world.towers[first.id].attuned
+    assert not world.towers[second.id].attuned
+
+
+def test_the_quartermaster_pays_for_charges():
+    world = arena(relics=("quartermaster",))
+    assert arena().mana_max - world.mana_max == 5.0
+    gold = world.gold
+    for _ in range(4):
+        world._relic("charge")
+    assert world.gold == gold + 8
+
+
+def test_the_bone_tithe_attunes_for_corpses():
+    world = arena(relics=("bone_tithe",))
+    tower = world.build("arrow", floor(world, 1)[0])
+    for _ in range(6):
+        world._relic("corpse")
+    assert world.towers[tower.id].attuned
+    assert world.towers[tower.id].charges == 3.0
+
+
+def test_the_last_breath_wells_mana_for_corpses():
+    world = arena(relics=("last_breath",))
+    world.mana = 0.0
+    for _ in range(6):
+        world._relic("corpse")
+    assert world.mana == 8.0
+
+
+def test_the_ossuary_pays_for_corpses():
+    world = arena(relics=("ossuary",))
+    gold = world.gold
+    for _ in range(8):
+        world._relic("corpse")
+    assert world.gold == gold + 20
+
+
+def test_the_martyrs_standard_charges_the_attuned_for_curses():
+    world = arena(relics=("standard",))
+    tower = world.build("arrow", floor(world, 1)[0])
+    world.attune(tower.id)
+    world.towers[tower.id].charges = 1.0
+    for _ in range(4):
+        world._relic("curse")
+    assert world.towers[tower.id].charges == 2.0
+
+
+def test_the_penitent_pays_in_spikes_for_curses():
+    world = arena(relics=("penitent",))
+    assert arena().mana_max - world.mana_max == 10.0
+    gold = world.gold
+    for _ in range(5):
+        world._relic("curse")
+    assert world.gold == gold + 100
+
+
+def test_the_ash_tithe_pays_for_debuffs():
+    world = arena(relics=("ash_tithe",))
+    gold = world.gold
+    for _ in range(8):
+        world._relic("debuff")
+    assert world.gold == gold + 10
+
+
+def test_the_crucible_charges_the_attuned_for_debuffs():
+    world = arena(relics=("crucible",))
+    tower = world.build("arrow", floor(world, 1)[0])
+    world.attune(tower.id)
+    world.towers[tower.id].charges = 1.0
+    for _ in range(6):
+        world._relic("debuff")
+    assert world.towers[tower.id].charges == 2.0
+
+
+def test_the_last_hymn_wells_mana_for_leaks():
+    world = arena(relics=("last_hymn",))
+    assert arena().mana_max - world.mana_max == 5.0
+    world.mana = 0.0
+    world._relic("leak")
+    assert world.mana == 0.0
+    world._relic("leak")
+    assert world.mana == 20.0
+
+
+def test_the_widows_tithe_pays_for_leaks():
+    world = arena(relics=("widows_tithe",))
+    gold, lives = world.gold, world.lives
+    for _ in range(3):
+        world._relic("leak")
+    assert world.gold == gold + 30
+    assert world.lives == lives - 1
+
+
+def test_the_sky_charter_calls_meteor_and_orb_with_no_unlock():
+    bare = arena()
+    bare.perks = perks(set())
+    assert "meteor" not in bare.spells and "orb" not in bare.spells
+    with pytest.raises(Refused):
+        bare.meteor(0.0, 0.0)
+    world = arena(relics=("sky_charter",))
+    world.perks = perks(set())
+    world.mana = world.mana_max
+    assert "meteor" in world.spells and "orb" in world.spells
+    world.meteor(0.0, 0.0)
+    world.mana = world.mana_max
+    world.orb(0.0, 0.0)
+    gold = world.gold
+    for _ in range(8):
+        world._relic("cast")
+    assert world.gold == gold + 12
+
+
+def test_the_tower_charters_raise_their_towers_anywhere():
+    pairs = {"storm_charter": ("storm",), "hook_charter": ("hook", "knife"),
+             "grove_charter": ("grove", "effigy"), "altar_charter": ("altar",)}
+    for key, kinds in pairs.items():
+        bare = arena()
+        bare.perks = perks(set())
+        with pytest.raises(Refused):
+            bare.build(kinds[0], floor(bare, 1)[0])
+        world = arena(relics=(key,))
+        world.perks = perks(set())
+        for kind, tile in zip(kinds, floor(world, 2)):
+            assert world.build(kind, tile).kind.key == kind
+        narrow = replace(bare.location, arsenal=replace(bare.location.arsenal, towers=("arrow",)))
+        shut = World(narrow, seed=1)
+        shut.gold = 10000
+        tile = next((x, y) for y in range(14) for x in range(25) if shut.buildable(x, y))
+        with pytest.raises(Refused):
+            shut.build(kinds[0], tile)
+        lean = World(narrow, seed=1, relics=(key,))
+        lean.gold = 10000
+        assert lean.build(kinds[0], tile).kind.key == kinds[0]
+
+
+def test_the_bone_charter_bursts_amplified_deaths_with_no_skill():
+    world = arena(relics=("bone_charter",))
+    world.call_wave()
+    while len([m for m in world.monsters if m.hp > 0]) < 2:
+        world.step()
+    victim, witness = [m for m in world.monsters if m.hp > 0][:2]
+    witness.hp = witness.max_hp
+    witness.s = victim.s
+    victim.amplified, victim.amplify = 2.0, 0.3
+    hurt = witness.hp
+    world._hurt(victim, 10000, Element.PHYSICAL)
+    assert world.verb_count["corpse"] == 1
+    assert witness.hp < hurt   # the 8% burst reached the witness
+
+
+def test_the_plague_charter_passes_one_stack_with_no_skill():
+    world = arena(relics=("plague_charter",))
+    world.call_wave()
+    while len([m for m in world.monsters if m.hp > 0]) < 2:
+        world.step()
+    dying, heir = [m for m in world.monsters if m.hp > 0][:2]
+    heir.s = dying.s
+    dying.poison = [(1.0, 5.0), (1.0, 5.0)]   # two stacks held: the charter passes one
+    world._hurt(dying, 10000, Element.PHYSICAL)
+    assert len(heir.poison) == 1   # one stack, not the whole dose
+
+
+def test_the_journeymans_seal_buys_the_second_rank_with_no_adept():
+    bare = arena()
+    tower = bare.build("arrow", floor(bare, 1)[0])
+    assert bare.rank_needs(tower) is not None
+    with pytest.raises(Refused):
+        bare.upgrade(tower.id)
+    world = arena(relics=("journeyman",))
+    tower = world.build("arrow", floor(world, 1)[0])
+    assert world.rank_needs(tower) is None
+    world.upgrade(tower.id)
+    assert world.towers[tower.id].level == 1
