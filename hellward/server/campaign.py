@@ -43,7 +43,7 @@ from hellward.sim.xp import xp_next
 from hellward.story import LAST_PAGES, STORIES, Story
 
 ARSENAL = ("arrow", "ballista", "hook", "knife", "pyre", "storm", "frost", "plague", "altar", "grove", "idol",
-           "censer", "gate", "smite", "hymn", "meteor", "orb")
+           "censer", "well", "effigy", "gate", "smite", "hymn", "meteor", "orb")
 ELEMENT_NAMES = {Element.PHYSICAL: "Physical", Element.FIRE: "Fire", Element.LIGHTNING: "Lightning",
                  Element.COLD: "Cold", Element.POISON: "Poison", Element.BONE: "Bone", Element.NATURE: "Nature"}
 NAME_LIMIT = 24
