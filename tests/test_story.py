@@ -25,3 +25,9 @@ def test_every_page_has_its_painted_panel_in_the_client():
     for story in STORIES.values():
         for page in story.pages:
             assert (PANELS / f"{page.key}.jpg").is_file(), page.key
+
+
+def test_every_page_balances_its_quotes():
+    for story in STORIES.values():
+        for page in story.pages:
+            assert " ".join(page.text).count('"') % 2 == 0, page.key

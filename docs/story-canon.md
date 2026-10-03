@@ -119,10 +119,12 @@ the Travincal words means the leaders the player fights, whatever their kinds.
 Accepted veil — the white-and-gold models carry it. [ELDER-1]
 
 **The Council.** The High Council kept the mother lamp carelessly for years; its
-oil was already low when his letter came. The Zakarum church has fallen — its
-zealots serve the coming dark knowingly — which is why the Council let him in
-and fights for him openly. The secrecy of the draining is for the city, not
-the Council: Kurast must not notice until it is dark. [COUNCIL-1]
+oil was already low when his letter came, and they let him in — flattered,
+neglectful, and duped: he told them the keeper comes to put the lamp out, and
+they believed him. The Zakarum church itself has fallen — its zealots serve
+the coming dark knowingly. The secrecy of the draining is for everyone: the
+Council thinks he tends the lamp; Kurast must not notice until it is dark.
+[COUNCIL-1]
 
 **His plan, in order.** First the nearer door: open Tristram's, let Azazel
 through, and let the lamp go out in the flood. Only when the door shut on

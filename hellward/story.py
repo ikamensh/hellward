@@ -84,7 +84,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "carved with the cathedral's seal.",
         "Dawn came grey over the ashes. Akara turned the dead shaman's charms over, one by one, and held up a finger "
         "bone carved with the cathedral's seal. \"Dawn, keeper,\" she said. \"Here is your answer. It was a priest's "
-        "gift.",
+        "gift.\"",
         "The Fallen had not climbed on their own, and the dead had not walked. Someone had sent them up — through the "
         "cellars, out of the churchyard.",
         refs=("seal",))),
@@ -203,14 +203,14 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "piers the Flayers are waiting, lordless since Azazel fell, and their shaman is already singing.",
         "A pale man in bone armour watches you land. \"I am a priest of Rathma,\" he says. \"Your enemy stole our "
         "art. Let me lend it back to you as the Bone Altar.\"",
-        "The Bone Priest's acolytes walk with every host, carrying his words ahead of them.",
+        "The Bone Priest's acolytes carry his words ahead of every host.",
         refs=("necromancer",))),
     Story("docks/after", 2, _page(
         "docks-after",
         "The necromancer kneels on a wet pier among small dead jungle fiends, closing their eyes with two fingers, "
         "wearing ribcage bone armour with skull motifs, matte yellowed bone, nothing plate-like.",
         "The shaman's song stopped. The necromancer knelt among the Flayers and closed their eyes. \"Twice his shaman "
-        "raised them on the priest's stolen art,\" he said. \"Each time, fewer of them came back.",
+        "raised them on the priest's stolen art,\" he said. \"Each time, fewer of them came back.\"",
         "\"He is not raising the dead. He is spending them.\"",
         "\"And his bones will never show him you. They show all that is settled — every stone, every tower, every "
         "demon. They cannot show the light itself — unless the light chooses to be shown.\"",
@@ -238,7 +238,8 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "A jungle path under green gloom; zealots in white and gold march in file; an inquisitor raises a hand, and a "
         "violet rune circle burns on the ground ahead of him.",
         "The jungle closes over the path. Zealots of the fallen Zakarum church march through it in white and gold, and "
-        "their inquisitors curse without a word of prayer.",
+        "their inquisitors curse without a word of prayer. They sang the old hymns as they marched, to words you did "
+        "not know.",
         "There will be no chant to warn you — only the mark on the ground, long before the curse falls.",
         refs=())),
     Story("jungle/after", 2, _page(
@@ -262,7 +263,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "A flooded shrine; the water glows warm red; the necromancer lifts wet fingers to his lips, wearing ribcage "
         "bone armour with skull motifs at shoulder and knee, matte yellowed bone, nothing plate-like.",
         "In a flooded shrine the water was warm and red. The necromancer tasted it and spat. \"Lamp oil,\" he said. "
-        "\"The mother lamp's.",
+        "\"The mother lamp's.\"",
         "\"He is not putting it out. He is draining it, a little each night, so the city will not notice until it is "
         "dark.\"",
         refs=("necromancer",))),
@@ -272,7 +273,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "glowing in his hand; high above them hangs the mother lamp, dying: its glass nearly black, only a thin red "
         "ember line still burning inside. No candles, no other light.",
         "The High Council meets on the temple terrace under the mother lamp: a row of elders in gold, and every one of "
-        "them curses. They let him in with open eyes.",
+        "them curses.",
         "They have waited for you. The Bone Priest has told them you come to put the lamp out. He promised Azazel "
         "an hour, and Azazel is dust in a shut door.",
         "The Council gave him the keeping of the lamp. But the old towers answer the flame, and his hands are empty.",
@@ -283,7 +284,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
         "thin gap, the mother lamp sunk to a red ember in dark glass and the glint of violet light on a gold floor. No "
         "candles, no other light.",
         "The last elder fell on the temple stairs. Above them the mother lamp hung dim and red, its oil almost gone. "
-        "The temple doors swung shut by themselves.",
+        "The temple doors swung nearly shut by themselves.",
         "Behind them, on the temple floor, you could hear bones being cast, again and again.",
         "Behind you, up the temple road, the eldest druid was coming with his cask of oil.",
         refs=("mother_lamp",))),
@@ -310,7 +311,7 @@ STORIES: dict[str, Story] = {s.key: s for s in (
              "lantern, seen from behind.",
              ("The last of the oil burned out, and the mother lamp guttered and went out, and the temple was dark but "
               "for your lantern — which burns on keeping, not oil. Across the sea, every daughter lamp went out with "
-              "her.",),
+              "her. The dark was brief; the doors barely stirred.",),
              ("you", "mother_lamp")),
         Page("act2-end-3",
              "The keeper holds the lantern up to the great lamp while the eldest druid pours oil from a wooden flask; "
