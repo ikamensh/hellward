@@ -1303,7 +1303,7 @@ func _refresh_card() -> void:
 		_mode.text = "AIMS %s · M" % _mode_name(t.mode).to_upper()
 		_mode.disabled = world.demo
 	var craft: Dictionary = world.start.get("attune", {})
-	_attune.visible = bool(craft.get("unlocked", false)) and not t.attuned
+	_attune.visible = bool(craft.get("unlocked", false)) and not t.attuned and t.attunable
 	if _attune.visible:
 		_attune.text = "ATTUNE · T   %d" % int(craft["gold"])
 		_attune.tooltip_text = "Hold charges for empowered shots, spent where they kill."

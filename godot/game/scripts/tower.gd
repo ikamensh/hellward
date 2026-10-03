@@ -21,6 +21,7 @@ var kind: String
 var mode := "first"               # its strategy, from its facts and the mode event
 var attuned := false              # whether it holds charges, from its frames
 var charges := 0.0
+var attunable := true             # whether its shots spend charges: the card's ATTUNE shows only then
 var tile: Vector2i
 var rank := 0
 var spent := 0
@@ -181,6 +182,7 @@ func sync(entry: Array) -> void:
 	refund = int(entry[7])
 	attuned = bool(entry[8])
 	charges = float(entry[9])
+	attunable = entry.size() <= 10 or bool(entry[10])
 	_sing(hymn > 0.0)
 
 

@@ -56,8 +56,10 @@ func _lay() -> void:
 		inner.add_child(Ui.paragraph("Your first run: hold %s. Spend points on the tree before you go." % [at], 22,
 			Style.GOLD, 880, HORIZONTAL_ALIGNMENT_CENTER))
 	for held in data["relics"]:
-		inner.add_child(Ui.paragraph("%s — %s" % [String(held["name"]), String(held["words"])], 20,
-			Style.PALE_GOLD, 880, HORIZONTAL_ALIGNMENT_CENTER))
+		var line := "%s — %s" % [String(held["name"]), String(held["words"])]
+		if int(held["every"]) > 0:
+			line += " (%d/%d)" % [int(held["count"]) % int(held["every"]), int(held["every"])]
+		inner.add_child(Ui.paragraph(line, 20, Style.PALE_GOLD, 880, HORIZONTAL_ALIGNMENT_CENTER))
 	col.add_child(PauseScreen.card(inner, 960))
 	if not (data["offer"] as Array).is_empty():
 		col.add_child(PauseScreen.gap(6))
