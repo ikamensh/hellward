@@ -137,7 +137,9 @@ def test_defend_in_a_run_guards_its_location_and_its_fight(client):
     with pytest.raises(WireRefused, match="Finish the defence"):
         client.request("defend", location="tristram")
     assert len(client.request("summon_preview")["stakes"]) == 3
-    assert client.request("abandon") == {"banked": 0}
+    assert client.request("abandon") == {"banked": 0}   # the defence waits in the save
+    assert client.request("run")["active"] is True
+    assert client.request("abandon") == {"banked": 0}   # at the camp, the run ends
     assert client.request("run") == {"active": False}
 
 
@@ -252,6 +254,22 @@ def test_a_saves_resume_replays_the_log_exactly_mid_wave_included(tmp_path):
     battle.advance(100)
     resumed.advance(100)
     assert _snapshot(resumed.world) == _snapshot(battle.world)
+
+
+def test_defend_returns_to_a_waiting_defence_instead_of_a_fresh_one(tmp_path):
+    data = tmp_path / "data"
+    first = campaign_at(data)
+    first.start_run(seed=11)
+    battle = first.defend("tristram")
+    battle.advance(250)
+    at_quit = battle.world.time
+    assert at_quit > 1.0
+    first.abandon()
+    assert first.run is not None   # quitting keeps the run
+    second = campaign_at(data)
+    back = second.defend("tristram")   # not resume: defend itself returns
+    assert back.world.time > 0.0 and back.world.time <= at_quit
+    assert back.world.time >= at_quit - 1.0   # never more than a second rewound
 
 
 def test_resume_refuses_without_a_run_a_defence_or_a_quiet_battle(tmp_path):

@@ -146,14 +146,17 @@ class Campaign:
         return self.run_view()
 
     def abandon(self) -> dict:
-        """Leave a live defence, or the run at a camp: a run's salvage stays in the profile's purse."""
+        """Leave a live defence: a run's defence waits in its save for the return; a run at a camp ends, its
+        salvage staying in the profile's purse."""
         if self.run is None:
             self.battle = None
             return {}
+        if self.battle is not None:   # the save's Kit and log wait: quitting never rewinds past them
+            self.battle = None
+            return {"banked": 0}
         banked = self.run.salvage
         self.progress.salvage += banked
         self.progress.save()
-        self.battle = None
         self.run = None
         self._save_run()
         return {"banked": banked}
@@ -478,6 +481,9 @@ class Campaign:
                 raise Refusal("This run is over. Abandon it and start another.")
             if loc.key != run.location.key:
                 raise Refusal(f"The run is at {run.location.called}.")
+            saved = self.saves.load(slot_for_run(self.progress.profile))
+            if player is None and saved is not None and saved["state"]["kit"] is not None:
+                return self._resume_battle(saved)   # an interrupted defence waits: never a fresh one
             dealt = kit(run)
             scripted = PLAYERS[player](dealt.seed) if player is not None else None
             self.battle = Battle(loc, seed=dealt.seed, planner=self.planner, player=scripted,
@@ -513,13 +519,17 @@ class Campaign:
         saved = self.saves.load(slot_for_run(self.progress.profile))
         if saved is None or saved["state"]["kit"] is None or saved["state"]["log"] is None:
             raise Refusal("No defence to resume.")
+        return self._resume_battle(saved).start()
+
+    def _resume_battle(self, saved: dict) -> Battle:
+        assert self.run is not None
         dealt = Kit.from_json(saved["state"]["kit"])
         self.battle = Battle(dealt.location, seed=dealt.seed, planner=self.planner,
                              replays=self.data / "replays", on_outcome=self._keep_run, kit=dealt,
                              run_seed=self.run.seed, run_index=self.run.index, drawn=self.run.drawn,
                              on_save=self._save_battle)
         self.battle.resume_from(saved["state"]["log"], self.planner)
-        return self.battle.start()
+        return self.battle
 
     def summon_preview(self) -> dict:
         """Every stake's bonus wave on the table now: its pack, its wager, and what a clean clear pays."""
