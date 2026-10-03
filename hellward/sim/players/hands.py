@@ -195,12 +195,15 @@ class Hands:
 def reference_kit(location: Location, learned: frozenset[str], seed: int, *,
                 loadout: Loadout = EMPTY_LOADOUT, gold: int | None = None,
                 lives: int | None = None, relics: tuple[str, ...] = (),
-                counters: tuple[tuple[str, int], ...] = ()) -> Kit:
+                counters: tuple[tuple[str, int], ...] = (),
+                xp: float = 0.0, level: int = 1) -> Kit:
     """The Kit today's convention deals: the location's start gold and sanctuary lives, the learned skills,
-    and the seed. The per-location tools deal from here, so one defence then and now starts the same."""
+    and the seed. The per-location tools deal from here, so one defence then and now starts the same. The
+    run's level and progress ride along (a duel deals the campaign's arrival, not a fresh run)."""
     return Kit(location=location, learned=learned, loadout=loadout, seed=seed,
                gold=location.start_gold if gold is None else gold,
-               lives=START_LIVES if lives is None else lives, relics=relics, counters=counters)
+               lives=START_LIVES if lives is None else lives, relics=relics, counters=counters,
+               xp=xp, level=level)
 
 
 def defend(kit: Kit, player: Player, *, planner: Planner | None, hardness: float = 1.0,

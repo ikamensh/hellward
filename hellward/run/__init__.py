@@ -174,6 +174,23 @@ def add_xp(run: Run, amount: float) -> tuple[Run, int]:
     return run, gained
 
 
+def location_xp(key: str) -> float:
+    """The XP a packless perfect defence of ``key`` awards: every group's kills, every wave's clear."""
+    location = LOCATIONS[key]
+    return sum(sum(group.count * kill_xp(MONSTERS[group.kind].hp) for group in wave.groups)
+               + clear_xp(number) for number, wave in enumerate(location.waves, start=1))
+
+
+def arrival(key: str) -> tuple[int, float]:
+    """The (level, xp) a packless perfect run carries into ``key``: the earlier locations' XP, levelled."""
+    total = sum(location_xp(earlier) for earlier in ORDER[:ORDER.index(key)])
+    level, need = 1, xp_next(1)
+    while total + 1e-9 >= need:
+        total, level = total - need, level + 1
+        need = xp_next(level)
+    return level, total
+
+
 def lives_sigils(lost: int) -> int:
     """The lives sigils: three for none lost, then by the tuning's thresholds."""
     return sum(1 for most in SIGIL_LOST if lost <= most)

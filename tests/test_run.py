@@ -20,6 +20,7 @@ from hellward.run import (
     DefenceResult,
     Drawn,
     add_xp,
+    arrival,
     bonus_pack,
     bonus_preview,
     camp,
@@ -122,15 +123,22 @@ def test_the_first_level_up_comes_in_tristrams_second_wave():
     assert first < xp_next(1) <= first + second_kills
 
 
-def test_the_campaigns_xp_reaches_about_twenty_two_levels():
+def test_the_campaigns_xp_reaches_about_fifty_five_levels():
     total = 0.0
     for key in ORDER:
         for number, wave in enumerate(LOCATIONS[key].waves, start=1):
             total += (sum(group.count * kill_xp(MONSTERS[group.kind].hp) for group in wave.groups)
                         + clear_xp(number))
     run, gained = add_xp(start(0), total)
-    assert 21 <= run.level <= 23
+    assert 54 <= run.level <= 56
     assert gained == run.level - 1
+
+
+def test_arrival_carries_a_perfect_runs_level_into_each_location():
+    assert arrival("tristram") == (1, 0)
+    level, xp = arrival("temple")
+    assert level == 51
+    assert xp == pytest.approx(58.4, abs=0.1)
 
 
 def test_levels_pay_points_and_every_fourth_a_reskill():

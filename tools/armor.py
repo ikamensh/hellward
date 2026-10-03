@@ -7,7 +7,8 @@ Each duel pits two builds of exactly equal gold against each other: pure arrows 
 ballistae, at 3:2 counts (three arrows-III cost what two ballistae-III do, at every rank). Both are
 physical, both stand on the same tiles (the warden's draft, which follows the current maps), and both
 are piloted by the planned player with the location's calls; only the hits differ (2 against 7). Armor
-takes 2 off every hit at hells_gate, 3 at the temple; the caves, without armor, are the control.
+takes 2 off every hit at hells_gate, 3 at the temple; the caves, without armor, are the control. Both
+arrive at the campaign's level for the location, so a duel's mid-battle level-ups are a run's.
 
 Hells_gate fights capped at rank I (108 gold): ranks would let the arrows escape armor 2, and the
 early economy cannot pay them anyway. The temple fights full builds to rank III (300 gold with its one
@@ -24,10 +25,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from hellward.run import arrival  # noqa: E402
 from hellward.sim import planner  # noqa: E402
 from hellward.sim.campaign import LOCATIONS, ORDER  # noqa: E402
 from hellward.sim.content import TOWERS  # noqa: E402
 from hellward.sim.model import DOOR  # noqa: E402
+from hellward.sim.skills import RANK_SKILL, TREE_COST  # noqa: E402
 from hellward.sim.players.hands import defend, reference_kit  # noqa: E402
 from hellward.sim.players.planned import Plan, Planned, load  # noqa: E402
 from hellward.sim.players.warden import draft_build  # noqa: E402
@@ -73,7 +76,8 @@ def capped(location: str, count: int) -> tuple[Plan, Plan]:
 
 
 def full(location: str, count: int) -> tuple[Plan, Plan]:
-    """Two builds to rank III of exactly equal gold, with the location's gates, skills and calls."""
+    """Two builds to rank III of exactly equal gold, with the location's gates, skills and calls. Each build
+    carries its own kind's rank skills (the searched list only ranks what the searched build ranks)."""
     assert count % 3 == 0, count
     base = load(location)
     ground = tiles(location)
@@ -84,7 +88,11 @@ def full(location: str, count: int) -> tuple[Plan, Plan]:
         steps = [s for s in base.steps if s[0] == "gate"]
         steps += [("build", kind, t) for t in use]
         steps += [("rank", t) for t in use] + [("rank", t) for t in use]
-        out.append(Plan(skills=list(base.skills), steps=steps, calls=list(base.calls), rebuild=base.rebuild,
+        skills = list(base.skills)
+        for extra in RANK_SKILL.get(kind, ()):
+            if extra not in skills:
+                skills.append(extra)
+        out.append(Plan(skills=skills, steps=steps, calls=list(base.calls), rebuild=base.rebuild,
                         smite_worth=base.smite_worth, meteor_worth=base.meteor_worth, orb_worth=base.orb_worth,
                         reserve=base.reserve))
     assert plan_cost(out[0].steps) == plan_cost(out[1].steps)
@@ -92,16 +100,18 @@ def full(location: str, count: int) -> tuple[Plan, Plan]:
 
 
 def duel(location: str, make, count: int, seeds: list[int]) -> tuple[list[str], list[str], int]:
-    """A location's duel: both builds' outcomes over ``seeds``, and the gold they cost."""
+    """A location's duel: both builds' outcomes over ``seeds``, and the gold they cost. Both arrive at the
+    campaign's level for the location, so mid-battle level-ups refill mana the way a run's do."""
     plans = make(location, count)
     cost = plan_cost(plans[0].steps)
+    level, xp = arrival(location)
     outs = []
     for plan in plans:
         row = []
         for seed in seeds:
-            learned = plan.learn(99, ORDER.index(location))
-            world, record = defend(reference_kit(LOCATIONS[location], learned, seed), Planned(plan=plan),
-                                   planner=planner.smart)
+            learned = plan.learn(TREE_COST, ORDER.index(location))
+            kit = reference_kit(LOCATIONS[location], learned, seed, xp=xp, level=level)
+            world, record = defend(kit, Planned(plan=plan), planner=planner.smart)
             row.append(f"{world.outcome[0]}{world.lives}")
         outs.append(row)
     return outs[0], outs[1], cost
