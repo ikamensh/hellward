@@ -25,15 +25,17 @@ keeper's keeping. A flame given into keeping burns on keeping from that hour —
 oil cannot starve it afterwards. That is why it survives the mother lamp's
 going out, when every oil flame lit from her dies. [LANT-2]
 
-**The chain.** When the mother lamp goes out, every daughter dies with her.
-Akara's candle burns through the dark on keeping alone, and from it she
-lights Tristram's lamp again once the mother burns. [MOTH-1]
+**The chain.** When the mother lamp goes out, every daughter dies with her;
+when she burns again, every daughter catches with her. Akara's candle burns
+through the dark on keeping alone, and beside it she watches Tristram's lamp
+catch. [MOTH-1]
 
 **The keeping.** The keeping passes from keeper to keeper, night by night;
 tonight it is yours. Akara can mind a lamp, but the old towers answer only the
-keeper. [KEEPER-2] And the keeping holds its keeper past death: that is how one
-priest kept Tristram's lamp nine hundred years, and why he walks still, a
-skeleton who cannot lay the office down. [KEEP-1]
+keeper. [KEEPER-2] The keeping holds its keeper past death: it held him long
+while he lived — nine hundred years alive — and when he stopped keeping, he
+died of it, but the keeping would not let him go. That is why he walks still,
+a skeleton who cannot lay the office down. [KEEP-1]
 
 **What each defence defends.** Every map ends at a sanctuary chapel, and the
 keeper sets the lantern down burning in it while working. The red orb is that
@@ -99,7 +101,11 @@ keeper no longer, but king of what comes through. [CROWN-1]
 
 **His voice.** His taunts run ahead of every host, carried by his acolytes on
 the eve of battle; the briefings stage them as his voice. That is how he
-taunts fights he does not attend. [TAUNT-1]
+taunts fights he does not attend. His taunts menace and sometimes bluff;
+pages and lessons teach the truth. [TAUNT-1] The prologue's beam is his will
+shown plainly, in the visions' figurative register; in battle the curses fall
+through his acolytes and leaders — he fights in person first, and only, at
+the temple. [CURSE-1]
 
 **The flame answers.** The towers answer the flame-bearer. The Council may
 give him the keeping of the lamp, but his hands are empty, and the old towers
@@ -255,9 +261,10 @@ text — verify on a full walk with panels open.)*
 
 ## Open questions
 
-Iteration 1 closed 1–7 (applied + committed 05cb5af; re-check verified the
-core lands). What follows is iteration 2, from the re-check reports (R1 = the
-rule the telling must still earn, with its canon tag).
+Iterations 1–2 applied and committed (05cb5af, bfa22ba); iteration 3 applied
+and committed (2bbd9da). Iteration 4 (below) answers the I3 critic's verified
+findings; its two misquotes ("spending an army", the jungle tooltip) matched
+already-fixed text and are marked [STALE] where they would have appeared.
 
 1. LANT-2 bridge: the lantern is lit as oil-flame but burns oil-less. Needs
    the transition stated (Akara: keeping feeds it from that hour). [R1/LANT-2]
@@ -296,10 +303,25 @@ rule the telling must still earn, with its canon tag).
 17. **Accepted, no telling change:** keeper's origin blank (deliberate,
     KEEPER-1); "my lamp" first-read (resolves at hells_gate); elders veil
     (ELDER-1); boat off-frame (moored hulls at act1-end-3's right edge);
-    Azazel's body behind the shut door; gargoyles "hang"→"roost" (trivial,
-    batched); necromancer's thin past (his payoff is the bones' rule);
-    prologue skeletons (both sides raise dead); Blood Bat's small model.
-18. **CLOSED by this canon:** orb fiction (ORB-1/LANT-1), wake-vs-build
+    Azazel's body behind the shut door; necromancer's thin past (his payoff
+    is the bones' rule); prologue skeletons (both sides raise dead); Blood
+    Bat's small model; travincal bargain as dramatic irony (the new taunt is
+    non-empty; the old hollowness is gone); oil timing as race structure (you
+    arrive as it runs out); Council zealotry needs no motive beyond faith;
+    uniform objectives (genre; per-fight objectives would be a game change);
+    lessons teach mechanics by design (drowned briefing); Abominations
+    off-panel at the stair (words may exceed the panel).
+18. **Iteration 4 (applied, uncommitted):** docks-after bone repaint;
+    caves-after crowned waiter; docks-before wingless Flayers; KEEP-1
+    (died of stopping, keeping holds him); MOTH-1 (daughters catch with
+    mother, Akara witnesses); TAUNT-1 bluff clause; CURSE-1 (prologue beam
+    figurative); taunt-carrier named; daughters catch + Akara witnesses;
+    lantern lifted (the light's choice); Council oil + frame-up; master/hound
+    seniority; own door; jungle taunt silence-fix; died-of-stopping;
+    inciting cause; Abominations among the dead; temple floor; black sails;
+    crossing nights; a set of bones; "let me look"; Tristram kept by him
+    (travincal taunt).
+19. **CLOSED by this canon:** orb fiction (ORB-1/LANT-1), wake-vs-build
     (TOWER-1/TOWER-2), priest's motive (PRIEST-1), why the bones never show
     the keeper (BONES-1), the lantern's survival (LANT-2), the chain
     (MOTH-1), his release (REL-1), his voice (TAUNT-1), the flame answers
@@ -349,5 +371,6 @@ rule the telling must still earn, with its canon tag).
    holes, extended impressions, new ledger entries).
 6. **Blind-check**: a subagent walks the touched arc with panels only (it must
    not open this canon, `docs/story.md`, or any source file) and reports what
-   it understood. Its report goes into the iteration notes; misses become new
-   Open questions.
+   it understood. Verify every quote in its report against the files before
+   acting — blind agents can misquote from false memory. Its report goes into
+   the iteration notes; verified misses become new Open questions.

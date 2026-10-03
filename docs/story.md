@@ -62,7 +62,7 @@ gauge. `stills` re-renders the stills into `hellward/assets/story/` after visual
 | Hell's Gate | In every night I have seen, the lamp goes out. I have begun to wonder what I have not seen. |
 | Kurast Docks | You crossed a sea for a lamp that is not yours. My shaman will raise every Flayer you leave whole. |
 | The Spider Forest | The old trees have taken your side. Stand close to them, then. One curse will find you all. |
-| The Flayer Jungle | My inquisitors do not chant. You will know their curse when the ground burns under your towers, and not before. |
+| The Flayer Jungle | My inquisitors do not chant. You will know their curse when the ground burns under your towers, and no chant before it. |
 | The Drowned City | The Hulks were drowned men once. They do not tire, and your gates are cloth to them. |
-| Travincal | Turn back, and I will leave Tristram's lamp alone. It is a small lamp. No one would miss it. |
+| Travincal | Turn back, and when the mother dies I will keep Tristram's little lamp myself. No one would miss it. |
 | The Temple of Light | I have done with bones. Come, keeper. Let me look at you myself, while the temple still stands. |
