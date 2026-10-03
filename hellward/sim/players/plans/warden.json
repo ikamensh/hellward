@@ -270,7 +270,7 @@
  },
  "docks/33": {
   "early": 0.9,
-  "map": "98ba996dda60",
+  "map": "b55a7063e8aa",
   "searched": {
    "leaders": "greedy",
    "life": 1.269,
@@ -346,7 +346,7 @@
  },
  "drowned_city/53": {
   "early": 0.7,
-  "map": "29fd2ea4d5bf",
+  "map": "def4ccaffa60",
   "searched": {
    "leaders": "greedy",
    "life": 1.022,
@@ -603,7 +603,7 @@
  },
  "jungle/45": {
   "early": 0.9,
-  "map": "c5ce1baccd9e",
+  "map": "fc831a7ccae4",
   "searched": {
    "leaders": "greedy",
    "life": 1.102,
@@ -672,7 +672,7 @@
  },
  "spider_forest/37": {
   "early": 0.9,
-  "map": "d511e04b3700",
+  "map": "30274744c1cb",
   "searched": {
    "leaders": "greedy",
    "life": 1.526,
@@ -728,7 +728,7 @@
  },
  "temple/63": {
   "early": 0.5,
-  "map": "27e052a998e0",
+  "map": "e71d51f56f55",
   "searched": {
    "leaders": "greedy",
    "life": 1.022,
@@ -813,7 +813,7 @@
  },
  "travincal/56": {
   "early": 0.7,
-  "map": "4239a260882e",
+  "map": "8f20b8d3d7e0",
   "searched": {
    "leaders": "greedy",
    "life": 1.0,
