@@ -71,7 +71,7 @@ def test_a_real_defence_counts_kills_clears_and_levels():
     world, _ = defend(reference_kit(LOCATIONS["tristram"], player.draft(LOCATIONS["tristram"], 0), 1),
                       player, planner=planner.smart, watch=lambda w: seen.extend(w.events))
     assert world.outcome == "victory"
-    assert world.xp > clear_xp(1)
+    assert world.xp_total > clear_xp(1)
     assert world.xp_level >= 2
     assert ("level_up", 2) in seen
 

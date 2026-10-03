@@ -297,6 +297,34 @@ def tree_too_dear() -> Result:
                   f"{TREE_COST}/{perfect} = {TREE_COST / perfect:.2f}x", TREE_COST >= 2.5 * perfect)
 
 
+def xp_bar() -> list[Result]:
+    """M2's bar: the first level-up lands in Tristram's second wave, the campaign's kills and clears reach
+    about fifty-five levels by the Temple, and a level-up refills the mana orb and tells the view."""
+    from hellward.sim.model import World  # noqa: E402
+    from hellward.sim.xp import XP_NEXT_BASE, XP_NEXT_GROWTH, clear_xp, kill_xp, xp_next  # noqa: E402
+
+    waves = LOCATIONS["tristram"].waves
+    first = sum(g.count * kill_xp(MONSTERS[g.kind].hp) for g in waves[0].groups) + clear_xp(1)
+    second = sum(g.count * kill_xp(MONSTERS[g.kind].hp) for g in waves[1].groups) + clear_xp(2)
+    total = sum(sum(g.count * kill_xp(MONSTERS[g.kind].hp) for g in w.groups) + clear_xp(n)
+                for location in LOCATIONS.values() for n, w in enumerate(location.waves, start=1))
+    level, need, spent = 1, XP_NEXT_BASE, 0.0
+    while spent + need <= total:
+        spent += need
+        level += 1
+        need = XP_NEXT_BASE + XP_NEXT_GROWTH * (level - 1) * (level - 1)
+    world = World(LOCATIONS["tristram"], seed=1)
+    world.mana = 5.0
+    world._earn(xp_next(1) + 1.0)
+    refills = world.mana == world.mana_max and ("level_up", 2) in world.events
+    return [Result("M2", "first level-up in Tristram's second wave",
+                   f"wave one {first:.0f} < {XP_NEXT_BASE:.0f} <= {first + second:.0f} waves one and two",
+                   first < XP_NEXT_BASE <= first + second),
+            Result("M2", "levels by the Temple", f"{level} over {total:.0f} XP", 50 <= level <= 60),
+            Result("M2", "a level-up refills the mana orb and tells the view",
+                   "mana full, level_up told" if refills else "no refill", refills)]
+
+
 def real_estate() -> list[Result]:
     """Each map's scarce ground, by tools/maps.py: the worst map against each target."""
     maps = {key: survey(LOCATIONS[key]) for key in ORDER}
@@ -541,7 +569,7 @@ def bot_table() -> Result:
 CHECKS: tuple[Callable[[], Result | list[Result]], ...] = (
     bodies_per_wave, three_ranks, number_scale, rank_economy, no_dispel, hymn_seeks, tower_kinds, real_estate,
     worth_and_cells, blight_kinds, power_table, armor_duels, verb_rates, verb_costs, tower_verbs, verb_set,
-    relic_pool, relic_builds, bot_table,
+    relic_pool, relic_builds, bot_table, xp_bar,
 )
 
 NOT_YET = (
