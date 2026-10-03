@@ -39,6 +39,17 @@ panel shows. The Bone Priest's taunts are on the locations (`hellward/sim/campai
   - **Violet** glow is his sight.
   - **Palette:** Act I is bone, rust and dried blood; Act II is moss, black water and tarnished gilt.
 
+## Walking it as the player
+
+`tools/llm_story.py` plays the story back in the player's order for critique: the thirteen
+prologue shots, then per location its before page, its briefing (taunt, lesson, map blurb), its
+fight and its after page, each act's ending in place of its last location's after page. Each beat
+names the panel the client shows; open the path to see it. `list` names the beats, `show` prints
+one, `all` prints every one, and `--notes` adds what the painter was told. A fight beat is
+watched, not played: the level's still, its waves, the kinds walking here first (every kind is
+shown once, labeled, on the first fight's monster sheet), the track playing, and the hardship
+gauge. `stills` re-renders the stills into `hellward/assets/story/` after visual changes.
+
 ## The taunts
 
 | Location | The Bone Priest |
@@ -54,4 +65,4 @@ panel shows. The Bone Priest's taunts are on the locations (`hellward/sim/campai
 | The Flayer Jungle | My inquisitors do not chant. You will know their curse when the ground burns under your towers, and not before. |
 | The Drowned City | The Hulks were drowned men once. They do not tire, and your gates are cloth to them. |
 | Travincal | Turn back, and I will leave Tristram's lamp alone. It is a small lamp. No one would miss it. |
-| The Temple of Light | I cannot see you in the bones. So I have come to see you myself. |
+| The Temple of Light | I have done with bones. Come, keeper. Let me look at you myself, while the temple still stands. |
