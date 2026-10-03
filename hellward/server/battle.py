@@ -113,6 +113,8 @@ class Battle:
         self._dirty = False                 # the log grew since the last save
         self._warnings: list[str] = []
         self._second = -1
+        self._skip: tuple[tuple, dict | None] | None = None   # the grind offer's memo: key, offer
+        self._replaying = False           # a resume's replay steps the world: no offers are predicted
 
     def start(self) -> dict:
         message = protocol.battle_start(self.world, demo=self.player is not None and self.on_outcome is None,
@@ -143,6 +145,21 @@ class Battle:
             self.steps += 1
             frames.append(self._flush(SIM_DT))
         return frames
+
+    def _refresh_skip(self) -> None:
+        """The grind's offer, predicted at most once per wave, orders and wave state: a person's battle
+        only, never a replay (its leaders read their decisions from the log, which a prediction must not
+        drink). A prediction stands while no orders land: the live wave walks the predicted steps."""
+        world = self.world
+        if self.player is not None or self._replaying:
+            self._skip = None
+            return
+        key = (world.wave, len(self.commands), bool(world.schedule), world.bonus is None,
+               world.breach_remaining)
+        if self._skip is not None and self._skip[0] == key:
+            return
+        offer = {"wave": world.wave, "bonus": BALANCE.income_unit()} if world.predict_clean() else None
+        self._skip = (key, offer)
 
     def _flush(self, dt: float) -> dict:
         world = self.world
@@ -190,6 +207,8 @@ class Battle:
         elif self._dirty and self.on_save is not None:
             self.on_save()
             self._dirty = False
+        self._refresh_skip()
+        message["state"]["skip_offer"] = self._skip[1] if self._skip is not None else None
         return message
 
     def resume_from(self, log: dict, planner: Planner | None) -> None:
@@ -201,6 +220,7 @@ class Battle:
         self.commands = self.log["commands"]
         saved, self.on_save = self.on_save, None   # the replay regrows the log; it writes nothing
         self.world.planner = _ReplayPlanner(log["decisions"])
+        self._replaying = True
         try:
             end = log["marks"][-1] if log["marks"] else 0.0
             pending = sorted(self.log["commands"], key=lambda entry: entry[0])
@@ -215,6 +235,7 @@ class Battle:
         finally:
             self.world.planner = planner
             self.on_save = saved
+            self._replaying = False
 
     # -- Orders ---------------------------------------------------------------------------------
 
@@ -229,13 +250,14 @@ class Battle:
             raise ValueError(f"unknown battle order {name!r}")
         self._warnings = [warned for fold in self.folds
                           if (warned := fold.warn(name, args)) is not None]
+        at = self.world.time   # before the handler: a skip jumps the clock it is logged at
         try:
             logged = handler(**args)
         except Refused as refusal:
             self._warnings = []
             return str(refusal), None
         if logged is not None:
-            self.commands.append([self.world.time, name, *logged])
+            self.commands.append([at, name, *logged])
             self._dirty = True   # every accepted order joins the resume's log
         return None, self._flush(0.0)
 
@@ -326,6 +348,15 @@ class Battle:
         self.world.summon(pack)
         self.repeats += 1
         return [int(stake)]
+
+    def _skip_grind(self) -> list:
+        """Skip the surely clean wave: the offer must stand for this wave and these orders."""
+        key = (self.world.wave, len(self.commands), bool(self.world.schedule),
+               self.world.bonus is None, self.world.breach_remaining)
+        if self._skip is None or self._skip[1] is None or self._skip[0] != key:
+            raise Refused("No wave is surely clean: the grind must be fought.")
+        self.world.skip_grind()
+        return []
 
     def _ready(self, key: str) -> None:
         """An aimed spell is cast in the fight's own time, and only where it is offered; the world refuses the rest

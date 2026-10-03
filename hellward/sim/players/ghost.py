@@ -67,6 +67,8 @@ def issue(world: World, hands: Hands, name: str, args: tuple[Any, ...]) -> bool:
             hands.meteor(float(args[0]), float(args[1]))
         elif name == "orb":
             hands.orb(float(args[0]), float(args[1]))
+        elif name == "skip_grind":
+            world.skip_grind()
         else:
             raise ValueError(f"unknown replay command {name!r}")
     except Refused:
